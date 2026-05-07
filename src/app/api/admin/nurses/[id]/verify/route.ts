@@ -14,16 +14,28 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (error) return error;
 
     const { id } = await params;
-    const { status, rejectedReason } = await request.json();
+    const body = await request.json();
 
-    if (!['verified', 'rejected'].includes(status)) {
-      return createErrorResponse('حالة التوثيق غير صالحة', 400, 'VALIDATION_ERROR');
+    // Accept both 'status' and 'verificationStatus' field names
+    const status = body.status || body.verificationStatus;
+    const rejectedReason = body.rejectedReason;
+
+    if (!status || !['verified', 'rejected'].includes(status)) {
+      return createErrorResponse('حالة التوثيق غير صالحة. يجب أن تكون verified أو rejected', 400, 'VALIDATION_ERROR');
     }
 
     const update: any = { verificationStatus: status };
-    if (status === 'rejected' && rejectedReason) update.rejectedReason = rejectedReason;
+    if (status === 'rejected') {
+      update.rejectedReason = rejectedReason || '';
+    } else {
+      // Clear rejection reason when verified
+      update.rejectedReason = '';
+    }
 
-    const nurse = await Nurse.findByIdAndUpdate(id, update, { new: true }).select('-password').lean();
+    // Exclude heavy document data from response for speed
+    const nurse = await Nurse.findByIdAndUpdate(id, update, { new: true })
+      .select('-password -identityDocumentData -licenseDocumentData')
+      .lean();
     if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
 
     // Create notification for the nurse

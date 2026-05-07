@@ -6,6 +6,8 @@ import {
   Stethoscope,
   Eye,
   ShieldCheck,
+  ToggleLeft,
+  ToggleRight,
   RefreshCw,
   Phone,
   Star,
@@ -13,23 +15,17 @@ import {
   Ban,
   Trash2,
   X,
-  ChevronLeft,
-  Clock,
-  Shield,
-  CheckCircle2,
-  XCircle,
+  ZoomIn,
   AlertTriangle,
   FileText,
-  ZoomIn,
-  UserX,
-  UserCheck,
-  Search,
-  Filter,
   Loader2,
 } from 'lucide-react';
+import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
-import { GlassCard } from '@/components/common/glass-card';
+import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
+import { SearchInput } from '@/components/common/search-input';
 import { BadgeStatus } from '@/components/common/badge-status';
+import { EmptyState } from '@/components/common/empty-state';
 import { DateFormatter } from '@/components/common/date-formatter';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
@@ -47,7 +43,16 @@ import {
   DialogFooter,
   DialogDescription,
 } from '@/components/ui/dialog';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
+import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { toast } from 'sonner';
+import { useIsMobile } from '@/hooks/use-mobile';
+import type { ColumnDef } from '@tanstack/react-table';
 
 interface NurseItem {
   id: string;
@@ -87,8 +92,12 @@ const specializationLabels: Record<string, string> = {
   emergency: 'طوارئ',
 };
 
+const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
+const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
+
 export default function AdminNursesPage() {
   const authFetch = useAuthFetch();
+  const isMobile = useIsMobile();
   const [nurses, setNurses] = useState<NurseItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -96,22 +105,24 @@ export default function AdminNursesPage() {
   const [specFilter, setSpecFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
-  const [total, setTotal] = useState(0);
-
-  // View detail state
-  const [viewTarget, setViewTarget] = useState<NurseItem | null>(null);
-  const [viewLoading, setViewLoading] = useState(false);
-  const [docLoading, setDocLoading] = useState(false);
-  const [docData, setDocData] = useState<{ identityDocumentData: string | null; licenseDocumentData: string | null } | null>(null);
-
-  // Image lightbox
-  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
 
   // Verify dialog
   const [verifyTarget, setVerifyTarget] = useState<NurseItem | null>(null);
   const [verifyAction, setVerifyAction] = useState<'verify' | 'reject'>('verify');
   const [rejectedReason, setRejectedReason] = useState('');
   const [isVerifying, setIsVerifying] = useState(false);
+
+  // View drawer/dialog
+  const [viewTarget, setViewTarget] = useState<NurseItem | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+  const [docLoading, setDocLoading] = useState(false);
+  const [docData, setDocData] = useState<{ identityDocumentData: string | null; licenseDocumentData: string | null; identityDocumentUrl: string | null; licenseDocumentUrl: string | null } | null>(null);
+
+  // Image lightbox
+  const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
+
+  // Toggle confirm
+  const [toggleTarget, setToggleTarget] = useState<NurseItem | null>(null);
 
   // Block dialog
   const [blockTarget, setBlockTarget] = useState<NurseItem | null>(null);
@@ -123,40 +134,6 @@ export default function AdminNursesPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
 
-  // Toggle active
-  const [toggleTarget, setToggleTarget] = useState<NurseItem | null>(null);
-  const [isToggling, setIsToggling] = useState(false);
-
-  const fetchNurses = useCallback(async () => {
-    setIsLoading(true);
-    try {
-      const params = new URLSearchParams({
-        page: String(page),
-        limit: '12',
-        search,
-        ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
-        ...(specFilter !== 'all' ? { specialization: specFilter } : {}),
-      });
-      const res = await authFetch(`/api/admin/nurses?${params}`);
-      const json = await res.json();
-      if (json.success && json.data) {
-        const items = json.data.nurses ?? json.data;
-        setNurses(Array.isArray(items) ? items : []);
-        if (json.data.pages) setTotalPages(json.data.pages);
-        if (json.data.total) setTotal(json.data.total);
-      }
-    } catch {
-      toast.error('فشل تحميل بيانات الممرضين');
-    } finally {
-      setIsLoading(false);
-    }
-  }, [authFetch, page, search, statusFilter, specFilter]);
-
-  useEffect(() => {
-    void fetchNurses();
-  }, [fetchNurses]);
-
-  // View nurse detail
   const handleViewNurse = useCallback(async (nurse: NurseItem) => {
     setViewTarget(nurse);
     setViewLoading(true);
@@ -168,7 +145,7 @@ export default function AdminNursesPage() {
         setViewTarget({ ...nurse, ...json.data });
       }
     } catch {
-      // Keep the list data as fallback
+      setViewTarget(nurse);
     } finally {
       setViewLoading(false);
     }
@@ -190,7 +167,34 @@ export default function AdminNursesPage() {
     }
   }, [authFetch]);
 
-  // Verify/reject nurse
+  const fetchNurses = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(page),
+        limit: '10',
+        search,
+        ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+        ...(specFilter !== 'all' ? { specialization: specFilter } : {}),
+      });
+      const res = await authFetch(`/api/admin/nurses?${params}`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        const items = json.data.nurses ?? json.data;
+        setNurses(Array.isArray(items) ? items : []);
+        if (json.data.pages) setTotalPages(json.data.pages);
+      }
+    } catch {
+      toast.error('فشل تحميل بيانات الممرضين');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [authFetch, page, search, statusFilter, specFilter]);
+
+  useEffect(() => {
+    void fetchNurses();
+  }, [fetchNurses]);
+
   const handleVerify = async () => {
     if (!verifyTarget) return;
     setIsVerifying(true);
@@ -199,16 +203,13 @@ export default function AdminNursesPage() {
         method: 'PATCH',
         body: JSON.stringify({
           status: verifyAction === 'verify' ? 'verified' : 'rejected',
-          ...(verifyAction === 'reject' ? { rejectedReason } : {}),
+          ...(verifyAction === 'reject' && rejectedReason ? { rejectedReason } : {}),
         }),
       });
       const json = await res.json();
       if (json.success) {
         toast.success(verifyAction === 'verify' ? 'تم توثيق الممرض/ـة' : 'تم رفض الممرض/ـة');
         void fetchNurses();
-        if (viewTarget?.id === verifyTarget.id) {
-          setViewTarget((prev) => prev ? { ...prev, verificationStatus: verifyAction === 'verify' ? 'verified' : 'rejected' } : null);
-        }
       } else {
         toast.error(json.message ?? 'فشل العملية');
       }
@@ -221,10 +222,8 @@ export default function AdminNursesPage() {
     }
   };
 
-  // Toggle active
   const handleToggle = async () => {
     if (!toggleTarget) return;
-    setIsToggling(true);
     try {
       const res = await authFetch(`/api/admin/nurses/${toggleTarget.id}`, {
         method: 'PATCH',
@@ -238,7 +237,6 @@ export default function AdminNursesPage() {
     } catch {
       toast.error('فشل تغيير الحالة');
     } finally {
-      setIsToggling(false);
       setToggleTarget(null);
     }
   };
@@ -260,9 +258,6 @@ export default function AdminNursesPage() {
       if (json.success) {
         toast.success(isBlocked ? 'تم حظر الممرض/ـة' : 'تم إلغاء حظر الممرض/ـة');
         void fetchNurses();
-        if (viewTarget?.id === blockTarget.id) {
-          setViewTarget((prev) => prev ? { ...prev, isBlocked, blockedReason: isBlocked ? blockReason : '' } : null);
-        }
       } else {
         toast.error(json.message ?? 'فشل العملية');
       }
@@ -304,35 +299,281 @@ export default function AdminNursesPage() {
     }
   };
 
-  const getVerificationColor = (status: string) => {
-    switch (status) {
-      case 'verified': return 'text-green-600 bg-green-50 dark:bg-green-900/20 dark:text-green-400';
-      case 'pending': return 'text-amber-600 bg-amber-50 dark:bg-amber-900/20 dark:text-amber-400';
-      case 'rejected': return 'text-red-600 bg-red-50 dark:bg-red-900/20 dark:text-red-400';
-      default: return 'text-gray-600 bg-gray-50 dark:bg-gray-900/20 dark:text-gray-400';
-    }
-  };
+  const columns: ColumnDef<NurseItem, unknown>[] = [
+    {
+      accessorKey: 'name',
+      header: 'الاسم',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-3">
+          <Avatar className="w-8 h-8">
+            <AvatarFallback className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 text-xs">
+              {row.original.name.slice(0, 2)}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <div className="flex items-center gap-1.5">
+              <p className="font-medium text-sm">{row.original.name}</p>
+              {row.original.isBlocked && <Ban className="w-3 h-3 text-red-500" />}
+            </div>
+            <p className="text-xs text-muted-foreground">{row.original.phone}</p>
+          </div>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'specialization',
+      header: 'التخصص',
+      cell: ({ row }) => (
+        <div className="flex flex-wrap gap-1">
+          {(row.original.specialization || []).slice(0, 2).map((s) => (
+            <Badge key={s} variant="outline" className="text-[10px] h-5">
+              {specializationLabels[s] ?? s}
+            </Badge>
+          ))}
+          {(row.original.specialization || []).length > 2 && (
+            <Badge variant="outline" className="text-[10px] h-5">+{(row.original.specialization || []).length - 2}</Badge>
+          )}
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'verificationStatus',
+      header: 'حالة التوثيق',
+      cell: ({ row }) => <BadgeStatus status={row.original.verificationStatus} />,
+    },
+    {
+      accessorKey: 'rating',
+      header: 'التقييم',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+          <span className="text-sm">{row.original.rating.toFixed(1)}</span>
+          <span className="text-xs text-muted-foreground">({row.original.reviewCount})</span>
+        </div>
+      ),
+    },
+    {
+      accessorKey: 'isActive',
+      header: 'الحالة',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5">
+          <BadgeStatus status={row.original.isActive ? 'active' : 'inactive'} />
+          {row.original.isBlocked && (
+            <Badge variant="destructive" className="text-[9px] h-4 px-1">محظور</Badge>
+          )}
+        </div>
+      ),
+    },
+  ];
 
-  const getVerificationIcon = (status: string) => {
-    switch (status) {
-      case 'verified': return <CheckCircle2 className="w-4 h-4" />;
-      case 'pending': return <Clock className="w-4 h-4" />;
-      case 'rejected': return <XCircle className="w-4 h-4" />;
-      default: return <Shield className="w-4 h-4" />;
-    }
-  };
+  const rowActions = [
+    {
+      label: 'عرض التفاصيل',
+      icon: <Eye className="w-4 h-4" />,
+      onClick: (row: Record<string, unknown>) => handleViewNurse(row as unknown as NurseItem),
+    },
+    {
+      label: 'توثيق',
+      icon: <ShieldCheck className="w-4 h-4" />,
+      onClick: (row: Record<string, unknown>) => {
+        setVerifyTarget(row as unknown as NurseItem);
+        setVerifyAction('verify');
+      },
+    },
+    {
+      label: 'رفض التوثيق',
+      icon: <X className="w-4 h-4" />,
+      onClick: (row: Record<string, unknown>) => {
+        setVerifyTarget(row as unknown as NurseItem);
+        setVerifyAction('reject');
+      },
+      variant: 'destructive' as const,
+    },
+    {
+      label: (row: Record<string, unknown>) => ((row as unknown as NurseItem).isActive ? 'تعطيل' : 'تفعيل'),
+      onClick: (row: Record<string, unknown>) => setToggleTarget(row as unknown as NurseItem),
+    },
+    {
+      label: (row: Record<string, unknown>) => ((row as unknown as NurseItem).isBlocked ? 'إلغاء الحظر' : 'حظر'),
+      icon: <Ban className="w-4 h-4" />,
+      onClick: (row: Record<string, unknown>) => setBlockTarget(row as unknown as NurseItem),
+    },
+    {
+      label: 'حذف نهائي',
+      icon: <Trash2 className="w-4 h-4" />,
+      onClick: (row: Record<string, unknown>) => setDeleteTarget(row as unknown as NurseItem),
+      variant: 'destructive' as const,
+    },
+  ];
 
-  const getVerificationLabel = (status: string) => {
-    switch (status) {
-      case 'verified': return 'موثق';
-      case 'pending': return 'قيد المراجعة';
-      case 'rejected': return 'مرفوض';
-      default: return 'غير موثق';
-    }
-  };
+  const ViewContent = ({ nurse }: { nurse: NurseItem }) => (
+    <div className="space-y-4 p-4">
+      {/* Header */}
+      <div className="flex items-center gap-4">
+        <Avatar className="w-16 h-16">
+          <AvatarFallback className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 text-xl">
+            {nurse.name.slice(0, 2)}
+          </AvatarFallback>
+        </Avatar>
+        <div>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-semibold">{nurse.name}</h3>
+            {nurse.isBlocked && <Badge variant="destructive" className="text-[10px]"><Ban className="w-3 h-3 ml-0.5" />محظور</Badge>}
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <Phone className="w-3.5 h-3.5 text-muted-foreground" />
+            <span className="text-sm text-muted-foreground">{nurse.phone}</span>
+          </div>
+          <div className="flex items-center gap-2 mt-1">
+            <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
+            <span className="text-sm">{nurse.rating.toFixed(1)} ({nurse.reviewCount} تقييم)</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Info grid */}
+      <div className="grid grid-cols-2 gap-3">
+        <div className="glass rounded-xl p-3">
+          <p className="text-xs text-muted-foreground">التخصص</p>
+          <p className="text-sm font-medium">{(nurse.specialization || []).map((s) => specializationLabels[s] ?? s).join('، ') || 'غير محدد'}</p>
+        </div>
+        <div className="glass rounded-xl p-3">
+          <p className="text-xs text-muted-foreground">الخبرة</p>
+          <p className="text-sm font-medium">{nurse.experience} سنوات</p>
+        </div>
+        <div className="glass rounded-xl p-3">
+          <p className="text-xs text-muted-foreground">الوظائف المكتملة</p>
+          <p className="text-sm font-medium">{nurse.completedJobs}</p>
+        </div>
+        <div className="glass rounded-xl p-3">
+          <p className="text-xs text-muted-foreground">حالة التوثيق</p>
+          <BadgeStatus status={nurse.verificationStatus} size="sm" />
+        </div>
+      </div>
+
+      {nurse.governorate && (
+        <div className="flex items-center gap-2 text-sm">
+          <MapPin className="w-4 h-4 text-muted-foreground" />
+          <span>{nurse.governorate}</span>
+        </div>
+      )}
+      {nurse.bio && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-1">نبذة</p>
+          <p className="text-sm">{nurse.bio}</p>
+        </div>
+      )}
+      {nurse.rejectedReason && (
+        <div className="bg-red-50 dark:bg-red-950/20 rounded-xl p-3">
+          <p className="text-xs text-red-600 dark:text-red-400 mb-1">سبب الرفض</p>
+          <p className="text-sm">{nurse.rejectedReason}</p>
+        </div>
+      )}
+      {nurse.isBlocked && nurse.blockedReason && (
+        <div className="bg-red-50 dark:bg-red-950/20 rounded-xl p-3">
+          <p className="text-xs text-red-600 dark:text-red-400 mb-1">سبب الحظر</p>
+          <p className="text-sm">{nurse.blockedReason}</p>
+        </div>
+      )}
+
+      {/* Documents - Lazy loaded */}
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <p className="text-xs text-muted-foreground">المستندات</p>
+          {!docData && !docLoading && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleLoadDocuments(nurse.id)}
+              className="text-xs h-7"
+            >
+              <Eye className="w-3 h-3 ml-1" />
+              عرض المستندات
+            </Button>
+          )}
+        </div>
+
+        {docLoading && (
+          <div className="flex items-center justify-center py-4">
+            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+            <span className="mr-2 text-xs text-muted-foreground">جاري تحميل المستندات...</span>
+          </div>
+        )}
+
+        {docData && (
+          <div className="grid grid-cols-2 gap-3">
+            {(() => {
+              const identitySrc = docData.identityDocumentData || (docData.identityDocumentUrl && !docData.identityDocumentUrl.startsWith('data:stored/') ? docData.identityDocumentUrl : null);
+              const licenseSrc = docData.licenseDocumentData || (docData.licenseDocumentUrl && !docData.licenseDocumentUrl.startsWith('data:stored/') ? docData.licenseDocumentUrl : null);
+
+              if (!identitySrc && !licenseSrc) {
+                return (
+                  <div className="col-span-2 text-center py-4 text-muted-foreground">
+                    <FileText className="w-6 h-6 mx-auto mb-1 opacity-30" />
+                    <p className="text-xs">لم يتم رفع مستندات بعد</p>
+                  </div>
+                );
+              }
+
+              return (
+                <>
+                  {identitySrc ? (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground">الهوية الوطنية</p>
+                      <div
+                        className="relative rounded-xl overflow-hidden border border-border aspect-[4/3] cursor-pointer group"
+                        onClick={() => setLightboxImage({ src: identitySrc, alt: 'الهوية الوطنية' })}
+                      >
+                        <img src={identitySrc} alt="الهوية الوطنية" className="w-full h-full object-contain bg-muted/20" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                          <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-all" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground">الهوية الوطنية</p>
+                      <div className="rounded-xl border-2 border-dashed border-border/50 aspect-[4/3] flex items-center justify-center">
+                        <p className="text-[10px] text-muted-foreground">لم يتم الرفع</p>
+                      </div>
+                    </div>
+                  )}
+                  {licenseSrc ? (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground">مزاولة المهنة</p>
+                      <div
+                        className="relative rounded-xl overflow-hidden border border-border aspect-[4/3] cursor-pointer group"
+                        onClick={() => setLightboxImage({ src: licenseSrc, alt: 'مزاولة المهنة' })}
+                      >
+                        <img src={licenseSrc} alt="مزاولة المهنة" className="w-full h-full object-contain bg-muted/20" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
+                          <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-all" />
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="space-y-1">
+                      <p className="text-[10px] text-muted-foreground">مزاولة المهنة</p>
+                      <div className="rounded-xl border-2 border-dashed border-border/50 aspect-[4/3] flex items-center justify-center">
+                        <p className="text-[10px] text-muted-foreground">لم يتم الرفع</p>
+                      </div>
+                    </div>
+                  )}
+                </>
+              );
+            })()}
+          </div>
+        )}
+      </div>
+
+      <div className="text-xs text-muted-foreground">
+        تاريخ التسجيل: <DateFormatter date={nurse.createdAt} format="date" />
+      </div>
+    </div>
+  );
 
   return (
-    <div className="space-y-6">
+    <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       {/* Image Lightbox */}
       <AnimatePresence>
         {lightboxImage && (
@@ -369,396 +610,93 @@ export default function AdminNursesPage() {
         )}
       </AnimatePresence>
 
-      <PageHeader title="إدارة الممرضين" description={`إجمالي الممرضين: ${total} ممرض/ـة`} />
+      <motion.div variants={itemAnim}>
+        <PageHeader title="إدارة الممرضين" description="إدارة وتوثيق الممرضين المسجلين" />
+      </motion.div>
 
-      {/* Filters */}
-      <GlassCard variant="admin" className="p-4">
-        <div className="flex flex-col sm:flex-row gap-3">
-          <div className="relative flex-1">
-            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              placeholder="بحث بالاسم أو الهاتف..."
-              value={search}
-              onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-              className="pr-10"
-            />
+      <motion.div variants={itemAnim}>
+        <GlassCard variant="admin">
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <SearchInput placeholder="بحث بالاسم أو الهاتف..." onChange={setSearch} className="flex-1" />
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-44">
+                <SelectValue placeholder="الحالة" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">جميع الحالات</SelectItem>
+                <SelectItem value="active">نشط</SelectItem>
+                <SelectItem value="inactive">غير نشط</SelectItem>
+                <SelectItem value="pending">قيد المراجعة</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={specFilter} onValueChange={setSpecFilter}>
+              <SelectTrigger className="w-full sm:w-44">
+                <SelectValue placeholder="التخصص" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">جميع التخصصات</SelectItem>
+                {Object.entries(specializationLabels).map(([key, label]) => (
+                  <SelectItem key={key} value={key}>{label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" onClick={() => void fetchNurses()}>
+              <RefreshCw className="w-4 h-4" />
+            </Button>
           </div>
-          <Select value={statusFilter} onValueChange={(v) => { setStatusFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="الحالة" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">جميع الحالات</SelectItem>
-              <SelectItem value="verified">موثق</SelectItem>
-              <SelectItem value="pending">قيد المراجعة</SelectItem>
-              <SelectItem value="unverified">غير موثق</SelectItem>
-              <SelectItem value="rejected">مرفوض</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={specFilter} onValueChange={(v) => { setSpecFilter(v); setPage(1); }}>
-            <SelectTrigger className="w-full sm:w-40">
-              <SelectValue placeholder="التخصص" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">جميع التخصصات</SelectItem>
-              {Object.entries(specializationLabels).map(([key, label]) => (
-                <SelectItem key={key} value={key}>{label}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          <Button variant="outline" size="icon" onClick={() => void fetchNurses()}>
-            <RefreshCw className="w-4 h-4" />
-          </Button>
-        </div>
-      </GlassCard>
-
-      {/* Nurses Grid */}
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} className="glass rounded-2xl p-5 animate-pulse">
-              <div className="flex items-center gap-3 mb-4">
-                <div className="w-12 h-12 bg-muted rounded-full" />
-                <div className="space-y-2 flex-1">
-                  <div className="h-4 bg-muted rounded w-2/3" />
-                  <div className="h-3 bg-muted rounded w-1/2" />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <div className="h-3 bg-muted rounded" />
-                <div className="h-3 bg-muted rounded w-2/3" />
-              </div>
-            </div>
-          ))}
-        </div>
-      ) : nurses.length === 0 ? (
-        <GlassCard variant="admin" className="p-12 text-center">
-          <Stethoscope className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
-          <p className="text-lg font-medium text-muted-foreground mb-1">لا يوجد ممرضون</p>
-          <p className="text-sm text-muted-foreground/60">لم يتم العثور على نتائج مطابقة</p>
         </GlassCard>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {nurses.map((nurse) => (
-              <NurseCard
-                key={nurse.id}
-                nurse={nurse}
-                onView={() => handleViewNurse(nurse)}
-                onVerify={() => { setVerifyTarget(nurse); setVerifyAction('verify'); }}
-                onReject={() => { setVerifyTarget(nurse); setVerifyAction('reject'); }}
-                onToggleActive={() => setToggleTarget(nurse)}
-                onBlock={() => setBlockTarget(nurse)}
-                onDelete={() => setDeleteTarget(nurse)}
-              />
-            ))}
-          </div>
+      </motion.div>
 
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page <= 1}
-                onClick={() => setPage((p) => Math.max(1, p - 1))}
-              >
-                السابق
-              </Button>
-              <div className="flex items-center gap-1">
-                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                  let pageNum: number;
-                  if (totalPages <= 5) {
-                    pageNum = i + 1;
-                  } else if (page <= 3) {
-                    pageNum = i + 1;
-                  } else if (page >= totalPages - 2) {
-                    pageNum = totalPages - 4 + i;
-                  } else {
-                    pageNum = page - 2 + i;
-                  }
-                  return (
-                    <Button
-                      key={pageNum}
-                      variant={page === pageNum ? 'default' : 'outline'}
-                      size="sm"
-                      className="w-9 h-9 p-0"
-                      onClick={() => setPage(pageNum)}
-                    >
-                      {pageNum}
-                    </Button>
-                  );
-                })}
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={page >= totalPages}
-                onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-              >
-                التالي
-              </Button>
-            </div>
-          )}
-        </>
+      <motion.div variants={itemAnim}>
+        <DataTable
+          columns={columns}
+          data={nurses}
+          isLoading={isLoading}
+          emptyMessage="لا يوجد ممرضون"
+          emptyAction={{ label: 'تحديث', onClick: () => void fetchNurses() }}
+          rowActions={rowActions as never}
+          currentPage={page}
+          pageCount={totalPages}
+          onPageChange={setPage}
+        />
+      </motion.div>
+
+      {/* View Drawer/Dialog */}
+      {viewTarget && (
+        isMobile ? (
+          <Drawer open={!!viewTarget} onOpenChange={(open) => { if (!open) { setViewTarget(null); setDocData(null); } }}>
+            <DrawerContent>
+              <DrawerHeader>
+                <DrawerTitle>تفاصيل الممرض/ـة</DrawerTitle>
+              </DrawerHeader>
+              {viewLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-admin" />
+                </div>
+              ) : (
+                <ViewContent nurse={viewTarget} />
+              )}
+            </DrawerContent>
+          </Drawer>
+        ) : (
+          <Dialog open={!!viewTarget} onOpenChange={(open) => { if (!open) { setViewTarget(null); setDocData(null); } }}>
+            <DialogContent dir="rtl" className="max-w-md">
+              <DialogHeader>
+                <DialogTitle>تفاصيل الممرض/ـة</DialogTitle>
+              </DialogHeader>
+              {viewLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="w-8 h-8 animate-spin text-admin" />
+                </div>
+              ) : (
+                <ViewContent nurse={viewTarget} />
+              )}
+            </DialogContent>
+          </Dialog>
+        )
       )}
 
-      {/* ====== VIEW DETAIL DIALOG ====== */}
-      <Dialog open={!!viewTarget} onOpenChange={(open) => { if (!open) { setViewTarget(null); setDocData(null); } }}>
-        <DialogContent dir="rtl" className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Stethoscope className="w-5 h-5 text-admin" />
-              تفاصيل الممرض/ـة
-            </DialogTitle>
-          </DialogHeader>
-
-          {viewLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="w-8 h-8 animate-spin text-admin" />
-            </div>
-          ) : viewTarget ? (
-            <div className="space-y-5">
-              {/* Header */}
-              <div className="flex items-center gap-4">
-                <Avatar className="w-20 h-20 text-xl border-2 border-admin/20">
-                  <AvatarFallback className="bg-gradient-to-br from-sky-100 to-blue-100 dark:from-sky-900/30 dark:to-blue-900/30 text-sky-700 dark:text-sky-400">
-                    {viewTarget.name.slice(0, 2)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <h3 className="text-lg font-bold">{viewTarget.name}</h3>
-                  <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
-                    <Phone className="w-3.5 h-3.5" />
-                    <span dir="ltr">{viewTarget.phone}</span>
-                  </div>
-                  <div className="flex items-center gap-2 mt-1">
-                    <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-                    <span className="text-sm">{viewTarget.rating.toFixed(1)}</span>
-                    <span className="text-xs text-muted-foreground">({viewTarget.reviewCount} تقييم)</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Status badges */}
-              <div className="flex flex-wrap gap-2">
-                <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium ${getVerificationColor(viewTarget.verificationStatus)}`}>
-                  {getVerificationIcon(viewTarget.verificationStatus)}
-                  {getVerificationLabel(viewTarget.verificationStatus)}
-                </div>
-                <Badge variant={viewTarget.isActive ? 'default' : 'secondary'} className="text-xs">
-                  {viewTarget.isActive ? 'نشط' : 'معطل'}
-                </Badge>
-                <Badge variant={viewTarget.isAvailable ? 'default' : 'secondary'} className="text-xs">
-                  {viewTarget.isAvailable ? 'متاح' : 'غير متاح'}
-                </Badge>
-                {viewTarget.isBlocked && (
-                  <Badge variant="destructive" className="text-xs">
-                    <Ban className="w-3 h-3 ml-1" />
-                    محظور
-                  </Badge>
-                )}
-              </div>
-
-              {/* Info grid */}
-              <div className="grid grid-cols-2 gap-3">
-                <InfoCard label="التخصص" value={(viewTarget.specialization || []).map((s) => specializationLabels[s] ?? s).join('، ') || 'غير محدد'} />
-                <InfoCard label="سنوات الخبرة" value={`${viewTarget.experience} سنة`} />
-                <InfoCard label="الوظائف المكتملة" value={`${viewTarget.completedJobs}`} />
-                <InfoCard label="رقم الترخيص" value={viewTarget.licenseNumber || 'غير محدد'} />
-                {viewTarget.governorate && <InfoCard label="المحافظة" value={viewTarget.governorate} />}
-              </div>
-
-              {viewTarget.bio && (
-                <div className="p-3 rounded-xl bg-muted/30">
-                  <p className="text-xs text-muted-foreground mb-1">نبذة</p>
-                  <p className="text-sm leading-relaxed">{viewTarget.bio}</p>
-                </div>
-              )}
-
-              {viewTarget.rejectedReason && (
-                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
-                  <p className="text-xs text-red-600 dark:text-red-400 mb-1">سبب رفض التوثيق</p>
-                  <p className="text-sm">{viewTarget.rejectedReason}</p>
-                </div>
-              )}
-
-              {viewTarget.isBlocked && viewTarget.blockedReason && (
-                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
-                  <p className="text-xs text-red-600 dark:text-red-400 mb-1">سبب الحظر</p>
-                  <p className="text-sm">{viewTarget.blockedReason}</p>
-                </div>
-              )}
-
-              {/* Documents Section - Lazy loaded */}
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <h4 className="font-semibold text-sm flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-admin" />
-                    المستندات
-                  </h4>
-                  {!docData && !docLoading && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleLoadDocuments(viewTarget.id)}
-                      className="text-xs"
-                    >
-                      <Eye className="w-3.5 h-3.5 ml-1" />
-                      عرض المستندات
-                    </Button>
-                  )}
-                </div>
-
-                {docLoading && (
-                  <div className="flex items-center justify-center py-6">
-                    <Loader2 className="w-6 h-6 animate-spin text-admin" />
-                    <span className="mr-2 text-sm text-muted-foreground">جاري تحميل المستندات...</span>
-                  </div>
-                )}
-
-                {docData && (
-                  <div className="grid grid-cols-2 gap-3">
-                    {(() => {
-                      const identitySrc = docData.identityDocumentData || (docData.identityDocumentUrl && !docData.identityDocumentUrl.startsWith('data:stored/') ? docData.identityDocumentUrl : null);
-                      const licenseSrc = docData.licenseDocumentData || (docData.licenseDocumentUrl && !docData.licenseDocumentUrl.startsWith('data:stored/') ? docData.licenseDocumentUrl : null);
-
-                      if (!identitySrc && !licenseSrc) {
-                        return (
-                          <div className="col-span-2 text-center py-6 text-muted-foreground">
-                            <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
-                            <p className="text-sm">لم يتم رفع مستندات بعد</p>
-                          </div>
-                        );
-                      }
-
-                      return (
-                        <>
-                          {identitySrc ? (
-                            <div className="space-y-1.5">
-                              <p className="text-xs font-medium text-muted-foreground">الهوية الوطنية</p>
-                              <div
-                                className="relative rounded-xl overflow-hidden border-2 border-border/50 hover:border-admin/30 transition-all cursor-pointer group aspect-[3/4]"
-                                onClick={() => setLightboxImage({ src: identitySrc, alt: 'الهوية الوطنية' })}
-                              >
-                                <img
-                                  src={identitySrc}
-                                  alt="الهوية الوطنية"
-                                  className="w-full h-full object-contain bg-muted/10 p-2"
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
-                                  <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-all" />
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-1.5">
-                              <p className="text-xs font-medium text-muted-foreground">الهوية الوطنية</p>
-                              <div className="rounded-xl border-2 border-dashed border-border/50 aspect-[3/4] flex items-center justify-center">
-                                <p className="text-xs text-muted-foreground">لم يتم الرفع</p>
-                              </div>
-                            </div>
-                          )}
-                          {licenseSrc ? (
-                            <div className="space-y-1.5">
-                              <p className="text-xs font-medium text-muted-foreground">مزاولة المهنة</p>
-                              <div
-                                className="relative rounded-xl overflow-hidden border-2 border-border/50 hover:border-admin/30 transition-all cursor-pointer group aspect-[3/4]"
-                                onClick={() => setLightboxImage({ src: licenseSrc, alt: 'مزاولة المهنة' })}
-                              >
-                                <img
-                                  src={licenseSrc}
-                                  alt="مزاولة المهنة"
-                                  className="w-full h-full object-contain bg-muted/10 p-2"
-                                />
-                                <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
-                                  <ZoomIn className="w-8 h-8 text-white opacity-0 group-hover:opacity-100 transition-all" />
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <div className="space-y-1.5">
-                              <p className="text-xs font-medium text-muted-foreground">مزاولة المهنة</p>
-                              <div className="rounded-xl border-2 border-dashed border-border/50 aspect-[3/4] flex items-center justify-center">
-                                <p className="text-xs text-muted-foreground">لم يتم الرفع</p>
-                              </div>
-                            </div>
-                          )}
-                        </>
-                      );
-                    })()}
-                  </div>
-                )}
-              </div>
-
-              {/* Registration date */}
-              <div className="text-xs text-muted-foreground pt-2 border-t">
-                تاريخ التسجيل: <DateFormatter date={viewTarget.createdAt} format="date" />
-              </div>
-
-              {/* Action buttons */}
-              <div className="flex flex-wrap gap-2 pt-2">
-                {viewTarget.verificationStatus !== 'verified' && (
-                  <Button
-                    size="sm"
-                    className="bg-green-600 hover:bg-green-700 text-xs"
-                    onClick={() => { setVerifyTarget(viewTarget); setVerifyAction('verify'); }}
-                  >
-                    <ShieldCheck className="w-3.5 h-3.5 ml-1" />
-                    توثيق
-                  </Button>
-                )}
-                {viewTarget.verificationStatus !== 'rejected' && viewTarget.verificationStatus !== 'unverified' && (
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
-                    onClick={() => { setVerifyTarget(viewTarget); setVerifyAction('reject'); }}
-                  >
-                    <XCircle className="w-3.5 h-3.5 ml-1" />
-                    رفض التوثيق
-                  </Button>
-                )}
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setToggleTarget(viewTarget)}
-                  className="text-xs"
-                >
-                  {viewTarget.isActive ? (
-                    <><UserX className="w-3.5 h-3.5 ml-1" />تعطيل</>
-                  ) : (
-                    <><UserCheck className="w-3.5 h-3.5 ml-1" />تفعيل</>
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setBlockTarget(viewTarget)}
-                  className={viewTarget.isBlocked ? 'text-green-600 border-green-200 hover:bg-green-50 text-xs' : 'text-orange-600 border-orange-200 hover:bg-orange-50 text-xs'}
-                >
-                  {viewTarget.isBlocked ? (
-                    <><UserCheck className="w-3.5 h-3.5 ml-1" />إلغاء الحظر</>
-                  ) : (
-                    <><Ban className="w-3.5 h-3.5 ml-1" />حظر</>
-                  )}
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
-                  onClick={() => setDeleteTarget(viewTarget)}
-                >
-                  <Trash2 className="w-3.5 h-3.5 ml-1" />
-                  حذف نهائي
-                </Button>
-              </div>
-            </div>
-          ) : null}
-        </DialogContent>
-      </Dialog>
-
-      {/* ====== VERIFY DIALOG ====== */}
+      {/* Verify/Reject Dialog */}
       <Dialog open={!!verifyTarget} onOpenChange={(open) => { if (!open) { setVerifyTarget(null); setRejectedReason(''); } }}>
         <DialogContent dir="rtl">
           <DialogHeader>
@@ -797,25 +735,18 @@ export default function AdminNursesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ====== TOGGLE ACTIVE DIALOG ====== */}
-      <Dialog open={!!toggleTarget} onOpenChange={(open) => { if (!open) setToggleTarget(null); }}>
-        <DialogContent dir="rtl">
-          <DialogHeader>
-            <DialogTitle>{toggleTarget?.isActive ? 'تعطيل الممرض/ـة' : 'تفعيل الممرض/ـة'}</DialogTitle>
-            <DialogDescription>
-              هل أنت متأكد من {toggleTarget?.isActive ? 'تعطيل' : 'تفعيل'} &quot;{toggleTarget?.name ?? ''}&quot;؟
-            </DialogDescription>
-          </DialogHeader>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setToggleTarget(null)} disabled={isToggling}>إلغاء</Button>
-            <Button onClick={handleToggle} disabled={isToggling}>
-              {isToggling ? 'جارٍ التنفيذ...' : toggleTarget?.isActive ? 'تعطيل' : 'تفعيل'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      {/* Toggle Confirm */}
+      <ConfirmDialog
+        open={!!toggleTarget}
+        onOpenChange={(open) => { if (!open) setToggleTarget(null); }}
+        title={toggleTarget?.isActive ? 'تعطيل الممرض/ـة' : 'تفعيل الممرض/ـة'}
+        description={`هل أنت متأكد من ${toggleTarget?.isActive ? 'تعطيل' : 'تفعيل'} "${toggleTarget?.name ?? ''}"؟`}
+        confirmLabel={toggleTarget?.isActive ? 'تعطيل' : 'تفعيل'}
+        variant={toggleTarget?.isActive ? 'warning' : 'info'}
+        onConfirm={handleToggle}
+      />
 
-      {/* ====== BLOCK DIALOG ====== */}
+      {/* Block Dialog */}
       <Dialog open={!!blockTarget} onOpenChange={(open) => { if (!open) { setBlockTarget(null); setBlockReason(''); } }}>
         <DialogContent dir="rtl">
           <DialogHeader>
@@ -855,7 +786,7 @@ export default function AdminNursesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ====== DELETE DIALOG ====== */}
+      {/* Delete Dialog */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmName(''); } }}>
         <DialogContent dir="rtl">
           <DialogHeader>
@@ -864,7 +795,7 @@ export default function AdminNursesPage() {
               حذف الممرض نهائياً
             </DialogTitle>
             <DialogDescription>
-              هذا الإجراء لا يمكن التراجع عنه! سيتم حذف الممرض/ـة &quot;{deleteTarget?.name ?? ''}&quot; وجميع بياناته نهائياً.
+              هذا الإجراء لا يمكن التراجع عنه! سيتم حذف &quot;{deleteTarget?.name ?? ''}&quot; نهائياً.
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-3">
@@ -872,12 +803,12 @@ export default function AdminNursesPage() {
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
                 <p className="text-sm text-red-700 dark:text-red-400">
-                  تحذير: سيتم حذف جميع البيانات بما في ذلك المستندات والتقييمات والمحفظة. لا يمكن استعادة البيانات بعد الحذف.
+                  تحذير: سيتم حذف جميع البيانات نهائياً. لا يمكن استعادة البيانات بعد الحذف.
                 </p>
               </div>
             </div>
             <div className="space-y-2">
-              <Label>اكتب اسم الممرض/ـة للتأكيد: <strong>{deleteTarget?.name}</strong></Label>
+              <Label>اكتب الاسم للتأكيد: <strong>{deleteTarget?.name}</strong></Label>
               <Input
                 value={deleteConfirmName}
                 onChange={(e) => setDeleteConfirmName(e.target.value)}
@@ -899,173 +830,6 @@ export default function AdminNursesPage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
-  );
-}
-
-// ====== Professional Nurse Card Component ======
-
-function NurseCard({
-  nurse,
-  onView,
-  onVerify,
-  onReject,
-  onToggleActive,
-  onBlock,
-  onDelete,
-}: {
-  nurse: NurseItem;
-  onView: () => void;
-  onVerify: () => void;
-  onReject: () => void;
-  onToggleActive: () => void;
-  onBlock: () => void;
-  onDelete: () => void;
-}) {
-  const [showActions, setShowActions] = useState(false);
-
-  const verificationColor = nurse.verificationStatus === 'verified'
-    ? 'bg-green-500'
-    : nurse.verificationStatus === 'pending'
-    ? 'bg-amber-500'
-    : nurse.verificationStatus === 'rejected'
-    ? 'bg-red-500'
-    : 'bg-gray-400';
-
-  return (
-    <motion.div
-      layout
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      exit={{ opacity: 0, y: -20 }}
-      className="glass rounded-2xl overflow-hidden hover:shadow-lg transition-all duration-300 border border-transparent hover:border-admin/20"
-    >
-      {/* Top color indicator */}
-      <div className={`h-1 ${verificationColor}`} />
-
-      <div className="p-5">
-        {/* Header */}
-        <div className="flex items-start gap-3 mb-4">
-          <Avatar className="w-14 h-14 border-2 border-white/50 dark:border-gray-700/50 shadow-sm">
-            <AvatarFallback className="bg-gradient-to-br from-sky-100 to-blue-200 dark:from-sky-900/30 dark:to-blue-900/40 text-sky-700 dark:text-sky-400 text-base font-bold">
-              {nurse.name.slice(0, 2)}
-            </AvatarFallback>
-          </Avatar>
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2">
-              <h3 className="font-bold text-sm truncate">{nurse.name}</h3>
-              {nurse.isBlocked && <Ban className="w-3.5 h-3.5 text-red-500 shrink-0" />}
-            </div>
-            <p className="text-xs text-muted-foreground mt-0.5" dir="ltr">{nurse.phone}</p>
-            <div className="flex items-center gap-1.5 mt-1.5">
-              <BadgeStatus status={nurse.verificationStatus} size="sm" />
-              <Badge variant={nurse.isActive ? 'default' : 'secondary'} className="text-[10px] h-5 px-1.5">
-                {nurse.isActive ? 'نشط' : 'معطل'}
-              </Badge>
-            </div>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-3 gap-2 mb-4">
-          <div className="text-center p-2 rounded-lg bg-muted/20">
-            <div className="flex items-center justify-center gap-1">
-              <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-              <span className="text-sm font-bold">{nurse.rating.toFixed(1)}</span>
-            </div>
-            <p className="text-[10px] text-muted-foreground mt-0.5">تقييم</p>
-          </div>
-          <div className="text-center p-2 rounded-lg bg-muted/20">
-            <p className="text-sm font-bold">{nurse.completedJobs}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">خدمة</p>
-          </div>
-          <div className="text-center p-2 rounded-lg bg-muted/20">
-            <p className="text-sm font-bold">{nurse.experience}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">سنة خبرة</p>
-          </div>
-        </div>
-
-        {/* Specialization */}
-        <div className="flex flex-wrap gap-1 mb-4">
-          {(nurse.specialization || []).slice(0, 2).map((spec) => (
-            <Badge key={spec} variant="outline" className="text-[10px] h-5 px-1.5">
-              {specializationLabels[spec] ?? spec}
-            </Badge>
-          ))}
-          {(nurse.specialization || []).length > 2 && (
-            <Badge variant="outline" className="text-[10px] h-5 px-1.5">
-              +{(nurse.specialization || []).length - 2}
-            </Badge>
-          )}
-        </div>
-
-        {/* Actions */}
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            className="flex-1 bg-admin hover:bg-admin/90 text-xs h-9"
-            onClick={onView}
-          >
-            <Eye className="w-3.5 h-3.5 ml-1" />
-            عرض التفاصيل
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-9 w-9 p-0"
-            onClick={() => setShowActions(!showActions)}
-          >
-            <ChevronLeft className={`w-4 h-4 transition-transform ${showActions ? '-rotate-90' : ''}`} />
-          </Button>
-        </div>
-
-        {/* Expandable actions */}
-        <AnimatePresence>
-          {showActions && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.2 }}
-              className="overflow-hidden"
-            >
-              <div className="flex flex-wrap gap-2 pt-3 mt-3 border-t">
-                {nurse.verificationStatus !== 'verified' && (
-                  <Button size="sm" variant="outline" onClick={onVerify} className="text-green-600 border-green-200 hover:bg-green-50 text-xs h-8">
-                    <ShieldCheck className="w-3 h-3 ml-1" />توثيق
-                  </Button>
-                )}
-                {nurse.verificationStatus === 'pending' && (
-                  <Button size="sm" variant="outline" onClick={onReject} className="text-red-600 border-red-200 hover:bg-red-50 text-xs h-8">
-                    <XCircle className="w-3 h-3 ml-1" />رفض
-                  </Button>
-                )}
-                <Button size="sm" variant="outline" onClick={onToggleActive} className="text-xs h-8">
-                  {nurse.isActive ? 'تعطيل' : 'تفعيل'}
-                </Button>
-                <Button size="sm" variant="outline" onClick={onBlock} className={`text-xs h-8 ${nurse.isBlocked ? 'text-green-600' : 'text-orange-600'}`}>
-                  <Ban className="w-3 h-3 ml-1" />
-                  {nurse.isBlocked ? 'إلغاء الحظر' : 'حظر'}
-                </Button>
-                <Button size="sm" variant="outline" onClick={onDelete} className="text-red-600 border-red-200 hover:bg-red-50 text-xs h-8">
-                  <Trash2 className="w-3 h-3 ml-1" />حذف
-                </Button>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </div>
     </motion.div>
-  );
-}
-
-// ====== Info Card Component ======
-
-function InfoCard({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="p-3 rounded-xl bg-muted/20 border border-border/30">
-      <p className="text-[10px] text-muted-foreground mb-0.5">{label}</p>
-      <p className="text-sm font-medium truncate">{value}</p>
-    </div>
   );
 }
