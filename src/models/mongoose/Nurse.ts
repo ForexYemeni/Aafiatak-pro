@@ -58,4 +58,13 @@ const NurseSchema = new Schema({
   rejectedReason: { type: String },
 });
 
-export const Nurse = mongoose.models.Nurse || User.discriminator('nurse', NurseSchema);
+// Prevent duplicate discriminator on hot reload
+export const Nurse = (mongoose.models.Nurse ||
+  (User.discriminators && User.discriminators['nurse'])
+) as ReturnType<typeof User.discriminator>;
+
+if (!mongoose.models.Nurse && !(User.discriminators && User.discriminators['nurse'])) {
+  User.discriminator('nurse', NurseSchema);
+}
+
+const _NurseModel = mongoose.models.Nurse;

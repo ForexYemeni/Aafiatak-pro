@@ -50,4 +50,13 @@ const BeneficiarySchema = new Schema({
   orderCount: { type: Number, default: 0 },
 });
 
-export const Beneficiary = mongoose.models.Beneficiary || User.discriminator('beneficiary', BeneficiarySchema);
+// Prevent duplicate discriminator on hot reload
+export const Beneficiary = (mongoose.models.Beneficiary ||
+  (User.discriminators && User.discriminators['beneficiary'])
+) as ReturnType<typeof User.discriminator>;
+
+if (!mongoose.models.Beneficiary && !(User.discriminators && User.discriminators['beneficiary'])) {
+  User.discriminator('beneficiary', BeneficiarySchema);
+}
+
+const _BeneficiaryModel = mongoose.models.Beneficiary;
