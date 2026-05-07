@@ -2,14 +2,13 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Plus, Edit, ToggleLeft, ToggleRight, RefreshCw, Search } from 'lucide-react';
+import { Plus, Edit, Trash2, AlertTriangle, RefreshCw } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { SearchInput } from '@/components/common/search-input';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { Currency } from '@/components/common/currency';
-import { EmptyState } from '@/components/common/empty-state';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,14 +64,11 @@ const item = {
 
 const defaultForm = {
   nameAr: '',
-  nameEn: '',
   descriptionAr: '',
-  basePrice: 0,
+  basePrice: '' as string | number,
   category: 'nursing',
-  duration: 60,
   isActive: true,
   isEmergency: false,
-  sortOrder: 0,
 };
 
 export default function AdminServicesPage() {
@@ -81,8 +77,6 @@ export default function AdminServicesPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [categoryFilter, setCategoryFilter] = useState('all');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
 
   // Dialog state
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -93,12 +87,14 @@ export default function AdminServicesPage() {
   // Toggle confirm
   const [toggleTarget, setToggleTarget] = useState<ServiceItem | null>(null);
 
+  // Delete confirm
+  const [deleteTarget, setDeleteTarget] = useState<ServiceItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+
   const fetchServices = useCallback(async () => {
     setIsLoading(true);
     try {
       const params = new URLSearchParams({
-        page: String(page),
-        limit: '10',
         search,
         ...(categoryFilter !== 'all' ? { category: categoryFilter } : {}),
       });
@@ -107,30 +103,47 @@ export default function AdminServicesPage() {
       if (json.success && json.data) {
         const items = json.data.services ?? json.data;
         setServices(Array.isArray(items) ? items : []);
-        if (json.data.pages) setTotalPages(json.data.pages);
       }
     } catch {
       toast.error('فشل تحميل الخدمات');
     } finally {
       setIsLoading(false);
     }
-  }, [authFetch, page, search, categoryFilter]);
+  }, [authFetch, search, categoryFilter]);
 
   useEffect(() => {
     void fetchServices();
   }, [fetchServices]);
 
   const handleSave = async () => {
-    if (!form.nameAr || !form.basePrice) {
-      toast.error('يرجى ملء الحقول المطلوبة');
+    if (!form.nameAr) {
+      toast.error('يرجى إدخال اسم الخدمة');
       return;
     }
+    const price = Number(form.basePrice);
+    if (!price || price <= 0) {
+      toast.error('يرجى إدخال السعر الأساسي');
+      return;
+    }
+
     setIsSaving(true);
     try {
+      const payload = {
+        nameAr: form.nameAr,
+        nameEn: form.nameAr, // Use Arabic name as English name (not needed)
+        descriptionAr: form.descriptionAr,
+        basePrice: price,
+        category: form.category,
+        duration: 60, // Default duration
+        isActive: form.isActive,
+        isEmergency: form.isEmergency,
+        sortOrder: 0,
+      };
+
       if (editingService) {
         const res = await authFetch(`/api/admin/services/${editingService.id}`, {
           method: 'PATCH',
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
         const json = await res.json();
         if (json.success) {
@@ -141,7 +154,7 @@ export default function AdminServicesPage() {
       } else {
         const res = await authFetch('/api/admin/services', {
           method: 'POST',
-          body: JSON.stringify(form),
+          body: JSON.stringify(payload),
         });
         const json = await res.json();
         if (json.success) {
@@ -170,7 +183,7 @@ export default function AdminServicesPage() {
       });
       const json = await res.json();
       if (json.success) {
-        toast.success(toggleTarget.isActive ? 'تم تعطيل الخدمة' : 'تم تفعيل الخدمة');
+        toast.success(toggleTarget.isActive ? 'تم إيقاف الخدمة' : 'تم تفعيل الخدمة');
         void fetchServices();
       }
     } catch {
@@ -180,18 +193,37 @@ export default function AdminServicesPage() {
     }
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const res = await authFetch(`/api/admin/services/${deleteTarget.id}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم حذف الخدمة نهائياً');
+        void fetchServices();
+      } else {
+        toast.error(json.message ?? 'فشل الحذف');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء الحذف');
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
   const openEdit = (svc: ServiceItem) => {
     setEditingService(svc);
     setForm({
       nameAr: svc.nameAr,
-      nameEn: svc.nameEn,
-      descriptionAr: svc.descriptionAr,
-      basePrice: svc.basePrice,
+      descriptionAr: svc.descriptionAr || '',
+      basePrice: svc.basePrice || '',
       category: svc.category,
-      duration: svc.duration,
       isActive: svc.isActive,
       isEmergency: svc.isEmergency,
-      sortOrder: svc.sortOrder,
     });
     setDialogOpen(true);
   };
@@ -209,7 +241,9 @@ export default function AdminServicesPage() {
       cell: ({ row }) => (
         <div>
           <p className="font-medium">{row.original.nameAr}</p>
-          <p className="text-xs text-muted-foreground">{row.original.nameEn}</p>
+          {row.original.isEmergency && (
+            <span className="text-[10px] text-red-500 font-medium">خدمة طوارئ</span>
+          )}
         </div>
       ),
     },
@@ -224,14 +258,14 @@ export default function AdminServicesPage() {
       cell: ({ row }) => <Currency amount={row.original.basePrice} />,
     },
     {
-      accessorKey: 'duration',
-      header: 'المدة',
-      cell: ({ row }) => `${row.original.duration} دقيقة`,
-    },
-    {
       accessorKey: 'isActive',
       header: 'الحالة',
-      cell: ({ row }) => <BadgeStatus status={row.original.isActive ? 'active' : 'inactive'} />,
+      cell: ({ row }) => (
+        <BadgeStatus
+          status={row.original.isActive ? 'active' : 'inactive'}
+          label={row.original.isActive ? 'نشطة' : 'متوقفة'}
+        />
+      ),
     },
   ];
 
@@ -241,9 +275,13 @@ export default function AdminServicesPage() {
       onClick: (row: Record<string, unknown>) => openEdit(row as unknown as ServiceItem),
     },
     {
-      label: (row: Record<string, unknown>) => ((row as unknown as ServiceItem).isActive ? 'تعطيل' : 'تفعيل'),
+      label: (row: Record<string, unknown>) => ((row as unknown as ServiceItem).isActive ? 'إيقاف' : 'تفعيل'),
       onClick: (row: Record<string, unknown>) => setToggleTarget(row as unknown as ServiceItem),
-      variant: 'default' as const,
+    },
+    {
+      label: 'حذف نهائياً',
+      onClick: (row: Record<string, unknown>) => setDeleteTarget(row as unknown as ServiceItem),
+      variant: 'destructive' as const,
     },
   ];
 
@@ -291,9 +329,9 @@ export default function AdminServicesPage() {
           emptyMessage="لا توجد خدمات"
           emptyAction={{ label: 'إضافة خدمة جديدة', onClick: openAdd }}
           rowActions={rowActions as never}
-          currentPage={page}
-          pageCount={totalPages}
-          onPageChange={setPage}
+          currentPage={1}
+          pageCount={1}
+          onPageChange={() => {}}
         />
       </motion.div>
 
@@ -307,24 +345,13 @@ export default function AdminServicesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>الاسم بالعربية *</Label>
-                <Input
-                  value={form.nameAr}
-                  onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
-                  placeholder="مثال: تمريض منزلي"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>الاسم بالإنجليزية</Label>
-                <Input
-                  value={form.nameEn}
-                  onChange={(e) => setForm({ ...form, nameEn: e.target.value })}
-                  placeholder="Home Nursing"
-                  dir="ltr"
-                />
-              </div>
+            <div className="space-y-2">
+              <Label>اسم الخدمة *</Label>
+              <Input
+                value={form.nameAr}
+                onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
+                placeholder="مثال: تمريض منزلي"
+              />
             </div>
             <div className="space-y-2">
               <Label>الوصف</Label>
@@ -354,27 +381,8 @@ export default function AdminServicesPage() {
                 <Input
                   type="number"
                   value={form.basePrice}
-                  onChange={(e) => setForm({ ...form, basePrice: Number(e.target.value) })}
-                  min={0}
-                />
-              </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>المدة (دقيقة)</Label>
-                <Input
-                  type="number"
-                  value={form.duration}
-                  onChange={(e) => setForm({ ...form, duration: Number(e.target.value) })}
-                  min={1}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>ترتيب العرض</Label>
-                <Input
-                  type="number"
-                  value={form.sortOrder}
-                  onChange={(e) => setForm({ ...form, sortOrder: Number(e.target.value) })}
+                  onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
+                  placeholder="0"
                   min={0}
                 />
               </div>
@@ -385,7 +393,7 @@ export default function AdminServicesPage() {
                   checked={form.isActive}
                   onCheckedChange={(v) => setForm({ ...form, isActive: v })}
                 />
-                <Label>فعّال</Label>
+                <Label>نشطة</Label>
               </div>
               <div className="flex items-center gap-2">
                 <Switch
@@ -411,16 +419,51 @@ export default function AdminServicesPage() {
       <ConfirmDialog
         open={!!toggleTarget}
         onOpenChange={(open) => { if (!open) setToggleTarget(null); }}
-        title={toggleTarget?.isActive ? 'تعطيل الخدمة' : 'تفعيل الخدمة'}
+        title={toggleTarget?.isActive ? 'إيقاف الخدمة' : 'تفعيل الخدمة'}
         description={
           toggleTarget?.isActive
-            ? `هل أنت متأكد من تعطيل خدمة "${toggleTarget.nameAr}"؟`
+            ? `هل أنت متأكد من إيقاف خدمة "${toggleTarget.nameAr}"؟ لن تكون متاحة للمستفيدين.`
             : `هل أنت متأكد من تفعيل خدمة "${toggleTarget?.nameAr ?? ''}"؟`
         }
-        confirmLabel={toggleTarget?.isActive ? 'تعطيل' : 'تفعيل'}
+        confirmLabel={toggleTarget?.isActive ? 'إيقاف' : 'تفعيل'}
         variant={toggleTarget?.isActive ? 'warning' : 'info'}
         onConfirm={handleToggle}
       />
+
+      {/* Delete Confirm */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent dir="rtl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              حذف الخدمة نهائياً
+            </DialogTitle>
+            <DialogDescription>
+              هل أنت متأكد من حذف خدمة &quot;{deleteTarget?.nameAr ?? ''}&quot; نهائياً؟ لا يمكن التراجع عن هذا الإجراء.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+            <div className="flex items-start gap-2">
+              <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
+              <p className="text-sm text-red-700 dark:text-red-400">
+                تحذير: سيتم حذف الخدمة نهائياً. أي طلبات مرتبطة بها قد تتأثر.
+              </p>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)} disabled={isDeleting}>
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleDelete}
+              disabled={isDeleting}
+              variant="destructive"
+            >
+              {isDeleting ? 'جارٍ الحذف...' : 'حذف نهائياً'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

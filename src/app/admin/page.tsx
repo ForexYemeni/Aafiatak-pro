@@ -265,45 +265,53 @@ export default function AdminDashboardPage() {
 
       {/* Stat Cards */}
       <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard
-          icon={<Stethoscope className="w-6 h-6" />}
-          value={dashboard.totalNurses}
-          label="إجمالي الممرضين"
-          variant="admin"
-          trend={
-            dashboard.nurseGrowthRate !== 0
-              ? { value: Math.abs(dashboard.nurseGrowthRate), isPositive: dashboard.nurseGrowthRate >= 0 }
-              : undefined
-          }
-        />
-        <StatCard
-          icon={<Users className="w-6 h-6" />}
-          value={dashboard.totalBeneficiaries}
-          label="إجمالي المستفيدين"
-          variant="admin"
-          trend={
-            dashboard.beneficiaryGrowthRate !== 0
-              ? { value: Math.abs(dashboard.beneficiaryGrowthRate), isPositive: dashboard.beneficiaryGrowthRate >= 0 }
-              : undefined
-          }
-        />
-        <StatCard
-          icon={<ClipboardList className="w-6 h-6" />}
-          value={dashboard.todayOrders}
-          label="طلبات اليوم"
-          variant="admin"
-          trend={
-            dashboard.orderGrowthRate !== 0
-              ? { value: Math.abs(dashboard.orderGrowthRate), isPositive: dashboard.orderGrowthRate >= 0 }
-              : undefined
-          }
-        />
-        <StatCard
-          icon={<Banknote className="w-6 h-6" />}
-          value={<Currency amount={dashboard.todayRevenue} />}
-          label="إيرادات اليوم"
-          variant="admin"
-        />
+        <Link href="/admin/nurses">
+          <StatCard
+            icon={<Stethoscope className="w-6 h-6" />}
+            value={dashboard.totalNurses}
+            label="إجمالي الممرضين"
+            variant="admin"
+            trend={
+              dashboard.nurseGrowthRate !== 0
+                ? { value: Math.abs(dashboard.nurseGrowthRate), isPositive: dashboard.nurseGrowthRate >= 0 }
+                : undefined
+            }
+          />
+        </Link>
+        <Link href="/admin/beneficiaries">
+          <StatCard
+            icon={<Users className="w-6 h-6" />}
+            value={dashboard.totalBeneficiaries}
+            label="إجمالي المستفيدين"
+            variant="admin"
+            trend={
+              dashboard.beneficiaryGrowthRate !== 0
+                ? { value: Math.abs(dashboard.beneficiaryGrowthRate), isPositive: dashboard.beneficiaryGrowthRate >= 0 }
+                : undefined
+            }
+          />
+        </Link>
+        <Link href="/admin/orders">
+          <StatCard
+            icon={<ClipboardList className="w-6 h-6" />}
+            value={dashboard.todayOrders}
+            label="طلبات اليوم"
+            variant="admin"
+            trend={
+              dashboard.orderGrowthRate !== 0
+                ? { value: Math.abs(dashboard.orderGrowthRate), isPositive: dashboard.orderGrowthRate >= 0 }
+                : undefined
+            }
+          />
+        </Link>
+        <Link href="/admin/payments">
+          <StatCard
+            icon={<Banknote className="w-6 h-6" />}
+            value={<Currency amount={dashboard.todayRevenue} />}
+            label="إيرادات اليوم"
+            variant="admin"
+          />
+        </Link>
       </motion.div>
 
       {/* Quick Actions */}

@@ -204,6 +204,11 @@ export const useAuthStore = create<AuthState>()(
           isLoading: false,
           error: null,
         });
+
+        // Navigate to login page
+        if (typeof window !== 'undefined') {
+          window.location.href = '/';
+        }
       },
 
       // ---- Refresh Token ----

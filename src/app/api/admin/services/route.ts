@@ -41,9 +41,12 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    if (!body.nameAr || !body.nameEn || !body.basePrice) {
+    if (!body.nameAr || !body.basePrice) {
       return createErrorResponse('اسم الخدمة والسعر مطلوبان', 400, 'VALIDATION_ERROR');
     }
+
+    // Auto-fill nameEn if not provided
+    if (!body.nameEn) body.nameEn = body.nameAr;
 
     const service = await Service.create(body);
 

@@ -1,8 +1,11 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Bell, Search, Menu } from 'lucide-react';
+import { Moon, Sun, Bell, Search, Menu, X, User, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import {
   DropdownMenu,
@@ -14,6 +17,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useAuthFetch } from '@/hooks/use-auth';
 import type { UserRole } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -43,10 +47,138 @@ function getRoleColor(role: UserRole): string {
   }
 }
 
+function getDashboardPath(role: UserRole): string {
+  switch (role) {
+    case 'admin':
+    case 'subadmin':
+      return '/admin';
+    case 'nurse':
+      return '/nurse';
+    case 'beneficiary':
+      return '/beneficiary';
+    default:
+      return '/';
+  }
+}
+
+function getProfilePath(role: UserRole): string {
+  switch (role) {
+    case 'admin':
+    case 'subadmin':
+      return '/admin/settings';
+    case 'nurse':
+      return '/nurse/profile';
+    case 'beneficiary':
+      return '/beneficiary/profile';
+    default:
+      return '/';
+  }
+}
+
+function getSettingsPath(role: UserRole): string {
+  switch (role) {
+    case 'admin':
+    case 'subadmin':
+      return '/admin/settings';
+    case 'nurse':
+      return '/nurse/profile';
+    case 'beneficiary':
+      return '/beneficiary/profile';
+    default:
+      return '/';
+  }
+}
+
+function getNotificationsPath(role: UserRole): string {
+  switch (role) {
+    case 'admin':
+    case 'subadmin':
+      return '/admin/settings'; // Admin doesn't have separate notifications page yet
+    case 'nurse':
+      return '/nurse/notifications';
+    case 'beneficiary':
+      return '/beneficiary/notifications';
+    default:
+      return '/';
+  }
+}
+
 export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
   const { theme, setTheme } = useTheme();
+  const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
+  const authFetch = useAuthFetch();
+
+  // Search state
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  // Notification count
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Fetch unread notification count
+  useEffect(() => {
+    const fetchCount = async () => {
+      try {
+        const res = await authFetch('/api/notifications?limit=1&unreadOnly=true');
+        const json = await res.json();
+        if (json.success && json.data) {
+          const count = json.data.unreadCount ?? json.data.total ?? 0;
+          setUnreadCount(count);
+        }
+      } catch {
+        // Ignore errors
+      }
+    };
+    fetchCount();
+    // Poll every 30 seconds
+    const interval = setInterval(fetchCount, 30000);
+    return () => clearInterval(interval);
+  }, [authFetch]);
+
+  // Focus search input when shown
+  useEffect(() => {
+    if (showSearch && searchInputRef.current) {
+      searchInputRef.current.focus();
+    }
+  }, [showSearch]);
+
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!searchQuery.trim()) return;
+
+    // Navigate based on role
+    switch (role) {
+      case 'admin':
+      case 'subadmin':
+        // Search could go to nurses or beneficiaries
+        router.push(`/admin/nurses?search=${encodeURIComponent(searchQuery)}`);
+        break;
+      case 'nurse':
+        router.push(`/nurse/requests`);
+        break;
+      case 'beneficiary':
+        router.push(`/beneficiary/orders`);
+        break;
+    }
+    setShowSearch(false);
+    setSearchQuery('');
+  };
+
+  const handleLogout = () => {
+    logout();
+    // Use replace to prevent going back to protected pages
+    router.replace('/');
+  };
+
+  const roleLabel: Record<UserRole, string> = {
+    admin: 'مدير النظام',
+    subadmin: 'مدير فرعي',
+    nurse: 'ممرض/ـة',
+    beneficiary: 'مستفيد/ـة',
+  };
 
   return (
     <header className="sticky top-0 z-30 glass-strong border-b border-border safe-top">
@@ -69,9 +201,35 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
         {/* Right Side Actions */}
         <div className="flex items-center gap-2">
           {/* Search */}
-          <Button variant="ghost" size="icon" className="w-9 h-9">
-            <Search className="w-4 h-4" />
-          </Button>
+          {showSearch ? (
+            <form onSubmit={handleSearch} className="flex items-center gap-2">
+              <Input
+                ref={searchInputRef}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="بحث..."
+                className="w-40 sm:w-56 h-9 text-sm"
+                autoFocus
+              />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="w-9 h-9"
+                onClick={() => { setShowSearch(false); setSearchQuery(''); }}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </form>
+          ) : (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-9 h-9"
+              onClick={() => setShowSearch(true)}
+            >
+              <Search className="w-4 h-4" />
+            </Button>
+          )}
 
           {/* Theme Toggle */}
           <Button
@@ -85,14 +243,21 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
           </Button>
 
           {/* Notifications Bell */}
-          <Button variant="ghost" size="icon" className="w-9 h-9 relative">
+          <Button
+            variant="ghost"
+            size="icon"
+            className="w-9 h-9 relative"
+            onClick={() => router.push(getNotificationsPath(role))}
+          >
             <Bell className="w-4 h-4" />
-            <Badge
-              variant="destructive"
-              className="absolute -top-1 -right-1 w-4 h-4 p-0 flex items-center justify-center text-[10px]"
-            >
-              ٣
-            </Badge>
+            {unreadCount > 0 && (
+              <Badge
+                variant="destructive"
+                className="absolute -top-1 -right-1 min-w-[16px] h-4 p-0 flex items-center justify-center text-[10px]"
+              >
+                {unreadCount > 9 ? '٩+' : unreadCount}
+              </Badge>
+            )}
           </Button>
 
           {/* User Avatar Dropdown */}
@@ -110,16 +275,22 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
               <DropdownMenuLabel>
                 <div className="flex flex-col space-y-1">
                   <p className="text-sm font-medium">{user?.name ?? 'مستخدم'}</p>
-                  <p className="text-xs text-muted-foreground">{user?.phone ?? ''}</p>
+                  <p className="text-xs text-muted-foreground">{roleLabel[role]}</p>
                 </div>
               </DropdownMenuLabel>
               <DropdownMenuSeparator />
-              <DropdownMenuItem>الملف الشخصي</DropdownMenuItem>
-              <DropdownMenuItem>الإعدادات</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(getProfilePath(role))}>
+                <User className="w-4 h-4 ml-2" />
+                الملف الشخصي
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => router.push(getSettingsPath(role))}>
+                <Settings className="w-4 h-4 ml-2" />
+                الإعدادات
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 className="text-destructive focus:text-destructive"
-                onClick={logout}
+                onClick={handleLogout}
               >
                 تسجيل الخروج
               </DropdownMenuItem>
