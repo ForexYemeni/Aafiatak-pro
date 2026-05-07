@@ -85,8 +85,20 @@ export async function POST(request: NextRequest) {
 
     response.headers.set('Set-Cookie', createAuthCookie(token));
     return response;
-  } catch (error) {
+  } catch (error: any) {
     console.error('[AUTH LOGIN ERROR]', error);
-    return createErrorResponse('حدث خطأ أثناء تسجيل الدخول', 500, 'INTERNAL_ERROR');
+    // Return detailed error for debugging (remove in production)
+    return Response.json(
+      {
+        success: false,
+        error: {
+          message: 'حدث خطأ أثناء تسجيل الدخول',
+          code: 'INTERNAL_ERROR',
+          debug: process.env.NODE_ENV === 'production' ? error.message : undefined,
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined,
+        }
+      },
+      { status: 500 }
+    );
   }
 }
