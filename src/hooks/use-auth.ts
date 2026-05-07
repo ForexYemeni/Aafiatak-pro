@@ -109,7 +109,11 @@ export function useAuthFetch() {
 
       const headers = new Headers(options.headers);
       headers.set('Authorization', `Bearer ${currentToken}`);
-      headers.set('Content-Type', 'application/json');
+      // Don't set Content-Type for FormData - browser must set it with boundary automatically
+      const isFormData = options.body instanceof FormData;
+      if (!isFormData) {
+        headers.set('Content-Type', 'application/json');
+      }
 
       let response = await fetch(url, {
         ...options,

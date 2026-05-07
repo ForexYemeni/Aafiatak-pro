@@ -1,5 +1,5 @@
 // POST /api/nurse/documents - Upload nurse documents (ID + License)
-// Supports both JSON (with URL) and FormData (with file) uploads
+// Accepts both identity and license files in a single request
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
@@ -20,14 +20,12 @@ export async function POST(request: NextRequest) {
     }
 
     const contentType = request.headers.get('content-type') || '';
-    let documentType = '';
-    let documentUrl = '';
 
+    // Handle single-file FormData upload (one file at a time)
     if (contentType.includes('multipart/form-data')) {
-      // Handle FormData upload
       const formData = await request.formData();
       const file = formData.get('file') as File | null;
-      documentType = formData.get('type') as string || '';
+      const documentType = formData.get('type') as string || '';
 
       if (!file || !documentType) {
         return createErrorResponse('الملف ونوع المستند مطلوبان', 400, 'VALIDATION_ERROR');
@@ -44,7 +42,12 @@ export async function POST(request: NextRequest) {
         return createErrorResponse('نوع الملف غير مدعوم. يُسمح بصور وملفات PDF فقط', 400, 'INVALID_FILE_TYPE');
       }
 
-      // Save file
+      // Validate document type
+      if (!['identity', 'license'].includes(documentType)) {
+        return createErrorResponse('نوع المستند غير صالح. يجب أن يكون identity أو license', 400, 'VALIDATION_ERROR');
+      }
+
+      // Save file to disk
       const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'nurse', user.userId);
       await mkdir(uploadDir, { recursive: true });
 
@@ -55,42 +58,71 @@ export async function POST(request: NextRequest) {
       const buffer = Buffer.from(await file.arrayBuffer());
       await writeFile(filepath, buffer);
 
-      documentUrl = `/uploads/nurse/${user.userId}/${filename}`;
-    } else {
-      // Handle JSON upload (with URL)
-      const body = await request.json();
-      documentType = body.documentType || body.type;
-      documentUrl = body.documentUrl;
+      const documentUrl = `/uploads/nurse/${user.userId}/${filename}`;
 
-      if (!documentType || !documentUrl) {
-        return createErrorResponse('نوع المستند ورابط المستند مطلوبان', 400, 'VALIDATION_ERROR');
+      // Update nurse document
+      const updateField = documentType === 'identity' ? 'identityDocumentUrl' : 'licenseDocumentUrl';
+      const nurse = await Nurse.findByIdAndUpdate(
+        user.userId,
+        { [updateField]: documentUrl },
+        { new: true }
+      ).select('identityDocumentUrl licenseDocumentUrl verificationStatus name').lean();
+
+      if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+
+      // Check if both documents are uploaded - if so, set verification to pending
+      const bothUploaded = !!(nurse.identityDocumentUrl && nurse.licenseDocumentUrl);
+      if (bothUploaded && nurse.verificationStatus !== 'verified') {
+        await Nurse.findByIdAndUpdate(user.userId, { verificationStatus: 'pending' });
       }
+
+      return Response.json({
+        success: true,
+        data: {
+          identityDocumentUrl: nurse.identityDocumentUrl,
+          licenseDocumentUrl: nurse.licenseDocumentUrl,
+          verificationStatus: bothUploaded && nurse.verificationStatus !== 'verified' ? 'pending' : nurse.verificationStatus,
+          bothUploaded,
+        },
+        message: `تم رفع ${documentType === 'identity' ? 'الهوية الوطنية' : 'مزاولة المهنة'} بنجاح`,
+      });
     }
 
-    const update: any = {};
-    if (documentType === 'identity') {
-      update.identityDocumentUrl = documentUrl;
-    } else if (documentType === 'license') {
-      update.licenseDocumentUrl = documentUrl;
-    } else {
+    // Handle JSON upload (with URL)
+    const body = await request.json();
+    const documentType = body.documentType || body.type;
+    const documentUrl = body.documentUrl;
+
+    if (!documentType || !documentUrl) {
+      return createErrorResponse('نوع المستند ورابط المستند مطلوبان', 400, 'VALIDATION_ERROR');
+    }
+
+    if (!['identity', 'license'].includes(documentType)) {
       return createErrorResponse('نوع المستند غير صالح. يجب أن يكون identity أو license', 400, 'VALIDATION_ERROR');
     }
 
-    const nurse = await Nurse.findByIdAndUpdate(user.userId, update, { new: true })
-      .select('identityDocumentUrl licenseDocumentUrl verificationStatus name')
-      .lean();
+    const updateField = documentType === 'identity' ? 'identityDocumentUrl' : 'licenseDocumentUrl';
+    const nurse = await Nurse.findByIdAndUpdate(
+      user.userId,
+      { [updateField]: documentUrl },
+      { new: true }
+    ).select('identityDocumentUrl licenseDocumentUrl verificationStatus name').lean();
 
     if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
 
-    // Check if both documents are uploaded - if so, set verification to pending
-    const bothUploaded = (nurse.identityDocumentUrl && nurse.licenseDocumentUrl);
+    const bothUploaded = !!(nurse.identityDocumentUrl && nurse.licenseDocumentUrl);
     if (bothUploaded && nurse.verificationStatus !== 'verified') {
       await Nurse.findByIdAndUpdate(user.userId, { verificationStatus: 'pending' });
     }
 
     return Response.json({
       success: true,
-      data: { ...nurse, id: nurse._id.toString(), bothUploaded },
+      data: {
+        identityDocumentUrl: nurse.identityDocumentUrl,
+        licenseDocumentUrl: nurse.licenseDocumentUrl,
+        verificationStatus: bothUploaded && nurse.verificationStatus !== 'verified' ? 'pending' : nurse.verificationStatus,
+        bothUploaded,
+      },
       message: 'تم رفع المستند بنجاح',
     });
   } catch (error) {

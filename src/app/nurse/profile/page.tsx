@@ -105,6 +105,14 @@ export default function NurseProfilePage() {
   const [editGovernorate, setEditGovernorate] = useState('');
   const [editExperience, setEditExperience] = useState('');
 
+  // Document upload state
+  const [identityFile, setIdentityFile] = useState<File | null>(null);
+  const [licenseFile, setLicenseFile] = useState<File | null>(null);
+  const [identityPreview, setIdentityPreview] = useState<string | null>(null);
+  const [licensePreview, setLicensePreview] = useState<string | null>(null);
+  const [isUploadingDocs, setIsUploadingDocs] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
@@ -234,6 +242,125 @@ export default function NurseProfilePage() {
   };
 
 
+
+  // Handle file selection for documents
+  const handleIdentityFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUploadError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('حجم صورة الهوية يجب أن يكون أقل من 10 ميجابايت');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      setUploadError('صورة الهوية يجب أن تكون بصيغة JPEG أو PNG أو WebP');
+      return;
+    }
+    setIdentityFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setIdentityPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleLicenseFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUploadError(null);
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setUploadError('حجم صورة المزاولة يجب أن يكون أقل من 10 ميجابايت');
+      return;
+    }
+    if (!['image/jpeg', 'image/png', 'image/webp', 'image/gif'].includes(file.type)) {
+      setUploadError('صورة المزاولة يجب أن تكون بصيغة JPEG أو PNG أو WebP');
+      return;
+    }
+    setLicenseFile(file);
+    const reader = new FileReader();
+    reader.onload = () => setLicensePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  const handleUploadDocuments = async () => {
+    if (!identityFile && !licenseFile) {
+      setUploadError('يرجى اختيار صورة الهوية الوطنية وصورة مزاولة المهنة');
+      return;
+    }
+    if (!identityFile) {
+      setUploadError('يرجى اختيار صورة الهوية الوطنية');
+      return;
+    }
+    if (!licenseFile) {
+      setUploadError('يرجى اختيار صورة مزاولة المهنة');
+      return;
+    }
+
+    setIsUploadingDocs(true);
+    setUploadError(null);
+
+    try {
+      // Upload identity document
+      const identityFormData = new FormData();
+      identityFormData.append('file', identityFile);
+      identityFormData.append('type', 'identity');
+      const identityRes = await authFetch('/api/nurse/documents', {
+        method: 'POST',
+        body: identityFormData,
+      });
+      const identityData = await identityRes.json();
+      if (!identityData.success) {
+        setUploadError(identityData.message || 'حدث خطأ في رفع صورة الهوية');
+        setIsUploadingDocs(false);
+        return;
+      }
+
+      // Upload license document
+      const licenseFormData = new FormData();
+      licenseFormData.append('file', licenseFile);
+      licenseFormData.append('type', 'license');
+      const licenseRes = await authFetch('/api/nurse/documents', {
+        method: 'POST',
+        body: licenseFormData,
+      });
+      const licenseData = await licenseRes.json();
+      if (!licenseData.success) {
+        setUploadError(licenseData.message || 'حدث خطأ في رفع صورة المزاولة');
+        setIsUploadingDocs(false);
+        return;
+      }
+
+      // Update profile state with new URLs
+      setProfile((prev) => prev ? {
+        ...prev,
+        identityDocumentUrl: identityData.data?.identityDocumentUrl || prev.identityDocumentUrl,
+        licenseDocumentUrl: licenseData.data?.licenseDocumentUrl || prev.licenseDocumentUrl,
+        verificationStatus: identityData.data?.verificationStatus || prev.verificationStatus,
+      } : null);
+
+      // Clear file selection
+      setIdentityFile(null);
+      setLicenseFile(null);
+      setIdentityPreview(null);
+      setLicensePreview(null);
+
+      showToast('تم رفع المستندات بنجاح. سيتم مراجعتها من قبل الإدارة');
+      // Refresh full profile
+      fetchProfile();
+    } catch {
+      setUploadError('حدث خطأ في رفع المستندات. يرجى المحاولة مرة أخرى');
+    } finally {
+      setIsUploadingDocs(false);
+    }
+  };
+
+  const handleRemoveIdentityFile = () => {
+    setIdentityFile(null);
+    setIdentityPreview(null);
+  };
+
+  const handleRemoveLicenseFile = () => {
+    setLicenseFile(null);
+    setLicensePreview(null);
+  };
 
   if (isLoading) {
     return (
@@ -427,96 +554,132 @@ export default function NurseProfilePage() {
 
             <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20">
               <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
-                يجب توثيق حسابك برفع الهوية الوطنية ومزاولة المهنة لاستقبال الطلبات. لن يتم تعيين أي طلب لك حتى يتم توثيق حسابك.
+                يجب توثيق حسابك برفع صورة الهوية الوطنية وصورة مزاولة المهنة لاستقبال الطلبات. لن يتم تعيين أي طلب لك حتى يتم توثيق حسابك.
               </p>
             </div>
 
-            {/* Current Document Status */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className={`p-3 rounded-xl border-2 ${profile.identityDocumentUrl ? 'border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10' : 'border-dashed border-border'}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  {profile.identityDocumentUrl ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <XCircle className="w-4 h-4 text-red-400" />
-                  )}
-                  <span className="text-xs font-medium">الهوية الوطنية</span>
+            {/* Step 1: National ID Image */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${identityPreview || profile.identityDocumentUrl ? 'bg-green-500 text-white' : 'bg-nurse/20 text-nurse'}`}>
+                  {identityPreview || profile.identityDocumentUrl ? <CheckCircle2 className="w-4 h-4" /> : '1'}
                 </div>
-                {profile.identityDocumentUrl ? (
-                  <img src={profile.identityDocumentUrl} alt="الهوية" className="w-full h-20 object-cover rounded-lg" />
-                ) : (
-                  <div className="w-full h-20 bg-muted/30 rounded-lg flex items-center justify-center">
-                    <FileText className="w-8 h-8 text-muted-foreground/50" />
-                  </div>
-                )}
+                <span className="text-sm font-medium">صورة الهوية الوطنية</span>
               </div>
-              <div className={`p-3 rounded-xl border-2 ${profile.licenseDocumentUrl ? 'border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10' : 'border-dashed border-border'}`}>
-                <div className="flex items-center gap-2 mb-2">
-                  {profile.licenseDocumentUrl ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <XCircle className="w-4 h-4 text-red-400" />
-                  )}
-                  <span className="text-xs font-medium">مزاولة المهنة</span>
-                </div>
-                {profile.licenseDocumentUrl ? (
-                  <img src={profile.licenseDocumentUrl} alt="الرخصة" className="w-full h-20 object-cover rounded-lg" />
-                ) : (
-                  <div className="w-full h-20 bg-muted/30 rounded-lg flex items-center justify-center">
-                    <Shield className="w-8 h-8 text-muted-foreground/50" />
+              <div className={`relative rounded-xl border-2 border-dashed overflow-hidden transition-all ${(identityPreview || profile.identityDocumentUrl) ? 'border-green-400 dark:border-green-700' : 'border-border hover:border-nurse/50'}`}>
+                {(identityPreview || profile.identityDocumentUrl) ? (
+                  <div className="relative group">
+                    <img
+                      src={identityPreview || profile.identityDocumentUrl || ''}
+                      alt="الهوية الوطنية"
+                      className="w-full h-36 object-contain bg-muted/20"
+                    />
+                    {identityPreview && (
+                      <button
+                        onClick={handleRemoveIdentityFile}
+                        className="absolute top-2 left-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/50 to-transparent p-2">
+                      <p className="text-[10px] text-white text-center">
+                        {identityPreview ? 'تم اختيار الصورة - في انتظار الرفع' : 'تم رفع الهوية الوطنية'}
+                      </p>
+                    </div>
                   </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center h-36 cursor-pointer hover:bg-muted/20 transition-colors">
+                    <div className="w-12 h-12 rounded-full bg-nurse/10 flex items-center justify-center mb-2">
+                      <Upload className="w-5 h-5 text-nurse" />
+                    </div>
+                    <p className="text-xs text-muted-foreground">اضغط لاختيار صورة الهوية</p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-1">JPEG, PNG, WebP - حد أقصى 10 ميجا</p>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      onChange={handleIdentityFileChange}
+                      className="hidden"
+                    />
+                  </label>
                 )}
               </div>
             </div>
 
+            {/* Step 2: Professional License Image */}
+            <div className="space-y-2">
+              <div className="flex items-center gap-2">
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${licensePreview || profile.licenseDocumentUrl ? 'bg-green-500 text-white' : 'bg-nurse/20 text-nurse'}`}>
+                  {licensePreview || profile.licenseDocumentUrl ? <CheckCircle2 className="w-4 h-4" /> : '2'}
+                </div>
+                <span className="text-sm font-medium">صورة مزاولة المهنة</span>
+              </div>
+              <div className={`relative rounded-xl border-2 border-dashed overflow-hidden transition-all ${(licensePreview || profile.licenseDocumentUrl) ? 'border-green-400 dark:border-green-700' : 'border-border hover:border-nurse/50'}`}>
+                {(licensePreview || profile.licenseDocumentUrl) ? (
+                  <div className="relative group">
+                    <img
+                      src={licensePreview || profile.licenseDocumentUrl || ''}
+                      alt="مزاولة المهنة"
+                      className="w-full h-36 object-contain bg-muted/20"
+                    />
+                    {licensePreview && (
+                      <button
+                        onClick={handleRemoveLicenseFile}
+                        className="absolute top-2 left-2 w-7 h-7 bg-red-500 text-white rounded-full flex items-center justify-center shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
+                      >
+                        <XCircle className="w-4 h-4" />
+                      </button>
+                    )}
+                    <div className="absolute bottom-0 inset-x-0 bg-gradient-to-t from-black/50 to-transparent p-2">
+                      <p className="text-[10px] text-white text-center">
+                        {licensePreview ? 'تم اختيار الصورة - في انتظار الرفع' : 'تم رفع مزاولة المهنة'}
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <label className="flex flex-col items-center justify-center h-36 cursor-pointer hover:bg-muted/20 transition-colors">
+                    <div className="w-12 h-12 rounded-full bg-nurse/10 flex items-center justify-center mb-2">
+                      <Upload className="w-5 h-5 text-nurse" />
+                    </div>
+                    <p className="text-xs text-muted-foreground">اضغط لاختيار صورة المزاولة</p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-1">JPEG, PNG, WebP - حد أقصى 10 ميجا</p>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png,image/webp,image/gif"
+                      onChange={handleLicenseFileChange}
+                      className="hidden"
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+
+            {/* Upload Error */}
+            {uploadError && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                <p className="text-xs text-red-600 dark:text-red-400">{uploadError}</p>
+              </div>
+            )}
+
             {/* Upload Button */}
             <Button
-              className="w-full bg-nurse hover:bg-nurse/90 gap-2"
-              onClick={() => {
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = 'image/*,.pdf';
-                input.multiple = true;
-                input.onchange = async (e) => {
-                  const files = (e.target as HTMLInputElement).files;
-                  if (!files || files.length === 0) return;
-                  
-                  for (let i = 0; i < Math.min(files.length, 2); i++) {
-                    const file = files[i];
-                    const docType = i === 0 ? 'identity' : 'license';
-                    const formData = new FormData();
-                    formData.append('file', file);
-                    formData.append('type', docType);
-                    try {
-                      const res = await authFetch('/api/nurse/documents', {
-                        method: 'POST',
-                        body: formData,
-                      });
-                      const data = await res.json();
-                      if (data.success) {
-                        if (docType === 'identity' && data.data?.identityDocumentUrl) {
-                          setProfile(prev => prev ? { ...prev, identityDocumentUrl: data.data.identityDocumentUrl } : null);
-                        } else if (docType === 'license' && data.data?.licenseDocumentUrl) {
-                          setProfile(prev => prev ? { ...prev, licenseDocumentUrl: data.data.licenseDocumentUrl } : null);
-                        }
-                        showToast(`تم رفع ${docType === 'identity' ? 'الهوية الوطنية' : 'مزاولة المهنة'} بنجاح`);
-                      } else {
-                        showToast('حدث خطأ في رفع المستند');
-                      }
-                    } catch {
-                      showToast('حدث خطأ في رفع المستند');
-                    }
-                  }
-                  // Refresh profile to get updated verification status
-                  fetchProfile();
-                };
-                input.click();
-              }}
+              className="w-full bg-nurse hover:bg-nurse/90 gap-2 h-12 text-base"
+              onClick={handleUploadDocuments}
+              disabled={isUploadingDocs || (!identityFile && !licenseFile)}
             >
-              <Upload className="w-4 h-4" />
-              رفع الهوية والمزاولة
+              {isUploadingDocs ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                  <span>جاري رفع المستندات...</span>
+                </>
+              ) : (
+                <>
+                  <Upload className="w-5 h-5" />
+                  <span>{identityFile && licenseFile ? 'رفع الهوية والمزاولة' : identityFile ? 'رفع الهوية الوطنية' : licenseFile ? 'رفع مزاولة المهنة' : 'رفع المستندات'}</span>
+                </>
+              )}
             </Button>
-            <p className="text-[10px] text-muted-foreground text-center">يمكنك اختيار صورتين معاً - الهوية الوطنية ومزاولة المهنة</p>
+            <p className="text-[10px] text-muted-foreground text-center">اختر صورة الهوية الوطنية ثم صورة مزاولة المهنة واضغط رفع المستندات</p>
           </div>
         )}
       </GlassCard>
