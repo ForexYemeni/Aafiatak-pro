@@ -116,7 +116,9 @@ export default function NurseNotificationsPage() {
       const res = await authFetch('/api/notifications?limit=100');
       const data = await res.json();
       if (data.success && data.data) {
-        setNotifications(data.data as NotificationItem[]);
+        // API returns { notifications: [...], total, unreadCount, ... } in data.data
+        const notificationsArray = Array.isArray(data.data) ? data.data : (data.data.notifications || []);
+        setNotifications(notificationsArray as NotificationItem[]);
       }
     } catch {
       // silently handle

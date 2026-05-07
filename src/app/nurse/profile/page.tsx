@@ -410,7 +410,7 @@ export default function NurseProfilePage() {
           <div className="space-y-3">
             <InfoRow icon={<Phone className="w-4 h-4" />} label="الهاتف" value={profile.phone} />
             <InfoRow icon={<Shield className="w-4 h-4" />} label="رقم الترخيص" value={profile.licenseNumber ?? 'غير محدد'} />
-            <InfoRow icon={<FileText className="w-4 h-4" />} label="التخصص" value={profile.specialization.map((s) => specializationLabels[s] ?? s).join('، ') || 'غير محدد'} />
+            <InfoRow icon={<FileText className="w-4 h-4" />} label="التخصص" value={(profile.specialization || []).map((s) => specializationLabels[s] ?? s).join('، ') || 'غير محدد'} />
             <InfoRow icon={<Clock className="w-4 h-4" />} label="سنوات الخبرة" value={`${toArabicNum(profile.experience)} سنة`} />
             {profile.bio && <InfoRow icon={<User className="w-4 h-4" />} label="نبذة" value={profile.bio} />}
             {profile.address && <InfoRow icon={<User className="w-4 h-4" />} label="العنوان" value={profile.address} />}
@@ -468,7 +468,7 @@ export default function NurseProfilePage() {
           </div>
 
           {/* Document statuses */}
-          {profile.documents.length > 0 && (
+          {profile.documents && profile.documents.length > 0 && (
             <div className="mt-2 space-y-2">
               {profile.documents.map((doc) => (
                 <div key={doc.id} className="flex items-center justify-between text-xs px-1">
