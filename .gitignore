@@ -87,3 +87,4 @@ prisma/migrations/
 # Aafiatak specific
 worklog.md
 agent-ctx/
+workflow
