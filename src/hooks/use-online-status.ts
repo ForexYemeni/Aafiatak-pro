@@ -1,7 +1,6 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { syncManager } from '@/lib/db/sync-manager';
 
 interface OnlineStatus {
   isOnline: boolean;
@@ -25,8 +24,12 @@ export function useOnlineStatus(): OnlineStatus {
     if (wasOfflineRef.current) {
       setWasOffline(true);
 
-      // Trigger sync when coming back online
-      void syncManager.fullSync();
+      // Trigger sync when coming back online (lazy loaded)
+      import('@/lib/db/sync-manager').then(({ syncManager }) => {
+        void syncManager.fullSync();
+      }).catch(() => {
+        // Sync not available
+      });
 
       // Reset wasOffline after a delay
       setTimeout(() => {

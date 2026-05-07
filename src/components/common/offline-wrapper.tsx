@@ -1,20 +1,39 @@
 'use client';
 
-import { type ReactNode, useEffect, useState, useCallback } from 'react';
+import { type ReactNode, useEffect, useState, useCallback, useRef } from 'react';
 import { WifiOff, Wifi, RefreshCw, CloudOff, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOnlineStatus } from '@/hooks/use-online-status';
-import { syncManager } from '@/lib/db/sync-manager';
-import { offlineQueue } from '@/lib/db/offline-queue';
 
 interface OfflineWrapperProps {
-  children: ReactNode;
+  children?: ReactNode;
 }
 
 interface QueueStatus {
   pending: number;
   processing: number;
   failed: number;
+}
+
+// Lazy loaded module references
+let offlineQueueModule: typeof import('@/lib/db/offline-queue') | null = null;
+let syncManagerModule: typeof import('@/lib/db/sync-manager') | null = null;
+
+async function loadOfflineModules() {
+  if (!offlineQueueModule) {
+    try {
+      offlineQueueModule = await import('@/lib/db/offline-queue');
+    } catch {
+      // Module not available
+    }
+  }
+  if (!syncManagerModule) {
+    try {
+      syncManagerModule = await import('@/lib/db/sync-manager');
+    } catch {
+      // Module not available
+    }
+  }
 }
 
 export function OfflineWrapper({ children }: OfflineWrapperProps) {
@@ -26,24 +45,32 @@ export function OfflineWrapper({ children }: OfflineWrapperProps) {
   });
   const [isSyncing, setIsSyncing] = useState(false);
   const [showBackOnline, setShowBackOnline] = useState(false);
+  const mountedRef = useRef(true);
 
   // Update queue status periodically
   const updateQueueStatus = useCallback(async () => {
     try {
-      const status = await offlineQueue.getStatus();
-      setQueueStatus(status);
+      await loadOfflineModules();
+      if (offlineQueueModule) {
+        const status = await offlineQueueModule.offlineQueue.getStatus();
+        if (mountedRef.current) setQueueStatus(status);
+      }
     } catch {
       // IndexedDB might not be available
     }
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     void updateQueueStatus();
     const interval = setInterval(() => {
       void updateQueueStatus();
     }, 10000);
 
-    return () => clearInterval(interval);
+    return () => {
+      mountedRef.current = false;
+      clearInterval(interval);
+    };
   }, [updateQueueStatus]);
 
   // Show "back online" notification
@@ -52,13 +79,12 @@ export function OfflineWrapper({ children }: OfflineWrapperProps) {
       setShowBackOnline(true);
       setIsSyncing(true);
 
-      // Simulate sync completion after a delay
       const syncTimeout = setTimeout(() => {
-        setIsSyncing(false);
+        if (mountedRef.current) setIsSyncing(false);
       }, 3000);
 
       const hideTimeout = setTimeout(() => {
-        setShowBackOnline(false);
+        if (mountedRef.current) setShowBackOnline(false);
       }, 4000);
 
       return () => {
@@ -72,10 +98,11 @@ export function OfflineWrapper({ children }: OfflineWrapperProps) {
   const handleRetry = useCallback(async () => {
     setIsSyncing(true);
     try {
-      await offlineQueue.retryFailed();
-      await syncManager.fullSync();
+      await loadOfflineModules();
+      if (offlineQueueModule) await offlineQueueModule.offlineQueue.retryFailed();
+      if (syncManagerModule) await syncManagerModule.syncManager.fullSync();
     } finally {
-      setIsSyncing(false);
+      if (mountedRef.current) setIsSyncing(false);
       await updateQueueStatus();
     }
   }, [updateQueueStatus]);
@@ -153,7 +180,7 @@ export function OfflineWrapper({ children }: OfflineWrapperProps) {
         )}
       </AnimatePresence>
 
-      {/* Pending Operations Indicator (shown when online but has pending work) */}
+      {/* Pending Operations Indicator */}
       <AnimatePresence>
         {isOnline && !showBackOnline && hasPendingWork && (
           <motion.div
