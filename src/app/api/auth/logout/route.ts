@@ -1,49 +1,35 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createClearAuthCookie, extractUserFromRequest } from '@/lib/auth/middleware';
-import { db } from '@/lib/prisma';
+// POST /api/auth/logout - Logout user and clear cookie
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
-// ---- POST /api/auth/logout ----
+import { NextRequest } from 'next/server';
+import { createClearAuthCookie, createErrorResponse } from '@/lib/auth';
+import { logActivity } from '@/lib/api/helpers';
+import { requireAuth } from '@/lib/auth/middleware';
 
 export async function POST(request: NextRequest) {
   try {
-    // Try to extract user for activity logging (optional - don't block logout)
-    const user = await extractUserFromRequest(request);
+    const { user } = requireAuth(request);
 
+    // Log activity (best effort)
     if (user) {
-      try {
-        const ipAddress = request.headers.get('x-forwarded-for') ?? request.headers.get('x-real-ip') ?? 'unknown';
-        await db.activityLog.create({
-          data: {
-            userId: user.userId,
-            userRole: user.role,
-            action: 'logout',
-            details: 'تسجيل خروج',
-            ipAddress: ipAddress.split(',')[0]?.trim() ?? 'unknown',
-          },
-        });
-      } catch {
-        // Activity logging should not block logout
-      }
+      await logActivity({
+        userId: user.userId,
+        userRole: user.role,
+        action: 'logout',
+        details: 'تسجيل خروج',
+        request,
+      });
     }
 
-    const response = NextResponse.json(
-      { success: true, data: null, message: 'تم تسجيل الخروج بنجاح' },
-      { status: 200 }
-    );
-
-    // Clear auth cookie
-    response.headers.set('Set-Cookie', createClearAuthCookie());
-
-    return response;
-  } catch {
-    // Even if something goes wrong, still clear the cookie and return success
-    const response = NextResponse.json(
-      { success: true, data: null, message: 'تم تسجيل الخروج بنجاح' },
-      { status: 200 }
-    );
+    const response = Response.json({
+      success: true,
+      message: 'تم تسجيل الخروج بنجاح',
+    });
 
     response.headers.set('Set-Cookie', createClearAuthCookie());
-
     return response;
+  } catch (error) {
+    console.error('[AUTH LOGOUT ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء تسجيل الخروج', 500, 'INTERNAL_ERROR');
   }
 }

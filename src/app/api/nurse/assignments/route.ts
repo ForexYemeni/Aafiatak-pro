@@ -1,44 +1,43 @@
-// GET /api/nurse/assignments - List assigned tasks
+// GET /api/nurse/assignments - Get nurse assignments
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, paginatedResponse, handleApiError,
-  parsePagination, paginate,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { ServiceRequest, EmergencyRequest } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'nurse');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
-    const status = url.searchParams.get('status') ?? '';
+    if (user.role !== 'nurse') {
+      return createErrorResponse('هذا الإجراء متاح للممرضين فقط', 403, 'FORBIDDEN');
+    }
 
-    const where: Record<string, unknown> = { nurseId: user.userId };
-    if (status) where.status = status;
+    const { searchParams } = new URL(request.url);
+    const status = searchParams.get('status') || 'active';
 
-    const [assignments, total] = await Promise.all([
-      db.serviceAssignment.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { assignedAt: 'desc' },
-        include: {
-          request: {
-            include: {
-              service: { select: { id: true, nameAr: true, nameEn: true, category: true, basePrice: true, duration: true } },
-              beneficiary: { select: { id: true, name: true, phone: true } },
-            },
-          },
-        },
-      }),
-      db.serviceAssignment.count({ where }),
-    ]);
+    const filter: any = { nurseId: user.userId };
+    if (status === 'active') {
+      filter.status = { $in: ['assigned', 'accepted', 'in_progress'] };
+    } else if (status === 'completed') {
+      filter.status = 'completed';
+    } else if (status === 'all') {
+      // No status filter
+    } else {
+      filter.status = status;
+    }
 
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(assignments, pagination);
+    const assignments = await ServiceRequest.find(filter).sort({ createdAt: -1 }).limit(50).lean();
+
+    return Response.json({
+      success: true,
+      data: assignments.map((a: any) => ({ ...a, id: a._id.toString() })),
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[NURSE ASSIGNMENTS ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب التعيينات', 500, 'INTERNAL_ERROR');
   }
 }

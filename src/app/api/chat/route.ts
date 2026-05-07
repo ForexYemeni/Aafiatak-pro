@@ -1,44 +1,73 @@
-// GET /api/chat - List chats for current user
+// GET/POST /api/chat - List/Create chats
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireAuth, paginatedResponse, handleApiError,
-  parsePagination, paginate, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Chat, ChatMessage } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
-
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
     // Find chats where user is a participant
-    const allChats = await db.chat.findMany({
-      where: { isActive: true },
-      orderBy: { lastMessageAt: 'desc' },
+    const chats = await Chat.find({
+      'participants.userId': user.userId,
+      isActive: true,
+    })
+      .sort({ lastMessageAt: -1 })
+      .lean();
+
+    return Response.json({
+      success: true,
+      data: chats.map((c: any) => ({ ...c, id: c._id.toString() })),
     });
-
-    // Filter chats where user is a participant (JSON field)
-    const userChats = allChats.filter((chat) => {
-      const participants = safeJsonParse<Array<{ userId: string; role: string }>>(chat.participants, []);
-      return participants.some((p) => p.userId === user.userId);
-    });
-
-    // Apply pagination
-    const total = userChats.length;
-    const paginatedChats = userChats.slice(skip, skip + limit);
-
-    const chatsWithParsed = paginatedChats.map((chat) => ({
-      ...chat,
-      participants: safeJsonParse<Array<{ userId: string; role: string; joinedAt: string }>>(chat.participants, []),
-      unreadCount: safeJsonParse<Record<string, number>>(chat.unreadCount, {}),
-    }));
-
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(chatsWithParsed, pagination);
   } catch (error) {
-    return handleApiError(error);
+    console.error('[CHAT LIST ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب المحادثات', 500, 'INTERNAL_ERROR');
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
+    const body = await request.json();
+    const { participantId, participantRole, requestId } = body;
+
+    if (!participantId) {
+      return createErrorResponse('معرف المشارك مطلوب', 400, 'VALIDATION_ERROR');
+    }
+
+    // Check if chat already exists between these users
+    let chat = await Chat.findOne({
+      'participants.userId': { $all: [user.userId, participantId] },
+      isActive: true,
+    }).lean();
+
+    if (!chat) {
+      // Create new chat
+      chat = await Chat.create({
+        participants: [
+          { userId: user.userId, role: user.role, joinedAt: new Date() },
+          { userId: participantId, role: participantRole || 'nurse', joinedAt: new Date() },
+        ],
+        requestId: requestId || undefined,
+        unreadCount: {},
+        isActive: true,
+      });
+    }
+
+    return Response.json({
+      success: true,
+      data: { ...chat.toObject(), id: chat._id.toString() },
+    }, { status: 201 });
+  } catch (error) {
+    console.error('[CHAT CREATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء إنشاء المحادثة', 500, 'INTERNAL_ERROR');
   }
 }

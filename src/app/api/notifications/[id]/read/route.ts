@@ -1,35 +1,34 @@
-// PATCH /api/notifications/[id]/read - Mark notification as read
+// POST /api/notifications/[id]/read - Mark notification as read
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireAuth, successResponse, handleApiError,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Notification } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireAuth(request);
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
     const { id } = await params;
 
-    const notification = await db.notification.findUnique({ where: { id } });
-    if (!notification) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الإشعار' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
+    const notification = await Notification.findOneAndUpdate(
+      { _id: id, userId: user.userId },
+      { read: true },
+      { new: true }
+    ).lean();
 
-    if (notification.userId !== user.userId) {
-      return new Response(JSON.stringify({ success: false, error: 'FORBIDDEN', message: 'ليس لديك صلاحية للوصول لهذا الإشعار' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
-    }
+    if (!notification) return createErrorResponse('الإشعار غير موجود', 404, 'NOT_FOUND');
 
-    await db.notification.update({
-      where: { id },
-      data: { read: true },
+    return Response.json({
+      success: true,
+      data: { ...notification, id: notification._id.toString() },
+      message: 'تم قراءة الإشعار',
     });
-
-    return successResponse(null, 'تم تحديد الإشعار كمقروء');
   } catch (error) {
-    return handleApiError(error);
+    console.error('[NOTIFICATION READ ERROR]', error);
+    return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
   }
 }

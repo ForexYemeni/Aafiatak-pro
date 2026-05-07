@@ -1,172 +1,93 @@
-import { verifyToken } from '@/lib/auth';
-import type { AuthenticatedRequest, UserRole, TokenPayload, ApiResponse } from '@/types';
+// ============================================================================
+// عافيتك (Aafiatak) Auth Middleware - MongoDB/Mongoose based
+// ============================================================================
+// Authentication middleware for Next.js API routes
+// NO Firebase, NO Prisma - MongoDB only
+// ============================================================================
 
-// ---- Authenticate Request ----
+import { NextRequest } from 'next/server';
+import { verifyToken, createErrorResponse } from './index';
+
+// Re-export createErrorResponse for convenience in API routes
+export { createErrorResponse } from './index';
+
+// ---- Get Auth User ----
 
 /**
  * Extract and verify JWT from Authorization header or cookies.
- * Returns an AuthenticatedRequest with the decoded user payload.
- * Throws an Error if no valid token is found.
+ * Returns the decoded user payload or null if unauthenticated.
  */
-export async function authenticateRequest(request: Request): Promise<AuthenticatedRequest> {
-  let token: string | null = null;
-
+export function getAuthUser(request: NextRequest): { userId: string; phone: string; role: string } | null {
   // 1. Try Authorization header (Bearer token)
   const authHeader = request.headers.get('Authorization');
+  let token: string | null = null;
+
   if (authHeader?.startsWith('Bearer ')) {
-    token = authHeader.slice(7).trim();
+    token = authHeader.substring(7);
   }
 
   // 2. Try cookie
   if (!token) {
-    const cookieHeader = request.headers.get('Cookie');
-    if (cookieHeader) {
-      const cookies = parseCookies(cookieHeader);
-      if (cookies['auth-token']) {
-        token = cookies['auth-token'];
-      }
+    const cookieToken = request.cookies.get('auth_token')?.value;
+    if (cookieToken) {
+      token = cookieToken;
     }
   }
 
   // 3. No token found
-  if (!token) {
-    throw new AuthError('لم يتم العثور على رمز المصادقة', 401);
-  }
+  if (!token) return null;
 
   // 4. Verify token
   const payload = verifyToken(token);
-  if (!payload) {
-    throw new AuthError('رمز المصادقة غير صالح أو منتهي الصلاحية', 401);
+  if (!payload) return null;
+
+  return payload;
+}
+
+// ---- Require Auth ----
+
+/**
+ * Require authentication. Returns user payload or an error response.
+ */
+export function requireAuth(request: NextRequest): {
+  user: { userId: string; phone: string; role: string };
+  error: null;
+} | {
+  user: null;
+  error: Response;
+} {
+  const user = getAuthUser(request);
+  if (!user) {
+    return {
+      user: null,
+      error: createErrorResponse('غير مصرح. يرجى تسجيل الدخول', 401, 'UNAUTHORIZED'),
+    };
   }
-
-  // 5. Return authenticated request
-  const authenticatedRequest = Object.create(request, {
-    user: {
-      value: payload,
-      writable: false,
-      configurable: false,
-    },
-  }) as AuthenticatedRequest;
-
-  return authenticatedRequest;
+  return { user, error: null };
 }
 
 // ---- Require Role ----
 
 /**
- * Higher-order function that checks if the authenticated user has the required role.
- * Returns a function that takes a request and returns the authenticated user if authorized,
- * or throws an AuthError if not.
+ * Require authentication with specific role(s).
+ * Returns user payload if authorized, or an error response.
  */
-export function requireRole(...roles: UserRole[]) {
-  return async (request: Request): Promise<AuthenticatedRequest> => {
-    const authenticatedReq = await authenticateRequest(request);
+export function requireRole(request: NextRequest, roles: string[]): {
+  user: { userId: string; phone: string; role: string };
+  error: null;
+} | {
+  user: null;
+  error: Response;
+} {
+  const result = requireAuth(request);
+  if (result.error) return result;
 
-    if (!roles.includes(authenticatedReq.user.role)) {
-      throw new AuthError('ليس لديك صلاحية للوصول إلى هذا المورد', 403);
-    }
-
-    return authenticatedReq;
-  };
-}
-
-// ---- Create Auth Response ----
-
-/**
- * Create a JSON response with standard API response format.
- */
-export function createAuthResponse(data: unknown, status: number = 200): Response {
-  const responseBody: ApiResponse<unknown> = {
-    success: true,
-    data,
-  };
-
-  return new Response(JSON.stringify(responseBody), {
-    status,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-}
-
-/**
- * Create an error response with standard API response format.
- */
-export function createErrorResponse(message: string, statusCode: number, error?: string): Response {
-  const responseBody: ApiResponse<never> = {
-    success: false,
-    error: error ?? 'AUTH_ERROR',
-    message,
-    statusCode,
-  };
-
-  return new Response(JSON.stringify(responseBody), {
-    status: statusCode,
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-}
-
-// ---- Custom Auth Error ----
-
-export class AuthError extends Error {
-  public readonly statusCode: number;
-
-  constructor(message: string, statusCode: number = 401) {
-    super(message);
-    this.name = 'AuthError';
-    this.statusCode = statusCode;
-  }
-}
-
-// ---- Cookie Helpers ----
-
-/**
- * Parse a cookie header string into a key-value object.
- */
-function parseCookies(cookieHeader: string): Record<string, string> {
-  const cookies: Record<string, string> = {};
-
-  const pairs = cookieHeader.split(';');
-  for (const pair of pairs) {
-    const trimmed = pair.trim();
-    const eqIndex = trimmed.indexOf('=');
-    if (eqIndex > 0) {
-      const key = trimmed.slice(0, eqIndex).trim();
-      const value = trimmed.slice(eqIndex + 1).trim();
-      cookies[key] = decodeURIComponent(value);
-    }
+  if (!roles.includes(result.user.role)) {
+    return {
+      user: null,
+      error: createErrorResponse('ليس لديك صلاحية لهذا الإجراء', 403, 'FORBIDDEN'),
+    };
   }
 
-  return cookies;
-}
-
-/**
- * Create a Set-Cookie header value for the auth token.
- */
-export function createAuthCookie(token: string, maxAge: number = 7 * 24 * 60 * 60): string {
-  return `auth-token=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
-}
-
-/**
- * Create a Set-Cookie header value that clears the auth token.
- */
-export function createClearAuthCookie(): string {
-  return 'auth-token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0';
-}
-
-// ---- Extract User from Request (utility) ----
-
-/**
- * Extract the TokenPayload from a request, or return null if unauthenticated.
- * Does not throw - useful for optional auth scenarios.
- */
-export async function extractUserFromRequest(request: Request): Promise<TokenPayload | null> {
-  try {
-    const authenticatedReq = await authenticateRequest(request);
-    return authenticatedReq.user;
-  } catch {
-    return null;
-  }
+  return result;
 }

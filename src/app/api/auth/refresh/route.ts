@@ -1,54 +1,68 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { verifyRefreshToken, generateToken, generateRefreshToken } from '@/lib/auth';
-import { createAuthCookie, createErrorResponse } from '@/lib/auth/middleware';
-import type { RefreshTokenRequest, RefreshTokenResponse } from '@/types';
+// POST /api/auth/refresh - Refresh JWT access token
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
-// ---- POST /api/auth/refresh ----
+import { NextRequest } from 'next/server';
+import { connectDB } from '@/lib/mongodb';
+import { User, Nurse, Beneficiary } from '@/models/mongoose';
+import {
+  verifyRefreshToken,
+  generateToken,
+  generateRefreshToken,
+  createAuthCookie,
+  createErrorResponse,
+} from '@/lib/auth';
 
 export async function POST(request: NextRequest) {
   try {
-    const body: RefreshTokenRequest = await request.json();
-    const { refreshToken } = body;
+    await connectDB();
+    const { refreshToken } = await request.json();
 
     if (!refreshToken) {
       return createErrorResponse('رمز التحديث مطلوب', 400, 'VALIDATION_ERROR');
     }
 
-    // Verify the refresh token
     const payload = verifyRefreshToken(refreshToken);
     if (!payload) {
       return createErrorResponse('رمز التحديث غير صالح أو منتهي الصلاحية', 401, 'INVALID_REFRESH_TOKEN');
     }
 
+    // Verify user still exists and is active
+    let user: any = null;
+    if (payload.role === 'nurse') {
+      user = await Nurse.findById(payload.userId).select('-password').lean();
+    } else if (payload.role === 'beneficiary') {
+      user = await Beneficiary.findById(payload.userId).select('-password').lean();
+    } else {
+      user = await User.findById(payload.userId).select('-password').lean();
+    }
+
+    if (!user || !user.isActive) {
+      return createErrorResponse('الحساب غير موجود أو معطل', 401, 'ACCOUNT_INVALID');
+    }
+
     // Generate new tokens
-    const newToken = generateToken({
-      userId: payload.userId,
-      phone: payload.phone,
-      role: payload.role,
-    });
-
-    const newRefreshToken = generateRefreshToken({
-      userId: payload.userId,
-      phone: payload.phone,
-      role: payload.role,
-    });
-
-    const responseData: RefreshTokenResponse = {
-      token: newToken,
-      refreshToken: newRefreshToken,
+    const newTokenPayload = {
+      userId: user._id.toString(),
+      phone: user.phone,
+      role: user.role,
     };
 
-    const response = NextResponse.json(
-      { success: true, data: responseData, message: 'تم تجديد رمز المصادقة بنجاح' },
-      { status: 200 }
-    );
+    const newToken = generateToken(newTokenPayload);
+    const newRefreshToken = generateRefreshToken(newTokenPayload);
 
-    // Set new auth cookie
+    const response = Response.json({
+      success: true,
+      data: {
+        token: newToken,
+        refreshToken: newRefreshToken,
+      },
+      message: 'تم تجديد الرمز بنجاح',
+    });
+
     response.headers.set('Set-Cookie', createAuthCookie(newToken));
-
     return response;
   } catch (error) {
     console.error('[AUTH REFRESH ERROR]', error);
-    return createErrorResponse('حدث خطأ أثناء تجديد رمز المصادقة', 500, 'INTERNAL_ERROR');
+    return createErrorResponse('حدث خطأ أثناء تجديد الرمز', 500, 'INTERNAL_ERROR');
   }
 }

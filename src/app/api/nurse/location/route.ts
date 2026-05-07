@@ -1,34 +1,46 @@
-// POST /api/nurse/location - Update GPS location
+// POST /api/nurse/location - Update nurse GPS location
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, validateRequired,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Nurse } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'nurse');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const body = await request.json();
-    const validationError = validateRequired(body, ['lat', 'lng']);
-    if (validationError) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: validationError }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (user.role !== 'nurse') {
+      return createErrorResponse('هذا الإجراء متاح للممرضين فقط', 403, 'FORBIDDEN');
     }
 
-    await db.nurse.update({
-      where: { id: user.userId },
-      data: {
-        lat: body.lat,
-        lng: body.lng,
-        locationUpdatedAt: new Date(),
-        isOnline: true,
-        lastActiveAt: new Date(),
-      },
-    });
+    const { lat, lng } = await request.json();
 
-    return successResponse({ lat: body.lat, lng: body.lng, updatedAt: new Date().toISOString() }, 'تم تحديث الموقع بنجاح');
+    if (typeof lat !== 'number' || typeof lng !== 'number') {
+      return createErrorResponse('إحداثيات الموقع مطلوبة', 400, 'VALIDATION_ERROR');
+    }
+
+    if (lat < -90 || lat > 90 || lng < -180 || lng > 180) {
+      return createErrorResponse('إحداثيات الموقع غير صالحة', 400, 'VALIDATION_ERROR');
+    }
+
+    const nurse = await Nurse.findByIdAndUpdate(
+      user.userId,
+      { lat, lng, locationUpdatedAt: new Date() },
+      { new: true }
+    ).select('lat lng locationUpdatedAt').lean();
+
+    if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+
+    return Response.json({
+      success: true,
+      data: { lat: nurse.lat, lng: nurse.lng, updatedAt: nurse.locationUpdatedAt },
+      message: 'تم تحديث الموقع بنجاح',
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[NURSE LOCATION ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء تحديث الموقع', 500, 'INTERNAL_ERROR');
   }
 }

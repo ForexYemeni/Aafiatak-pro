@@ -1,72 +1,66 @@
-// GET /api/admin/settings - Get platform settings
-// PATCH /api/admin/settings - Update platform settings
+// GET/PATCH /api/admin/settings - Get/update platform settings
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { AdminSettings } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { logActivity } from '@/lib/api/helpers';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
 
-    let settings = await db.adminSettings.findFirst();
+    let settings = await AdminSettings.findOne().lean();
     if (!settings) {
-      // Create default settings
-      settings = await db.adminSettings.create({ data: {} });
+      // Create default settings if none exist
+      settings = await AdminSettings.create({});
+      settings = settings.toObject();
     }
 
-    return successResponse(settings);
+    return Response.json({ success: true, data: { ...settings, id: settings._id.toString() } });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN SETTINGS GET ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب الإعدادات', 500, 'INTERNAL_ERROR');
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
 
     const body = await request.json();
+    delete body._id;
 
-    let settings = await db.adminSettings.findFirst();
+    let settings = await AdminSettings.findOne();
     if (!settings) {
-      settings = await db.adminSettings.create({ data: {} });
+      settings = await AdminSettings.create(body);
+    } else {
+      Object.assign(settings, body);
+      await settings.save();
     }
-
-    const allowedFields = [
-      'commissionRate', 'emergencyFee', 'nightFeePercent', 'fridayFeePercent',
-      'nightStartHour', 'nightEndHour', 'minOrderAmount', 'loyaltyPointsPerOrder',
-      'loyaltyRedemptionThreshold', 'referralReward', 'maxNurseAssignmentRadius',
-      'autoAssignEnabled', 'emergencyAutoDispatch', 'maintenanceMode',
-      'maintenanceMessageAr', 'maintenanceMessageEn', 'supportPhone', 'supportWhatsApp',
-      'termsAndConditionsAr', 'termsAndConditionsEn', 'privacyPolicyAr', 'privacyPolicyEn',
-    ];
-
-    const updateData: Record<string, unknown> = {};
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
-      }
-    }
-
-    const updated = await db.adminSettings.update({
-      where: { id: settings.id },
-      data: updateData,
-    });
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'update_settings',
       entity: 'AdminSettings',
-      entityId: settings.id,
-      details: 'تم تحديث إعدادات المنصة',
+      details: 'تحديث إعدادات المنصة',
       request,
     });
 
-    return successResponse(updated, 'تم تحديث الإعدادات بنجاح');
+    const settingsObj = settings.toObject();
+    return Response.json({
+      success: true,
+      data: { ...settingsObj, id: settingsObj._id.toString() },
+      message: 'تم تحديث الإعدادات بنجاح',
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN SETTINGS UPDATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء تحديث الإعدادات', 500, 'INTERNAL_ERROR');
   }
 }

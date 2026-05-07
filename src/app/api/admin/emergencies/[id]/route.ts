@@ -1,96 +1,65 @@
-// GET /api/admin/emergencies/[id] - Get emergency details
-// PATCH /api/admin/emergencies/[id] - Update emergency status
+// GET/PATCH /api/admin/emergencies/[id] - Get/update emergency request
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { EmergencyRequest } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { logActivity } from '@/lib/api/helpers';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
+
     const { id } = await params;
+    const emergency = await EmergencyRequest.findById(id).lean();
+    if (!emergency) return createErrorResponse('طلب الطوارئ غير موجود', 404, 'NOT_FOUND');
 
-    const emergency = await db.emergencyRequest.findUnique({
-      where: { id },
-      include: {
-        beneficiary: { select: { id: true, name: true, phone: true } },
-        nurse: { select: { id: true, name: true, phone: true, rating: true } },
-        assignments: {
-          include: { nurse: { select: { id: true, name: true, phone: true } } },
-        },
-        transactions: true,
-      },
-    });
-
-    if (!emergency) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الطلب الطارئ' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    return successResponse(emergency);
+    return Response.json({ success: true, data: { ...emergency, id: emergency._id.toString() } });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN EMERGENCY DETAIL ERROR]', error);
+    return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
+
     const { id } = await params;
-
-    const emergency = await db.emergencyRequest.findUnique({ where: { id } });
-    if (!emergency) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الطلب الطارئ' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
     const body = await request.json();
-    const updateData: Record<string, unknown> = {};
 
-    if (body.status) {
-      const validStatuses = ['pending', 'dispatched', 'in_progress', 'resolved', 'cancelled'];
-      if (!validStatuses.includes(body.status)) {
-        return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: 'حالة الطوارئ غير صالحة' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-      }
-      updateData.status = body.status;
+    delete body._id;
 
-      if (body.status === 'dispatched') updateData.dispatchedAt = new Date();
-      if (body.status === 'in_progress') updateData.arrivedAt = new Date();
-      if (body.status === 'resolved') updateData.resolvedAt = new Date();
-      if (body.status === 'cancelled') {
-        updateData.cancelledAt = new Date();
-        updateData.cancelReason = body.cancelReason ?? null;
+    const updateData: any = { ...body };
+    if (body.status === 'dispatched') updateData.dispatchedAt = new Date();
+    if (body.status === 'resolved') {
+      updateData.resolvedAt = new Date();
+      if (updateData.dispatchedAt) {
+        updateData.responseTime = Math.round((Date.now() - new Date(updateData.dispatchedAt).getTime()) / 1000);
       }
     }
 
-    if (body.nurseId !== undefined) updateData.nurseId = body.nurseId;
-    if (body.priority) updateData.priority = body.priority;
-    if (body.notes !== undefined) updateData.notes = body.notes;
-    if (body.feedbackRating !== undefined) updateData.feedbackRating = body.feedbackRating;
-
-    const updated = await db.emergencyRequest.update({
-      where: { id },
-      data: updateData,
-    });
+    const emergency = await EmergencyRequest.findByIdAndUpdate(id, updateData, { new: true }).lean();
+    if (!emergency) return createErrorResponse('طلب الطوارئ غير موجود', 404, 'NOT_FOUND');
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'update_emergency',
       entity: 'EmergencyRequest',
       entityId: id,
-      details: `تم تحديث حالة الطوارئ ${id} إلى ${body.status ?? emergency.status}`,
+      details: `تحديث حالة طلب الطوارئ إلى: ${body.status || 'محدث'}`,
       request,
     });
 
-    return successResponse(updated, 'تم تحديث حالة الطوارئ بنجاح');
+    return Response.json({ success: true, data: { ...emergency, id: emergency._id.toString() }, message: 'تم تحديث طلب الطوارئ بنجاح' });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN EMERGENCY UPDATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');
   }
 }

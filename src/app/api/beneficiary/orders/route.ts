@@ -1,177 +1,151 @@
-// GET /api/beneficiary/orders - List service requests
-// POST /api/beneficiary/orders - Create service request
+// GET/POST /api/beneficiary/orders - List/Create orders
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, paginatedResponse, handleApiError,
-  parsePagination, paginate, logActivity, validateRequired, calculatePricing,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { ServiceRequest, Service, Beneficiary, AdminSettings, Transaction, Coupon, Notification } from '@/models/mongoose';
+import { createErrorResponse } from '@/lib/auth';
+import { requireAuth } from '@/lib/auth/middleware';
+import { calculatePricing } from '@/lib/api/helpers';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'beneficiary');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
-    const status = url.searchParams.get('status') ?? '';
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
+    }
 
-    const where: Record<string, unknown> = { beneficiaryId: user.userId };
-    if (status) where.status = status;
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const status = searchParams.get('status');
+
+    const filter: any = { beneficiaryId: user.userId };
+    if (status) filter.status = status;
 
     const [orders, total] = await Promise.all([
-      db.serviceRequest.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          service: { select: { id: true, nameAr: true, nameEn: true, category: true, icon: true, basePrice: true, duration: true } },
-          nurse: { select: { id: true, name: true, phone: true, rating: true, specialization: true } },
-          rating: true,
-        },
-      }),
-      db.serviceRequest.count({ where }),
+      ServiceRequest.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      ServiceRequest.countDocuments(filter),
     ]);
 
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(orders, pagination);
+    return Response.json({
+      success: true,
+      data: {
+        orders: orders.map((o: any) => ({ ...o, id: o._id.toString() })),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[BENEFICIARY ORDERS LIST ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب الطلبات', 500, 'INTERNAL_ERROR');
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'beneficiary');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
+    }
 
     const body = await request.json();
-    const validationError = validateRequired(body, ['serviceId', 'address', 'lat', 'lng']);
-    if (validationError) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: validationError }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    const { serviceId, scheduledAt, notes, address, lat, lng, isEmergency, paymentMethod, couponCode, loyaltyPointsToRedeem } = body;
+
+    if (!serviceId) {
+      return createErrorResponse('معرف الخدمة مطلوب', 400, 'VALIDATION_ERROR');
     }
 
-    // Get service
-    const service = await db.service.findUnique({ where: { id: body.serviceId } });
-    if (!service || !service.isActive) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'الخدمة غير متاحة' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
+    // Get service details
+    const service = await Service.findById(serviceId).lean();
+    if (!service) return createErrorResponse('الخدمة غير موجودة', 404, 'NOT_FOUND');
+    if (!service.isActive) return createErrorResponse('الخدمة غير متاحة', 400, 'SERVICE_INACTIVE');
 
     // Get settings for pricing
-    let settings = await db.adminSettings.findFirst();
-    if (!settings) {
-      settings = await db.adminSettings.create({ data: {} });
-    }
+    let settings = await AdminSettings.findOne().lean();
+    if (!settings) settings = await AdminSettings.create({});
 
     // Calculate pricing
-    const scheduledAt = body.scheduledAt ? new Date(body.scheduledAt) : new Date();
-    const hour = scheduledAt.getHours();
-    const dayOfWeek = scheduledAt.getDay();
+    const now = new Date();
+    const scheduledDate = scheduledAt ? new Date(scheduledAt) : now;
+    const hour = scheduledDate.getHours();
     const isNightService = hour >= settings.nightStartHour || hour < settings.nightEndHour;
-    const isFridayService = dayOfWeek === 5; // Friday in most Arab countries
+    const isFridayService = scheduledDate.getDay() === 5;
 
-    // Apply coupon if provided
+    // Coupon discount
     let couponDiscount = 0;
-    let couponId: string | null = null;
-    if (body.couponCode) {
-      const coupon = await db.coupon.findUnique({ where: { code: body.couponCode } });
-      if (coupon && coupon.isActive && coupon.usedCount < coupon.maxUses && new Date(coupon.expiresAt) > new Date() && service.basePrice >= coupon.minOrderAmount) {
-        couponDiscount = service.basePrice * (coupon.discountPercent / 100);
-        if (coupon.maxDiscountAmount && couponDiscount > coupon.maxDiscountAmount) {
-          couponDiscount = coupon.maxDiscountAmount;
-        }
-        couponId = coupon.id;
-      }
-    }
-
-    // Apply loyalty points if requested
-    let loyaltyDiscount = 0;
-    if (body.loyaltyPointsToRedeem && body.loyaltyPointsToRedeem > 0) {
-      const beneficiary = await db.beneficiary.findUnique({ where: { id: user.userId } });
-      if (beneficiary && beneficiary.loyaltyPoints >= body.loyaltyPointsToRedeem && body.loyaltyPointsToRedeem >= (settings.loyaltyRedemptionThreshold)) {
-        loyaltyDiscount = body.loyaltyPointsToRedeem; // 1 point = 1 ر.ي
+    let couponId: string | undefined;
+    if (couponCode) {
+      const coupon = await Coupon.findOne({ code: couponCode.toUpperCase(), isActive: true, expiresAt: { $gt: now } });
+      if (coupon && coupon.usedCount < coupon.maxUses && service.basePrice >= coupon.minOrderAmount) {
+        couponDiscount = Math.min(
+          service.basePrice * (coupon.discountPercent / 100),
+          coupon.maxDiscountAmount || Infinity
+        );
+        couponId = coupon._id.toString();
       }
     }
 
     const pricing = calculatePricing({
       basePrice: service.basePrice,
-      isEmergency: body.isEmergency ?? false,
+      isEmergency: isEmergency || false,
       isNightService,
       isFridayService,
       commissionRate: settings.commissionRate,
       emergencyFee: settings.emergencyFee,
       nightFeePercent: settings.nightFeePercent,
       fridayFeePercent: settings.fridayFeePercent,
-      loyaltyDiscount,
       couponDiscount,
     });
 
-    const serviceRequest = await db.serviceRequest.create({
-      data: {
-        serviceId: body.serviceId,
-        beneficiaryId: user.userId,
-        status: 'pending',
-        basePrice: pricing.basePrice,
-        nightFee: pricing.nightFee,
-        fridayFee: pricing.fridayFee,
-        emergencyFee: pricing.emergencyFee,
-        discount: pricing.discount,
-        loyaltyDiscount: pricing.loyaltyDiscount,
-        couponDiscount: pricing.couponDiscount,
-        totalPrice: pricing.totalPrice,
-        commission: pricing.commission,
-        nursePayout: pricing.nursePayout,
-        beneficiaryLat: body.lat,
-        beneficiaryLng: body.lng,
-        beneficiaryAddress: body.address,
-        notes: body.notes ?? null,
-        scheduledAt,
-        isEmergency: body.isEmergency ?? false,
-        isNightService,
-        isFridayService,
-        paymentMethod: body.paymentMethod ?? null,
-        paymentStatus: 'pending',
-        couponId,
-      },
+    // Create the order
+    const order = await ServiceRequest.create({
+      serviceId,
+      beneficiaryId: user.userId,
+      status: 'pending',
+      basePrice: pricing.basePrice,
+      nightFee: pricing.nightFee,
+      fridayFee: pricing.fridayFee,
+      emergencyFee: pricing.emergencyFee,
+      discount: pricing.discount,
+      totalPrice: pricing.totalPrice,
+      commission: pricing.commission,
+      nursePayout: pricing.nursePayout,
+      beneficiaryLat: lat,
+      beneficiaryLng: lng,
+      beneficiaryAddress: address,
+      notes,
+      scheduledAt: scheduledDate,
+      isEmergency: isEmergency || false,
+      isNightService,
+      isFridayService,
+      paymentStatus: 'pending',
+      paymentMethod: paymentMethod || 'cash',
+      couponId,
     });
 
-    // Deduct loyalty points if used
-    if (loyaltyDiscount > 0 && body.loyaltyPointsToRedeem) {
-      await db.beneficiary.update({
-        where: { id: user.userId },
-        data: { loyaltyPoints: { decrement: body.loyaltyPointsToRedeem } },
-      });
-      await db.loyaltyTransaction.create({
-        data: {
-          beneficiaryId: user.userId,
-          points: body.loyaltyPointsToRedeem,
-          type: 'redeem',
-          referenceId: serviceRequest.id,
-          description: `استخدام نقاط الولاء للطلب ${serviceRequest.id}`,
-        },
-      });
-    }
-
-    // Increment coupon usage
+    // Update coupon usage
     if (couponId) {
-      await db.coupon.update({
-        where: { id: couponId },
-        data: { usedCount: { increment: 1 } },
-      });
+      await Coupon.findByIdAndUpdate(couponId, { $inc: { usedCount: 1 } });
     }
 
-    await logActivity({
-      userId: user.userId,
-      userRole: 'beneficiary',
-      action: 'create_order',
-      entity: 'ServiceRequest',
-      entityId: serviceRequest.id,
-      details: `تم إنشاء طلب خدمة جديد: ${service.nameAr}`,
-      request,
-    });
+    // Update beneficiary order count
+    await Beneficiary.findByIdAndUpdate(user.userId, { $inc: { orderCount: 1 } });
 
-    return successResponse(serviceRequest, 'تم إنشاء طلب الخدمة بنجاح', 201);
+    return Response.json({
+      success: true,
+      data: { ...order.toObject(), id: order._id.toString() },
+      message: 'تم إنشاء الطلب بنجاح',
+    }, { status: 201 });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[BENEFICIARY ORDERS CREATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء إنشاء الطلب', 500, 'INTERNAL_ERROR');
   }
 }

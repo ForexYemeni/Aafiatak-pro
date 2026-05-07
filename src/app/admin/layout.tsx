@@ -12,12 +12,12 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
-      router.replace('/login?redirect=/admin');
+      router.replace('/?redirect=/admin');
       return;
     }
     if (!isLoading && isAuthenticated && user) {
       if (user.role !== 'admin' && user.role !== 'subadmin') {
-        router.replace('/login?redirect=/admin');
+        router.replace('/?redirect=/admin');
       }
     }
   }, [isLoading, isAuthenticated, user, router]);

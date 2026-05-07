@@ -17,7 +17,7 @@ export default function NurseLayout({ children }: NurseLayoutProps) {
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || user?.role !== 'nurse')) {
-      router.replace('/login?redirect=/nurse');
+      router.replace('/?redirect=/nurse');
     }
   }, [isAuthenticated, isLoading, user, router]);
 

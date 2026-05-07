@@ -1,51 +1,31 @@
 // GET /api/beneficiary/services - List available services
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, paginatedResponse, handleApiError,
-  parsePagination, paginate, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Service } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole(request, 'beneficiary');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
-    const category = url.searchParams.get('category') ?? '';
-    const search = url.searchParams.get('search') ?? '';
-    const isEmergency = url.searchParams.get('isEmergency');
+    const { searchParams } = new URL(request.url);
+    const category = searchParams.get('category');
 
-    const where: Record<string, unknown> = { isActive: true };
-    if (category) where.category = category;
-    if (isEmergency !== null && isEmergency !== '') where.isEmergency = isEmergency === 'true';
-    if (search) {
-      where.OR = [
-        { nameAr: { contains: search } },
-        { nameEn: { contains: search } },
-      ];
-    }
+    const filter: any = { isActive: true };
+    if (category) filter.category = category;
 
-    const [services, total] = await Promise.all([
-      db.service.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { sortOrder: 'asc' },
-      }),
-      db.service.count({ where }),
-    ]);
+    const services = await Service.find(filter).sort({ sortOrder: 1, nameAr: 1 }).lean();
 
-    const parsed = services.map((s) => ({
-      ...s,
-      requirements: safeJsonParse<string[]>(s.requirements, []),
-      includedItems: safeJsonParse<string[]>(s.includedItems, []),
-    }));
-
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(parsed, pagination);
+    return Response.json({
+      success: true,
+      data: services.map((s: any) => ({ ...s, id: s._id.toString() })),
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[BENEFICIARY SERVICES ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب الخدمات', 500, 'INTERNAL_ERROR');
   }
 }

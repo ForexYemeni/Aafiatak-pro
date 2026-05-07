@@ -1,49 +1,47 @@
 // GET /api/admin/emergencies - List emergency requests
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, paginatedResponse, handleApiError,
-  parsePagination, paginate,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { EmergencyRequest } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
-    const status = url.searchParams.get('status') ?? '';
-    const type = url.searchParams.get('type') ?? '';
-    const priority = url.searchParams.get('priority') ?? '';
-    const sortBy = url.searchParams.get('sortBy') ?? 'createdAt';
-    const sortOrder = url.searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const status = searchParams.get('status');
+    const priority = searchParams.get('priority');
 
-    const where: Record<string, unknown> = {};
-    if (status) where.status = status;
-    if (type) where.type = type;
-    if (priority) where.priority = priority;
+    const filter: any = {};
+    if (status) filter.status = status;
+    if (priority) filter.priority = priority;
 
     const [emergencies, total] = await Promise.all([
-      db.emergencyRequest.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { [sortBy]: sortOrder },
-        include: {
-          beneficiary: { select: { id: true, name: true, phone: true } },
-          nurse: { select: { id: true, name: true, phone: true } },
-          assignments: {
-            include: { nurse: { select: { id: true, name: true, phone: true } } },
-          },
-        },
-      }),
-      db.emergencyRequest.count({ where }),
+      EmergencyRequest.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      EmergencyRequest.countDocuments(filter),
     ]);
 
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(emergencies, pagination);
+    return Response.json({
+      success: true,
+      data: {
+        emergencies: emergencies.map((e: any) => ({ ...e, id: e._id.toString() })),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN EMERGENCIES ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب طلبات الطوارئ', 500, 'INTERNAL_ERROR');
   }
 }

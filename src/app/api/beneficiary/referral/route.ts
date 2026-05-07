@@ -1,40 +1,45 @@
-// GET /api/beneficiary/referral - Referral info
+// GET /api/beneficiary/referral - Get referral info
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Beneficiary, Referral } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'beneficiary');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const beneficiary = await db.beneficiary.findUnique({
-      where: { id: user.userId },
-      select: { referralCode: true, name: true },
-    });
-
-    if (!beneficiary) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المستفيد' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
     }
 
-    const referrals = await db.referral.findMany({
-      where: { referrerId: user.userId },
-      orderBy: { createdAt: 'desc' },
-    });
+    const [beneficiary, referrals] = await Promise.all([
+      Beneficiary.findById(user.userId).select('referralCode referredBy').lean(),
+      Referral.find({ referrerId: user.userId }).sort({ createdAt: -1 }).lean(),
+    ]);
 
-    const settings = await db.adminSettings.findFirst();
+    if (!beneficiary) return createErrorResponse('المستفيد غير موجود', 404, 'NOT_FOUND');
 
-    return successResponse({
-      code: beneficiary.referralCode,
-      reward: settings?.referralReward ?? 50,
-      totalReferrals: referrals.length,
-      completedReferrals: referrals.filter((r) => r.status === 'completed' || r.status === 'rewarded').length,
-      pendingReferrals: referrals.filter((r) => r.status === 'pending').length,
-      referrals,
+    const totalReferrals = referrals.length;
+    const completedReferrals = referrals.filter((r: any) => ['completed', 'rewarded'].includes(r.status)).length;
+    const totalRewards = referrals.reduce((sum: number, r: any) => sum + (r.status === 'rewarded' ? r.reward : 0), 0);
+
+    return Response.json({
+      success: true,
+      data: {
+        referralCode: beneficiary.referralCode,
+        referredBy: beneficiary.referredBy,
+        totalReferrals,
+        completedReferrals,
+        totalRewards,
+        referrals: referrals.map((r: any) => ({ ...r, id: r._id.toString() })),
+      },
     });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[BENEFICIARY REFERRAL ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب معلومات الإحالة', 500, 'INTERNAL_ERROR');
   }
 }

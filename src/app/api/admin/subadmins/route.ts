@@ -1,102 +1,95 @@
-// GET /api/admin/subadmins - List sub-admins
-// POST /api/admin/subadmins - Create sub-admin
+// GET/POST /api/admin/subadmins - List/Create sub-admins
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import { hashPassword } from '@/lib/auth';
-import {
-  requireRole, successResponse, paginatedResponse, handleApiError,
-  parsePagination, paginate, logActivity, validateRequired, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { User } from '@/models/mongoose';
+import { hashPassword, generateReferralCode, createErrorResponse } from '@/lib/auth';
+import { requireRole } from '@/lib/auth/middleware';
+import { logActivity } from '@/lib/api/helpers';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
-    const search = url.searchParams.get('search') ?? '';
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
 
-    const where: Record<string, unknown> = {};
-    if (search) {
-      where.OR = [
-        { name: { contains: search } },
-        { phone: { contains: search } },
-      ];
-    }
+    const filter: any = { role: 'subadmin' };
 
-    const [subAdmins, total] = await Promise.all([
-      db.subAdmin.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        select: {
-          id: true, name: true, phone: true, email: true, permissions: true,
-          isActive: true, adminId: true, lastLoginAt: true, createdAt: true, updatedAt: true,
-        },
-      }),
-      db.subAdmin.count({ where }),
+    const [subadmins, total] = await Promise.all([
+      User.find(filter).select('-password').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      User.countDocuments(filter),
     ]);
 
-    const parsed = subAdmins.map((sa) => ({
-      ...sa,
-      permissions: safeJsonParse<string[]>(sa.permissions, []),
-    }));
-
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(parsed, pagination);
+    return Response.json({
+      success: true,
+      data: {
+        subadmins: subadmins.map((s: any) => ({ ...s, id: s._id.toString() })),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN SUBADMINS LIST ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب المشرفين', 500, 'INTERNAL_ERROR');
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
 
     const body = await request.json();
-    const validationError = validateRequired(body, ['name', 'phone', 'password']);
-    if (validationError) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: validationError }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    const { name, phone, password } = body;
+
+    if (!name || !phone || !password) {
+      return createErrorResponse('الاسم ورقم الهاتف وكلمة المرور مطلوبون', 400, 'VALIDATION_ERROR');
     }
 
-    const existingPhone = await db.subAdmin.findUnique({ where: { phone: body.phone } })
-      ?? await db.admin.findUnique({ where: { phone: body.phone } })
-      ?? await db.nurse.findUnique({ where: { phone: body.phone } })
-      ?? await db.beneficiary.findUnique({ where: { phone: body.phone } });
-
-    if (existingPhone) {
-      return new Response(JSON.stringify({ success: false, error: 'CONFLICT', message: 'رقم الهاتف مستخدم بالفعل' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+    if (password.length < 6) {
+      return createErrorResponse('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 400, 'VALIDATION_ERROR');
     }
 
-    const hashedPassword = await hashPassword(body.password);
+    // Check if phone already exists
+    const existing = await User.findOne({ phone });
+    if (existing) {
+      return createErrorResponse('رقم الهاتف مسجل بالفعل', 409, 'PHONE_EXISTS');
+    }
 
-    const subAdmin = await db.subAdmin.create({
-      data: {
-        name: body.name,
-        phone: body.phone,
-        password: hashedPassword,
-        email: body.email ?? null,
-        permissions: JSON.stringify(body.permissions ?? []),
-        adminId: user.userId,
-        isActive: true,
-      },
+    const hashedPassword = await hashPassword(password);
+
+    const subadmin = await User.create({
+      name,
+      phone,
+      password: hashedPassword,
+      role: 'subadmin',
+      isActive: true,
     });
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'create_subadmin',
-      entity: 'SubAdmin',
-      entityId: subAdmin.id,
-      details: `تم إنشاء مشرف فرعي جديد: ${subAdmin.name}`,
+      entity: 'User',
+      entityId: subadmin._id.toString(),
+      details: `إنشاء مشرف جديد: ${name}`,
       request,
     });
 
-    const { password: _, ...data } = subAdmin;
-    return successResponse({ ...data, permissions: safeJsonParse<string[]>(subAdmin.permissions, []) }, 'تم إنشاء المشرف الفرعي بنجاح', 201);
+    return Response.json({
+      success: true,
+      data: { id: subadmin._id.toString(), name: subadmin.name, phone: subadmin.phone, role: subadmin.role, isActive: subadmin.isActive },
+      message: 'تم إنشاء المشرف بنجاح',
+    }, { status: 201 });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN SUBADMINS CREATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء إنشاء المشرف', 500, 'INTERNAL_ERROR');
   }
 }

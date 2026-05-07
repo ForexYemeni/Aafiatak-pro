@@ -1,105 +1,63 @@
-// GET /api/admin/orders/[id] - Get order details
-// PATCH /api/admin/orders/[id] - Update order status
+// GET/PATCH /api/admin/orders/[id] - Get/update order
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { ServiceRequest } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { logActivity } from '@/lib/api/helpers';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
+
     const { id } = await params;
+    const order = await ServiceRequest.findById(id).lean();
+    if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
-    const order = await db.serviceRequest.findUnique({
-      where: { id },
-      include: {
-        service: true,
-        beneficiary: { select: { id: true, name: true, phone: true, governorate: true } },
-        nurse: { select: { id: true, name: true, phone: true, rating: true } },
-        assignments: {
-          include: { nurse: { select: { id: true, name: true, phone: true } } },
-          orderBy: { assignedAt: 'desc' },
-        },
-        transactions: true,
-        rating: true,
-      },
-    });
-
-    if (!order) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الطلب' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    return successResponse(order);
+    return Response.json({ success: true, data: { ...order, id: order._id.toString() } });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN ORDER DETAIL ERROR]', error);
+    return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
+
     const { id } = await params;
-
-    const order = await db.serviceRequest.findUnique({ where: { id } });
-    if (!order) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الطلب' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
     const body = await request.json();
-    const updateData: Record<string, unknown> = {};
 
-    if (body.status) {
-      const validStatuses = ['pending', 'assigned', 'accepted', 'in_progress', 'completed', 'cancelled', 'rejected'];
-      if (!validStatuses.includes(body.status)) {
-        return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: 'حالة الطلب غير صالحة' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-      }
-      updateData.status = body.status;
+    delete body._id;
 
-      if (body.status === 'in_progress' && !order.startedAt) {
-        updateData.startedAt = new Date();
-      }
-      if (body.status === 'completed') {
-        updateData.completedAt = new Date();
-      }
-      if (body.status === 'cancelled') {
-        updateData.cancelledAt = new Date();
-        updateData.cancelReason = body.cancelReason ?? null;
-        updateData.cancelledBy = user.userId;
-      }
+    const updateData: any = { ...body };
+    if (body.status === 'completed') updateData.completedAt = new Date();
+    if (body.status === 'cancelled') {
+      updateData.cancelledAt = new Date();
+      updateData.cancelReason = body.cancelReason || 'إلغاء بواسطة الإدارة';
     }
 
-    if (body.paymentStatus) {
-      updateData.paymentStatus = body.paymentStatus;
-    }
-    if (body.notes !== undefined) {
-      updateData.notes = body.notes;
-    }
-
-    const updated = await db.serviceRequest.update({
-      where: { id },
-      data: updateData,
-    });
+    const order = await ServiceRequest.findByIdAndUpdate(id, updateData, { new: true }).lean();
+    if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'update_order',
       entity: 'ServiceRequest',
       entityId: id,
-      details: `تم تحديث حالة الطلب ${id} إلى ${body.status ?? order.status}`,
+      details: `تحديث حالة الطلب إلى: ${body.status || 'محدث'}`,
       request,
     });
 
-    return successResponse(updated, 'تم تحديث الطلب بنجاح');
+    return Response.json({ success: true, data: { ...order, id: order._id.toString() }, message: 'تم تحديث الطلب بنجاح' });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN ORDER UPDATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');
   }
 }

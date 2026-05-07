@@ -1,73 +1,53 @@
-// GET /api/nurse/schedule - Weekly schedule
+// GET /api/nurse/schedule - Get nurse schedule
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { ServiceRequest } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'nurse');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const weekStart = url.searchParams.get('weekStart');
+    if (user.role !== 'nurse') {
+      return createErrorResponse('هذا الإجراء متاح للممرضين فقط', 403, 'FORBIDDEN');
+    }
 
-    const now = new Date();
-    const startOfWeek = weekStart ? new Date(weekStart) : new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay());
-    const endOfWeek = new Date(startOfWeek);
-    endOfWeek.setDate(endOfWeek.getDate() + 7);
+    const { searchParams } = new URL(request.url);
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
 
-    // Get accepted and in-progress assignments for this week
-    const assignments = await db.serviceAssignment.findMany({
-      where: {
-        nurseId: user.userId,
-        status: { in: ['accepted', 'pending'] },
-        request: {
-          scheduledAt: {
-            gte: startOfWeek,
-            lt: endOfWeek,
-          },
-        },
-      },
-      include: {
-        request: {
-          include: {
-            service: { select: { id: true, nameAr: true, nameEn: true, duration: true } },
-            beneficiary: { select: { id: true, name: true, phone: true, address: true } },
-          },
-        },
-      },
-      orderBy: { assignedAt: 'asc' },
-    });
+    const filter: any = {
+      nurseId: user.userId,
+      status: { $in: ['assigned', 'accepted', 'in_progress', 'completed'] },
+    };
 
-    // Get emergency assignments for this week
-    const emergencyAssignments = await db.emergencyAssignment.findMany({
-      where: {
-        nurseId: user.userId,
-        status: { in: ['pending', 'accepted'] },
-        assignedAt: {
-          gte: startOfWeek,
-          lt: endOfWeek,
-        },
-      },
-      include: {
-        emergencyRequest: {
-          include: {
-            beneficiary: { select: { id: true, name: true, phone: true, address: true } },
-          },
-        },
-      },
-      orderBy: { assignedAt: 'asc' },
-    });
+    if (dateFrom || dateTo) {
+      filter.scheduledAt = {};
+      if (dateFrom) filter.scheduledAt.$gte = new Date(dateFrom);
+      if (dateTo) filter.scheduledAt.$lte = new Date(dateTo);
+    } else {
+      // Default: upcoming 7 days
+      const now = new Date();
+      const weekFromNow = new Date(now);
+      weekFromNow.setDate(weekFromNow.getDate() + 7);
+      filter.scheduledAt = { $gte: now, $lte: weekFromNow };
+    }
 
-    return successResponse({
-      weekStart: startOfWeek.toISOString(),
-      weekEnd: endOfWeek.toISOString(),
-      assignments,
-      emergencyAssignments,
+    const schedule = await ServiceRequest.find(filter)
+      .sort({ scheduledAt: 1 })
+      .limit(50)
+      .lean();
+
+    return Response.json({
+      success: true,
+      data: schedule.map((s: any) => ({ ...s, id: s._id.toString() })),
     });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[NURSE SCHEDULE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب الجدول', 500, 'INTERNAL_ERROR');
   }
 }

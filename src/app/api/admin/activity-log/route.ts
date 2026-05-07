@@ -1,48 +1,54 @@
 // GET /api/admin/activity-log - List activity logs
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, paginatedResponse, handleApiError,
-  parsePagination, paginate,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { ActivityLog } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
-    const action = url.searchParams.get('action') ?? '';
-    const userId = url.searchParams.get('userId') ?? '';
-    const userRole = url.searchParams.get('userRole') ?? '';
-    const dateFrom = url.searchParams.get('dateFrom');
-    const dateTo = url.searchParams.get('dateTo');
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const action = searchParams.get('action');
+    const userRole = searchParams.get('userRole');
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
 
-    const where: Record<string, unknown> = {};
-    if (action) where.action = { contains: action };
-    if (userId) where.userId = userId;
-    if (userRole) where.userRole = userRole;
+    const filter: any = {};
+    if (action) filter.action = action;
+    if (userRole) filter.userRole = userRole;
     if (dateFrom || dateTo) {
-      const createdAt: Record<string, Date> = {};
-      if (dateFrom) createdAt.gte = new Date(dateFrom);
-      if (dateTo) createdAt.lte = new Date(dateTo);
-      where.createdAt = createdAt;
+      filter.createdAt = {};
+      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) filter.createdAt.$lte = new Date(dateTo);
     }
 
     const [logs, total] = await Promise.all([
-      db.activityLog.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      db.activityLog.count({ where }),
+      ActivityLog.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      ActivityLog.countDocuments(filter),
     ]);
 
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(logs, pagination);
+    return Response.json({
+      success: true,
+      data: {
+        logs: logs.map((l: any) => ({ ...l, id: l._id.toString() })),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN ACTIVITY LOG ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب سجل النشاط', 500, 'INTERNAL_ERROR');
   }
 }

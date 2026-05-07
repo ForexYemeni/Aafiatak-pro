@@ -18,7 +18,7 @@ const PROTECTED_ROUTES: RouteProtection[] = [
 ];
 
 // Paths that should redirect away from login if already authenticated
-const AUTH_PATHS = ['/login', '/register'];
+const AUTH_PATHS = ['/', '/login', '/register'];
 
 // ---- JWT Secret (Edge-compatible) ----
 
@@ -168,7 +168,7 @@ export async function middleware(request: NextRequest) {
 
   // ---- No token found, redirect to login ----
   if (!token) {
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl = new URL('/', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     const response = NextResponse.redirect(loginUrl);
     return applySecurityHeaders(request, response);
@@ -179,7 +179,7 @@ export async function middleware(request: NextRequest) {
 
   if (!userRole) {
     // Token is invalid/expired, clear cookie and redirect to login
-    const loginUrl = new URL('/login', request.url);
+    const loginUrl = new URL('/', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     const response = NextResponse.redirect(loginUrl);
     response.cookies.delete('auth-token');

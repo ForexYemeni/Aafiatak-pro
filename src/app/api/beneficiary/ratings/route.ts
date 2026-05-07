@@ -1,113 +1,134 @@
-// POST /api/beneficiary/ratings - Rate service/nurse
+// GET/POST /api/beneficiary/ratings - List/Create ratings
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, validateRequired, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Rating, ServiceRequest, Nurse, Notification } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+
+export async function GET(request: NextRequest) {
+  try {
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
+    }
+
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+
+    const [ratings, total] = await Promise.all([
+      Rating.find({ fromUserId: user.userId })
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Rating.countDocuments({ fromUserId: user.userId }),
+    ]);
+
+    return Response.json({
+      success: true,
+      data: {
+        ratings: ratings.map((r: any) => ({ ...r, id: r._id.toString() })),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
+  } catch (error) {
+    console.error('[BENEFICIARY RATINGS LIST ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب التقييمات', 500, 'INTERNAL_ERROR');
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'beneficiary');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
+    }
 
     const body = await request.json();
-    const validationError = validateRequired(body, ['requestId', 'score']);
-    if (validationError) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: validationError }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    const { requestId, score, comment, tags, isAnonymous } = body;
+
+    if (!requestId || !score) {
+      return createErrorResponse('معرف الطلب والتقييم مطلوبان', 400, 'VALIDATION_ERROR');
     }
 
-    if (body.score < 1 || body.score > 5) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: 'التقييم يجب أن يكون بين 1 و 5' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (score < 1 || score > 5) {
+      return createErrorResponse('التقييم يجب أن يكون بين 1 و 5', 400, 'VALIDATION_ERROR');
     }
 
-    const serviceRequest = await db.serviceRequest.findUnique({
-      where: { id: body.requestId },
-    });
+    // Verify order exists and belongs to user
+    const order = await ServiceRequest.findOne({ _id: requestId, beneficiaryId: user.userId });
+    if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
-    if (!serviceRequest) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الطلب' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    if (serviceRequest.beneficiaryId !== user.userId) {
-      return new Response(JSON.stringify({ success: false, error: 'FORBIDDEN', message: 'لا يمكنك تقييم هذا الطلب' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    if (serviceRequest.status !== 'completed') {
-      return new Response(JSON.stringify({ success: false, error: 'INVALID_STATUS', message: 'لا يمكن تقييم طلب غير مكتمل' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    if (!serviceRequest.nurseId) {
-      return new Response(JSON.stringify({ success: false, error: 'NO_NURSE', message: 'لا يوجد ممرض مرتبط بهذا الطلب' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (order.status !== 'completed') {
+      return createErrorResponse('يمكن تقييم الطلبات المكتملة فقط', 400, 'INVALID_STATUS');
     }
 
     // Check if already rated
-    const existingRating = await db.rating.findUnique({
-      where: { requestId: body.requestId },
-    });
-
+    const existingRating = await Rating.findOne({ requestId });
     if (existingRating) {
-      return new Response(JSON.stringify({ success: false, error: 'ALREADY_RATED', message: 'تم تقييم هذا الطلب بالفعل' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+      return createErrorResponse('تم تقييم هذا الطلب بالفعل', 409, 'ALREADY_RATED');
     }
 
-    const rating = await db.rating.create({
-      data: {
-        requestId: body.requestId,
-        fromUserId: user.userId,
-        toUserId: serviceRequest.nurseId,
-        fromRole: 'beneficiary',
-        toRole: 'nurse',
-        score: body.score,
-        comment: body.comment ?? null,
-        tags: JSON.stringify(body.tags ?? []),
-        isAnonymous: body.isAnonymous ?? false,
-      },
-    });
-
-    // Update nurse's average rating
-    const nurseRatings = await db.rating.findMany({
-      where: { toUserId: serviceRequest.nurseId, toRole: 'nurse' },
-      select: { score: true },
-    });
-    const avgRating = nurseRatings.reduce((sum, r) => sum + r.score, 0) / nurseRatings.length;
-
-    await db.nurse.update({
-      where: { id: serviceRequest.nurseId },
-      data: {
-        rating: Math.round(avgRating * 10) / 10,
-        reviewCount: nurseRatings.length,
-      },
-    });
-
-    // Award loyalty points for rating
-    const settings = await db.adminSettings.findFirst();
-    if (settings) {
-      await db.beneficiary.update({
-        where: { id: user.userId },
-        data: { loyaltyPoints: { increment: 5 } },
-      });
-      await db.loyaltyTransaction.create({
-        data: {
-          beneficiaryId: user.userId,
-          points: 5,
-          type: 'earn',
-          referenceId: rating.id,
-          description: 'نقاط مكافأة للتقييم',
-        },
-      });
+    if (!order.nurseId) {
+      return createErrorResponse('لا يوجد ممرض مُعيَّن لهذا الطلب', 400, 'NO_NURSE');
     }
 
-    await logActivity({
-      userId: user.userId,
-      userRole: 'beneficiary',
-      action: 'rate_service',
-      entity: 'Rating',
-      entityId: rating.id,
-      details: `تم تقييم الخدمة بـ ${body.score}/5`,
-      request,
+    // Create rating
+    const rating = await Rating.create({
+      requestId,
+      fromUserId: user.userId,
+      toUserId: order.nurseId,
+      fromRole: 'beneficiary',
+      toRole: 'nurse',
+      score,
+      comment,
+      tags: tags || [],
+      isAnonymous: isAnonymous || false,
     });
 
-    return successResponse(rating, 'تم إرسال التقييم بنجاح', 201);
+    // Update nurse rating
+    const nurseRatings = await Rating.find({ toUserId: order.nurseId });
+    const totalScore = nurseRatings.reduce((sum: number, r: any) => sum + r.score, 0);
+    const avgRating = nurseRatings.length > 0 ? totalScore / nurseRatings.length : 0;
+
+    await Nurse.findByIdAndUpdate(order.nurseId, {
+      rating: Math.round(avgRating * 10) / 10,
+      reviewCount: nurseRatings.length,
+    });
+
+    // Notify nurse
+    try {
+      await Notification.create({
+        userId: order.nurseId,
+        userRole: 'nurse',
+        titleAr: 'تقييم جديد',
+        bodyAr: `حصلت على تقييم ${score} من 5${comment ? `: "${comment.substring(0, 50)}"` : ''}`,
+        type: 'rating',
+        priority: 'low',
+        data: { ratingId: rating._id.toString(), score },
+        voiceEnabled: false,
+      });
+    } catch {
+      // Non-critical
+    }
+
+    return Response.json({
+      success: true,
+      data: { ...rating.toObject(), id: rating._id.toString() },
+      message: 'تم إرسال التقييم بنجاح',
+    }, { status: 201 });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[BENEFICIARY RATING CREATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء إرسال التقييم', 500, 'INTERNAL_ERROR');
   }
 }

@@ -12,7 +12,7 @@ export default function BeneficiaryLayout({ children }: { children: ReactNode })
 
   useEffect(() => {
     if (!isLoading && (!isAuthenticated || user?.role !== 'beneficiary')) {
-      router.replace('/login?redirect=/beneficiary');
+      router.replace('/?redirect=/beneficiary');
     }
   }, [isAuthenticated, isLoading, user, router]);
 

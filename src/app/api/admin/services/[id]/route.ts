@@ -1,120 +1,82 @@
-// GET /api/admin/services/[id] - Get service
-// PATCH /api/admin/services/[id] - Update service
-// DELETE /api/admin/services/[id] - Delete service
+// GET/PATCH/DELETE /api/admin/services/[id] - Get/update/delete service
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError,
-  logActivity, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Service } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { logActivity } from '@/lib/api/helpers';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
+
     const { id } = await params;
+    const service = await Service.findById(id).lean();
+    if (!service) return createErrorResponse('الخدمة غير موجودة', 404, 'NOT_FOUND');
 
-    const service = await db.service.findUnique({ where: { id } });
-    if (!service) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الخدمة' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    return successResponse({
-      ...service,
-      requirements: safeJsonParse<string[]>(service.requirements, []),
-      includedItems: safeJsonParse<string[]>(service.includedItems, []),
-    });
+    return Response.json({ success: true, data: { ...service, id: service._id.toString() } });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN SERVICE DETAIL ERROR]', error);
+    return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
+
     const { id } = await params;
-
-    const service = await db.service.findUnique({ where: { id } });
-    if (!service) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الخدمة' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
     const body = await request.json();
-    const updateData: Record<string, unknown> = {};
+    delete body._id;
 
-    const allowedFields = [
-      'nameAr', 'nameEn', 'descriptionAr', 'descriptionEn', 'basePrice',
-      'category', 'duration', 'icon', 'image', 'isActive', 'isEmergency', 'sortOrder',
-    ];
-
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
-      }
-    }
-
-    if (body.requirements !== undefined) {
-      updateData.requirements = JSON.stringify(body.requirements);
-    }
-    if (body.includedItems !== undefined) {
-      updateData.includedItems = JSON.stringify(body.includedItems);
-    }
-
-    const updated = await db.service.update({ where: { id }, data: updateData });
+    const service = await Service.findByIdAndUpdate(id, body, { new: true }).lean();
+    if (!service) return createErrorResponse('الخدمة غير موجودة', 404, 'NOT_FOUND');
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'update_service',
       entity: 'Service',
       entityId: id,
-      details: `تم تحديث الخدمة: ${updated.nameAr}`,
+      details: 'تحديث بيانات الخدمة',
       request,
     });
 
-    return successResponse({
-      ...updated,
-      requirements: safeJsonParse<string[]>(updated.requirements, []),
-      includedItems: safeJsonParse<string[]>(updated.includedItems, []),
-    }, 'تم تحديث الخدمة بنجاح');
+    return Response.json({ success: true, data: { ...service, id: service._id.toString() }, message: 'تم تحديث الخدمة بنجاح' });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN SERVICE UPDATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
+
     const { id } = await params;
-
-    const service = await db.service.findUnique({ where: { id } });
-    if (!service) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الخدمة' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    await db.service.update({ where: { id }, data: { isActive: false } });
+    const service = await Service.findByIdAndDelete(id).lean();
+    if (!service) return createErrorResponse('الخدمة غير موجودة', 404, 'NOT_FOUND');
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'delete_service',
       entity: 'Service',
       entityId: id,
-      details: `تم تعطيل الخدمة: ${service.nameAr}`,
+      details: 'حذف الخدمة',
       request,
     });
 
-    return successResponse(null, 'تم تعطيل الخدمة بنجاح');
+    return Response.json({ success: true, message: 'تم حذف الخدمة بنجاح' });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN SERVICE DELETE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء الحذف', 500, 'INTERNAL_ERROR');
   }
 }

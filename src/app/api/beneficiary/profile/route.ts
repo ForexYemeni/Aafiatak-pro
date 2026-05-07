@@ -1,101 +1,62 @@
-// GET /api/beneficiary/profile - Get beneficiary profile
-// PATCH /api/beneficiary/profile - Update beneficiary profile
+// GET/PATCH /api/beneficiary/profile - Get/update beneficiary profile
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import { hashPassword } from '@/lib/auth';
-import {
-  requireRole, successResponse, handleApiError,
-  logActivity, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Beneficiary } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'beneficiary');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const beneficiary = await db.beneficiary.findUnique({
-      where: { id: user.userId },
-    });
-
-    if (!beneficiary) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المستفيد' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
     }
 
-    const { password: _, ...data } = beneficiary;
-    return successResponse({
-      ...data,
-      medicalConditions: safeJsonParse<string[]>(beneficiary.medicalConditions, []),
-      allergies: safeJsonParse<string[]>(beneficiary.allergies, []),
-    });
+    const beneficiary = await Beneficiary.findById(user.userId).select('-password').lean();
+    if (!beneficiary) return createErrorResponse('المستفيد غير موجود', 404, 'NOT_FOUND');
+
+    return Response.json({ success: true, data: { ...beneficiary, id: beneficiary._id.toString() } });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[BENEFICIARY PROFILE GET ERROR]', error);
+    return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
   }
 }
 
 export async function PATCH(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'beneficiary');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
+    }
 
     const body = await request.json();
-    const updateData: Record<string, unknown> = {};
+    delete body.password;
+    delete body._id;
+    delete body.role;
+    delete body.phone;
+    delete body.referralCode;
+    delete body.loyaltyPoints;
+    delete body.loyaltyTier;
+    delete body.totalSpent;
+    delete body.orderCount;
 
-    const allowedFields = [
-      'name', 'governorate', 'district', 'city', 'address',
-      'emergencyContactName', 'emergencyContactPhone', 'emergencyContactRelation',
-      'gender', 'bloodType',
-    ];
+    const beneficiary = await Beneficiary.findByIdAndUpdate(user.userId, body, { new: true }).select('-password').lean();
+    if (!beneficiary) return createErrorResponse('المستفيد غير موجود', 404, 'NOT_FOUND');
 
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) {
-        updateData[field] = body[field];
-      }
-    }
-
-    if (body.medicalConditions !== undefined) {
-      updateData.medicalConditions = JSON.stringify(body.medicalConditions);
-    }
-    if (body.allergies !== undefined) {
-      updateData.allergies = JSON.stringify(body.allergies);
-    }
-    if (body.dateOfBirth !== undefined) {
-      updateData.dateOfBirth = new Date(body.dateOfBirth);
-    }
-
-    if (body.password && body.currentPassword) {
-      const beneficiary = await db.beneficiary.findUnique({ where: { id: user.userId } });
-      if (!beneficiary) {
-        return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المستفيد' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-      }
-      const { verifyPassword } = await import('@/lib/auth');
-      const isValid = await verifyPassword(body.currentPassword, beneficiary.password);
-      if (!isValid) {
-        return new Response(JSON.stringify({ success: false, error: 'INVALID_PASSWORD', message: 'كلمة المرور الحالية غير صحيحة' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-      }
-      updateData.password = await hashPassword(body.password);
-    }
-
-    const updated = await db.beneficiary.update({
-      where: { id: user.userId },
-      data: updateData,
+    return Response.json({
+      success: true,
+      data: { ...beneficiary, id: beneficiary._id.toString() },
+      message: 'تم تحديث الملف الشخصي بنجاح',
     });
-
-    await logActivity({
-      userId: user.userId,
-      userRole: 'beneficiary',
-      action: 'update_profile',
-      entity: 'Beneficiary',
-      entityId: user.userId,
-      details: 'تم تحديث الملف الشخصي',
-      request,
-    });
-
-    const { password: _, ...data } = updated;
-    return successResponse({
-      ...data,
-      medicalConditions: safeJsonParse<string[]>(updated.medicalConditions, []),
-      allergies: safeJsonParse<string[]>(updated.allergies, []),
-    }, 'تم تحديث الملف الشخصي بنجاح');
   } catch (error) {
-    return handleApiError(error);
+    console.error('[BENEFICIARY PROFILE UPDATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');
   }
 }

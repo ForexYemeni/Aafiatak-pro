@@ -1,6 +1,12 @@
+// ============================================================================
+// عافيتك (Aafiatak) Auth Library - MongoDB/Mongoose based
+// ============================================================================
+// Authentication utilities using bcryptjs + JWT
+// NO Firebase, NO Prisma - MongoDB only
+// ============================================================================
+
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import type { TokenPayload, UserRole } from '@/types';
 
 // ---- Constants ----
 const SALT_ROUNDS = 12;
@@ -30,16 +36,16 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
 // ---- JWT Token Generation ----
 
 /**
- * Generate a JWT access token with 7d expiry.
+ * Generate a JWT access token.
  */
-export function generateToken(payload: TokenPayload): string {
+export function generateToken(payload: { userId: string; phone: string; role: string }): string {
   return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY } as jwt.SignOptions);
 }
 
 /**
- * Generate a JWT refresh token with 30d expiry.
+ * Generate a JWT refresh token.
  */
-export function generateRefreshToken(payload: TokenPayload): string {
+export function generateRefreshToken(payload: { userId: string; phone: string; role: string }): string {
   return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRY } as jwt.SignOptions);
 }
 
@@ -47,9 +53,9 @@ export function generateRefreshToken(payload: TokenPayload): string {
  * Verify and decode a JWT access token.
  * Returns the decoded payload or null if invalid/expired.
  */
-export function verifyToken(token: string): TokenPayload | null {
+export function verifyToken(token: string): { userId: string; phone: string; role: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_SECRET) as TokenPayload;
+    const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; phone: string; role: string };
     return {
       userId: decoded.userId,
       phone: decoded.phone,
@@ -64,9 +70,9 @@ export function verifyToken(token: string): TokenPayload | null {
  * Verify and decode a JWT refresh token.
  * Returns the decoded payload or null if invalid/expired.
  */
-export function verifyRefreshToken(token: string): TokenPayload | null {
+export function verifyRefreshToken(token: string): { userId: string; phone: string; role: string } | null {
   try {
-    const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as TokenPayload;
+    const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as { userId: string; phone: string; role: string };
     return {
       userId: decoded.userId,
       phone: decoded.phone,
@@ -81,94 +87,81 @@ export function verifyRefreshToken(token: string): TokenPayload | null {
 
 /**
  * Validate a Yemen phone number.
- * Accepts formats: 7XXXXXXXX (9 digits starting with 7)
- * Also accepts +9677XXXXXXXXX and 9677XXXXXXXXX
+ * Accepts formats: 7XXXXXXXX, +9677XXXXXXXXX, 9677XXXXXXXXX
  */
 export function validateYemeniPhone(phone: string): boolean {
-  // Remove all whitespace and dashes
-  const cleaned = phone.replace(/[\s\-]/g, '');
-
-  // Format: 7XXXXXXXX (9 digits starting with 7)
-  if (/^7\d{8}$/.test(cleaned)) {
-    return true;
-  }
-
-  // Format: +9677XXXXXXXXX
-  if (/^\+9677\d{7}$/.test(cleaned)) {
-    return true;
-  }
-
-  // Format: 9677XXXXXXXXX
-  if (/^9677\d{7}$/.test(cleaned)) {
-    return true;
-  }
-
+  const cleaned = phone.replace(/[\s\-()]/g, '');
+  if (/^7\d{8}$/.test(cleaned)) return true;
+  if (/^\+9677\d{7}$/.test(cleaned)) return true;
+  if (/^9677\d{7}$/.test(cleaned)) return true;
   return false;
 }
 
 /**
- * Format a Yemen phone number to international format: +967XXXXXXXXX
- * Input can be: 7XXXXXXXX, 9677XXXXXXXXX, or +9677XXXXXXXXX
+ * Normalize a Yemen phone number to local format: 7XXXXXXXX
  */
-export function formatYemeniPhone(phone: string): string {
-  const cleaned = phone.replace(/[\s\-]/g, '');
-
-  // Already in international format with +
-  if (cleaned.startsWith('+967')) {
-    return cleaned;
-  }
-
-  // Starts with 967 without +
-  if (cleaned.startsWith('967')) {
-    return `+${cleaned}`;
-  }
-
-  // Starts with 7 (local format)
-  if (cleaned.startsWith('7')) {
-    return `+967${cleaned}`;
-  }
-
-  // Fallback: return with +967 prefix
-  return `+967${cleaned}`;
+export function normalizeYemeniPhone(phone: string): string {
+  const cleaned = phone.replace(/[\s\-()]/g, '');
+  if (cleaned.startsWith('+967')) return cleaned.slice(4);
+  if (cleaned.startsWith('967')) return cleaned.slice(3);
+  return cleaned;
 }
 
 /**
- * Normalize a Yemen phone number to local format: 7XXXXXXXX
- * Useful for database lookups.
+ * Format a Yemen phone number to international format: +967XXXXXXXXX
  */
-export function normalizeYemeniPhone(phone: string): string {
-  const cleaned = phone.replace(/[\s\-]/g, '');
+export function formatYemeniPhone(phone: string): string {
+  const normalized = normalizeYemeniPhone(phone);
+  return `+967${normalized}`;
+}
 
-  // Strip +967 or 967 prefix
-  if (cleaned.startsWith('+967')) {
-    return cleaned.slice(4);
+// ---- Cookie Helpers ----
+
+/**
+ * Create a Set-Cookie header value for the auth token.
+ */
+export function createAuthCookie(token: string, maxAge: number = 7 * 24 * 60 * 60): string {
+  return `auth_token=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
+}
+
+/**
+ * Create a Set-Cookie header value that clears the auth token.
+ */
+export function createClearAuthCookie(): string {
+  return 'auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0';
+}
+
+// ---- Error Response Helper ----
+
+/**
+ * Create a standard error response.
+ */
+export function createErrorResponse(message: string, status: number, code: string): Response {
+  return Response.json(
+    { success: false, error: { message, code } },
+    { status }
+  );
+}
+
+// ---- Referral Code Generator ----
+
+/**
+ * Generate a unique referral code with prefix AFK-.
+ */
+export function generateReferralCode(): string {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'AFK-';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-
-  if (cleaned.startsWith('967')) {
-    return cleaned.slice(3);
-  }
-
-  return cleaned;
+  return code;
 }
 
 // ---- Role Helpers ----
 
 /**
- * Check if a role string is a valid UserRole.
+ * Check if a role string is a valid role.
  */
-export function isValidRole(role: string): role is UserRole {
+export function isValidRole(role: string): role is 'admin' | 'subadmin' | 'nurse' | 'beneficiary' {
   return ['admin', 'subadmin', 'nurse', 'beneficiary'].includes(role);
-}
-
-/**
- * Get the Prisma model name for a given role.
- */
-export function getPrismaModelForRole(role: UserRole): 'admin' | 'subAdmin' | 'nurse' | 'beneficiary' {
-  const mapping: Record<UserRole, 'admin' | 'subAdmin' | 'nurse' | 'beneficiary'> = {
-    admin: 'admin',
-    subadmin: 'subAdmin',
-    nurse: 'nurse',
-    beneficiary: 'beneficiary',
-  };
-  return mapping[role];
 }

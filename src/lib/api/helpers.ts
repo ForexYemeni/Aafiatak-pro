@@ -1,18 +1,20 @@
 // ============================================================================
 // عافيتك API Helpers - Shared utilities for all API route handlers
 // ============================================================================
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
+// ============================================================================
 
-import { NextResponse } from 'next/server';
+import { connectDB } from '@/lib/mongodb';
+import { ActivityLog } from '@/models/mongoose';
 import { verifyToken } from '@/lib/auth';
-import { db } from '@/lib/prisma';
-import type { TokenPayload, PaginationMeta, UserRole } from '@/types';
+import type { PaginationMeta } from '@/types';
 
 // ---- Response Helpers ----
 
 /**
  * Create a success API response with standard format.
  */
-export function successResponse<T>(data: T, message?: string, status: number = 200): NextResponse {
+export function successResponse<T>(data: T, message?: string, status: number = 200): Response {
   const body: Record<string, unknown> = {
     success: true,
     data,
@@ -20,7 +22,7 @@ export function successResponse<T>(data: T, message?: string, status: number = 2
   if (message) {
     body.message = message;
   }
-  return NextResponse.json(body, { status });
+  return Response.json(body, { status });
 }
 
 /**
@@ -31,7 +33,7 @@ export function paginatedResponse<T>(
   pagination: PaginationMeta,
   message?: string,
   status: number = 200
-): NextResponse {
+): Response {
   const body: Record<string, unknown> = {
     success: true,
     data,
@@ -40,20 +42,20 @@ export function paginatedResponse<T>(
   if (message) {
     body.message = message;
   }
-  return NextResponse.json(body, { status });
+  return Response.json(body, { status });
 }
 
 /**
  * Create an error API response with standard format.
  */
-export function errorResponse(message: string, status: number, errorCode?: string): NextResponse {
+export function errorResponse(message: string, status: number, errorCode?: string): Response {
   const body: Record<string, unknown> = {
     success: false,
     error: errorCode ?? 'ERROR',
     message,
     statusCode: status,
   };
-  return NextResponse.json(body, { status });
+  return Response.json(body, { status });
 }
 
 // ---- Pagination Helper ----
@@ -88,7 +90,7 @@ export function parsePagination(url: URL): { page: number; limit: number; skip: 
  * Extract and verify the authenticated user from the request.
  * Returns TokenPayload or null if unauthenticated.
  */
-export async function getAuthUser(request: Request): Promise<TokenPayload | null> {
+export function getAuthUserFromRequest(request: Request): { userId: string; phone: string; role: string } | null {
   let token: string | null = null;
 
   // Try Authorization header
@@ -102,8 +104,8 @@ export async function getAuthUser(request: Request): Promise<TokenPayload | null
     const cookieHeader = request.headers.get('Cookie');
     if (cookieHeader) {
       const cookies = parseCookies(cookieHeader);
-      if (cookies['auth-token']) {
-        token = cookies['auth-token'];
+      if (cookies['auth_token']) {
+        token = cookies['auth_token'];
       }
     }
   }
@@ -117,10 +119,10 @@ export async function getAuthUser(request: Request): Promise<TokenPayload | null
 /**
  * Require authentication. Returns user payload or throws an error response.
  */
-export async function requireAuth(request: Request): Promise<TokenPayload> {
-  const user = await getAuthUser(request);
+export function requireAuthFromRequest(request: Request): { userId: string; phone: string; role: string } {
+  const user = getAuthUserFromRequest(request);
   if (!user) {
-    throw new AuthApiError('لم يتم العثور على رمز المصادقة', 401);
+    throw new AuthApiError('غير مصرح. يرجى تسجيل الدخول', 401);
   }
   return user;
 }
@@ -128,8 +130,8 @@ export async function requireAuth(request: Request): Promise<TokenPayload> {
 /**
  * Require authentication with specific role(s).
  */
-export async function requireRole(request: Request, ...roles: UserRole[]): Promise<TokenPayload> {
-  const user = await requireAuth(request);
+export function requireRoleFromRequest(request: Request, ...roles: string[]): { userId: string; phone: string; role: string } {
+  const user = requireAuthFromRequest(request);
   if (!roles.includes(user.role)) {
     throw new AuthApiError('ليس لديك صلاحية للوصول إلى هذا المورد', 403);
   }
@@ -139,7 +141,7 @@ export async function requireRole(request: Request, ...roles: UserRole[]): Promi
 // ---- Activity Log Helper ----
 
 /**
- * Log an activity to the ActivityLog table.
+ * Log an activity to the ActivityLog collection.
  */
 export async function logActivity(params: {
   userId: string;
@@ -151,27 +153,26 @@ export async function logActivity(params: {
   request?: Request;
 }): Promise<void> {
   try {
+    await connectDB();
     const ipAddress = params.request
       ? (params.request.headers.get('x-forwarded-for') ?? params.request.headers.get('x-real-ip') ?? 'unknown')
       : 'unknown';
 
-    await db.activityLog.create({
-      data: {
-        userId: params.userId,
-        userRole: params.userRole,
-        action: params.action,
-        entity: params.entity ?? '',
-        entityId: params.entityId,
-        details: params.details,
-        ipAddress: ipAddress.split(',')[0]?.trim() ?? 'unknown',
-      },
+    await ActivityLog.create({
+      userId: params.userId,
+      userRole: params.userRole,
+      action: params.action,
+      entity: params.entity,
+      entityId: params.entityId,
+      details: params.details,
+      ipAddress: ipAddress.split(',')[0]?.trim() ?? 'unknown',
     });
   } catch {
     // Activity logging should never block the main operation
   }
 }
 
-// ---- JSON Helpers for SQLite ----
+// ---- JSON Helpers ----
 
 /**
  * Safely parse a JSON string, returning default value on failure.
@@ -183,13 +184,6 @@ export function safeJsonParse<T>(json: string | null | undefined, defaultValue: 
   } catch {
     return defaultValue;
   }
-}
-
-/**
- * Safely stringify a value to JSON.
- */
-export function safeJsonStringify(value: unknown): string {
-  return JSON.stringify(value);
 }
 
 // ---- Error Class ----
@@ -210,7 +204,7 @@ export class AuthApiError extends Error {
 /**
  * Handle an API error, converting AuthApiError to proper responses or returning a generic 500.
  */
-export function handleApiError(error: unknown): NextResponse {
+export function handleApiError(error: unknown): Response {
   if (error instanceof AuthApiError) {
     return errorResponse(error.message, error.statusCode, 'API_ERROR');
   }

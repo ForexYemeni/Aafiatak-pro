@@ -1,63 +1,49 @@
-// GET /api/notifications - List notifications
-// PATCH /api/notifications - Mark all as read
+// GET /api/notifications - Get notifications (with voice support)
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireAuth, successResponse, paginatedResponse, handleApiError,
-  parsePagination, paginate, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Notification } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
-    const unreadOnly = url.searchParams.get('unreadOnly') === 'true';
-    const type = url.searchParams.get('type') ?? '';
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const unreadOnly = searchParams.get('unread') === 'true';
+    const type = searchParams.get('type');
 
-    const where: Record<string, unknown> = { userId: user.userId };
-    if (unreadOnly) where.read = false;
-    if (type) where.type = type;
+    const filter: any = { userId: user.userId, userRole: user.role };
+    if (unreadOnly) filter.read = false;
+    if (type) filter.type = type;
 
-    const [notifications, total] = await Promise.all([
-      db.notification.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      db.notification.count({ where }),
+    const [notifications, total, unreadCount] = await Promise.all([
+      Notification.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Notification.countDocuments(filter),
+      Notification.countDocuments({ userId: user.userId, read: false }),
     ]);
 
-    const parsed = notifications.map((n) => ({
-      ...n,
-      data: safeJsonParse<Record<string, string>>(n.data, {}),
-    }));
-
-    const unreadCount = await db.notification.count({
-      where: { userId: user.userId, read: false },
+    return Response.json({
+      success: true,
+      data: {
+        notifications: notifications.map((n: any) => ({ ...n, id: n._id.toString() })),
+        total,
+        unreadCount,
+        page,
+        pages: Math.ceil(total / limit),
+      },
     });
-
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(parsed, pagination);
   } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-export async function PATCH(request: NextRequest) {
-  try {
-    const user = await requireAuth(request);
-
-    await db.notification.updateMany({
-      where: { userId: user.userId, read: false },
-      data: { read: true },
-    });
-
-    return successResponse(null, 'تم تحديد جميع الإشعارات كمقروءة');
-  } catch (error) {
-    return handleApiError(error);
+    console.error('[NOTIFICATIONS GET ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب الإشعارات', 500, 'INTERNAL_ERROR');
   }
 }

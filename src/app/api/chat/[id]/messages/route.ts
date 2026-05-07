@@ -1,115 +1,119 @@
-// GET /api/chat/[id]/messages - Get chat messages
-// POST /api/chat/[id]/messages - Send message
+// GET/POST /api/chat/[id]/messages - Get/Send messages in a chat
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireAuth, successResponse, paginatedResponse, handleApiError,
-  parsePagination, paginate, safeJsonParse, validateRequired, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Chat, ChatMessage } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireAuth(request);
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
     const { id } = await params;
 
-    const chat = await db.chat.findUnique({ where: { id } });
-    if (!chat) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المحادثة' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
+    // Verify user is a participant in this chat
+    const chat = await Chat.findOne({
+      _id: id,
+      'participants.userId': user.userId,
+    }).lean();
 
-    // Verify user is a participant
-    const participants = safeJsonParse<Array<{ userId: string }>>(chat.participants, []);
-    if (!participants.some((p) => p.userId === user.userId)) {
-      return new Response(JSON.stringify({ success: false, error: 'FORBIDDEN', message: 'ليس لديك صلاحية للوصول لهذه المحادثة' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
-    }
+    if (!chat) return createErrorResponse('المحادثة غير موجودة', 404, 'NOT_FOUND');
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '50');
 
     const [messages, total] = await Promise.all([
-      db.chatMessage.findMany({
-        where: { chatId: id, isDeleted: false },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      db.chatMessage.count({ where: { chatId: id, isDeleted: false } }),
+      ChatMessage.find({ chatId: id, isDeleted: false })
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      ChatMessage.countDocuments({ chatId: id, isDeleted: false }),
     ]);
 
-    const parsed = messages.map((m) => ({
-      ...m,
-      readBy: safeJsonParse<string[]>(m.readBy, []),
-      deliveredTo: safeJsonParse<string[]>(m.deliveredTo, []),
-      quickReplies: m.quickReplies ? safeJsonParse<Array<{ id: string; labelAr: string; labelEn: string; value: string }>>(m.quickReplies, null) : null,
-    }));
+    // Mark messages as read
+    await ChatMessage.updateMany(
+      { chatId: id, senderId: { $ne: user.userId }, readBy: { $ne: user.userId } },
+      { $addToSet: { readBy: user.userId } }
+    );
 
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(parsed, pagination);
+    return Response.json({
+      success: true,
+      data: {
+        messages: messages.map((m: any) => ({ ...m, id: m._id.toString() })).reverse(),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[CHAT MESSAGES GET ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب الرسائل', 500, 'INTERNAL_ERROR');
   }
 }
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireAuth(request);
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
     const { id } = await params;
 
-    const chat = await db.chat.findUnique({ where: { id } });
-    if (!chat) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المحادثة' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
+    // Verify user is a participant
+    const chat = await Chat.findOne({
+      _id: id,
+      'participants.userId': user.userId,
+      isActive: true,
+    });
 
-    const participants = safeJsonParse<Array<{ userId: string }>>(chat.participants, []);
-    if (!participants.some((p) => p.userId === user.userId)) {
-      return new Response(JSON.stringify({ success: false, error: 'FORBIDDEN', message: 'ليس لديك صلاحية للكتابة في هذه المحادثة' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
-    }
+    if (!chat) return createErrorResponse('المحادثة غير موجودة', 404, 'NOT_FOUND');
 
     const body = await request.json();
-    const validationError = validateRequired(body, ['content']);
-    if (validationError) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: validationError }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    const { content, type, imageUrl } = body;
+
+    if (!content && !imageUrl) {
+      return createErrorResponse('محتوى الرسالة مطلوب', 400, 'VALIDATION_ERROR');
     }
 
-    const message = await db.chatMessage.create({
-      data: {
-        chatId: id,
-        senderId: user.userId,
-        senderRole: user.role,
-        content: body.content,
-        type: body.type ?? 'text',
-        imageUrl: body.imageUrl ?? null,
-        replyTo: body.replyTo ?? null,
-        quickReplies: body.quickReplies ? JSON.stringify(body.quickReplies) : null,
-        readBy: JSON.stringify([user.userId]),
-        deliveredTo: JSON.stringify([user.userId]),
-      },
+    // Create message
+    const message = await ChatMessage.create({
+      chatId: id,
+      senderId: user.userId,
+      senderRole: user.role,
+      content: content || '',
+      type: type || (imageUrl ? 'image' : 'text'),
+      imageUrl,
+      readBy: [user.userId],
+      isDeleted: false,
     });
 
     // Update chat's last message
-    await db.chat.update({
-      where: { id },
-      data: {
-        lastMessageContent: body.content,
-        lastMessageSender: user.userId,
-        lastMessageAt: new Date(),
-      },
-    });
+    chat.lastMessageContent = content || '[صورة]';
+    chat.lastMessageSender = user.userId;
+    chat.lastMessageAt = new Date();
 
-    return successResponse({
-      ...message,
-      readBy: [user.userId],
-      deliveredTo: [user.userId],
-      quickReplies: body.quickReplies ?? null,
-    }, 'تم إرسال الرسالة بنجاح', 201);
+    // Increment unread count for other participants
+    for (const participant of chat.participants) {
+      if (participant.userId.toString() !== user.userId) {
+        const currentCount = (chat.unreadCount as Map<string, number>)?.get(participant.userId.toString()) || 0;
+        if (!chat.unreadCount) chat.unreadCount = new Map();
+        chat.unreadCount.set(participant.userId.toString(), currentCount + 1);
+      }
+    }
+
+    await chat.save();
+
+    return Response.json({
+      success: true,
+      data: { ...message.toObject(), id: message._id.toString() },
+    }, { status: 201 });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[CHAT MESSAGE SEND ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء إرسال الرسالة', 500, 'INTERNAL_ERROR');
   }
 }

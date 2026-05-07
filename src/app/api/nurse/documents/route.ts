@@ -1,60 +1,50 @@
-// POST /api/nurse/documents - Upload verification documents
+// POST /api/nurse/documents - Upload nurse documents
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, validateRequired, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Nurse } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'nurse');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
+    if (user.role !== 'nurse') {
+      return createErrorResponse('هذا الإجراء متاح للممرضين فقط', 403, 'FORBIDDEN');
+    }
 
     const body = await request.json();
-    const validationError = validateRequired(body, ['type', 'url']);
-    if (validationError) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: validationError }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    const { documentType, documentUrl } = body;
+
+    if (!documentType || !documentUrl) {
+      return createErrorResponse('نوع المستند ورابط المستند مطلوبان', 400, 'VALIDATION_ERROR');
     }
 
-    const validTypes = ['identity', 'license', 'certificate', 'other'];
-    if (!validTypes.includes(body.type)) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: 'نوع المستند غير صالح' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    const update: any = {};
+    if (documentType === 'identity') {
+      update.identityDocumentUrl = documentUrl;
+    } else if (documentType === 'license') {
+      update.licenseDocumentUrl = documentUrl;
+    } else {
+      return createErrorResponse('نوع المستند غير صالح', 400, 'VALIDATION_ERROR');
     }
 
-    const document = await db.nurseDocument.create({
-      data: {
-        nurseId: user.userId,
-        type: body.type,
-        url: body.url,
-        status: 'pending',
-      },
+    const nurse = await Nurse.findByIdAndUpdate(user.userId, update, { new: true })
+      .select('identityDocumentUrl licenseDocumentUrl verificationStatus')
+      .lean();
+
+    if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+
+    return Response.json({
+      success: true,
+      data: { ...nurse, id: nurse._id.toString() },
+      message: 'تم رفع المستند بنجاح',
     });
-
-    // Update nurse's document URLs if applicable
-    if (body.type === 'identity') {
-      await db.nurse.update({
-        where: { id: user.userId },
-        data: { identityDocumentUrl: body.url },
-      });
-    } else if (body.type === 'license') {
-      await db.nurse.update({
-        where: { id: user.userId },
-        data: { licenseDocumentUrl: body.url },
-      });
-    }
-
-    await logActivity({
-      userId: user.userId,
-      userRole: 'nurse',
-      action: 'upload_document',
-      entity: 'NurseDocument',
-      entityId: document.id,
-      details: `تم رفع مستند ${body.type}`,
-      request,
-    });
-
-    return successResponse(document, 'تم رفع المستند بنجاح', 201);
   } catch (error) {
-    return handleApiError(error);
+    console.error('[NURSE DOCUMENTS ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء رفع المستند', 500, 'INTERNAL_ERROR');
   }
 }

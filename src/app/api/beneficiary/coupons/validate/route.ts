@@ -1,84 +1,68 @@
 // POST /api/beneficiary/coupons/validate - Validate coupon code
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, validateRequired, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Coupon } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'beneficiary');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const body = await request.json();
-    const validationError = validateRequired(body, ['code']);
-    if (validationError) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: validationError }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
     }
 
-    const coupon = await db.coupon.findUnique({
-      where: { code: body.code },
-    });
+    const { code, orderAmount } = await request.json();
+
+    if (!code) {
+      return createErrorResponse('رمز الكوبون مطلوب', 400, 'VALIDATION_ERROR');
+    }
+
+    const coupon = await Coupon.findOne({ code: code.toUpperCase() }).lean();
 
     if (!coupon) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'كوبون الخصم غير صالح' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+      return createErrorResponse('الكوبون غير موجود', 404, 'NOT_FOUND');
     }
 
-    // Check if coupon is valid
-    const now = new Date();
-    const isValid = coupon.isActive
-      && coupon.usedCount < coupon.maxUses
-      && new Date(coupon.expiresAt) > now
-      && (!body.orderAmount || body.orderAmount >= coupon.minOrderAmount);
-
-    // Check applicable categories
-    let categoryMatch = true;
-    if (body.serviceCategory) {
-      const applicableCategories = safeJsonParse<string[]>(coupon.applicableCategories, []);
-      if (applicableCategories.length > 0) {
-        categoryMatch = applicableCategories.includes(body.serviceCategory);
-      }
+    if (!coupon.isActive) {
+      return createErrorResponse('الكوبون غير نشط', 400, 'COUPON_INACTIVE');
     }
 
-    const discountAmount = isValid && categoryMatch && body.orderAmount
-      ? Math.min(
-          body.orderAmount * (coupon.discountPercent / 100),
-          coupon.maxDiscountAmount ?? Infinity
-        )
-      : 0;
+    if (coupon.usedCount >= coupon.maxUses) {
+      return createErrorResponse('تم استخدام الكوبون الحد الأقصى من المرات', 400, 'COUPON_EXHAUSTED');
+    }
 
-    if (!isValid) {
-      const reasons: string[] = [];
-      if (!coupon.isActive) reasons.push('الكوبون غير نشط');
-      if (coupon.usedCount >= coupon.maxUses) reasons.push('تم استخدام الكوبون للحد الأقصى');
-      if (new Date(coupon.expiresAt) <= now) reasons.push('انتهت صلاحية الكوبون');
-      if (body.orderAmount && body.orderAmount < coupon.minOrderAmount) reasons.push(`الحد الأدنى للطلب ${coupon.minOrderAmount} ر.ي`);
+    if (new Date() > new Date(coupon.expiresAt)) {
+      return createErrorResponse('الكوبون منتهي الصلاحية', 400, 'COUPON_EXPIRED');
+    }
 
-      return successResponse({
-        valid: false,
-        reasons,
+    if (orderAmount && orderAmount < coupon.minOrderAmount) {
+      return createErrorResponse(`الحد الأدنى للطلب ${coupon.minOrderAmount} ريال`, 400, 'MIN_ORDER_NOT_MET');
+    }
+
+    const discountAmount = orderAmount
+      ? Math.min(orderAmount * (coupon.discountPercent / 100), coupon.maxDiscountAmount || Infinity)
+      : null;
+
+    return Response.json({
+      success: true,
+      data: {
+        valid: true,
         code: coupon.code,
-      }, 'كوبون الخصم غير صالح');
-    }
-
-    if (!categoryMatch) {
-      return successResponse({
-        valid: false,
-        reasons: ['الكوبون لا ينطبق على هذه الفئة'],
-        code: coupon.code,
-      }, 'كوبون الخصم لا ينطبق');
-    }
-
-    return successResponse({
-      valid: true,
-      code: coupon.code,
-      discountPercent: coupon.discountPercent,
-      discountAmount: Math.round(discountAmount),
-      maxDiscountAmount: coupon.maxDiscountAmount,
-      minOrderAmount: coupon.minOrderAmount,
-      applicableCategories: safeJsonParse<string[]>(coupon.applicableCategories, []),
-    }, 'كوبون الخصم صالح');
+        discountPercent: coupon.discountPercent,
+        discountAmount,
+        maxDiscountAmount: coupon.maxDiscountAmount,
+        minOrderAmount: coupon.minOrderAmount,
+        expiresAt: coupon.expiresAt,
+      },
+      message: 'الكوبون صالح',
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[BENEFICIARY COUPON VALIDATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء التحقق من الكوبون', 500, 'INTERNAL_ERROR');
   }
 }

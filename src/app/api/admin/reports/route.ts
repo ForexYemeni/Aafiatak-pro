@@ -1,115 +1,104 @@
 // GET /api/admin/reports - Generate reports
-// POST /api/admin/reports - Create report
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, paginatedResponse, handleApiError,
-  parsePagination, paginate, logActivity, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { ServiceRequest, Transaction, Nurse, Beneficiary, EmergencyRequest } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
-    const type = url.searchParams.get('type') ?? '';
+    const { searchParams } = new URL(request.url);
+    const type = searchParams.get('type') || 'operational';
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
 
-    const where: Record<string, unknown> = {};
-    if (type) where.type = type;
-
-    const [reports, total] = await Promise.all([
-      db.report.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      db.report.count({ where }),
-    ]);
-
-    const parsed = reports.map((r) => ({
-      ...r,
-      data: safeJsonParse<Record<string, unknown>>(r.data, {}),
-    }));
-
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(parsed, pagination);
-  } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const user = await requireRole(request, 'admin');
-
-    const body = await request.json();
-    const type = body.type ?? 'operational';
-    const dateRangeStart = body.dateRangeStart ? new Date(body.dateRangeStart) : new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-    const dateRangeEnd = body.dateRangeEnd ? new Date(body.dateRangeEnd) : new Date();
-
-    let reportData: Record<string, unknown> = {};
-
-    if (type === 'financial') {
-      const transactions = await db.transaction.findMany({
-        where: {
-          status: 'completed',
-          processedAt: { gte: dateRangeStart, lte: dateRangeEnd },
-        },
-      });
-      const totalRevenue = transactions.reduce((sum, t) => sum + t.amount, 0);
-      const totalCommission = transactions.reduce((sum, t) => sum + t.commission, 0);
-      reportData = { totalRevenue, totalCommission, transactionCount: transactions.length };
-    } else if (type === 'operational') {
-      const [totalOrders, completedOrders, cancelledOrders, avgRating] = await Promise.all([
-        db.serviceRequest.count({ where: { createdAt: { gte: dateRangeStart, lte: dateRangeEnd } } }),
-        db.serviceRequest.count({ where: { status: 'completed', createdAt: { gte: dateRangeStart, lte: dateRangeEnd } } }),
-        db.serviceRequest.count({ where: { status: 'cancelled', createdAt: { gte: dateRangeStart, lte: dateRangeEnd } } }),
-        db.nurse.aggregate({ _avg: { rating: true }, where: { reviewCount: { gt: 0 } } }),
-      ]);
-      reportData = { totalOrders, completedOrders, cancelledOrders, averageRating: avgRating._avg.rating ?? 0 };
-    } else if (type === 'nurse_performance') {
-      const nurses = await db.nurse.findMany({
-        where: { isActive: true },
-        select: { id: true, name: true, completedJobs: true, cancelledJobs: true, rating: true, totalEarnings: true },
-        orderBy: { completedJobs: 'desc' },
-        take: 20,
-      });
-      reportData = { topNurses: nurses };
-    } else if (type === 'beneficiary_activity') {
-      const [newBeneficiaries, activeBeneficiaries] = await Promise.all([
-        db.beneficiary.count({ where: { createdAt: { gte: dateRangeStart, lte: dateRangeEnd } } }),
-        db.beneficiary.count({ where: { orderCount: { gt: 0 } } }),
-      ]);
-      reportData = { newBeneficiaries, activeBeneficiaries };
+    const dateFilter: any = {};
+    if (dateFrom || dateTo) {
+      dateFilter.createdAt = {};
+      if (dateFrom) dateFilter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) dateFilter.createdAt.$lte = new Date(dateTo);
     }
 
-    const report = await db.report.create({
-      data: {
-        type,
-        title: body.title ?? `تقرير ${type} - ${dateRangeStart.toISOString().split('T')[0]} إلى ${dateRangeEnd.toISOString().split('T')[0]}`,
-        generatedById: user.userId,
-        data: JSON.stringify(reportData),
-        format: body.format ?? 'json',
-        dateRangeStart,
-        dateRangeEnd,
-      },
-    });
+    let reportData: any = {};
 
-    await logActivity({
-      userId: user.userId,
-      userRole: user.role,
-      action: 'generate_report',
-      entity: 'Report',
-      entityId: report.id,
-      details: `تم إنشاء تقرير: ${report.title}`,
-      request,
-    });
+    switch (type) {
+      case 'financial': {
+        const [revenueAgg, byMethod] = await Promise.all([
+          Transaction.aggregate([
+            { $match: { status: 'completed', ...dateFilter } },
+            { $group: { _id: null, totalRevenue: { $sum: '$amount' }, totalCommission: { $sum: '$commission' }, totalPayouts: { $sum: '$netAmount' }, count: { $sum: 1 } } },
+          ]),
+          Transaction.aggregate([
+            { $match: { status: 'completed', ...dateFilter } },
+            { $group: { _id: '$paymentMethod', total: { $sum: '$amount' }, count: { $sum: 1 } } },
+          ]),
+        ]);
+        reportData = {
+          totalRevenue: revenueAgg[0]?.totalRevenue || 0,
+          totalCommission: revenueAgg[0]?.totalCommission || 0,
+          totalPayouts: revenueAgg[0]?.totalPayouts || 0,
+          transactionCount: revenueAgg[0]?.count || 0,
+          byPaymentMethod: byMethod.map((m: any) => ({ method: m._id, total: m.total, count: m.count })),
+        };
+        break;
+      }
 
-    return successResponse({ ...report, data: safeJsonParse<Record<string, unknown>>(report.data, {}) }, 'تم إنشاء التقرير بنجاح', 201);
+      case 'nurse_performance': {
+        const nurses = await Nurse.find({ role: 'nurse', verificationStatus: 'verified' })
+          .select('name completedJobs rating reviewCount totalEarnings availableBalance')
+          .sort({ completedJobs: -1 })
+          .limit(50)
+          .lean();
+        reportData = {
+          nurses: nurses.map((n: any) => ({ ...n, id: n._id.toString() })),
+        };
+        break;
+      }
+
+      case 'beneficiary_activity': {
+        const [totalBeneficiaries, newBeneficiaries, topSpenders] = await Promise.all([
+          Beneficiary.countDocuments({ role: 'beneficiary' }),
+          Beneficiary.countDocuments({ role: 'beneficiary', ...dateFilter }),
+          Beneficiary.find({ role: 'beneficiary' })
+            .select('name phone totalSpent orderCount loyaltyPoints loyaltyTier')
+            .sort({ totalSpent: -1 })
+            .limit(20)
+            .lean(),
+        ]);
+        reportData = {
+          totalBeneficiaries,
+          newBeneficiaries,
+          topSpenders: topSpenders.map((b: any) => ({ ...b, id: b._id.toString() })),
+        };
+        break;
+      }
+
+      default: {
+        // Operational report
+        const [ordersByStatus, emergenciesByStatus, orderCount, emergencyCount] = await Promise.all([
+          ServiceRequest.aggregate([{ $match: dateFilter }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+          EmergencyRequest.aggregate([{ $match: dateFilter }, { $group: { _id: '$status', count: { $sum: 1 } } }]),
+          ServiceRequest.countDocuments(dateFilter),
+          EmergencyRequest.countDocuments(dateFilter),
+        ]);
+        reportData = {
+          totalOrders: orderCount,
+          totalEmergencies: emergencyCount,
+          ordersByStatus: ordersByStatus.map((s: any) => ({ status: s._id, count: s.count })),
+          emergenciesByStatus: emergenciesByStatus.map((s: any) => ({ status: s._id, count: s.count })),
+        };
+        break;
+      }
+    }
+
+    return Response.json({ success: true, data: reportData });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN REPORTS ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء إنشاء التقرير', 500, 'INTERNAL_ERROR');
   }
 }

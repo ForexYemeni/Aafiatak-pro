@@ -1,43 +1,42 @@
-// PATCH /api/nurse/availability - Toggle availability
+// POST /api/nurse/availability - Toggle nurse availability
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Nurse } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
-export async function PATCH(request: NextRequest) {
+export async function POST(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'nurse');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const body = await request.json();
-    const isAvailable = body.isAvailable;
-
-    if (typeof isAvailable !== 'boolean') {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: 'isAvailable يجب أن يكون قيمة منطقية' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (user.role !== 'nurse') {
+      return createErrorResponse('هذا الإجراء متاح للممرضين فقط', 403, 'FORBIDDEN');
     }
 
-    await db.nurse.update({
-      where: { id: user.userId },
-      data: {
-        isAvailable,
-        isOnline: isAvailable,
-        lastActiveAt: new Date(),
-      },
-    });
+    const { isAvailable } = await request.json();
 
-    await logActivity({
-      userId: user.userId,
-      userRole: 'nurse',
-      action: isAvailable ? 'go_online' : 'go_offline',
-      entity: 'Nurse',
-      entityId: user.userId,
-      details: isAvailable ? 'الممرض متاح الآن' : 'الممرض غير متاح',
-      request,
-    });
+    if (typeof isAvailable !== 'boolean') {
+      return createErrorResponse('قيمة التوفر مطلوبة (true/false)', 400, 'VALIDATION_ERROR');
+    }
 
-    return successResponse({ isAvailable }, isAvailable ? 'أنت متاح الآن لاستقبال الطلبات' : 'أنت غير متاح الآن');
+    const nurse = await Nurse.findByIdAndUpdate(
+      user.userId,
+      { isAvailable, isOnline: isAvailable },
+      { new: true }
+    ).select('-password').lean();
+
+    if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+
+    return Response.json({
+      success: true,
+      data: { isAvailable: nurse.isAvailable, isOnline: nurse.isOnline },
+      message: isAvailable ? 'تم تفعيل التوفر' : 'تم إيقاف التوفر',
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[NURSE AVAILABILITY ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء تحديث التوفر', 500, 'INTERNAL_ERROR');
   }
 }

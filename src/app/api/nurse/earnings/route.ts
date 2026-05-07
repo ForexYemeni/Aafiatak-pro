@@ -1,83 +1,65 @@
-// GET /api/nurse/earnings - Earnings summary
+// GET /api/nurse/earnings - Get nurse earnings
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Nurse, Transaction } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'nurse');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const nurse = await db.nurse.findUnique({
-      where: { id: user.userId },
-      select: {
-        totalEarnings: true,
-        availableBalance: true,
-        completedJobs: true,
-      },
-    });
-
-    if (!nurse) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الممرض' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    if (user.role !== 'nurse') {
+      return createErrorResponse('هذا الإجراء متاح للممرضين فقط', 403, 'FORBIDDEN');
     }
 
-    // Get recent payouts
-    const recentPayouts = await db.nursePayout.findMany({
-      where: { nurseId: user.userId },
-      orderBy: { createdAt: 'desc' },
-      take: 10,
-    });
+    const { searchParams } = new URL(request.url);
+    const period = searchParams.get('period') || 'all'; // all, week, month
 
-    // Get this month's earnings
-    const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    // Get nurse earnings summary
+    const nurse = await Nurse.findById(user.userId).select('totalEarnings availableBalance completedJobs').lean();
+    if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
 
-    const monthTransactions = await db.transaction.findMany({
-      where: {
-        nurseId: user.userId,
-        status: 'completed',
-        processedAt: { gte: monthStart },
-      },
-      select: { netAmount: true },
-    });
-
-    const thisMonthEarnings = monthTransactions.reduce((sum, t) => sum + t.netAmount, 0);
-
-    // Get last 7 days earnings for chart
-    const dailyEarnings = [];
-    const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    for (let i = 6; i >= 0; i--) {
-      const dayStart = new Date(todayStart);
-      dayStart.setDate(dayStart.getDate() - i);
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayEnd.getDate() + 1);
-
-      const dayTransactions = await db.transaction.findMany({
-        where: {
-          nurseId: user.userId,
-          status: 'completed',
-          processedAt: { gte: dayStart, lt: dayEnd },
-        },
-        select: { netAmount: true },
-      });
-
-      dailyEarnings.push({
-        date: dayStart.toISOString().split('T')[0],
-        earnings: dayTransactions.reduce((sum, t) => sum + t.netAmount, 0),
-      });
+    // Get transaction history
+    const dateFilter: any = { nurseId: user.userId, status: 'completed' };
+    if (period === 'week') {
+      const weekAgo = new Date();
+      weekAgo.setDate(weekAgo.getDate() - 7);
+      dateFilter.createdAt = { $gte: weekAgo };
+    } else if (period === 'month') {
+      const monthAgo = new Date();
+      monthAgo.setMonth(monthAgo.getMonth() - 1);
+      dateFilter.createdAt = { $gte: monthAgo };
     }
 
-    return successResponse({
-      totalEarnings: nurse.totalEarnings,
-      availableBalance: nurse.availableBalance,
-      completedJobs: nurse.completedJobs,
-      thisMonthEarnings: Math.round(thisMonthEarnings),
-      recentPayouts,
-      dailyEarnings,
+    const [transactions, periodAgg] = await Promise.all([
+      Transaction.find(dateFilter)
+        .sort({ createdAt: -1 })
+        .limit(50)
+        .lean(),
+      Transaction.aggregate([
+        { $match: dateFilter },
+        { $group: { _id: null, totalEarnings: { $sum: '$netAmount' }, totalCommission: { $sum: '$commission' }, count: { $sum: 1 } } },
+      ]),
+    ]);
+
+    return Response.json({
+      success: true,
+      data: {
+        totalEarnings: nurse.totalEarnings,
+        availableBalance: nurse.availableBalance,
+        completedJobs: nurse.completedJobs,
+        periodEarnings: periodAgg[0]?.totalEarnings || 0,
+        periodCommission: periodAgg[0]?.totalCommission || 0,
+        periodCount: periodAgg[0]?.count || 0,
+        transactions: transactions.map((t: any) => ({ ...t, id: t._id.toString() })),
+      },
     });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[NURSE EARNINGS ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب الأرباح', 500, 'INTERNAL_ERROR');
   }
 }

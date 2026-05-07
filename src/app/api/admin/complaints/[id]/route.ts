@@ -1,59 +1,46 @@
-// PATCH /api/admin/complaints/[id] - Resolve complaint
+// PATCH /api/admin/complaints/[id] - Update complaint (respond)
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Rating } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { logActivity } from '@/lib/api/helpers';
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
+
     const { id } = await params;
-
-    const complaint = await db.complaint.findUnique({ where: { id } });
-    if (!complaint) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الشكوى' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
     const body = await request.json();
-    const updateData: Record<string, unknown> = {};
 
-    if (body.status) {
-      const validStatuses = ['open', 'under_review', 'resolved', 'dismissed'];
-      if (!validStatuses.includes(body.status)) {
-        return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: 'حالة الشكوى غير صالحة' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-      }
-      updateData.status = body.status;
-    }
+    const rating = await Rating.findByIdAndUpdate(
+      id,
+      { response: body.response },
+      { new: true }
+    ).lean();
 
-    if (body.priority) updateData.priority = body.priority;
-    if (body.resolution) {
-      updateData.resolution = body.resolution;
-      updateData.resolvedBy = user.userId;
-      updateData.resolvedAt = new Date();
-    }
-
-    const updated = await db.complaint.update({
-      where: { id },
-      data: updateData,
-    });
+    if (!rating) return createErrorResponse('الشكوى غير موجودة', 404, 'NOT_FOUND');
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
-      action: 'resolve_complaint',
-      entity: 'Complaint',
+      userId: user!.userId,
+      userRole: user!.role,
+      action: 'respond_complaint',
+      entity: 'Rating',
       entityId: id,
-      details: `تم تحديث الشكوى ${id} إلى ${body.status ?? complaint.status}`,
+      details: 'الرد على شكوى',
       request,
     });
 
-    return successResponse(updated, 'تم تحديث الشكوى بنجاح');
+    return Response.json({
+      success: true,
+      data: { ...rating, id: rating._id.toString() },
+      message: 'تم الرد على الشكوى بنجاح',
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN COMPLAINT UPDATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء تحديث الشكوى', 500, 'INTERNAL_ERROR');
   }
 }

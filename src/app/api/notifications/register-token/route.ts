@@ -1,57 +1,44 @@
-// POST /api/notifications/register-token - Register FCM token
+// POST /api/notifications/register-token - Register push notification token
+// MongoDB/Mongoose based - NO Firebase, NO Firebase Cloud Messaging
+// Voice notifications come from MongoDB Notification model, not FCM
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireAuth, successResponse, handleApiError, validateRequired,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { User, Nurse, Beneficiary } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireAuth(request);
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
     const body = await request.json();
-    const validationError = validateRequired(body, ['token']);
-    if (validationError) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: validationError }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    const { fcmToken } = body;
+
+    if (!fcmToken) {
+      return createErrorResponse('رمز الإشعار مطلوب', 400, 'VALIDATION_ERROR');
     }
 
-    const platform = body.platform ?? 'web';
-    const deviceId = body.deviceId ?? 'default';
-
-    // Deactivate existing tokens for this device
-    await db.fCMToken.updateMany({
-      where: { userId: user.userId, deviceId },
-      data: { isActive: false },
-    });
-
-    // Create new token
-    await db.fCMToken.create({
-      data: {
-        userId: user.userId,
-        userRole: user.role,
-        token: body.token,
-        platform,
-        deviceId,
-        isActive: true,
-      },
-    });
-
-    // Also update the user's fcmToken field
+    // Store the FCM token on the user record for future push notifications
+    // This is a simplified approach - in production, use a dedicated Token model
+    let Model: any;
     if (user.role === 'nurse') {
-      await db.nurse.update({
-        where: { id: user.userId },
-        data: { fcmToken: body.token },
-      });
+      Model = Nurse;
     } else if (user.role === 'beneficiary') {
-      await db.beneficiary.update({
-        where: { id: user.userId },
-        data: { fcmToken: body.token },
-      });
+      Model = Beneficiary;
+    } else {
+      Model = User;
     }
 
-    return successResponse(null, 'تم تسجيل رمز الإشعارات بنجاح');
+    await Model.findByIdAndUpdate(user.userId, { fcmToken });
+
+    return Response.json({
+      success: true,
+      message: 'تم تسجيل رمز الإشعارات بنجاح',
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[NOTIFICATION REGISTER TOKEN ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء تسجيل رمز الإشعارات', 500, 'INTERNAL_ERROR');
   }
 }

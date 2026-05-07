@@ -1,112 +1,82 @@
-// GET /api/admin/coupons/[id] - Get coupon
-// PATCH /api/admin/coupons/[id] - Update coupon
-// DELETE /api/admin/coupons/[id] - Delete coupon
+// GET/PATCH/DELETE /api/admin/coupons/[id] - Get/update/delete coupon
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError,
-  logActivity, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Coupon } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { logActivity } from '@/lib/api/helpers';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
+
     const { id } = await params;
+    const coupon = await Coupon.findById(id).lean();
+    if (!coupon) return createErrorResponse('الكوبون غير موجود', 404, 'NOT_FOUND');
 
-    const coupon = await db.coupon.findUnique({ where: { id } });
-    if (!coupon) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على كوبون الخصم' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    return successResponse({
-      ...coupon,
-      applicableCategories: safeJsonParse<string[]>(coupon.applicableCategories, []),
-    });
+    return Response.json({ success: true, data: { ...coupon, id: coupon._id.toString() } });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN COUPON DETAIL ERROR]', error);
+    return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
+
     const { id } = await params;
-
-    const coupon = await db.coupon.findUnique({ where: { id } });
-    if (!coupon) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على كوبون الخصم' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
     const body = await request.json();
-    const updateData: Record<string, unknown> = {};
+    delete body._id;
 
-    const allowedFields = [
-      'discountPercent', 'maxUses', 'minOrderAmount', 'maxDiscountAmount',
-      'isActive',
-    ];
-    for (const field of allowedFields) {
-      if (body[field] !== undefined) updateData[field] = body[field];
-    }
-    if (body.expiresAt) updateData.expiresAt = new Date(body.expiresAt);
-    if (body.applicableCategories !== undefined) {
-      updateData.applicableCategories = JSON.stringify(body.applicableCategories);
-    }
-
-    const updated = await db.coupon.update({ where: { id }, data: updateData });
+    const coupon = await Coupon.findByIdAndUpdate(id, body, { new: true }).lean();
+    if (!coupon) return createErrorResponse('الكوبون غير موجود', 404, 'NOT_FOUND');
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'update_coupon',
       entity: 'Coupon',
       entityId: id,
-      details: `تم تحديث كوبون الخصم: ${updated.code}`,
+      details: 'تحديث بيانات الكوبون',
       request,
     });
 
-    return successResponse({
-      ...updated,
-      applicableCategories: safeJsonParse<string[]>(updated.applicableCategories, []),
-    }, 'تم تحديث كوبون الخصم بنجاح');
+    return Response.json({ success: true, data: { ...coupon, id: coupon._id.toString() }, message: 'تم تحديث الكوبون بنجاح' });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN COUPON UPDATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
+
     const { id } = await params;
-
-    const coupon = await db.coupon.findUnique({ where: { id } });
-    if (!coupon) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على كوبون الخصم' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    await db.coupon.update({ where: { id }, data: { isActive: false } });
+    const coupon = await Coupon.findByIdAndDelete(id).lean();
+    if (!coupon) return createErrorResponse('الكوبون غير موجود', 404, 'NOT_FOUND');
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'delete_coupon',
       entity: 'Coupon',
       entityId: id,
-      details: `تم تعطيل كوبون الخصم: ${coupon.code}`,
+      details: 'حذف الكوبون',
       request,
     });
 
-    return successResponse(null, 'تم تعطيل كوبون الخصم بنجاح');
+    return Response.json({ success: true, message: 'تم حذف الكوبون بنجاح' });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN COUPON DELETE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء الحذف', 500, 'INTERNAL_ERROR');
   }
 }

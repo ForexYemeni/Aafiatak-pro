@@ -1,64 +1,56 @@
 // GET /api/beneficiary/tracking/[nurseId] - Track nurse location
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Nurse, ServiceRequest } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ nurseId: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ nurseId: string }> }) {
   try {
-    const user = await requireRole(request, 'beneficiary');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
+    }
+
     const { nurseId } = await params;
 
-    // Verify the beneficiary has an active order with this nurse
-    const activeOrder = await db.serviceRequest.findFirst({
-      where: {
-        beneficiaryId: user.userId,
-        nurseId,
-        status: { in: ['assigned', 'accepted', 'in_progress'] },
-      },
-    });
+    // Verify that the beneficiary has an active order with this nurse
+    const activeOrder = await ServiceRequest.findOne({
+      beneficiaryId: user.userId,
+      nurseId,
+      status: { $in: ['assigned', 'accepted', 'in_progress'] },
+    }).lean();
 
     if (!activeOrder) {
-      // Also check emergency requests
-      const activeEmergency = await db.emergencyRequest.findFirst({
-        where: {
-          beneficiaryId: user.userId,
-          nurseId,
-          status: { in: ['dispatched', 'in_progress'] },
-        },
-      });
-
-      if (!activeEmergency) {
-        return new Response(JSON.stringify({ success: false, error: 'FORBIDDEN', message: 'لا يمكنك تتبع هذا الممرض - لا يوجد طلب نشط معه' }), { status: 403, headers: { 'Content-Type': 'application/json' } });
-      }
+      return createErrorResponse('ليس لديك طلب نشط مع هذا الممرض', 403, 'NO_ACTIVE_ORDER');
     }
 
-    const nurse = await db.nurse.findUnique({
-      where: { id: nurseId },
-      select: {
-        id: true, name: true, phone: true, isOnline: true, isAvailable: true,
-        lat: true, lng: true, locationUpdatedAt: true, rating: true,
+    // Get nurse location
+    const nurse = await Nurse.findById(nurseId)
+      .select('name isOnline lat lng locationUpdatedAt phone')
+      .lean();
+
+    if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+
+    return Response.json({
+      success: true,
+      data: {
+        nurseId: nurse._id.toString(),
+        name: nurse.name,
+        isOnline: nurse.isOnline,
+        lat: nurse.lat,
+        lng: nurse.lng,
+        locationUpdatedAt: nurse.locationUpdatedAt,
+        orderId: activeOrder._id.toString(),
+        orderStatus: activeOrder.status,
       },
     });
-
-    if (!nurse) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الممرض' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    return successResponse({
-      nurseId: nurse.id,
-      name: nurse.name,
-      isOnline: nurse.isOnline,
-      location: nurse.lat !== null && nurse.lng !== null
-        ? { lat: nurse.lat, lng: nurse.lng, updatedAt: nurse.locationUpdatedAt }
-        : null,
-    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[BENEFICIARY TRACKING ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء تتبع الممرض', 500, 'INTERNAL_ERROR');
   }
 }

@@ -1,96 +1,87 @@
-// GET /api/admin/coupons - List coupons
-// POST /api/admin/coupons - Create coupon
+// GET/POST /api/admin/coupons - List/Create coupons
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, paginatedResponse, handleApiError,
-  parsePagination, paginate, logActivity, validateRequired, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Coupon } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { logActivity } from '@/lib/api/helpers';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
-    const isActive = url.searchParams.get('isActive');
-    const search = url.searchParams.get('search') ?? '';
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const activeOnly = searchParams.get('active') === 'true';
 
-    const where: Record<string, unknown> = {};
-    if (isActive !== null && isActive !== '') where.isActive = isActive === 'true';
-    if (search) {
-      where.OR = [
-        { code: { contains: search } },
-      ];
-    }
+    const filter: any = {};
+    if (activeOnly) filter.isActive = true;
 
     const [coupons, total] = await Promise.all([
-      db.coupon.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-      }),
-      db.coupon.count({ where }),
+      Coupon.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      Coupon.countDocuments(filter),
     ]);
 
-    const parsed = coupons.map((c) => ({
-      ...c,
-      applicableCategories: safeJsonParse<string[]>(c.applicableCategories, []),
-    }));
-
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(parsed, pagination);
+    return Response.json({
+      success: true,
+      data: {
+        coupons: coupons.map((c: any) => ({ ...c, id: c._id.toString() })),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN COUPONS LIST ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب الكوبونات', 500, 'INTERNAL_ERROR');
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
 
     const body = await request.json();
-    const validationError = validateRequired(body, ['code', 'discountPercent', 'expiresAt']);
-    if (validationError) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: validationError }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+
+    if (!body.code || !body.discountPercent || !body.expiresAt) {
+      return createErrorResponse('رمز الكوبون ونسبة الخصم وتاريخ الانتهاء مطلوبون', 400, 'VALIDATION_ERROR');
     }
 
-    const existing = await db.coupon.findUnique({ where: { code: body.code } });
+    // Check if code already exists
+    const existing = await Coupon.findOne({ code: body.code.toUpperCase() });
     if (existing) {
-      return new Response(JSON.stringify({ success: false, error: 'CONFLICT', message: 'كود الخصم مستخدم بالفعل' }), { status: 409, headers: { 'Content-Type': 'application/json' } });
+      return createErrorResponse('رمز الكوبون موجود بالفعل', 409, 'CODE_EXISTS');
     }
 
-    const coupon = await db.coupon.create({
-      data: {
-        code: body.code,
-        discountPercent: body.discountPercent,
-        maxUses: body.maxUses ?? 100,
-        minOrderAmount: body.minOrderAmount ?? 0,
-        maxDiscountAmount: body.maxDiscountAmount ?? null,
-        expiresAt: new Date(body.expiresAt),
-        isActive: body.isActive ?? true,
-        createdById: user.userId,
-        applicableCategories: JSON.stringify(body.applicableCategories ?? []),
-      },
+    const coupon = await Coupon.create({
+      ...body,
+      code: body.code.toUpperCase(),
+      createdById: user!.userId,
     });
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'create_coupon',
       entity: 'Coupon',
-      entityId: coupon.id,
-      details: `تم إنشاء كوبون خصم: ${coupon.code}`,
+      entityId: coupon._id.toString(),
+      details: `إنشاء كوبون: ${coupon.code}`,
       request,
     });
 
-    return successResponse({
-      ...coupon,
-      applicableCategories: safeJsonParse<string[]>(coupon.applicableCategories, []),
-    }, 'تم إنشاء كوبون الخصم بنجاح', 201);
+    return Response.json({
+      success: true,
+      data: { ...coupon.toObject(), id: coupon._id.toString() },
+      message: 'تم إنشاء الكوبون بنجاح',
+    }, { status: 201 });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN COUPONS CREATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء إنشاء الكوبون', 500, 'INTERNAL_ERROR');
   }
 }

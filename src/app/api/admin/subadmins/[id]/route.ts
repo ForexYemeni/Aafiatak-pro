@@ -1,112 +1,92 @@
-// GET /api/admin/subadmins/[id] - Get sub-admin
-// PATCH /api/admin/subadmins/[id] - Update sub-admin
-// DELETE /api/admin/subadmins/[id] - Delete sub-admin
+// GET/PATCH/DELETE /api/admin/subadmins/[id] - Get/update/delete sub-admin
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import { hashPassword } from '@/lib/auth';
-import {
-  requireRole, successResponse, handleApiError,
-  logActivity, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { User } from '@/models/mongoose';
+import { hashPassword, createErrorResponse } from '@/lib/auth';
+import { requireRole } from '@/lib/auth/middleware';
+import { logActivity } from '@/lib/api/helpers';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
+
     const { id } = await params;
+    const subadmin = await User.findOne({ _id: id, role: 'subadmin' }).select('-password').lean();
+    if (!subadmin) return createErrorResponse('المشرف غير موجود', 404, 'NOT_FOUND');
 
-    const subAdmin = await db.subAdmin.findUnique({
-      where: { id },
-      select: {
-        id: true, name: true, phone: true, email: true, permissions: true,
-        isActive: true, adminId: true, lastLoginAt: true, createdAt: true, updatedAt: true,
-      },
-    });
-
-    if (!subAdmin) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المشرف الفرعي' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    return successResponse({ ...subAdmin, permissions: safeJsonParse<string[]>(subAdmin.permissions, []) });
+    return Response.json({ success: true, data: { ...subadmin, id: subadmin._id.toString() } });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN SUBADMIN DETAIL ERROR]', error);
+    return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
   }
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
+
     const { id } = await params;
-
-    const subAdmin = await db.subAdmin.findUnique({ where: { id } });
-    if (!subAdmin) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المشرف الفرعي' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
     const body = await request.json();
-    const updateData: Record<string, unknown> = {};
 
-    if (body.name !== undefined) updateData.name = body.name;
-    if (body.email !== undefined) updateData.email = body.email;
-    if (body.isActive !== undefined) updateData.isActive = body.isActive;
-    if (body.permissions !== undefined) updateData.permissions = JSON.stringify(body.permissions);
-    if (body.password) updateData.password = await hashPassword(body.password);
+    delete body._id;
+    delete body.role; // Cannot change role
 
-    const updated = await db.subAdmin.update({
-      where: { id },
-      data: updateData,
-    });
+    // If password is being updated, hash it
+    if (body.password) {
+      body.password = await hashPassword(body.password);
+    } else {
+      delete body.password;
+    }
+
+    const subadmin = await User.findOneAndUpdate({ _id: id, role: 'subadmin' }, body, { new: true }).select('-password').lean();
+    if (!subadmin) return createErrorResponse('المشرف غير موجود', 404, 'NOT_FOUND');
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'update_subadmin',
-      entity: 'SubAdmin',
+      entity: 'User',
       entityId: id,
-      details: `تم تحديث المشرف الفرعي: ${updated.name}`,
+      details: 'تحديث بيانات المشرف',
       request,
     });
 
-    const { password: _, ...data } = updated;
-    return successResponse({ ...data, permissions: safeJsonParse<string[]>(updated.permissions, []) }, 'تم تحديث المشرف الفرعي بنجاح');
+    return Response.json({ success: true, data: { ...subadmin, id: subadmin._id.toString() }, message: 'تم تحديث بيانات المشرف بنجاح' });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN SUBADMIN UPDATE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');
   }
 }
 
-export async function DELETE(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'admin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin']);
+    if (error) return error;
+
     const { id } = await params;
-
-    const subAdmin = await db.subAdmin.findUnique({ where: { id } });
-    if (!subAdmin) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المشرف الفرعي' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    await db.subAdmin.update({ where: { id }, data: { isActive: false } });
+    const subadmin = await User.findOneAndDelete({ _id: id, role: 'subadmin' }).lean();
+    if (!subadmin) return createErrorResponse('المشرف غير موجود', 404, 'NOT_FOUND');
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
+      userId: user!.userId,
+      userRole: user!.role,
       action: 'delete_subadmin',
-      entity: 'SubAdmin',
+      entity: 'User',
       entityId: id,
-      details: `تم تعطيل المشرف الفرعي: ${subAdmin.name}`,
+      details: 'حذف المشرف',
       request,
     });
 
-    return successResponse(null, 'تم تعطيل المشرف الفرعي بنجاح');
+    return Response.json({ success: true, message: 'تم حذف المشرف بنجاح' });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN SUBADMIN DELETE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء الحذف', 500, 'INTERNAL_ERROR');
   }
 }

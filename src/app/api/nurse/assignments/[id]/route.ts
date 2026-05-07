@@ -1,108 +1,77 @@
-// GET /api/nurse/assignments/[id] - Get assignment details
-// PATCH /api/nurse/assignments/[id] - Accept/reject assignment
+// POST /api/nurse/assignments/[id] - Accept/reject assignment
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
-export async function GET(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'nurse');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
+    if (user.role !== 'nurse') {
+      return createErrorResponse('هذا الإجراء متاح للممرضين فقط', 403, 'FORBIDDEN');
+    }
+
     const { id } = await params;
+    const { action, rejectedReason } = await request.json();
 
-    const assignment = await db.serviceAssignment.findUnique({
-      where: { id },
-      include: {
-        request: {
-          include: {
-            service: true,
-            beneficiary: { select: { id: true, name: true, phone: true, governorate: true, address: true } },
-          },
-        },
-      },
-    });
-
-    if (!assignment || assignment.nurseId !== user.userId) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المهمة' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    if (!['accept', 'reject'].includes(action)) {
+      return createErrorResponse('الإجراء مطلوب (accept/reject)', 400, 'VALIDATION_ERROR');
     }
 
-    return successResponse(assignment);
-  } catch (error) {
-    return handleApiError(error);
-  }
-}
+    const order = await ServiceRequest.findById(id);
+    if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
-  try {
-    const user = await requireRole(request, 'nurse');
-    const { id } = await params;
-
-    const assignment = await db.serviceAssignment.findUnique({
-      where: { id },
-      include: { request: true },
-    });
-
-    if (!assignment || assignment.nurseId !== user.userId) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المهمة' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    if (order.nurseId?.toString() !== user.userId) {
+      return createErrorResponse('هذا الطلب غير معين لك', 403, 'FORBIDDEN');
     }
 
-    if (assignment.status !== 'pending') {
-      return new Response(JSON.stringify({ success: false, error: 'INVALID_STATUS', message: 'لا يمكن تعديل مهمة تم الرد عليها بالفعل' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    if (order.status !== 'assigned') {
+      return createErrorResponse('لا يمكن التعامل مع هذا الطلب في حالته الحالية', 400, 'INVALID_STATUS');
     }
 
-    const body = await request.json();
-    const newStatus = body.status as string; // 'accepted' or 'rejected'
+    if (action === 'accept') {
+      order.status = 'accepted';
+      await order.save();
 
-    if (!['accepted', 'rejected'].includes(newStatus)) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: 'الحالة يجب أن تكون "accepted" أو "rejected"' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    const updated = await db.$transaction(async (tx) => {
-      const updatedAssignment = await tx.serviceAssignment.update({
-        where: { id },
-        data: {
-          status: newStatus,
-          respondedAt: new Date(),
-          rejectedReason: newStatus === 'rejected' ? (body.rejectedReason ?? null) : null,
-        },
-      });
-
-      if (newStatus === 'accepted') {
-        await tx.serviceRequest.update({
-          where: { id: assignment.requestId },
-          data: { status: 'accepted' },
+      // Notify beneficiary
+      try {
+        await Notification.create({
+          userId: order.beneficiaryId,
+          userRole: 'beneficiary',
+          titleAr: 'تم قبول طلبك',
+          bodyAr: 'تم قبول طلبك وسيقوم الممرض بالوصول قريباً',
+          type: 'status_change',
+          priority: 'medium',
+          data: { requestId: id, status: 'accepted' },
+          voiceEnabled: true,
         });
-      } else {
-        // If rejected, make the order pending again for reassignment
-        await tx.serviceRequest.update({
-          where: { id: assignment.requestId },
-          data: { nurseId: null, status: 'pending' },
-        });
+      } catch {
+        // Non-critical
       }
 
-      return updatedAssignment;
-    });
+      return Response.json({
+        success: true,
+        data: { ...order.toObject(), id: order._id.toString() },
+        message: 'تم قبول الطلب بنجاح',
+      });
+    } else {
+      order.status = 'pending';
+      order.nurseId = undefined;
+      await order.save();
 
-    await logActivity({
-      userId: user.userId,
-      userRole: 'nurse',
-      action: newStatus === 'accepted' ? 'accept_assignment' : 'reject_assignment',
-      entity: 'ServiceAssignment',
-      entityId: id,
-      details: newStatus === 'accepted' ? 'تم قبول المهمة' : `تم رفض المهمة: ${body.rejectedReason ?? ''}`,
-      request,
-    });
-
-    return successResponse(updated, newStatus === 'accepted' ? 'تم قبول المهمة بنجاح' : 'تم رفض المهمة');
+      return Response.json({
+        success: true,
+        data: { ...order.toObject(), id: order._id.toString() },
+        message: 'تم رفض الطلب',
+      });
+    }
   } catch (error) {
-    return handleApiError(error);
+    console.error('[NURSE ASSIGNMENT ACTION ERROR]', error);
+    return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
   }
 }

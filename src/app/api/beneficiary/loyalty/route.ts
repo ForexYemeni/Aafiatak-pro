@@ -1,106 +1,65 @@
 // GET /api/beneficiary/loyalty - Get loyalty points
-// POST /api/beneficiary/loyalty - Redeem loyalty points
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Beneficiary, LoyaltyTransaction } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'beneficiary');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const beneficiary = await db.beneficiary.findUnique({
-      where: { id: user.userId },
-      select: { loyaltyPoints: true, loyaltyTier: true, totalSpent: true, orderCount: true },
-    });
-
-    if (!beneficiary) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المستفيد' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
     }
 
-    // Get recent loyalty transactions
-    const recentTransactions = await db.loyaltyTransaction.findMany({
-      where: { beneficiaryId: user.userId },
-      orderBy: { createdAt: 'desc' },
-      take: 20,
-    });
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
 
-    // Get settings
-    const settings = await db.adminSettings.findFirst();
+    const [beneficiary, transactions, total] = await Promise.all([
+      Beneficiary.findById(user.userId).select('loyaltyPoints loyaltyTier').lean(),
+      LoyaltyTransaction.find({ beneficiaryId: user.userId })
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      LoyaltyTransaction.countDocuments({ beneficiaryId: user.userId }),
+    ]);
 
-    return successResponse({
-      points: beneficiary.loyaltyPoints,
-      tier: beneficiary.loyaltyTier,
-      totalSpent: beneficiary.totalSpent,
-      orderCount: beneficiary.orderCount,
-      redemptionThreshold: settings?.loyaltyRedemptionThreshold ?? 100,
-      pointsPerOrder: settings?.loyaltyPointsPerOrder ?? 10,
-      recentTransactions,
+    if (!beneficiary) return createErrorResponse('المستفيد غير موجود', 404, 'NOT_FOUND');
+
+    // Tier thresholds
+    const tierInfo: Record<string, { name: string; minPoints: number; nextTier: string | null; pointsNeeded: number }> = {
+      bronze: { name: 'برونزي', minPoints: 0, nextTier: 'silver', pointsNeeded: 500 },
+      silver: { name: 'فضي', minPoints: 500, nextTier: 'gold', pointsNeeded: 1500 },
+      gold: { name: 'ذهبي', minPoints: 1500, nextTier: 'platinum', pointsNeeded: 3000 },
+      platinum: { name: 'بلاتيني', minPoints: 3000, nextTier: null, pointsNeeded: 0 },
+    };
+
+    const currentTier = tierInfo[beneficiary.loyaltyTier] || tierInfo.bronze;
+
+    return Response.json({
+      success: true,
+      data: {
+        loyaltyPoints: beneficiary.loyaltyPoints,
+        loyaltyTier: beneficiary.loyaltyTier,
+        tierName: currentTier.name,
+        nextTier: currentTier.nextTier,
+        pointsToNextTier: currentTier.nextTier
+          ? (tierInfo[currentTier.nextTier]?.minPoints || 0) - beneficiary.loyaltyPoints
+          : 0,
+        transactions: transactions.map((t: any) => ({ ...t, id: t._id.toString() })),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
     });
   } catch (error) {
-    return handleApiError(error);
-  }
-}
-
-export async function POST(request: NextRequest) {
-  try {
-    const user = await requireRole(request, 'beneficiary');
-
-    const body = await request.json();
-    if (!body.points || body.points <= 0) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: 'عدد النقاط مطلوب ويجب أن يكون أكبر من صفر' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    const settings = await db.adminSettings.findFirst();
-    const threshold = settings?.loyaltyRedemptionThreshold ?? 100;
-
-    if (body.points < threshold) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: `الحد الأدنى لاستبدال النقاط هو ${threshold} نقطة` }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    const beneficiary = await db.beneficiary.findUnique({
-      where: { id: user.userId },
-      select: { loyaltyPoints: true },
-    });
-
-    if (!beneficiary) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على المستفيد' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    if (beneficiary.loyaltyPoints < body.points) {
-      return new Response(JSON.stringify({ success: false, error: 'INSUFFICIENT_POINTS', message: 'رصيد النقاط غير كافٍ' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    await db.$transaction(async (tx) => {
-      await tx.beneficiary.update({
-        where: { id: user.userId },
-        data: { loyaltyPoints: { decrement: body.points } },
-      });
-
-      await tx.loyaltyTransaction.create({
-        data: {
-          beneficiaryId: user.userId,
-          points: body.points,
-          type: 'redeem',
-          description: `استبدال ${body.points} نقطة`,
-        },
-      });
-    });
-
-    await logActivity({
-      userId: user.userId,
-      userRole: 'beneficiary',
-      action: 'redeem_loyalty',
-      entity: 'Beneficiary',
-      entityId: user.userId,
-      details: `تم استبدال ${body.points} نقطة ولاء`,
-      request,
-    });
-
-    return successResponse({ redeemed: body.points }, 'تم استبدال النقاط بنجاح');
-  } catch (error) {
-    return handleApiError(error);
+    console.error('[BENEFICIARY LOYALTY ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب نقاط الولاء', 500, 'INTERNAL_ERROR');
   }
 }

@@ -30,7 +30,7 @@ export function useRequireAuth(redirectPath?: string) {
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
       const currentPath = redirectPath ?? window.location.pathname;
-      router.replace(`/login?redirect=${encodeURIComponent(currentPath)}`);
+      router.replace(`/?redirect=${encodeURIComponent(currentPath)}`);
     }
   }, [isAuthenticated, isLoading, router, redirectPath]);
 

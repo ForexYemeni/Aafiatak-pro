@@ -1,63 +1,56 @@
-// GET /api/admin/orders - List all service requests with filters
+// GET /api/admin/orders - List all orders with filters
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, paginatedResponse, handleApiError,
-  parsePagination, paginate,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { ServiceRequest } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
-    const status = url.searchParams.get('status') ?? '';
-    const beneficiaryId = url.searchParams.get('beneficiaryId') ?? '';
-    const nurseId = url.searchParams.get('nurseId') ?? '';
-    const serviceId = url.searchParams.get('serviceId') ?? '';
-    const isEmergency = url.searchParams.get('isEmergency');
-    const paymentStatus = url.searchParams.get('paymentStatus') ?? '';
-    const dateFrom = url.searchParams.get('dateFrom');
-    const dateTo = url.searchParams.get('dateTo');
-    const sortBy = url.searchParams.get('sortBy') ?? 'createdAt';
-    const sortOrder = url.searchParams.get('sortOrder') === 'asc' ? 'asc' : 'desc';
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+    const status = searchParams.get('status');
+    const beneficiaryId = searchParams.get('beneficiaryId');
+    const nurseId = searchParams.get('nurseId');
+    const dateFrom = searchParams.get('dateFrom');
+    const dateTo = searchParams.get('dateTo');
 
-    const where: Record<string, unknown> = {};
-    if (status) where.status = status;
-    if (beneficiaryId) where.beneficiaryId = beneficiaryId;
-    if (nurseId) where.nurseId = nurseId;
-    if (serviceId) where.serviceId = serviceId;
-    if (isEmergency !== null && isEmergency !== '') where.isEmergency = isEmergency === 'true';
-    if (paymentStatus) where.paymentStatus = paymentStatus;
-
+    const filter: any = {};
+    if (status) filter.status = status;
+    if (beneficiaryId) filter.beneficiaryId = beneficiaryId;
+    if (nurseId) filter.nurseId = nurseId;
     if (dateFrom || dateTo) {
-      const createdAt: Record<string, Date> = {};
-      if (dateFrom) createdAt.gte = new Date(dateFrom);
-      if (dateTo) createdAt.lte = new Date(dateTo);
-      where.createdAt = createdAt;
+      filter.createdAt = {};
+      if (dateFrom) filter.createdAt.$gte = new Date(dateFrom);
+      if (dateTo) filter.createdAt.$lte = new Date(dateTo);
     }
 
     const [orders, total] = await Promise.all([
-      db.serviceRequest.findMany({
-        where,
-        skip,
-        take: limit,
-        orderBy: { [sortBy]: sortOrder },
-        include: {
-          service: { select: { id: true, nameAr: true, nameEn: true, category: true } },
-          beneficiary: { select: { id: true, name: true, phone: true } },
-          nurse: { select: { id: true, name: true, phone: true } },
-          assignments: { take: 5, orderBy: { assignedAt: 'desc' } },
-        },
-      }),
-      db.serviceRequest.count({ where }),
+      ServiceRequest.find(filter)
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      ServiceRequest.countDocuments(filter),
     ]);
 
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(orders, pagination);
+    return Response.json({
+      success: true,
+      data: {
+        orders: orders.map((o: any) => ({ ...o, id: o._id.toString() })),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN ORDERS ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب الطلبات', 500, 'INTERNAL_ERROR');
   }
 }

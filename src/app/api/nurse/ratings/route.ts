@@ -1,42 +1,51 @@
-// GET /api/nurse/ratings - Received ratings
+// GET /api/nurse/ratings - Get nurse ratings
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, paginatedResponse, handleApiError,
-  parsePagination, paginate, safeJsonParse,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { Rating, Nurse } from '@/models/mongoose';
+import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
-    const user = await requireRole(request, 'nurse');
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
 
-    const url = new URL(request.url);
-    const { page, limit, skip } = parsePagination(url);
+    if (user.role !== 'nurse') {
+      return createErrorResponse('هذا الإجراء متاح للممرضين فقط', 403, 'FORBIDDEN');
+    }
 
-    const [ratings, total] = await Promise.all([
-      db.rating.findMany({
-        where: { toUserId: user.userId, toRole: 'nurse' },
-        skip,
-        take: limit,
-        orderBy: { createdAt: 'desc' },
-        include: {
-          serviceRequest: {
-            select: { id: true, status: true, service: { select: { nameAr: true, nameEn: true } } },
-          },
-        },
-      }),
-      db.rating.count({ where: { toUserId: user.userId, toRole: 'nurse' } }),
+    const { searchParams } = new URL(request.url);
+    const page = parseInt(searchParams.get('page') || '1');
+    const limit = parseInt(searchParams.get('limit') || '20');
+
+    const [nurse, ratings, total] = await Promise.all([
+      Nurse.findById(user.userId).select('rating reviewCount completedJobs').lean(),
+      Rating.find({ toUserId: user.userId })
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * limit)
+        .limit(limit)
+        .lean(),
+      Rating.countDocuments({ toUserId: user.userId }),
     ]);
 
-    const parsed = ratings.map((r) => ({
-      ...r,
-      tags: safeJsonParse<string[]>(r.tags, []),
-    }));
-
-    const pagination = paginate({ page, limit, total });
-    return paginatedResponse(parsed, pagination);
+    return Response.json({
+      success: true,
+      data: {
+        summary: {
+          averageRating: nurse?.rating || 0,
+          reviewCount: nurse?.reviewCount || 0,
+          completedJobs: nurse?.completedJobs || 0,
+        },
+        ratings: ratings.map((r: any) => ({ ...r, id: r._id.toString() })),
+        total,
+        page,
+        pages: Math.ceil(total / limit),
+      },
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[NURSE RATINGS ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب التقييمات', 500, 'INTERNAL_ERROR');
   }
 }

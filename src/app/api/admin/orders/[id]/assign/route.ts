@@ -1,74 +1,73 @@
 // POST /api/admin/orders/[id]/assign - Assign nurse to order
+// MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/prisma';
-import {
-  requireRole, successResponse, handleApiError, logActivity,
-} from '@/lib/api/helpers';
+import { connectDB } from '@/lib/mongodb';
+import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { logActivity } from '@/lib/api/helpers';
 
-export async function POST(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> }
-) {
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const user = await requireRole(request, 'admin', 'subadmin');
+    await connectDB();
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    if (error) return error;
+
     const { id } = await params;
+    const { nurseId } = await request.json();
 
-    const order = await db.serviceRequest.findUnique({ where: { id } });
-    if (!order) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الطلب' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+    if (!nurseId) {
+      return createErrorResponse('معرف الممرض مطلوب', 400, 'VALIDATION_ERROR');
     }
 
-    const body = await request.json();
-    if (!body.nurseId) {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: 'معرف الممرض مطلوب' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+    // Verify nurse exists and is verified
+    const nurse = await Nurse.findById(nurseId).select('-password').lean();
+    if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+    if (nurse.verificationStatus !== 'verified') {
+      return createErrorResponse('الممرض غير موثق', 400, 'NURSE_NOT_VERIFIED');
     }
 
-    const nurse = await db.nurse.findUnique({ where: { id: body.nurseId } });
-    if (!nurse) {
-      return new Response(JSON.stringify({ success: false, error: 'NOT_FOUND', message: 'لم يتم العثور على الممرض' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
-    }
+    // Update order
+    const order = await ServiceRequest.findByIdAndUpdate(
+      id,
+      { nurseId, status: 'assigned' },
+      { new: true }
+    ).lean();
+    if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
-    if (!nurse.isActive || nurse.verificationStatus !== 'verified') {
-      return new Response(JSON.stringify({ success: false, error: 'VALIDATION_ERROR', message: 'الممرض غير متاح للتعيين' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
-    }
-
-    // Create assignment and update order in transaction
-    const assignment = await db.$transaction(async (tx) => {
-      const newAssignment = await tx.serviceAssignment.create({
-        data: {
-          requestId: id,
-          nurseId: body.nurseId,
-          status: 'pending',
-          assignedBy: user.userId,
-          assignedByRole: user.role,
-          estimatedArrivalMinutes: body.estimatedArrivalMinutes ?? null,
-        },
+    // Create notification for the nurse
+    try {
+      await Notification.create({
+        userId: nurseId,
+        userRole: 'nurse',
+        titleAr: 'طلب خدمة جديد',
+        bodyAr: `تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول`,
+        type: 'assignment',
+        priority: 'high',
+        data: { requestId: id, assignmentType: 'service' },
+        voiceEnabled: true,
       });
-
-      await tx.serviceRequest.update({
-        where: { id },
-        data: {
-          nurseId: body.nurseId,
-          status: 'assigned',
-        },
-      });
-
-      return newAssignment;
-    });
+    } catch {
+      // Non-critical
+    }
 
     await logActivity({
-      userId: user.userId,
-      userRole: user.role,
-      action: 'assign_nurse_to_order',
+      userId: user!.userId,
+      userRole: user!.role,
+      action: 'assign_nurse',
       entity: 'ServiceRequest',
       entityId: id,
-      details: `تم تعيين الممرض ${nurse.name} للطلب ${id}`,
+      details: `تعيين الممرض ${nurse.name} للطلب`,
       request,
     });
 
-    return successResponse(assignment, 'تم تعيين الممرض بنجاح');
+    return Response.json({
+      success: true,
+      data: { ...order, id: order._id.toString() },
+      message: 'تم تعيين الممرض للطلب بنجاح',
+    });
   } catch (error) {
-    return handleApiError(error);
+    console.error('[ADMIN ASSIGN NURSE ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء تعيين الممرض', 500, 'INTERNAL_ERROR');
   }
 }
