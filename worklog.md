@@ -105,3 +105,31 @@ Stage Summary:
 - Two new pages created: /nurse/requests and /nurse/my-requests (fixing 404 errors)
 - All APIs tested and confirmed working in production
 - Deployment: https://aafiatak-v0-1.vercel.app
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix ratings crash, add experience field, document upload, verification gate, dynamic support, legal pages
+
+Work Log:
+- Fixed nurse ratings page crash: API returns {data: {ratings: []}} not flat array
+- Added experience years field to nurse profile edit form
+- Redesigned document upload section: single button for ID+license with thumbnail previews
+- Added verification gate: unverified nurses blocked from receiving assignments
+- Created dynamic support numbers system (multiple phones + WhatsApp from admin settings)
+- Created Terms & Conditions page at /nurse/help/terms
+- Created Privacy Policy page at /nurse/help/privacy
+- Created public API routes: /api/settings/support, /api/settings/legal
+- Updated admin settings page with support numbers management + legal content editor
+- Updated admin nurses page to show uploaded document images
+- Updated AdminSettings model with new fields
+- Updated nurse documents API to handle FormData uploads
+- Updated nurse assignments API to check verification status
+
+Stage Summary:
+- All nurse dashboard pages now work without crashes
+- Document upload flow works with single button for both documents
+- Verification gate prevents unverified nurses from receiving tasks
+- Support contact info is dynamic from admin settings
+- Legal pages fetch content from admin-editable settings
+- Admin can manage multiple support numbers and legal content
+- Deployment: https://aafiatak-v0-1.vercel.app
