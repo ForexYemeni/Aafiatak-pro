@@ -53,3 +53,35 @@ Stage Summary:
 - Both critical bugs fixed: redirect loop and registration errors
 - All authentication flows working correctly
 - Deployment live at https://aafiatak-v0-1.vercel.app
+
+---
+Task ID: 3
+Agent: Main Agent
+Task: Fix admin dashboard "خطأ في التحميل" and emergencies "Application error"
+
+Work Log:
+- Diagnosed root cause: API endpoints return nested data { data: { items: [...], pages } }
+  but admin pages treated json.data as flat array, causing .map() to fail on objects
+- Fixed useAuthFetch to wait for Zustand hydration before making API requests
+- Fixed data extraction in all 8 admin pages + emergencies + orders:
+  - admin/page.tsx (dashboard) - orders, nurses, beneficiaries extraction
+  - admin/emergencies/page.tsx - emergencies and nurses extraction
+  - admin/orders/page.tsx - orders and nurses extraction
+  - admin/nurses/page.tsx - nurses extraction
+  - admin/beneficiaries/page.tsx - beneficiaries extraction
+  - admin/payments/page.tsx - transactions extraction
+  - admin/complaints/page.tsx - complaints extraction
+  - admin/activity/page/page.tsx - logs extraction
+  - admin/services/page.tsx - services extraction
+  - admin/coupons/page.tsx - coupons extraction
+  - admin/subadmins/page.tsx - subadmins extraction
+- Added Array.isArray() safety checks throughout
+- Fixed pagination extraction from json.data.pages
+- Built, pushed, and deployed to Vercel
+- All admin pages return 200 with auth cookie ✅
+
+Stage Summary:
+- Fixed all admin page rendering errors (data structure mismatch)
+- Fixed auth fetch hydration race condition
+- 11 pages fixed total
+- Deployment live at https://aafiatak-v0-1.vercel.app
