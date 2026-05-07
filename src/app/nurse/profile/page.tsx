@@ -36,6 +36,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { toArabicNum } from '@/components/common/date-formatter';
+import { compressImage } from '@/lib/utils/image-compress';
 import Link from 'next/link';
 
 // ---- Types ----
@@ -260,8 +261,8 @@ export default function NurseProfilePage() {
     }
   };
 
-  // Handle file selection for documents
-  const handleIdentityFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  // Handle file selection for documents - with automatic compression
+  const handleIdentityFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
     const file = e.target.files?.[0];
     if (!file) return;
@@ -273,13 +274,28 @@ export default function NurseProfilePage() {
       setUploadError('صورة الهوية يجب أن تكون بصيغة JPEG أو PNG أو WebP');
       return;
     }
-    setIdentityFile(file);
+
+    // Show preview immediately from original file
     const reader = new FileReader();
     reader.onload = () => setIdentityPreview(reader.result as string);
     reader.readAsDataURL(file);
+
+    // Compress in background
+    try {
+      const compressed = await compressImage(file, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.85,
+        maxSizeKB: 500,
+      });
+      setIdentityFile(compressed);
+    } catch {
+      // Fallback to original file if compression fails
+      setIdentityFile(file);
+    }
   };
 
-  const handleLicenseFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleLicenseFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     setUploadError(null);
     const file = e.target.files?.[0];
     if (!file) return;
@@ -291,10 +307,25 @@ export default function NurseProfilePage() {
       setUploadError('صورة المزاولة يجب أن تكون بصيغة JPEG أو PNG أو WebP');
       return;
     }
-    setLicenseFile(file);
+
+    // Show preview immediately from original file
     const reader = new FileReader();
     reader.onload = () => setLicensePreview(reader.result as string);
     reader.readAsDataURL(file);
+
+    // Compress in background
+    try {
+      const compressed = await compressImage(file, {
+        maxWidth: 1600,
+        maxHeight: 1600,
+        quality: 0.85,
+        maxSizeKB: 500,
+      });
+      setLicenseFile(compressed);
+    } catch {
+      // Fallback to original file if compression fails
+      setLicenseFile(file);
+    }
   };
 
   const handleUploadDocuments = async () => {
@@ -315,43 +346,38 @@ export default function NurseProfilePage() {
     setUploadError(null);
 
     try {
-      // Upload identity document
-      const identityFormData = new FormData();
-      identityFormData.append('file', identityFile);
-      identityFormData.append('type', 'identity');
-      const identityRes = await authFetch('/api/nurse/documents', {
-        method: 'POST',
-        body: identityFormData,
-      });
-      const identityData = await identityRes.json();
-      if (!identityData.success) {
-        setUploadError(identityData.message || 'حدث خطأ في رفع صورة الهوية');
-        setIsUploadingDocs(false);
+      // Upload both documents in parallel for speed
+      const [identityResult, licenseResult] = await Promise.all([
+        (async () => {
+          const formData = new FormData();
+          formData.append('file', identityFile!);
+          formData.append('type', 'identity');
+          const res = await authFetch('/api/nurse/documents', {
+            method: 'POST',
+            body: formData,
+          });
+          return res.json();
+        })(),
+        (async () => {
+          const formData = new FormData();
+          formData.append('file', licenseFile!);
+          formData.append('type', 'license');
+          const res = await authFetch('/api/nurse/documents', {
+            method: 'POST',
+            body: formData,
+          });
+          return res.json();
+        })(),
+      ]);
+
+      if (!identityResult.success) {
+        setUploadError(identityResult.message || 'حدث خطأ في رفع صورة الهوية');
         return;
       }
-
-      // Upload license document
-      const licenseFormData = new FormData();
-      licenseFormData.append('file', licenseFile);
-      licenseFormData.append('type', 'license');
-      const licenseRes = await authFetch('/api/nurse/documents', {
-        method: 'POST',
-        body: licenseFormData,
-      });
-      const licenseData = await licenseRes.json();
-      if (!licenseData.success) {
-        setUploadError(licenseData.message || 'حدث خطأ في رفع صورة المزاولة');
-        setIsUploadingDocs(false);
+      if (!licenseResult.success) {
+        setUploadError(licenseResult.message || 'حدث خطأ في رفع صورة المزاولة');
         return;
       }
-
-      // Update profile state with new data
-      setProfile((prev) => prev ? {
-        ...prev,
-        identityDocumentData: identityData.data?.identityDocumentData || prev.identityDocumentData,
-        licenseDocumentData: licenseData.data?.licenseDocumentData || prev.licenseDocumentData,
-        verificationStatus: identityData.data?.verificationStatus || prev.verificationStatus,
-      } : null);
 
       // Clear file selection
       setIdentityFile(null);

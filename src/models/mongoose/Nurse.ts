@@ -32,6 +32,8 @@ export interface INurse extends Document {
   licenseDocumentData?: string;
   rejectedReason?: string;
   isActive: boolean;
+  isBlocked: boolean;
+  blockedReason?: string;
 }
 
 const NurseSchema = new Schema({
@@ -60,6 +62,8 @@ const NurseSchema = new Schema({
   identityDocumentData: { type: String },
   licenseDocumentData: { type: String },
   rejectedReason: { type: String },
+  isBlocked: { type: Boolean, default: false },
+  blockedReason: { type: String },
 });
 
 // Safe discriminator registration - prevents "Discriminator with name already exists" error
