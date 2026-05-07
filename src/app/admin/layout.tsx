@@ -8,9 +8,11 @@ import { Loader2 } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading } = useAuthStore();
+  const { user, isAuthenticated, isLoading, _hasHydrated } = useAuthStore();
 
   useEffect(() => {
+    // Wait for hydration before checking auth to prevent redirect loops
+    if (!_hasHydrated) return;
     if (!isLoading && !isAuthenticated) {
       router.replace('/?redirect=/admin');
       return;
@@ -20,9 +22,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
         router.replace('/?redirect=/admin');
       }
     }
-  }, [isLoading, isAuthenticated, user, router]);
+  }, [isLoading, isAuthenticated, user, router, _hasHydrated]);
 
-  if (isLoading) {
+  if (!_hasHydrated || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" dir="rtl">
         <div className="flex flex-col items-center gap-4">

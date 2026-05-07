@@ -22,6 +22,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   error: string | null;
+  _hasHydrated: boolean;
 
   // Actions
   login: (phone: string, password: string) => Promise<void>;
@@ -33,26 +34,43 @@ interface AuthState {
   clearError: () => void;
   setUser: (user: AppUser) => void;
   setTokens: (token: string, refreshToken: string) => void;
+  setHasHydrated: (state: boolean) => void;
 }
 
 // ---- API Helper ----
 
 async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
-  const response = await fetch(url, {
-    headers: {
-      'Content-Type': 'application/json',
-      ...options.headers,
-    },
-    ...options,
-  });
-
-  const data: ApiResponse<T> = await response.json();
-
-  if (!data.success) {
-    throw new Error(data.message || 'حدث خطأ في الطلب');
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        'Content-Type': 'application/json',
+        ...options.headers,
+      },
+      ...options,
+    });
+  } catch (networkError) {
+    throw new Error('تعذر الاتصال بالخادم. تحقق من اتصالك بالإنترنت');
   }
 
-  return data;
+  // Try to parse JSON, handle non-JSON responses gracefully
+  let data: any;
+  try {
+    data = await response.json();
+  } catch {
+    if (!response.ok) {
+      throw new Error(`خطأ في الخادم (${response.status})`);
+    }
+    throw new Error('حدث خطأ غير متوقع');
+  }
+
+  if (!data.success) {
+    // Handle nested error structure: { success: false, error: { message, code } }
+    const errorMessage = data.error?.message || data.message || data.error || 'حدث خطأ في الطلب';
+    throw new Error(errorMessage);
+  }
+
+  return data as ApiResponse<T>;
 }
 
 // ---- Auth Store ----
@@ -67,6 +85,7 @@ export const useAuthStore = create<AuthState>()(
       isAuthenticated: false,
       isLoading: false,
       error: null,
+      _hasHydrated: false,
 
       // ---- Login ----
       login: async (phone: string, password: string) => {
@@ -237,6 +256,11 @@ export const useAuthStore = create<AuthState>()(
       setTokens: (token: string, newRefreshToken: string) => {
         set({ token, refreshToken: newRefreshToken });
       },
+
+      // ---- Set Hydration State ----
+      setHasHydrated: (state: boolean) => {
+        set({ _hasHydrated: state });
+      },
     }),
     {
       name: 'aafiatak-auth-storage',
@@ -257,6 +281,16 @@ export const useAuthStore = create<AuthState>()(
         refreshToken: state.refreshToken,
         isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrateStorage: () => {
+        return (_state, error) => {
+          // Use setTimeout to ensure the store is fully initialized before setting
+          if (!error) {
+            setTimeout(() => {
+              useAuthStore.setState({ _hasHydrated: true });
+            }, 0);
+          }
+        };
+      },
     }
   )
 );

@@ -18,7 +18,9 @@ const PROTECTED_ROUTES: RouteProtection[] = [
 ];
 
 // Paths that should redirect away from login if already authenticated
-const AUTH_PATHS = ['/', '/login', '/register'];
+// IMPORTANT: Use exact match for '/' to avoid matching ALL paths (every path starts with '/')
+const AUTH_PATHS_EXACT = ['/']; // Exact match only
+const AUTH_PATHS_PREFIX = ['/login', '/register']; // Prefix match
 
 // ---- JWT Secret (Edge-compatible) ----
 
@@ -141,14 +143,20 @@ export async function middleware(request: NextRequest) {
   const token = extractToken(request);
 
   // ---- Handle authenticated users on auth pages ----
-  if (AUTH_PATHS.some((authPath) => pathname.startsWith(authPath))) {
+  // Check exact match first (for '/' path), then prefix match (for '/login', '/register')
+  const isAuthPage = AUTH_PATHS_EXACT.includes(pathname) || AUTH_PATHS_PREFIX.some((p) => pathname.startsWith(p));
+  
+  if (isAuthPage) {
     if (token) {
       const role = await getUserRoleFromToken(token);
       if (role) {
         // Redirect to role-specific dashboard
         const dashboardPath = getDashboardPath(role);
-        const response = NextResponse.redirect(new URL(dashboardPath, request.url));
-        return applySecurityHeaders(request, response);
+        // Prevent redirect loop: only redirect if not already on the target
+        if (pathname !== dashboardPath) {
+          const response = NextResponse.redirect(new URL(dashboardPath, request.url));
+          return applySecurityHeaders(request, response);
+        }
       }
     }
     const response = NextResponse.next();

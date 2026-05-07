@@ -8,15 +8,17 @@ import { FloatingChatBubble } from '@/components/common/floating-chat-bubble';
 
 export default function BeneficiaryLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { isAuthenticated, user, isLoading } = useAuthStore();
+  const { isAuthenticated, user, isLoading, _hasHydrated } = useAuthStore();
 
   useEffect(() => {
+    // Wait for hydration before checking auth to prevent redirect loops
+    if (!_hasHydrated) return;
     if (!isLoading && (!isAuthenticated || user?.role !== 'beneficiary')) {
       router.replace('/?redirect=/beneficiary');
     }
-  }, [isAuthenticated, isLoading, user, router]);
+  }, [isAuthenticated, isLoading, user, router, _hasHydrated]);
 
-  if (isLoading) {
+  if (!_hasHydrated || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-beneficiary" dir="rtl" lang="ar">
         <div className="flex flex-col items-center gap-4">

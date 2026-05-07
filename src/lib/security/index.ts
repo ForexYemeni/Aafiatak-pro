@@ -16,13 +16,13 @@ export const rateLimitConfig = {
   /** Time window in milliseconds (15 minutes) */
   windowMs: 15 * 60 * 1000,
   /** Maximum requests per IP within the time window */
-  max: 100,
+  max: 200,
   /** Rate limit for authentication endpoints (stricter) */
-  authMax: 5,
+  authMax: 20,
   /** Auth rate limit time window in milliseconds (15 minutes) */
   authWindowMs: 15 * 60 * 1000,
   /** Rate limit for file upload endpoints */
-  uploadMax: 10,
+  uploadMax: 30,
   /** Upload rate limit time window in milliseconds (15 minutes) */
   uploadWindowMs: 15 * 60 * 1000,
 };

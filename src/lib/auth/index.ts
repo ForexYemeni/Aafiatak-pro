@@ -140,16 +140,17 @@ export function formatYemeniPhone(phone: string): string {
 
 /**
  * Create a Set-Cookie header value for the auth token.
+ * Uses SameSite=Lax for better compatibility (allows top-level navigations).
  */
 export function createAuthCookie(token: string, maxAge: number = 7 * 24 * 60 * 60): string {
-  return `auth_token=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${maxAge}`;
+  return `auth_token=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
 }
 
 /**
  * Create a Set-Cookie header value that clears the auth token.
  */
 export function createClearAuthCookie(): string {
-  return 'auth_token=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0';
+  return 'auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0';
 }
 
 // ---- Error Response Helper ----
