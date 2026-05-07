@@ -96,8 +96,9 @@ export default function AdminSubAdminsPage() {
       const res = await authFetch(`/api/admin/subadmins?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
-        setSubAdmins(json.data as SubAdminItem[]);
-        if (json.pagination) setTotalPages(json.pagination.totalPages);
+        const items = json.data.subadmins ?? json.data;
+        setSubAdmins(Array.isArray(items) ? items : []);
+        if (json.data.pages) setTotalPages(json.data.pages);
       }
     } catch {
       toast.error('فشل تحميل المديرين الفرعيين');

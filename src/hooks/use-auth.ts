@@ -82,20 +82,33 @@ export function useIsBeneficiary(): boolean {
 /**
  * Hook that provides an authenticated fetch wrapper.
  * Automatically adds the Authorization header and handles token refresh.
+ * Returns null during hydration until the token is available.
  */
 export function useAuthFetch() {
   const token = useAuthStore((state) => state.token);
+  const _hasHydrated = useAuthStore((state) => state._hasHydrated);
   const refreshAuthToken = useAuthStore((state) => state.refreshAuthToken);
   const logout = useAuthStore((state) => state.logout);
 
   const authFetch = useCallback(
     async (url: string, options: RequestInit = {}): Promise<Response> => {
-      if (!token) {
+      // Wait for hydration to complete before making requests
+      if (!_hasHydrated) {
+        // Wait up to 3 seconds for hydration
+        for (let i = 0; i < 30; i++) {
+          await new Promise((r) => setTimeout(r, 100));
+          const hydrated = useAuthStore.getState()._hasHydrated;
+          if (hydrated) break;
+        }
+      }
+
+      const currentToken = useAuthStore.getState().token;
+      if (!currentToken) {
         throw new Error('غير مصادق عليه');
       }
 
       const headers = new Headers(options.headers);
-      headers.set('Authorization', `Bearer ${token}`);
+      headers.set('Authorization', `Bearer ${currentToken}`);
       headers.set('Content-Type', 'application/json');
 
       let response = await fetch(url, {
@@ -124,7 +137,7 @@ export function useAuthFetch() {
 
       return response;
     },
-    [token, refreshAuthToken, logout]
+    [token, _hasHydrated, refreshAuthToken, logout]
   );
 
   return authFetch;

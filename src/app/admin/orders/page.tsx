@@ -95,7 +95,11 @@ export default function AdminOrdersPage() {
       const res = await authFetch(`/api/admin/orders?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
-        setOrders(json.data as OrderItem[]);
+        // API returns { data: { orders: [...], total, page, pages } }
+        const ordersArray = json.data.orders ?? json.data;
+        setOrders(Array.isArray(ordersArray) ? ordersArray : []);
+        const pages = json.data.pages ?? json.data.totalPages;
+        if (pages) setTotalPages(pages);
         if (json.pagination) setTotalPages(json.pagination.totalPages);
       }
     } catch {
@@ -114,9 +118,11 @@ export default function AdminOrdersPage() {
       const res = await authFetch('/api/admin/nurses?limit=50&status=active');
       const json = await res.json();
       if (json.success && json.data) {
-        setNurses(json.data.map((n: Record<string, unknown>) => ({
-          id: String(n.id),
-          name: String(n.name),
+        // API returns { data: { nurses: [...], total, ... } }
+        const nursesArray = json.data.nurses ?? json.data;
+        setNurses((Array.isArray(nursesArray) ? nursesArray : []).map((n: Record<string, unknown>) => ({
+          id: String(n.id ?? n._id ?? ''),
+          name: String(n.name ?? ''),
           specialization: String(n.specialization ?? ''),
           rating: Number(n.rating ?? 0),
         })));

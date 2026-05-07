@@ -89,8 +89,9 @@ export default function AdminCouponsPage() {
       const res = await authFetch(`/api/admin/coupons?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
-        setCoupons(json.data as CouponItem[]);
-        if (json.pagination) setTotalPages(json.pagination.totalPages);
+        const items = json.data.coupons ?? json.data;
+        setCoupons(Array.isArray(items) ? items : []);
+        if (json.data.pages) setTotalPages(json.data.pages);
       }
     } catch {
       toast.error('فشل تحميل الكوبونات');

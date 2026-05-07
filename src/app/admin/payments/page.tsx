@@ -93,8 +93,9 @@ export default function AdminPaymentsPage() {
       const res = await authFetch(`/api/admin/transactions?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
-        setTransactions(json.data as TransactionItem[]);
-        if (json.pagination) setTotalPages(json.pagination.totalPages);
+        const items = json.data.transactions ?? json.data;
+        setTransactions(Array.isArray(items) ? items : []);
+        if (json.data.pages) setTotalPages(json.data.pages);
       }
     } catch {
       toast.error('فشل تحميل المعاملات');

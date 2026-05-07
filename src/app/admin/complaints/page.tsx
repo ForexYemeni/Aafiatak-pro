@@ -72,8 +72,9 @@ export default function AdminComplaintsPage() {
       const res = await authFetch(`/api/admin/complaints?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
-        setComplaints(json.data as ComplaintItem[]);
-        if (json.pagination) setTotalPages(json.pagination.totalPages);
+        const items = json.data.complaints ?? json.data;
+        setComplaints(Array.isArray(items) ? items : []);
+        if (json.data.pages) setTotalPages(json.data.pages);
       }
     } catch {
       toast.error('فشل تحميل الشكاوى');

@@ -86,7 +86,12 @@ export default function AdminEmergenciesPage() {
       const res = await authFetch(`/api/admin/emergencies?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
-        setEmergencies(json.data as EmergencyItem[]);
+        // API returns { data: { emergencies: [...], total, page, pages } }
+        const emergenciesArray = json.data.emergencies ?? json.data;
+        setEmergencies(Array.isArray(emergenciesArray) ? emergenciesArray : []);
+        if (json.data.pages || json.data.totalPages) {
+          setTotalPages(json.data.pages ?? json.data.totalPages ?? 1);
+        }
         if (json.pagination) setTotalPages(json.pagination.totalPages);
       }
     } catch {
@@ -119,9 +124,11 @@ export default function AdminEmergenciesPage() {
       const res = await authFetch('/api/admin/nurses?limit=50&status=active');
       const json = await res.json();
       if (json.success && json.data) {
-        setNurseOptions(json.data.map((n: Record<string, unknown>) => ({
-          id: String(n.id),
-          name: String(n.name),
+        // API returns { data: { nurses: [...], total, ... } }
+        const nursesArray = json.data.nurses ?? json.data;
+        setNurseOptions((Array.isArray(nursesArray) ? nursesArray : []).map((n: Record<string, unknown>) => ({
+          id: String(n.id ?? n._id ?? ''),
+          name: String(n.name ?? ''),
         })));
       }
     } catch {

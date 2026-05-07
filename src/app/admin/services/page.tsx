@@ -105,10 +105,9 @@ export default function AdminServicesPage() {
       const res = await authFetch(`/api/admin/services?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
-        setServices(json.data as ServiceItem[]);
-        if (json.pagination) {
-          setTotalPages(json.pagination.totalPages);
-        }
+        const items = json.data.services ?? json.data;
+        setServices(Array.isArray(items) ? items : []);
+        if (json.data.pages) setTotalPages(json.data.pages);
       }
     } catch {
       toast.error('فشل تحميل الخدمات');

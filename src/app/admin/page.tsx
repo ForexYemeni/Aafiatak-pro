@@ -136,12 +136,14 @@ export default function AdminDashboardPage() {
       const ordersRes = await authFetch('/api/admin/orders?limit=5&page=1');
       const ordersJson = await ordersRes.json();
       if (ordersJson.success && ordersJson.data) {
-        const orders = ordersJson.data.map((o: Record<string, unknown>) => ({
-          id: String(o.id ?? ''),
+        // API returns { data: { orders: [...], total, ... } }
+        const ordersArray = ordersJson.data.orders ?? ordersJson.data;
+        const orders = (Array.isArray(ordersArray) ? ordersArray : []).map((o: Record<string, unknown>) => ({
+          id: String(o.id ?? o._id ?? ''),
           beneficiaryName: String((o.beneficiary as Record<string, unknown>)?.name ?? 'غير معروف'),
           serviceName: String((o.service as Record<string, unknown>)?.nameAr ?? 'خدمة'),
           status: String(o.status ?? 'pending'),
-          totalPrice: Number(o.totalPrice ?? 0),
+          totalPrice: Number(o.totalPrice ?? o.basePrice ?? 0),
           createdAt: String(o.createdAt ?? new Date().toISOString()),
         }));
         setRecentOrders(orders);
@@ -151,9 +153,12 @@ export default function AdminDashboardPage() {
       const nursesJson = await nursesRes.json();
       const nurses: RecentRegistration[] = [];
       if (nursesJson.success && nursesJson.data) {
-        for (const n of nursesJson.data as Record<string, unknown>[]) {
+        // API returns { data: { nurses: [...], total, ... } }
+        const nursesArray = nursesJson.data.nurses ?? nursesJson.data;
+        const nursesList = Array.isArray(nursesArray) ? nursesArray : [];
+        for (const n of nursesList as Record<string, unknown>[]) {
           nurses.push({
-            id: String(n.id ?? ''),
+            id: String(n.id ?? n._id ?? ''),
             name: String(n.name ?? ''),
             type: 'nurse',
             status: String(n.verificationStatus ?? n.status ?? 'pending'),
@@ -166,9 +171,12 @@ export default function AdminDashboardPage() {
       const benJson = await benRes.json();
       const beneficiaries: RecentRegistration[] = [];
       if (benJson.success && benJson.data) {
-        for (const b of benJson.data as Record<string, unknown>[]) {
+        // API returns { data: { beneficiaries: [...], total, ... } }
+        const benArray = benJson.data.beneficiaries ?? benJson.data;
+        const benList = Array.isArray(benArray) ? benArray : [];
+        for (const b of benList as Record<string, unknown>[]) {
           beneficiaries.push({
-            id: String(b.id ?? ''),
+            id: String(b.id ?? b._id ?? ''),
             name: String(b.name ?? ''),
             type: 'beneficiary',
             status: String(b.status ?? 'active'),

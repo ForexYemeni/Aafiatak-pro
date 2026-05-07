@@ -93,8 +93,9 @@ export default function AdminActivityPage() {
       const res = await authFetch(`/api/admin/activity-log?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
-        setActivities(json.data as ActivityItem[]);
-        if (json.pagination) setTotalPages(json.pagination.totalPages);
+        const items = json.data.logs ?? json.data;
+        setActivities(Array.isArray(items) ? items : []);
+        if (json.data.pages) setTotalPages(json.data.pages);
       }
     } catch {
       toast.error('فشل تحميل سجل النشاط');

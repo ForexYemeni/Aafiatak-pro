@@ -116,8 +116,9 @@ export default function AdminNursesPage() {
       const res = await authFetch(`/api/admin/nurses?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
-        setNurses(json.data as NurseItem[]);
-        if (json.pagination) setTotalPages(json.pagination.totalPages);
+        const items = json.data.nurses ?? json.data;
+        setNurses(Array.isArray(items) ? items : []);
+        if (json.data.pages) setTotalPages(json.data.pages);
       }
     } catch {
       toast.error('فشل تحميل بيانات الممرضين');

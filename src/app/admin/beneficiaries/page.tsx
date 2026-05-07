@@ -83,8 +83,9 @@ export default function AdminBeneficiariesPage() {
       const res = await authFetch(`/api/admin/beneficiaries?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
-        setBeneficiaries(json.data as BeneficiaryItem[]);
-        if (json.pagination) setTotalPages(json.pagination.totalPages);
+        const items = json.data.beneficiaries ?? json.data;
+        setBeneficiaries(Array.isArray(items) ? items : []);
+        if (json.data.pages) setTotalPages(json.data.pages);
       }
     } catch {
       toast.error('فشل تحميل بيانات المستفيدين');
