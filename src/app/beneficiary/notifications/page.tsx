@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Bell,
   CheckCheck,
-  ClipboardList,
+  ClipboardCheck,
   CreditCard,
   AlertTriangle,
   MessageCircle,
