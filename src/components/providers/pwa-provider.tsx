@@ -1,33 +1,34 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { registerServiceWorker, isServiceWorkerSupported } from '@/lib/pwa/register-sw';
+import dynamic from 'next/dynamic';
 
-export function PWAInitializer() {
-  const [OfflineWrapper, setOfflineWrapper] = useState<React.ComponentType<{ children?: React.ReactNode }> | null>(null);
+// Dynamic import of OfflineWrapper with SSR disabled to avoid
+// importing browser-only modules (IndexedDB, etc.) during build
+const OfflineWrapper = dynamic(
+  () => import('@/components/common/offline-wrapper').then(mod => mod.OfflineWrapper),
+  { ssr: false }
+);
 
+function ServiceWorkerRegistrar() {
   useEffect(() => {
-    if (isServiceWorkerSupported()) {
-      registerServiceWorker();
+    if (typeof window === 'undefined') return;
+
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/sw.js').catch(() => {
+        // SW registration failed silently
+      });
     }
 
-    // Dynamic imports for browser-only modules to avoid SSR issues
-    Promise.all([
-      import('@/lib/db/indexeddb'),
-      import('@/lib/db/offline-queue'),
-      import('@/components/common/offline-wrapper'),
-    ]).then(([dbModule, queueModule, offlineModule]) => {
-      const localDb = dbModule.localDb;
-      const offlineQueue = queueModule.offlineQueue;
-      const OfflineWrapperComponent = offlineModule.OfflineWrapper;
-
-      localDb.init().catch((error: unknown) => {
-        console.error('[PWA] IndexedDB initialization failed:', error);
-      });
-
+    // Initialize IndexedDB and offline queue (browser only)
+    const initPromise = import('@/lib/db/indexeddb').then(async ({ localDb }) => {
+      await localDb.init().catch(() => {});
+      const { offlineQueue } = await import('@/lib/db/offline-queue');
       offlineQueue.start(30000);
 
-      if (typeof navigator !== 'undefined' && 'serviceWorker' in navigator) {
+      // Listen for sync messages from service worker
+      if ('serviceWorker' in navigator) {
         navigator.serviceWorker.addEventListener('message', (event: MessageEvent) => {
           if (event.data?.type === 'SYNC_REQUIRED') {
             import('@/lib/db/sync-manager').then(({ syncManager }) => {
@@ -37,19 +38,28 @@ export function PWAInitializer() {
         });
       }
 
-      setOfflineWrapper(() => OfflineWrapperComponent);
-
       return () => {
         offlineQueue.stop();
       };
-    }).catch((error: unknown) => {
-      console.error('[PWA] Failed to initialize offline modules:', error);
+    }).catch(() => {
+      // Offline modules not available
     });
+
+    return () => {
+      initPromise.then(cleanup => {
+        if (typeof cleanup === 'function') cleanup();
+      }).catch(() => {});
+    };
   }, []);
 
-  if (OfflineWrapper) {
-    return <OfflineWrapper />;
-  }
-
   return null;
+}
+
+export function PWAInitializer() {
+  return (
+    <>
+      <ServiceWorkerRegistrar />
+      <OfflineWrapper />
+    </>
+  );
 }
