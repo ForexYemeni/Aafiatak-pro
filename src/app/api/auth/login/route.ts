@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { User, Nurse, Beneficiary } from '@/models/mongoose';
+import { User } from '@/models/mongoose/User';
 import {
   verifyPassword,
   generateToken,
@@ -13,7 +13,6 @@ import {
   createAuthCookie,
   createErrorResponse,
 } from '@/lib/auth';
-import { logActivity } from '@/lib/api/helpers';
 
 export async function POST(request: NextRequest) {
   try {
@@ -30,19 +29,9 @@ export async function POST(request: NextRequest) {
 
     const normalizedPhone = normalizeYemeniPhone(phone);
 
-    // Search across all user collections using Mongoose discriminator models
-    let user: any = null;
-
-    // Check Nurse first (most common login)
-    user = await Nurse.findOne({ phone: normalizedPhone }).lean();
-    if (!user) {
-      // Check Beneficiary
-      user = await Beneficiary.findOne({ phone: normalizedPhone }).lean();
-    }
-    if (!user) {
-      // Check base User (admin/subadmin)
-      user = await User.findOne({ phone: normalizedPhone }).lean();
-    }
+    // Search in the users collection directly using the base User model
+    // This avoids discriminator issues in serverless environments
+    const user = await User.findOne({ phone: normalizedPhone }).lean();
 
     if (!user) {
       return createErrorResponse('رقم الهاتف أو كلمة المرور غير صحيحة', 401, 'INVALID_CREDENTIALS');
@@ -69,22 +58,12 @@ export async function POST(request: NextRequest) {
     const token = generateToken(tokenPayload);
     const refreshToken = generateRefreshToken(tokenPayload);
 
-    // Update last login
+    // Update last login (non-critical)
     try {
-      const Model = user.role === 'nurse' ? Nurse : user.role === 'beneficiary' ? Beneficiary : User;
-      await Model.findByIdAndUpdate(user._id, { lastLoginAt: new Date() });
+      await User.findByIdAndUpdate(user._id, { lastLoginAt: new Date() });
     } catch {
       // Non-critical update
     }
-
-    // Log activity
-    await logActivity({
-      userId: user._id.toString(),
-      userRole: user.role,
-      action: 'login',
-      details: 'تسجيل دخول ناجح',
-      request,
-    });
 
     // Build response
     const responseData = {
