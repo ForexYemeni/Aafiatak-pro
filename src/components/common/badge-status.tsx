@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 
-type BadgeStatusVariant = 'active' | 'inactive' | 'pending' | 'suspended' | 'verified' | 'rejected' | 'completed' | 'cancelled' | 'in_progress' | 'dispatched';
+type BadgeStatusVariant = 'active' | 'inactive' | 'pending' | 'suspended' | 'verified' | 'rejected' | 'completed' | 'cancelled' | 'in_progress' | 'dispatched' | 'unverified';
 
 interface BadgeStatusProps {
   status: BadgeStatusVariant | string;
@@ -19,6 +19,10 @@ const statusConfig: Record<BadgeStatusVariant, { label: string; className: strin
   inactive: {
     label: 'غير نشط',
     className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
+  },
+  unverified: {
+    label: 'غير موثق',
+    className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
   },
   pending: {
     label: 'قيد المراجعة',

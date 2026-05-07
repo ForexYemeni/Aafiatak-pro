@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Nurse } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import bcrypt from 'bcryptjs';
 
 export async function GET(request: NextRequest) {
   try {
@@ -16,7 +17,11 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('هذا الإجراء متاح للممرضين فقط', 403, 'FORBIDDEN');
     }
 
-    const nurse = await Nurse.findById(user.userId).select('-password').lean();
+    // Include document data for profile display (needed to show uploaded images)
+    const nurse = await Nurse.findById(user.userId)
+      .select('-password')
+      .lean();
+
     if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
 
     return Response.json({ success: true, data: { ...nurse, id: nurse._id.toString() } });
@@ -37,13 +42,40 @@ export async function PATCH(request: NextRequest) {
     }
 
     const body = await request.json();
+
+    // Handle password change separately
+    if (body.currentPassword && body.password) {
+      const nurse = await Nurse.findById(user.userId);
+      if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+
+      const isValid = await bcrypt.compare(body.currentPassword, nurse.password);
+      if (!isValid) {
+        return createErrorResponse('كلمة المرور الحالية غير صحيحة', 400, 'INVALID_PASSWORD');
+      }
+
+      const hashedPassword = await bcrypt.hash(body.password, 12);
+      await Nurse.findByIdAndUpdate(user.userId, { password: hashedPassword });
+
+      return Response.json({
+        success: true,
+        message: 'تم تغيير كلمة المرور بنجاح',
+      });
+    }
+
+    // Regular profile update - strip protected fields
     delete body.password;
+    delete body.currentPassword;
     delete body._id;
     delete body.role;
     delete body.verificationStatus;
     delete body.phone;
+    delete body.identityDocumentData;
+    delete body.licenseDocumentData;
 
-    const nurse = await Nurse.findByIdAndUpdate(user.userId, body, { new: true }).select('-password').lean();
+    const nurse = await Nurse.findByIdAndUpdate(user.userId, body, { new: true })
+      .select('-password -identityDocumentData -licenseDocumentData')
+      .lean();
+
     if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
 
     return Response.json({

@@ -51,7 +51,7 @@ export async function POST(request: NextRequest) {
       governorate,
       district,
       licenseNumber,
-      verificationStatus: 'pending',
+      verificationStatus: 'unverified',
       isActive: true,
     });
 

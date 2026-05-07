@@ -18,6 +18,7 @@ import {
   UserRound,
   Activity,
   Filter,
+  Shield,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -31,6 +32,8 @@ import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { useOrderUpdates } from '@/hooks/use-socket';
 import { formatDateOnly, formatTimeOnly, toArabicNum } from '@/components/common/date-formatter';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import Link from 'next/link';
 
 // ---- Types ----
 
@@ -113,6 +116,8 @@ export default function NurseAvailableRequestsPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const authFetch = useAuthFetch();
   const orderUpdates = useOrderUpdates();
+  const user = useAuthStore((s) => s.user);
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -129,9 +134,23 @@ export default function NurseAvailableRequestsPage() {
     }
   }, [authFetch]);
 
+  // Fetch nurse verification status
+  const fetchVerificationStatus = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/nurse/profile');
+      const data = await res.json();
+      if (data.success && data.data) {
+        setVerificationStatus(data.data.verificationStatus || 'unverified');
+      }
+    } catch {
+      // silently handle
+    }
+  }, [authFetch]);
+
   useEffect(() => {
     fetchAssignments();
-  }, [fetchAssignments]);
+    fetchVerificationStatus();
+  }, [fetchAssignments, fetchVerificationStatus]);
 
   // Refresh on real-time order updates
   useEffect(() => {
@@ -196,6 +215,37 @@ export default function NurseAvailableRequestsPage() {
             : undefined
         }
       />
+
+      {/* Verification Warning Banner */}
+      {verificationStatus && verificationStatus !== 'verified' && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <Link href="/nurse/profile">
+            <GlassCard variant="nurse" className="p-4 cursor-pointer hover:bg-nurse/5 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                  <Shield className="w-5 h-5 text-amber-600" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm text-amber-700 dark:text-amber-400">
+                    {verificationStatus === 'unverified' && 'حسابك غير موثق'}
+                    {verificationStatus === 'pending' && 'حسابك قيد المراجعة'}
+                    {verificationStatus === 'rejected' && 'تم رفض التوثيق'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {verificationStatus === 'unverified' && 'لن تصلك أي طلبات حتى يتم توثيق حسابك. اضغط هنا للتوثيق'}
+                    {verificationStatus === 'pending' && 'تم رفع المستندات وجاري المراجعة. سنقوم بإشعارك فوراً'}
+                    {verificationStatus === 'rejected' && 'اضغط هنا لرفع المستندات مرة أخرى'}
+                  </p>
+                </div>
+                <ChevronLeft className="w-5 h-5 text-muted-foreground shrink-0" />
+              </div>
+            </GlassCard>
+          </Link>
+        </motion.div>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 gap-3">

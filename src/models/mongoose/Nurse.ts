@@ -8,7 +8,7 @@ export interface INurse extends Document {
   role: 'nurse';
   specialization: string[];
   licenseNumber?: string;
-  verificationStatus: 'pending' | 'verified' | 'rejected';
+  verificationStatus: 'unverified' | 'pending' | 'verified' | 'rejected';
   isAvailable: boolean;
   isOnline: boolean;
   lat?: number;
@@ -28,6 +28,8 @@ export interface INurse extends Document {
   walletNumber?: string;
   identityDocumentUrl?: string;
   licenseDocumentUrl?: string;
+  identityDocumentData?: string;
+  licenseDocumentData?: string;
   rejectedReason?: string;
   isActive: boolean;
 }
@@ -35,7 +37,7 @@ export interface INurse extends Document {
 const NurseSchema = new Schema({
   specialization: [{ type: String }],
   licenseNumber: { type: String },
-  verificationStatus: { type: String, enum: ['pending', 'verified', 'rejected'], default: 'pending' },
+  verificationStatus: { type: String, enum: ['unverified', 'pending', 'verified', 'rejected'], default: 'unverified' },
   isAvailable: { type: Boolean, default: false },
   isOnline: { type: Boolean, default: false },
   lat: { type: Number },
@@ -55,6 +57,8 @@ const NurseSchema = new Schema({
   walletNumber: { type: String },
   identityDocumentUrl: { type: String },
   licenseDocumentUrl: { type: String },
+  identityDocumentData: { type: String },
+  licenseDocumentData: { type: String },
   rejectedReason: { type: String },
 });
 

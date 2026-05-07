@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
   Phone,
@@ -18,13 +18,15 @@ import {
   ChevronLeft,
   Eye,
   EyeOff,
+  AlertTriangle,
+  Power,
+  PowerOff,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
-import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { GlassCard } from '@/components/common/glass-card';
@@ -60,13 +62,9 @@ interface NurseProfile {
   experience: number;
   identityDocumentUrl: string | null;
   licenseDocumentUrl: string | null;
+  identityDocumentData: string | null;
+  licenseDocumentData: string | null;
   rejectedReason: string | null;
-  documents: Array<{
-    id: string;
-    type: string;
-    url: string;
-    status: string;
-  }>;
 }
 
 // ---- Specialization labels ----
@@ -96,6 +94,10 @@ export default function NurseProfilePage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [toast, setToast] = useState<string | null>(null);
+
+  // Availability confirmation dialog
+  const [showAvailabilityConfirm, setShowAvailabilityConfirm] = useState(false);
+  const [pendingAvailability, setPendingAvailability] = useState<boolean | null>(null);
 
   // Edit form state
   const [editName, setEditName] = useState('');
@@ -181,23 +183,40 @@ export default function NurseProfilePage() {
     }
   };
 
-  const handleAvailabilityToggle = async () => {
-    if (!profile) return;
+  // Availability toggle with confirmation
+  const handleAvailabilityToggleRequest = (newAvailability: boolean) => {
+    // If nurse is not verified, warn them
+    if (newAvailability && profile?.verificationStatus !== 'verified') {
+      setPendingAvailability(newAvailability);
+      setShowAvailabilityConfirm(true);
+      return;
+    }
+    setPendingAvailability(newAvailability);
+    setShowAvailabilityConfirm(true);
+  };
+
+  const handleAvailabilityConfirm = async (confirmed: boolean) => {
+    setShowAvailabilityConfirm(false);
+    if (!confirmed || pendingAvailability === null || !profile) return;
+
     setIsAvailabilityLoading(true);
     try {
       const res = await authFetch('/api/nurse/availability', {
-        method: 'PATCH',
-        body: JSON.stringify({ isAvailable: !profile.isAvailable }),
+        method: 'POST',
+        body: JSON.stringify({ isAvailable: pendingAvailability }),
       });
       const data = await res.json();
       if (data.success) {
-        setProfile((prev) => prev ? { ...prev, isAvailable: !prev.isAvailable, isOnline: !prev.isAvailable } : null);
-        showToast(profile.isAvailable ? 'أنت غير متاح الآن' : 'أنت متاح الآن لاستقبال الطلبات');
+        setProfile((prev) => prev ? { ...prev, isAvailable: pendingAvailability, isOnline: pendingAvailability } : null);
+        showToast(pendingAvailability ? 'أنت متاح الآن لاستقبال الطلبات' : 'تم إيقاف الخدمة. يمكنك العودة متى شئت');
+      } else {
+        showToast(data.message || 'حدث خطأ في تحديث التوفر');
       }
     } catch {
       showToast('حدث خطأ في تحديث التوفر');
     } finally {
       setIsAvailabilityLoading(false);
+      setPendingAvailability(null);
     }
   };
 
@@ -240,8 +259,6 @@ export default function NurseProfilePage() {
       setIsPasswordSaving(false);
     }
   };
-
-
 
   // Handle file selection for documents
   const handleIdentityFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -328,11 +345,11 @@ export default function NurseProfilePage() {
         return;
       }
 
-      // Update profile state with new URLs
+      // Update profile state with new data
       setProfile((prev) => prev ? {
         ...prev,
-        identityDocumentUrl: identityData.data?.identityDocumentUrl || prev.identityDocumentUrl,
-        licenseDocumentUrl: licenseData.data?.licenseDocumentUrl || prev.licenseDocumentUrl,
+        identityDocumentData: identityData.data?.identityDocumentData || prev.identityDocumentData,
+        licenseDocumentData: licenseData.data?.licenseDocumentData || prev.licenseDocumentData,
         verificationStatus: identityData.data?.verificationStatus || prev.verificationStatus,
       } : null);
 
@@ -345,7 +362,8 @@ export default function NurseProfilePage() {
       showToast('تم رفع المستندات بنجاح. سيتم مراجعتها من قبل الإدارة');
       // Refresh full profile
       fetchProfile();
-    } catch {
+    } catch (err) {
+      console.error('Upload error:', err);
       setUploadError('حدث خطأ في رفع المستندات. يرجى المحاولة مرة أخرى');
     } finally {
       setIsUploadingDocs(false);
@@ -360,6 +378,19 @@ export default function NurseProfilePage() {
   const handleRemoveLicenseFile = () => {
     setLicenseFile(null);
     setLicensePreview(null);
+  };
+
+  // Helper: get document image src (from base64 data or URL)
+  const getDocImageSrc = (data: string | null, url: string | null, preview: string | null) => {
+    if (preview) return preview;
+    if (data) return data;
+    if (url && !url.startsWith('data:stored/')) return url;
+    return null;
+  };
+
+  // Helper: check if document is uploaded
+  const isDocUploaded = (data: string | null, url: string | null, preview: string | null) => {
+    return !!(preview || data || (url && !url.startsWith('data:stored/')));
   };
 
   if (isLoading) {
@@ -383,6 +414,11 @@ export default function NurseProfilePage() {
     );
   }
 
+  const identitySrc = getDocImageSrc(profile.identityDocumentData, profile.identityDocumentUrl, identityPreview);
+  const licenseSrc = getDocImageSrc(profile.licenseDocumentData, profile.licenseDocumentUrl, licensePreview);
+  const identityUploaded = isDocUploaded(profile.identityDocumentData, profile.identityDocumentUrl, identityPreview);
+  const licenseUploaded = isDocUploaded(profile.licenseDocumentData, profile.licenseDocumentUrl, licensePreview);
+
   return (
     <div className="space-y-4">
       {/* Toast */}
@@ -397,7 +433,108 @@ export default function NurseProfilePage() {
         </motion.div>
       )}
 
+      {/* Availability Confirmation Dialog */}
+      <AnimatePresence>
+        {showAvailabilityConfirm && pendingAvailability !== null && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4"
+            onClick={() => setShowAvailabilityConfirm(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="w-full max-w-sm"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <GlassCard variant="nurse" className="p-6 space-y-4">
+                <div className="flex flex-col items-center text-center">
+                  <div className={`w-16 h-16 rounded-full flex items-center justify-center mb-3 ${pendingAvailability ? 'bg-green-100 dark:bg-green-900/30' : 'bg-amber-100 dark:bg-amber-900/30'}`}>
+                    {pendingAvailability ? (
+                      <Power className="w-8 h-8 text-green-600" />
+                    ) : (
+                      <PowerOff className="w-8 h-8 text-amber-600" />
+                    )}
+                  </div>
+                  <h3 className="text-lg font-bold mb-1">
+                    {pendingAvailability ? 'بدء العمل' : 'إيقاف الخدمة'}
+                  </h3>
+                  <p className="text-sm text-muted-foreground leading-relaxed">
+                    {pendingAvailability ? (
+                      profile.verificationStatus !== 'verified'
+                        ? 'حسابك غير موثق بعد. لن يتم إرسال أي طلبات لك حتى يتم توثيق حسابك من قبل الإدارة. هل تريد المتابعة؟'
+                        : 'سيتم إعلام النظام بأنك متاح لاستقبال الطلبات والمهام الجديدة. هل أنت مستعد؟'
+                    ) : (
+                      'لن يتم إرسال أي طلب أو مهمة إليك أثناء إيقاف الخدمة. يمكنك العودة للعمل في أي وقت تكون متاحاً. هل تريد الإيقاف؟'
+                    )}
+                  </p>
+                </div>
+
+                {pendingAvailability && profile.verificationStatus !== 'verified' && (
+                  <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
+                    <div className="flex items-center gap-2 mb-1">
+                      <AlertTriangle className="w-4 h-4 text-amber-600" />
+                      <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">تنبيه هام</span>
+                    </div>
+                    <p className="text-xs text-amber-600 dark:text-amber-400">
+                      يجب توثيق حسابك أولاً برفع الهوية والمزاولة لتتمكن من استقبال الطلبات
+                    </p>
+                  </div>
+                )}
+
+                <div className="flex gap-3">
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => handleAvailabilityConfirm(false)}
+                  >
+                    إلغاء
+                  </Button>
+                  <Button
+                    className={`flex-1 ${pendingAvailability ? 'bg-green-600 hover:bg-green-700' : 'bg-amber-600 hover:bg-amber-700'}`}
+                    onClick={() => handleAvailabilityConfirm(true)}
+                  >
+                    {pendingAvailability ? 'نعم، ابدأ العمل' : 'نعم، أوقف الخدمة'}
+                  </Button>
+                </div>
+              </GlassCard>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       <PageHeader title="الملف الشخصي" />
+
+      {/* Verification Warning Banner (if not verified) */}
+      {profile.verificationStatus !== 'verified' && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+        >
+          <GlassCard variant="nurse" className="p-4">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                <Shield className="w-5 h-5 text-amber-600" />
+              </div>
+              <div className="flex-1">
+                <p className="font-semibold text-sm text-amber-700 dark:text-amber-400 mb-0.5">
+                  {profile.verificationStatus === 'unverified' && 'حسابك غير موثق'}
+                  {profile.verificationStatus === 'pending' && 'حسابك قيد المراجعة'}
+                  {profile.verificationStatus === 'rejected' && 'تم رفض التوثيق'}
+                </p>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  {profile.verificationStatus === 'unverified' && 'لن يتم إرسال أي طلبات أو مهام إليك حتى يتم توثيق حسابك. يرجى رفع الهوية الوطنية ومزاولة المهنة أدناه.'}
+                  {profile.verificationStatus === 'pending' && 'تم رفع المستندات وسيتم مراجعتها من قبل الإدارة قريباً. سنقوم بإشعارك فور التحقق.'}
+                  {profile.verificationStatus === 'rejected' && `تم رفض التوثيق${profile.rejectedReason ? `: ${profile.rejectedReason}` : ''}. يرجى رفع المستندات مرة أخرى.`}
+                </p>
+              </div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
 
       {/* Profile Header */}
       <GlassCard variant="nurse" className="p-6">
@@ -457,7 +594,7 @@ export default function NurseProfilePage() {
           </div>
           <Switch
             checked={profile.isAvailable}
-            onCheckedChange={handleAvailabilityToggle}
+            onCheckedChange={(checked) => handleAvailabilityToggleRequest(checked)}
             disabled={isAvailabilityLoading}
             className="data-[state=checked]:bg-green-600"
           />
@@ -561,16 +698,16 @@ export default function NurseProfilePage() {
             {/* Step 1: National ID Image */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${identityPreview || profile.identityDocumentUrl ? 'bg-green-500 text-white' : 'bg-nurse/20 text-nurse'}`}>
-                  {identityPreview || profile.identityDocumentUrl ? <CheckCircle2 className="w-4 h-4" /> : '1'}
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${identityUploaded ? 'bg-green-500 text-white' : 'bg-nurse/20 text-nurse'}`}>
+                  {identityUploaded ? <CheckCircle2 className="w-4 h-4" /> : '1'}
                 </div>
                 <span className="text-sm font-medium">صورة الهوية الوطنية</span>
               </div>
-              <div className={`relative rounded-xl border-2 border-dashed overflow-hidden transition-all ${(identityPreview || profile.identityDocumentUrl) ? 'border-green-400 dark:border-green-700' : 'border-border hover:border-nurse/50'}`}>
-                {(identityPreview || profile.identityDocumentUrl) ? (
+              <div className={`relative rounded-xl border-2 border-dashed overflow-hidden transition-all ${identityUploaded ? 'border-green-400 dark:border-green-700' : 'border-border hover:border-nurse/50'}`}>
+                {identitySrc ? (
                   <div className="relative group">
                     <img
-                      src={identityPreview || profile.identityDocumentUrl || ''}
+                      src={identitySrc}
                       alt="الهوية الوطنية"
                       className="w-full h-36 object-contain bg-muted/20"
                     />
@@ -609,16 +746,16 @@ export default function NurseProfilePage() {
             {/* Step 2: Professional License Image */}
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${licensePreview || profile.licenseDocumentUrl ? 'bg-green-500 text-white' : 'bg-nurse/20 text-nurse'}`}>
-                  {licensePreview || profile.licenseDocumentUrl ? <CheckCircle2 className="w-4 h-4" /> : '2'}
+                <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${licenseUploaded ? 'bg-green-500 text-white' : 'bg-nurse/20 text-nurse'}`}>
+                  {licenseUploaded ? <CheckCircle2 className="w-4 h-4" /> : '2'}
                 </div>
                 <span className="text-sm font-medium">صورة مزاولة المهنة</span>
               </div>
-              <div className={`relative rounded-xl border-2 border-dashed overflow-hidden transition-all ${(licensePreview || profile.licenseDocumentUrl) ? 'border-green-400 dark:border-green-700' : 'border-border hover:border-nurse/50'}`}>
-                {(licensePreview || profile.licenseDocumentUrl) ? (
+              <div className={`relative rounded-xl border-2 border-dashed overflow-hidden transition-all ${licenseUploaded ? 'border-green-400 dark:border-green-700' : 'border-border hover:border-nurse/50'}`}>
+                {licenseSrc ? (
                   <div className="relative group">
                     <img
-                      src={licensePreview || profile.licenseDocumentUrl || ''}
+                      src={licenseSrc}
                       alt="مزاولة المهنة"
                       className="w-full h-36 object-contain bg-muted/20"
                     />

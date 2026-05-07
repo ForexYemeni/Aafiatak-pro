@@ -63,6 +63,8 @@ interface NurseItem {
   rejectedReason: string | null;
   identityDocumentUrl: string | null;
   licenseDocumentUrl: string | null;
+  identityDocumentData: string | null;
+  licenseDocumentData: string | null;
   createdAt: string;
 }
 
@@ -101,6 +103,24 @@ export default function AdminNursesPage() {
 
   // View drawer
   const [viewTarget, setViewTarget] = useState<NurseItem | null>(null);
+  const [viewLoading, setViewLoading] = useState(false);
+
+  const handleViewNurse = useCallback(async (nurse: NurseItem) => {
+    setViewLoading(true);
+    try {
+      const res = await authFetch(`/api/admin/nurses/${nurse.id}`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        setViewTarget(json.data as NurseItem);
+      } else {
+        setViewTarget(nurse);
+      }
+    } catch {
+      setViewTarget(nurse);
+    } finally {
+      setViewLoading(false);
+    }
+  }, [authFetch]);
 
   // Toggle confirm
   const [toggleTarget, setToggleTarget] = useState<NurseItem | null>(null);
@@ -228,7 +248,7 @@ export default function AdminNursesPage() {
   const rowActions = [
     {
       label: 'عرض التفاصيل',
-      onClick: (row: Record<string, unknown>) => setViewTarget(row as unknown as NurseItem),
+      onClick: (row: Record<string, unknown>) => handleViewNurse(row as unknown as NurseItem),
     },
     {
       label: 'توثيق',
@@ -308,41 +328,41 @@ export default function AdminNursesPage() {
         </div>
       )}
       {/* Documents */}
-      {(nurse.identityDocumentUrl || nurse.licenseDocumentUrl) && (
-        <div>
-          <p className="text-xs text-muted-foreground mb-2">المستندات المرفوعة</p>
-          <div className="grid grid-cols-2 gap-3">
-            {nurse.identityDocumentUrl && (
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground">الهوية الوطنية</p>
-                <div className="relative rounded-xl overflow-hidden border border-border aspect-[4/3]">
-                  <img
-                    src={nurse.identityDocumentUrl}
-                    alt="الهوية الوطنية"
-                    className="w-full h-full object-cover"
-                    onClick={() => window.open(nurse.identityDocumentUrl!, '_blank')}
-                    role="button"
-                  />
+      {(() => {
+        const identitySrc = nurse.identityDocumentData || (nurse.identityDocumentUrl && !nurse.identityDocumentUrl.startsWith('data:stored/') ? nurse.identityDocumentUrl : null);
+        const licenseSrc = nurse.licenseDocumentData || (nurse.licenseDocumentUrl && !nurse.licenseDocumentUrl.startsWith('data:stored/') ? nurse.licenseDocumentUrl : null);
+        return (identitySrc || licenseSrc) ? (
+          <div>
+            <p className="text-xs text-muted-foreground mb-2">المستندات المرفوعة</p>
+            <div className="grid grid-cols-2 gap-3">
+              {identitySrc && (
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground">الهوية الوطنية</p>
+                  <div className="relative rounded-xl overflow-hidden border border-border aspect-[4/3]">
+                    <img
+                      src={identitySrc}
+                      alt="الهوية الوطنية"
+                      className="w-full h-full object-contain bg-muted/20"
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
-            {nurse.licenseDocumentUrl && (
-              <div className="space-y-1">
-                <p className="text-[10px] text-muted-foreground">مزاولة المهنة</p>
-                <div className="relative rounded-xl overflow-hidden border border-border aspect-[4/3]">
-                  <img
-                    src={nurse.licenseDocumentUrl}
-                    alt="مزاولة المهنة"
-                    className="w-full h-full object-cover"
-                    onClick={() => window.open(nurse.licenseDocumentUrl!, '_blank')}
-                    role="button"
-                  />
+              )}
+              {licenseSrc && (
+                <div className="space-y-1">
+                  <p className="text-[10px] text-muted-foreground">مزاولة المهنة</p>
+                  <div className="relative rounded-xl overflow-hidden border border-border aspect-[4/3]">
+                    <img
+                      src={licenseSrc}
+                      alt="مزاولة المهنة"
+                      className="w-full h-full object-contain bg-muted/20"
+                    />
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
-        </div>
-      )}
+        ) : null;
+      })()}
       <div className="text-xs text-muted-foreground">
         تاريخ التسجيل: <DateFormatter date={nurse.createdAt} format="date" />
       </div>

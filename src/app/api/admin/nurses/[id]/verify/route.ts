@@ -64,3 +64,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     return createErrorResponse('حدث خطأ أثناء توثيق الممرض', 500, 'INTERNAL_ERROR');
   }
 }
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  return POST(request, { params });
+}
