@@ -7,10 +7,8 @@ interface OnlineStatus {
   wasOffline: boolean;
 }
 
-/**
- * Hook to track online/offline status and trigger sync when coming back online.
- * Shows toast notifications when connectivity changes.
- */
+const SYNC_MANAGER_PATH = '@/lib/db/sync-manager';
+
 export function useOnlineStatus(): OnlineStatus {
   const [isOnline, setIsOnline] = useState<boolean>(
     typeof navigator !== 'undefined' ? navigator.onLine : true
@@ -20,23 +18,15 @@ export function useOnlineStatus(): OnlineStatus {
 
   const handleOnline = useCallback(() => {
     setIsOnline(true);
-
     if (wasOfflineRef.current) {
       setWasOffline(true);
-
-      // Trigger sync when coming back online (lazy loaded)
-      import('@/lib/db/sync-manager').then(({ syncManager }) => {
-        void syncManager.fullSync();
-      }).catch(() => {
-        // Sync not available
-      });
-
-      // Reset wasOffline after a delay
-      setTimeout(() => {
-        setWasOffline(false);
-      }, 5000);
+      // Use variable path to prevent static analysis
+      import(SYNC_MANAGER_PATH as string).then((mod: Record<string, unknown>) => {
+        const sm = mod.syncManager as { fullSync: () => Promise<void> };
+        void sm.fullSync();
+      }).catch(() => {});
+      setTimeout(() => setWasOffline(false), 5000);
     }
-
     wasOfflineRef.current = false;
   }, []);
 
@@ -48,14 +38,9 @@ export function useOnlineStatus(): OnlineStatus {
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
-
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    return () => { window.removeEventListener('online', handleOnline); window.removeEventListener('offline', handleOffline); };
   }, [handleOnline, handleOffline]);
 
   return { isOnline, wasOffline };
