@@ -3,46 +3,21 @@
 // ============================================================================
 // Central notification management system that coordinates voice (TTS),
 // sound, browser notifications, and in-app notifications.
-// Includes deduplication, priority handling, and FCM integration.
+// ALL notifications come from MongoDB database - NO Firebase.
 // ============================================================================
 
 import { voiceManager } from './voice-manager';
 import { soundManager } from './sound-manager';
-import type { NotificationType, NotificationPriority } from '@/types';
+import { notificationClient, type AppNotification } from './firebase-client';
 
-// ============================================================================
-// Types
-// ============================================================================
-
-/** Application-level notification interface */
-export interface AppNotification {
-  id: string;
-  title: string;
-  body: string;
-  type: NotificationType;
-  priority: NotificationPriority;
-  data?: Record<string, string>;
-  imageUrl?: string;
-  clickAction?: string;
-}
-
-/** Firebase message payload for background notifications */
-export interface FirebaseMessagePayload {
-  data?: Record<string, string>;
-  notification?: {
-    title?: string;
-    body?: string;
-    icon?: string;
-    image?: string;
-    click_action?: string;
-  };
-}
+// Re-export AppNotification for convenience
+export type { AppNotification };
 
 /** Notification permission status */
 type NotificationPermissionStatus = 'default' | 'granted' | 'denied';
 
 /** Arabic TTS messages mapped by notification type */
-const TTS_MESSAGES: Record<NotificationType, (notification: AppNotification) => string> = {
+const TTS_MESSAGES: Record<string, (notification: AppNotification) => string> = {
   assignment: (n) => `لديك طلب خدمة جديد: ${n.title}`,
   payment: (n) => `إشعار دفعة: ${n.title}`,
   emergency: (n) => `تنبيه طوارئ! ${n.body}`,
@@ -55,7 +30,7 @@ const TTS_MESSAGES: Record<NotificationType, (notification: AppNotification) => 
 };
 
 /** Sound names mapped by notification type */
-const SOUND_MAP: Record<NotificationType, string> = {
+const SOUND_MAP: Record<string, string> = {
   assignment: 'notification',
   payment: 'success',
   emergency: 'emergency',
@@ -74,12 +49,11 @@ interface DeduplicationEntry {
 }
 
 // ============================================================================
-// NotificationManager Class
+// NotificationManager Class (MongoDB Only - No Firebase)
 // ============================================================================
 
 class NotificationManager {
   private permission: NotificationPermissionStatus = 'default';
-  private fcmToken: string | null = null;
   private deduplicationSet: Map<string, DeduplicationEntry> = new Map();
   private maxDeduplicationSize = 100;
   private deduplicationWindowMs = 5000; // 5 seconds
@@ -88,7 +62,7 @@ class NotificationManager {
   // ---- Initialization ----
 
   /** Initialize the notification system */
-  async init(): Promise<void> {
+  async init(userId?: string): Promise<void> {
     if (this.initialized) return;
     if (typeof window === 'undefined') return;
 
@@ -101,97 +75,52 @@ class NotificationManager {
     voiceManager.init();
     soundManager.init();
 
+    // Initialize MongoDB notification client
+    await notificationClient.init(userId);
+
+    // Register callback for new notifications from MongoDB
+    notificationClient.onNotification((notification) => {
+      this.notify(notification);
+    });
+
     // Start periodic deduplication cleanup
     this.startDeduplicationCleanup();
 
     this.initialized = true;
   }
 
+  /** Set the current user for notification polling */
+  setUserId(userId: string): void {
+    notificationClient.setUserId(userId);
+  }
+
   // ---- Permission Management ----
 
   /** Request browser notification permission */
   async requestPermission(): Promise<NotificationPermissionStatus> {
-    if (typeof window === 'undefined') return 'denied';
-    if (!('Notification' in window)) return 'denied';
-
-    if (this.permission === 'granted') return 'granted';
-
-    try {
-      const result = await Notification.requestPermission();
-      this.permission = result as NotificationPermissionStatus;
-      return this.permission;
-    } catch {
-      return 'denied';
-    }
+    return notificationClient.requestPermission();
   }
 
   /** Get the current notification permission status */
   getPermissionStatus(): NotificationPermissionStatus {
-    return this.permission;
+    return notificationClient.getPermissionStatus();
   }
 
   /** Check if browser notifications are supported */
   isBrowserNotificationSupported(): boolean {
-    if (typeof window === 'undefined') return false;
-    return 'Notification' in window;
+    return notificationClient.isBrowserNotificationSupported();
   }
 
   // ---- In-App Notification ----
 
   /** Show an in-app notification (toast-style) */
   showInApp(notification: AppNotification): void {
-    // Dispatch custom event that UI components can listen to
     if (typeof window === 'undefined') return;
 
     const event = new CustomEvent('app-notification', {
       detail: notification,
     });
     window.dispatchEvent(event);
-  }
-
-  // ---- Browser Notification ----
-
-  /** Show a browser notification */
-  showBrowser(notification: AppNotification): void {
-    if (typeof window === 'undefined') return;
-    if (!('Notification' in window)) return;
-    if (this.permission !== 'granted') return;
-
-    const options: NotificationOptions = {
-      body: notification.body,
-      icon: '/logo.svg',
-      badge: '/logo.svg',
-      tag: notification.id,
-      dir: 'rtl',
-      lang: 'ar',
-      requireInteraction: notification.priority === 'urgent' || notification.priority === 'high',
-      silent: false,
-      data: {
-        ...notification.data,
-        clickAction: notification.clickAction ?? '',
-        type: notification.type,
-        priority: notification.priority,
-      },
-    };
-
-    // Add image if provided (rich notification)
-    if (notification.imageUrl) {
-      options.image = notification.imageUrl;
-    }
-
-    const browserNotification = new Notification(notification.title, options);
-
-    browserNotification.onclick = () => {
-      this.handleNotificationClick(browserNotification);
-      browserNotification.close();
-    };
-
-    // Auto-close for non-urgent notifications after 5 seconds
-    if (notification.priority !== 'urgent') {
-      setTimeout(() => {
-        browserNotification.close();
-      }, 5000);
-    }
   }
 
   // ---- Combined Notification ----
@@ -210,7 +139,7 @@ class NotificationManager {
     this.showInApp(notification);
 
     // Show browser notification
-    this.showBrowser(notification);
+    notificationClient.showBrowserNotification(notification);
 
     // Play sound
     const soundName = this.getSoundByType(notification.type);
@@ -228,7 +157,7 @@ class NotificationManager {
       }, 1500);
     }
 
-    // TTS for high and urgent priority
+    // TTS for high and urgent priority (voice notifications from MongoDB data)
     if (notification.priority === 'high' || notification.priority === 'urgent') {
       const ttsMessage = this.getTTSMessage(notification);
       voiceManager.speak(ttsMessage, {
@@ -236,32 +165,15 @@ class NotificationManager {
         rate: notification.priority === 'urgent' ? 1.1 : 1,
       });
     }
-  }
 
-  // ---- FCM Token Management ----
-
-  /** Register an FCM token for push notifications */
-  async registerFCMToken(token: string, platform: string, deviceId: string): Promise<void> {
-    this.fcmToken = token;
-
-    try {
-      const response = await fetch('/api/notifications/register-token', {
-        method: 'POST',
+    // Mark voice as played on the server
+    if (notification.voiceEnabled && notification.id) {
+      fetch(`/api/notifications/${notification.id}/read`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, platform, deviceId }),
-      });
-
-      if (!response.ok) {
-        console.warn('[NotificationManager] Failed to register FCM token');
-      }
-    } catch (error) {
-      console.warn('[NotificationManager] FCM token registration error:', error);
+        body: JSON.stringify({ voicePlayed: true }),
+      }).catch(() => {});
     }
-  }
-
-  /** Get the current FCM token */
-  getFCMToken(): string | null {
-    return this.fcmToken;
   }
 
   // ---- Deduplication ----
@@ -278,7 +190,6 @@ class NotificationManager {
       return true;
     }
 
-    // Entry has expired, remove it
     this.deduplicationSet.delete(hash);
     return false;
   }
@@ -288,13 +199,12 @@ class NotificationManager {
     const hash = this.computeNotificationHash(notification);
     this.deduplicationSet.set(hash, { hash, timestamp: Date.now() });
 
-    // Enforce max size
     if (this.deduplicationSet.size > this.maxDeduplicationSize) {
       this.pruneDeduplicationCache();
     }
   }
 
-  /** Compute a hash for a notification based on type, title, body, and data */
+  /** Compute a hash for a notification */
   private computeNotificationHash(notification: AppNotification): string {
     const dataStr = notification.data
       ? Object.entries(notification.data)
@@ -320,17 +230,6 @@ class NotificationManager {
     for (const hash of entriesToDelete) {
       this.deduplicationSet.delete(hash);
     }
-
-    // If still too large, remove oldest entries
-    if (this.deduplicationSet.size > this.maxDeduplicationSize) {
-      const sorted = [...this.deduplicationSet.entries()].sort(
-        (a, b) => a[1].timestamp - b[1].timestamp
-      );
-      const toRemove = sorted.slice(0, this.deduplicationSet.size - this.maxDeduplicationSize);
-      for (const [hash] of toRemove) {
-        this.deduplicationSet.delete(hash);
-      }
-    }
   }
 
   /** Start periodic cleanup of deduplication cache */
@@ -339,13 +238,13 @@ class NotificationManager {
 
     setInterval(() => {
       this.pruneDeduplicationCache();
-    }, 30000); // Clean up every 30 seconds
+    }, 30000);
   }
 
   // ---- Sound & TTS Helpers ----
 
   /** Get the appropriate sound name for a notification type */
-  private getSoundByType(type: NotificationType): string {
+  private getSoundByType(type: string): string {
     return SOUND_MAP[type] ?? 'notification';
   }
 
@@ -358,46 +257,22 @@ class NotificationManager {
     return notification.title;
   }
 
-  // ---- Background Notification Handler ----
-
-  /** Handle a background notification (from service worker / FCM) */
-  handleBackgroundNotification(payload: FirebaseMessagePayload): void {
-    const notification: AppNotification = {
-      id: payload.data?.id ?? crypto.randomUUID(),
-      title: payload.notification?.title ?? payload.data?.title ?? 'إشعار جديد',
-      body: payload.notification?.body ?? payload.data?.body ?? '',
-      type: (payload.data?.type as NotificationType) ?? 'system',
-      priority: (payload.data?.priority as NotificationPriority) ?? 'medium',
-      data: payload.data ?? {},
-      imageUrl: payload.notification?.image,
-      clickAction: payload.notification?.click_action ?? payload.data?.clickAction,
-    };
-
-    // Even in background, we should show it if the app is visible
-    if (document.visibilityState === 'visible') {
-      this.notify(notification);
-    }
-  }
-
   // ---- Notification Click Handler ----
 
   /** Handle a notification click event */
-  handleNotificationClick(notification: Notification): void {
-    const data = notification.data as Record<string, string> | undefined;
+  handleNotificationClick(browserNotification: Notification): void {
+    const data = browserNotification.data as Record<string, string> | undefined;
     const clickAction = data?.clickAction;
-    const type = data?.type as NotificationType | undefined;
+    const type = data?.type as string | undefined;
 
-    // Focus the window
     window.focus();
 
-    // Navigate based on click action or type
     if (clickAction) {
       window.location.href = clickAction;
       return;
     }
 
-    // Default navigation based on notification type
-    const typeRoutes: Partial<Record<NotificationType, string>> = {
+    const typeRoutes: Record<string, string> = {
       assignment: '/nurse',
       payment: '/nurse/earnings',
       emergency: '/beneficiary/emergency',
@@ -418,8 +293,8 @@ class NotificationManager {
   destroy(): void {
     voiceManager.destroy();
     soundManager.destroy();
+    notificationClient.destroy();
     this.deduplicationSet.clear();
-    this.fcmToken = null;
     this.initialized = false;
   }
 }
@@ -428,7 +303,7 @@ class NotificationManager {
 // Singleton Export
 // ============================================================================
 
-/** Global NotificationManager instance */
+/** Global NotificationManager instance - MongoDB only, NO Firebase */
 export const notificationManager = new NotificationManager();
 
 export default notificationManager;

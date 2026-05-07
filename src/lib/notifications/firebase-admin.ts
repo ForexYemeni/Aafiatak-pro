@@ -1,291 +1,245 @@
 // ============================================================================
-// عافيتك (Aafiatak) Healthcare Platform - Firebase Admin SDK
+// عافيتك (Aafiatak) Healthcare Platform - Notification Server (MongoDB Only)
 // ============================================================================
-// Server-side Firebase Admin SDK for sending push notifications.
-// Handles single token, multi-token, and topic-based notifications.
-// Uses Firebase Cloud Messaging (FCM) for reliable delivery.
+// Server-side notification system using MongoDB only - NO Firebase.
+// Stores notifications in MongoDB and supports voice notifications from DB.
+// Browser notifications use the Web Notification API directly.
 // ============================================================================
+
+import { connectDB } from '@/lib/mongodb';
+import { Notification } from '@/models/mongoose/Notification';
 
 // ============================================================================
 // Types
 // ============================================================================
 
-/** Options for sending a push notification */
+/** Options for creating a notification */
 export interface SendNotificationOptions {
-  /** Single device FCM token */
-  token?: string;
-  /** Multiple device FCM tokens (max 500) */
-  tokens?: string[];
-  /** FCM topic to send to */
-  topic?: string;
+  /** Target user ID */
+  userId: string;
+  /** Target user role */
+  userRole: string;
   /** Notification title (Arabic) */
   title: string;
   /** Notification body (Arabic) */
   body: string;
+  /** Notification type */
+  type?: string;
+  /** Message priority */
+  priority?: 'low' | 'medium' | 'high' | 'urgent';
   /** Custom data payload */
   data?: Record<string, string>;
-  /** Message priority */
-  priority?: 'high' | 'normal';
-  /** Notification sound */
-  sound?: string;
-  /** Badge number (iOS) */
-  badge?: number;
+  /** Action URL for click navigation */
+  clickAction?: string;
+  /** Enable voice notification */
+  voiceEnabled?: boolean;
 }
 
-/** Result of a multi-token notification send */
-export interface MulticastResult {
-  successCount: number;
-  failureCount: number;
-  responses: Array<{
-    success: boolean;
-    messageId?: string;
-    error?: string;
-  }>;
+/** Options for sending to multiple users */
+export interface MultiUserNotificationOptions extends Omit<SendNotificationOptions, 'userId'> {
+  /** Target user IDs */
+  userIds: string[];
+  /** Target user role */
+  userRole: string;
 }
 
 // ============================================================================
-// Firebase Admin Initialization
+// Create Notification in MongoDB
 // ============================================================================
-
-let firebaseAdminApp: unknown = null;
-let messagingInstance: unknown = null;
-let initializationAttempted = false;
 
 /**
- * Get the Firebase Admin app instance.
- * Initializes on first call with service account credentials from environment.
- * Returns null if Firebase is not configured.
+ * Create a notification in MongoDB.
+ * This stores the notification and makes it available for:
+ * 1. In-app notification display
+ * 2. Browser push notifications (via service worker)
+ * 3. Voice notifications (TTS from stored data)
+ *
+ * @param options - Notification options
  */
-async function getFirebaseAdmin(): Promise<{ app: unknown; messaging: unknown } | null> {
-  if (firebaseAdminApp && messagingInstance) {
-    return { app: firebaseAdminApp, messaging: messagingInstance };
-  }
-
-  if (initializationAttempted) {
-    return null;
-  }
-
-  initializationAttempted = true;
-
+export async function sendNotification(options: SendNotificationOptions): Promise<string | null> {
   try {
-    // Check for required environment variables
-    const projectId = process.env.FIREBASE_PROJECT_ID;
-    const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-    const privateKey = process.env.FIREBASE_PRIVATE_KEY;
+    await connectDB();
 
-    if (!projectId || !clientEmail || !privateKey) {
-      console.info('[FirebaseAdmin] Firebase Admin SDK not configured. Set FIREBASE_* env vars.');
-      return null;
-    }
-
-    // Dynamic import to avoid bundling on client side
-    const admin = await import('firebase-admin/app');
-    const adminMessaging = await import('firebase-admin/messaging');
-
-    // Initialize the Admin SDK
-    const serviceAccount = {
-      projectId,
-      clientEmail,
-      privateKey: privateKey.replace(/\\n/g, '\n'),
-    };
-
-    firebaseAdminApp = admin.initializeApp({
-      credential: admin.cert(serviceAccount),
-      projectId,
+    const notification = await Notification.create({
+      userId: options.userId,
+      userRole: options.userRole,
+      titleAr: options.title,
+      bodyAr: options.body,
+      type: options.type || 'system',
+      priority: options.priority || 'medium',
+      data: options.data || {},
+      read: false,
+      actionUrl: options.clickAction || undefined,
+      voiceEnabled: options.voiceEnabled !== false,
     });
 
-    messagingInstance = adminMessaging.getMessaging(firebaseAdminApp);
-
-    console.info('[FirebaseAdmin] Firebase Admin SDK initialized successfully');
-    return { app: firebaseAdminApp, messaging: messagingInstance };
+    console.info(`[NotificationService] Notification created for user ${options.userId}: ${options.title}`);
+    return notification._id.toString();
   } catch (error) {
-    console.warn('[FirebaseAdmin] Failed to initialize Firebase Admin SDK:', error);
+    console.error('[NotificationService] Failed to create notification:', error);
     return null;
   }
 }
 
-// ============================================================================
-// Send Push Notification
-// ============================================================================
+/**
+ * Send notification to multiple users.
+ * Creates individual notification records in MongoDB for each user.
+ *
+ * @param options - Multi-user notification options
+ */
+export async function sendMultiUserNotification(
+  options: MultiUserNotificationOptions
+): Promise<{ successCount: number; failureCount: number }> {
+  let successCount = 0;
+  let failureCount = 0;
+
+  for (const userId of options.userIds) {
+    const result = await sendNotification({
+      userId,
+      userRole: options.userRole,
+      title: options.title,
+      body: options.body,
+      type: options.type,
+      priority: options.priority,
+      data: options.data,
+      clickAction: options.clickAction,
+      voiceEnabled: options.voiceEnabled,
+    });
+
+    if (result) {
+      successCount++;
+    } else {
+      failureCount++;
+    }
+  }
+
+  console.info(
+    `[NotificationService] Multi-user notification: ${successCount} success, ${failureCount} failure`
+  );
+  return { successCount, failureCount };
+}
 
 /**
- * Send a push notification via Firebase Cloud Messaging.
+ * Send a role-based notification to all users of a specific role.
  *
- * Supports three modes:
- * 1. Single token: Provide `token`
- * 2. Multiple tokens: Provide `tokens` (max 500)
- * 3. Topic-based: Provide `topic`
- *
- * @param options - Notification options including target, title, body, and data
- * @throws Error if no target is specified or Firebase is not configured
+ * @param role - The target role
+ * @param options - Notification options (without userId)
  */
-export async function sendPushNotification(options: SendNotificationOptions): Promise<void> {
-  const { token, tokens, topic, title, body, data, priority, sound, badge } = options;
-
-  // Validate that at least one target is specified
-  if (!token && !tokens && !topic) {
-    throw new Error('يجب تحديد هدف واحد على الأقل: token أو tokens أو topic');
-  }
-
-  // Validate multi-token limit
-  if (tokens && tokens.length > 500) {
-    throw new Error('الحد الأقصى لعدد الرموز هو 500 لكل طلب');
-  }
-
-  const adminInstance = await getFirebaseAdmin();
-  if (!adminInstance) {
-    console.warn('[FirebaseAdmin] Cannot send notification: Firebase not configured');
-    return;
-  }
-
-  const { messaging } = adminInstance;
-
+export async function sendRoleNotification(
+  role: string,
+  title: string,
+  body: string,
+  options?: Partial<SendNotificationOptions>
+): Promise<{ successCount: number; failureCount: number }> {
   try {
-    // Import messaging types dynamically
-    const adminMessaging = await import('firebase-admin/messaging');
+    await connectDB();
 
-    // ---- Single Token ----
-    if (token) {
-      const message: adminMessaging.Message = {
-        token,
-        notification: {
-          title,
-          body,
-        },
-        data: data ?? {},
-        android: {
-          priority: priority === 'high' ? 'high' : 'normal',
-          notification: {
-            sound: sound ?? 'default',
-            channelId: 'default',
-            clickAction: data?.clickAction ?? 'OPEN_APP',
-          },
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: sound ?? 'default',
-              badge: badge ?? 1,
-              contentAvailable: true,
-            },
-          },
-        },
-      };
-
-      await adminMessaging.sendMessaging(messaging, message);
-      console.info(`[FirebaseAdmin] Notification sent to token: ${token.substring(0, 10)}...`);
-      return;
+    // Dynamic import to get the right model based on role
+    let Model;
+    if (role === 'nurse') {
+      const { Nurse } = await import('@/models/mongoose/Nurse');
+      Model = Nurse;
+    } else if (role === 'beneficiary') {
+      const { Beneficiary } = await import('@/models/mongoose/Beneficiary');
+      Model = Beneficiary;
+    } else {
+      const { User } = await import('@/models/mongoose/User');
+      Model = User;
     }
 
-    // ---- Multiple Tokens (Multicast) ----
-    if (tokens && tokens.length > 0) {
-      const message: adminMessaging.MulticastMessage = {
-        tokens,
-        notification: {
-          title,
-          body,
-        },
-        data: data ?? {},
-        android: {
-          priority: priority === 'high' ? 'high' : 'normal',
-          notification: {
-            sound: sound ?? 'default',
-            channelId: 'default',
-            clickAction: data?.clickAction ?? 'OPEN_APP',
-          },
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: sound ?? 'default',
-              badge: badge ?? 1,
-              contentAvailable: true,
-            },
-          },
-        },
-      };
+    const users = await Model.find({ isActive: true }).select('_id').lean();
+    const userIds = users.map((u: any) => u._id.toString());
 
-      const response = await adminMessaging.sendMulticast(messaging, message);
-      console.info(
-        `[FirebaseAdmin] Multicast sent: ${response.successCount} success, ${response.failureCount} failure`
-      );
-      return;
-    }
-
-    // ---- Topic ----
-    if (topic) {
-      const message: adminMessaging.Message = {
-        topic,
-        notification: {
-          title,
-          body,
-        },
-        data: data ?? {},
-        android: {
-          priority: priority === 'high' ? 'high' : 'normal',
-          notification: {
-            sound: sound ?? 'default',
-            channelId: 'default',
-            clickAction: data?.clickAction ?? 'OPEN_APP',
-          },
-        },
-        apns: {
-          payload: {
-            aps: {
-              sound: sound ?? 'default',
-              badge: badge ?? 1,
-              contentAvailable: true,
-            },
-          },
-        },
-      };
-
-      await adminMessaging.sendMessaging(messaging, message);
-      console.info(`[FirebaseAdmin] Notification sent to topic: ${topic}`);
-    }
+    return sendMultiUserNotification({
+      userIds,
+      userRole: role,
+      title,
+      body,
+      ...options,
+    });
   } catch (error) {
-    console.error('[FirebaseAdmin] Failed to send notification:', error);
-    throw new Error('فشل إرسال الإشعار. يرجى المحاولة مرة أخرى');
+    console.error('[NotificationService] Failed to send role notification:', error);
+    return { successCount: 0, failureCount: 1 };
   }
 }
 
 // ============================================================================
-// Topic Subscription
+// Get Unread Count for a User
 // ============================================================================
 
-/**
- * Subscribe device tokens to an FCM topic.
- * Useful for role-based or category-based notification groups.
- * @param tokens - Array of FCM tokens to subscribe
- * @param topic - The topic to subscribe to
- */
-export async function subscribeToTopic(tokens: string[], topic: string): Promise<void> {
-  const adminInstance = await getFirebaseAdmin();
-  if (!adminInstance) return;
-
+export async function getUnreadCount(userId: string): Promise<number> {
   try {
-    const adminMessaging = await import('firebase-admin/messaging');
-    await adminMessaging.subscribeToTopic(messagingInstance, tokens, topic);
-    console.info(`[FirebaseAdmin] Subscribed ${tokens.length} tokens to topic: ${topic}`);
-  } catch (error) {
-    console.error('[FirebaseAdmin] Failed to subscribe to topic:', error);
+    await connectDB();
+    return Notification.countDocuments({ userId, read: false });
+  } catch {
+    return 0;
   }
 }
 
-/**
- * Unsubscribe device tokens from an FCM topic.
- * @param tokens - Array of FCM tokens to unsubscribe
- * @param topic - The topic to unsubscribe from
- */
-export async function unsubscribeFromTopic(tokens: string[], topic: string): Promise<void> {
-  const adminInstance = await getFirebaseAdmin();
-  if (!adminInstance) return;
+// ============================================================================
+// Mark Notifications as Read
+// ============================================================================
 
+export async function markAsRead(notificationId: string, userId: string): Promise<boolean> {
   try {
-    const adminMessaging = await import('firebase-admin/messaging');
-    await adminMessaging.unsubscribeFromTopic(messagingInstance, tokens, topic);
-    console.info(`[FirebaseAdmin] Unsubscribed ${tokens.length} tokens from topic: ${topic}`);
-  } catch (error) {
-    console.error('[FirebaseAdmin] Failed to unsubscribe from topic:', error);
+    await connectDB();
+    const result = await Notification.updateOne(
+      { _id: notificationId, userId },
+      { read: true }
+    );
+    return result.modifiedCount > 0;
+  } catch {
+    return false;
+  }
+}
+
+export async function markAllAsRead(userId: string): Promise<number> {
+  try {
+    await connectDB();
+    const result = await Notification.updateMany(
+      { userId, read: false },
+      { read: true }
+    );
+    return result.modifiedCount;
+  } catch {
+    return 0;
+  }
+}
+
+// ============================================================================
+// Mark Voice as Played
+// ============================================================================
+
+export async function markVoicePlayed(notificationId: string, userId: string): Promise<boolean> {
+  try {
+    await connectDB();
+    const result = await Notification.updateOne(
+      { _id: notificationId, userId, voiceEnabled: true },
+      { voicePlayedAt: new Date() }
+    );
+    return result.modifiedCount > 0;
+  } catch {
+    return false;
+  }
+}
+
+// ============================================================================
+// Get Voice-Pending Notifications (for voice notification polling)
+// ============================================================================
+
+export async function getVoicePendingNotifications(userId: string): Promise<any[]> {
+  try {
+    await connectDB();
+    return Notification.find({
+      userId,
+      voiceEnabled: true,
+      voicePlayedAt: { $exists: false },
+      read: false,
+    })
+      .sort({ createdAt: -1 })
+      .limit(5)
+      .lean();
+  } catch {
+    return [];
   }
 }

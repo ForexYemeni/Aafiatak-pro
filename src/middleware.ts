@@ -31,7 +31,7 @@ function getJwtSecret(): Uint8Array {
 
 function extractToken(request: NextRequest): string | null {
   // Try cookie first
-  const cookieToken = request.cookies.get('auth-token')?.value;
+  const cookieToken = request.cookies.get('auth_token')?.value;
   if (cookieToken) {
     return cookieToken;
   }
@@ -182,7 +182,7 @@ export async function middleware(request: NextRequest) {
     const loginUrl = new URL('/', request.url);
     loginUrl.searchParams.set('redirect', pathname);
     const response = NextResponse.redirect(loginUrl);
-    response.cookies.delete('auth-token');
+    response.cookies.delete('auth_token');
     return applySecurityHeaders(request, response);
   }
 
