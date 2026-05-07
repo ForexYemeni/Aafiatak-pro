@@ -39,14 +39,35 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  * Generate a JWT access token.
  */
 export function generateToken(payload: { userId: string; phone: string; role: string }): string {
-  return jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRY } as jwt.SignOptions);
+  // Parse expiry - handle both string ("7d") and number formats
+  const expiresIn = parseExpiry(JWT_EXPIRY);
+  return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
 
 /**
  * Generate a JWT refresh token.
  */
 export function generateRefreshToken(payload: { userId: string; phone: string; role: string }): string {
-  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn: JWT_REFRESH_EXPIRY } as jwt.SignOptions);
+  const expiresIn = parseExpiry(JWT_REFRESH_EXPIRY);
+  return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn });
+}
+
+/**
+ * Parse JWT expiry value - converts string like "7d" to seconds or returns as-is
+ */
+function parseExpiry(value: string): string | number {
+  // If it's already a number string, return as number
+  if (/^\d+$/.test(value)) {
+    return parseInt(value, 10);
+  }
+  // If it's a timespan string like "7d", "30d", "24h", etc - return as string
+  // jwt.sign supports timespan strings like "7d", "2 days", "10h", etc.
+  if (/^\d+\s*(ms|s|m|h|d|w|y|seconds?|minutes?|hours?|days?|weeks?|years?)$/i.test(value.trim())) {
+    return value.trim();
+  }
+  // Default to 7 days in seconds if unrecognizable
+  console.warn(`[Auth] Unrecognized JWT expiry format: ${value}. Defaulting to 7d.`);
+  return '7d';
 }
 
 /**
