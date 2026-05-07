@@ -41,7 +41,7 @@ interface ScheduleBeneficiary {
   address?: string;
 }
 
-interface ScheduleAssignment {
+interface ScheduleClipboardList {
   id: string;
   requestId: string;
   nurseId: string;
@@ -80,7 +80,7 @@ interface ScheduleEmergency {
 interface DaySchedule {
   date: Date;
   dayName: string;
-  assignments: ScheduleAssignment[];
+  assignments: ScheduleClipboardList[];
   emergencies: ScheduleEmergency[];
 }
 
@@ -126,9 +126,9 @@ export default function NurseSchedulePage() {
   const [weekOffset, setWeekOffset] = useState(0);
   const [selectedDate, setSelectedDate] = useState<Date>(new Date());
   const [scheduleData, setScheduleData] = useState<{
-    assignments: ScheduleAssignment[];
-    emergencyAssignments: ScheduleEmergency[];
-  }>({ assignments: [], emergencyAssignments: [] });
+    assignments: ScheduleClipboardList[];
+    emergencyClipboardLists: ScheduleEmergency[];
+  }>({ assignments: [], emergencyClipboardLists: [] });
   const [isLoading, setIsLoading] = useState(true);
   const [isAvailable, setIsAvailable] = useState(true);
   const [availableDays, setAvailableDays] = useState<Record<number, boolean>>({
@@ -147,8 +147,8 @@ export default function NurseSchedulePage() {
       const data = await res.json();
       if (data.success && data.data) {
         setScheduleData({
-          assignments: (data.data.assignments ?? []) as ScheduleAssignment[],
-          emergencyAssignments: (data.data.emergencyAssignments ?? []) as ScheduleEmergency[],
+          assignments: (data.data.assignments ?? []) as ScheduleClipboardList[],
+          emergencyClipboardLists: (data.data.emergencyClipboardLists ?? []) as ScheduleEmergency[],
         });
       }
     } catch {
@@ -163,21 +163,21 @@ export default function NurseSchedulePage() {
     fetchSchedule();
   }, [fetchSchedule]);
 
-  const currentDayAssignments = scheduleData.assignments.filter((a) => {
+  const currentDayClipboardLists = scheduleData.assignments.filter((a) => {
     if (!a.request.scheduledAt) return false;
     return isSameDay(new Date(a.request.scheduledAt), selectedDate);
   });
 
-  const currentDayEmergencies = scheduleData.emergencyAssignments.filter((a) => {
+  const currentDayEmergencies = scheduleData.emergencyClipboardLists.filter((a) => {
     return isSameDay(new Date(a.assignedAt), selectedDate);
   });
 
-  const getAssignmentCountForDay = (date: Date): number => {
+  const getClipboardListCountForDay = (date: Date): number => {
     const count = scheduleData.assignments.filter((a) => {
       if (!a.request.scheduledAt) return false;
       return isSameDay(new Date(a.request.scheduledAt), date);
     }).length;
-    const emCount = scheduleData.emergencyAssignments.filter((a) => {
+    const emCount = scheduleData.emergencyClipboardLists.filter((a) => {
       return isSameDay(new Date(a.assignedAt), date);
     }).length;
     return count + emCount;
@@ -218,7 +218,7 @@ export default function NurseSchedulePage() {
           {weekDates.map((date, idx) => {
             const isSelected = isSameDay(date, selectedDate);
             const isTodayDate = isToday(date);
-            const count = getAssignmentCountForDay(date);
+            const count = getClipboardListCountForDay(date);
 
             return (
               <button
@@ -272,7 +272,7 @@ export default function NurseSchedulePage() {
               <CardSkeleton key={i} />
             ))}
           </div>
-        ) : currentDayAssignments.length === 0 && currentDayEmergencies.length === 0 ? (
+        ) : currentDayClipboardLists.length === 0 && currentDayEmergencies.length === 0 ? (
           <EmptyState
             icon={<CalendarDays className="w-10 h-10 text-muted-foreground" />}
             title="لا توجد مواعيد"
@@ -285,8 +285,8 @@ export default function NurseSchedulePage() {
             animate="visible"
             className="space-y-3"
           >
-            {/* Regular Assignments */}
-            {currentDayAssignments.map((assignment) => (
+            {/* Regular ClipboardLists */}
+            {currentDayClipboardLists.map((assignment) => (
               <motion.div key={assignment.id} variants={itemVariants}>
                 <GlassCard variant="nurse" className="p-4">
                   <div className="flex items-start justify-between mb-2">
@@ -329,7 +329,7 @@ export default function NurseSchedulePage() {
               </motion.div>
             ))}
 
-            {/* Emergency Assignments */}
+            {/* Emergency ClipboardLists */}
             {currentDayEmergencies.map((emergency) => (
               <motion.div key={emergency.id} variants={itemVariants}>
                 <GlassCard variant="nurse" className="p-4 border-l-4 border-l-red-500">

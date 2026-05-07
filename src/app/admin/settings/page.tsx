@@ -25,7 +25,7 @@ interface SettingsData {
   loyaltyPointsPerOrder: number;
   loyaltyRedemptionThreshold: number;
   referralReward: number;
-  maxNurseAssignmentRadius: number;
+  maxNurseClipboardListRadius: number;
   autoAssignEnabled: boolean;
   emergencyAutoDispatch: boolean;
   maintenanceMode: boolean;
@@ -49,7 +49,7 @@ const defaultSettings: SettingsData = {
   loyaltyPointsPerOrder: 10,
   loyaltyRedemptionThreshold: 100,
   referralReward: 50,
-  maxNurseAssignmentRadius: 10,
+  maxNurseClipboardListRadius: 10,
   autoAssignEnabled: true,
   emergencyAutoDispatch: true,
   maintenanceMode: false,
@@ -241,7 +241,7 @@ export default function AdminSettingsPage() {
         </GlassCard>
       </motion.div>
 
-      {/* Auto Assignment */}
+      {/* Auto ClipboardList */}
       <motion.div variants={itemAnim}>
         <GlassCard variant="admin">
           <GlassCardHeader>
@@ -275,8 +275,8 @@ export default function AdminSettingsPage() {
                 <Label>نصف قطر التعيين الأقصى (كم)</Label>
                 <Input
                   type="number"
-                  value={settings.maxNurseAssignmentRadius}
-                  onChange={(e) => updateField('maxNurseAssignmentRadius', Number(e.target.value))}
+                  value={settings.maxNurseClipboardListRadius}
+                  onChange={(e) => updateField('maxNurseClipboardListRadius', Number(e.target.value))}
                   min={1}
                   max={100}
                 />

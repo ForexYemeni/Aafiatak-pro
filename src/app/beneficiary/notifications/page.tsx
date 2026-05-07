@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Bell,
   CheckCheck,
-  Assignment,
+  ClipboardList,
   CreditCard,
   AlertTriangle,
   MessageCircle,
@@ -23,7 +23,7 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import type { ApiResponse, Notification, NotificationType } from '@/types';
 
 const notificationTypeIcons: Record<NotificationType, React.ElementType> = {
-  assignment: Assignment,
+  assignment: ClipboardList,
   payment: CreditCard,
   emergency: AlertTriangle,
   reminder: Clock,

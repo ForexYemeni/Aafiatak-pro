@@ -50,7 +50,7 @@ interface BeneficiaryInfo {
   address?: string;
 }
 
-interface AssignmentRequest {
+interface ClipboardListRequest {
   id: string;
   status: string;
   scheduledAt: string | null;
@@ -65,7 +65,7 @@ interface AssignmentRequest {
   beneficiary: BeneficiaryInfo;
 }
 
-interface Assignment {
+interface ClipboardList {
   id: string;
   requestId: string;
   nurseId: string;
@@ -73,7 +73,7 @@ interface Assignment {
   assignedAt: string;
   respondedAt: string | null;
   estimatedArrivalMinutes: number | null;
-  request: AssignmentRequest;
+  request: ClipboardListRequest;
 }
 
 type TabType = 'new' | 'active' | 'completed';
@@ -111,7 +111,7 @@ const itemVariants = {
 
 export default function NurseTasksPage() {
   const [activeTab, setActiveTab] = useState<TabType>('new');
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [assignments, setClipboardLists] = useState<ClipboardList[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -119,7 +119,7 @@ export default function NurseTasksPage() {
   const user = useAuthStore((s) => s.user);
   const orderUpdates = useOrderUpdates();
 
-  const fetchAssignments = useCallback(async () => {
+  const fetchClipboardLists = useCallback(async () => {
     try {
       const statusMap: Record<TabType, string> = {
         new: 'pending',
@@ -129,7 +129,7 @@ export default function NurseTasksPage() {
       const res = await authFetch(`/api/nurse/assignments?status=${statusMap[activeTab]}&limit=50`);
       const data = await res.json();
       if (data.success && data.data) {
-        setAssignments(data.data as Assignment[]);
+        setClipboardLists(data.data as ClipboardList[]);
       }
     } catch {
       // silently handle
@@ -141,22 +141,22 @@ export default function NurseTasksPage() {
 
   useEffect(() => {
     setIsLoading(true);
-    fetchAssignments();
-  }, [fetchAssignments]);
+    fetchClipboardLists();
+  }, [fetchClipboardLists]);
 
   // Refresh on real-time order updates
   useEffect(() => {
     if (orderUpdates.latestOrderUpdate) {
-      fetchAssignments();
+      fetchClipboardLists();
     }
-  }, [orderUpdates.latestOrderUpdate, fetchAssignments]);
+  }, [orderUpdates.latestOrderUpdate, fetchClipboardLists]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchAssignments();
+    await fetchClipboardLists();
   };
 
-  const handleAcceptAssignment = async (assignmentId: string) => {
+  const handleAcceptClipboardList = async (assignmentId: string) => {
     setActionLoading(assignmentId);
     try {
       const res = await authFetch(`/api/nurse/assignments/${assignmentId}`, {
@@ -165,7 +165,7 @@ export default function NurseTasksPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
+        setClipboardLists((prev) => prev.filter((a) => a.id !== assignmentId));
       }
     } catch {
       // silently handle
@@ -174,7 +174,7 @@ export default function NurseTasksPage() {
     }
   };
 
-  const handleRejectAssignment = async (assignmentId: string) => {
+  const handleRejectClipboardList = async (assignmentId: string) => {
     setActionLoading(assignmentId);
     try {
       const res = await authFetch(`/api/nurse/assignments/${assignmentId}`, {
@@ -183,7 +183,7 @@ export default function NurseTasksPage() {
       });
       const data = await res.json();
       if (data.success) {
-        setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
+        setClipboardLists((prev) => prev.filter((a) => a.id !== assignmentId));
       }
     } catch {
       // silently handle
@@ -192,7 +192,7 @@ export default function NurseTasksPage() {
     }
   };
 
-  const getDistanceText = (assignment: Assignment): string | null => {
+  const getDistanceText = (assignment: ClipboardList): string | null => {
     // In a real app, we'd calculate using nurse's GPS and beneficiary's GPS
     // For now, show a placeholder
     if (assignment.request.beneficiaryLat && assignment.request.beneficiaryLng) {
@@ -201,7 +201,7 @@ export default function NurseTasksPage() {
     return null;
   };
 
-  const filteredAssignments = assignments;
+  const filteredClipboardLists = assignments;
 
   return (
     <div className="space-y-4">
@@ -249,7 +249,7 @@ export default function NurseTasksPage() {
                   <CardSkeleton key={i} />
                 ))}
               </div>
-            ) : filteredAssignments.length === 0 ? (
+            ) : filteredClipboardLists.length === 0 ? (
               <EmptyState
                 icon={<ClipboardList className="w-10 h-10 text-muted-foreground" />}
                 title={
@@ -271,7 +271,7 @@ export default function NurseTasksPage() {
                 className="space-y-3"
               >
                 <AnimatePresence mode="popLayout">
-                  {filteredAssignments.map((assignment) => (
+                  {filteredClipboardLists.map((assignment) => (
                     <motion.div
                       key={assignment.id}
                       variants={itemVariants}
@@ -351,7 +351,7 @@ export default function NurseTasksPage() {
                                 variant="outline"
                                 className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8"
                                 disabled={actionLoading === assignment.id}
-                                onClick={() => handleRejectAssignment(assignment.id)}
+                                onClick={() => handleRejectClipboardList(assignment.id)}
                               >
                                 <XCircle className="w-4 h-4 me-1" />
                                 رفض
@@ -360,7 +360,7 @@ export default function NurseTasksPage() {
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 h-8"
                                 disabled={actionLoading === assignment.id}
-                                onClick={() => handleAcceptAssignment(assignment.id)}
+                                onClick={() => handleAcceptClipboardList(assignment.id)}
                               >
                                 {actionLoading === assignment.id ? (
                                   <RefreshCw className="w-4 h-4 animate-spin" />
