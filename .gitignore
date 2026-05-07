@@ -52,3 +52,38 @@ prompt
 server.log
 # Skills directory
 /skills/
+# Database
+db/
+*.db
+*.db-journal
+
+# Mini services node_modules
+mini-services/*/node_modules
+
+# Work scripts
+.zscripts/
+
+# Download directory content (keep the folder)
+download/*
+
+# Dev logs
+*.log
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+Thumbs.db
+
+# Lock files (optional - uncomment if needed)
+# bun.lock
+
+# Prisma
+prisma/migrations/
+
+# Aafiatak specific
+worklog.md
+agent-ctx/
