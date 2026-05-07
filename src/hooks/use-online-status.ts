@@ -1,13 +1,12 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { syncManager } from '@/lib/db/sync-manager';
 
 interface OnlineStatus {
   isOnline: boolean;
   wasOffline: boolean;
 }
-
-const SYNC_MANAGER_PATH = '@/lib/db/sync-manager';
 
 export function useOnlineStatus(): OnlineStatus {
   const [isOnline, setIsOnline] = useState<boolean>(
@@ -20,11 +19,7 @@ export function useOnlineStatus(): OnlineStatus {
     setIsOnline(true);
     if (wasOfflineRef.current) {
       setWasOffline(true);
-      // Use variable path to prevent static analysis
-      import(SYNC_MANAGER_PATH as string).then((mod: Record<string, unknown>) => {
-        const sm = mod.syncManager as { fullSync: () => Promise<void> };
-        void sm.fullSync();
-      }).catch(() => {});
+      void syncManager.fullSync();
       setTimeout(() => setWasOffline(false), 5000);
     }
     wasOfflineRef.current = false;

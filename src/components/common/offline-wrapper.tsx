@@ -4,6 +4,8 @@ import { type ReactNode, useEffect, useState, useCallback, useRef } from 'react'
 import { WifiOff, Wifi, RefreshCw, CloudOff, Check } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useOnlineStatus } from '@/hooks/use-online-status';
+import { offlineQueue } from '@/lib/db/offline-queue';
+import { syncManager } from '@/lib/db/sync-manager';
 
 interface OfflineWrapperProps {
   children?: ReactNode;
@@ -15,46 +17,15 @@ interface QueueStatus {
   failed: number;
 }
 
-// Use variable paths to prevent Turbopack static analysis
-const DB_PATHS = {
-  offlineQueue: '@/lib/db/offline-queue',
-  syncManager: '@/lib/db/sync-manager',
-};
-
-async function getQueueStatus(): Promise<QueueStatus> {
-  try {
-    const mod = await import(DB_PATHS.offlineQueue as string) as Record<string, unknown>;
-    const queue = mod.offlineQueue as { getStatus: () => Promise<QueueStatus> };
-    return await queue.getStatus();
-  } catch {
-    return { pending: 0, processing: 0, failed: 0 };
-  }
-}
-
-async function retryFailedOps(): Promise<void> {
-  try {
-    const queueMod = await import(DB_PATHS.offlineQueue as string) as Record<string, unknown>;
-    const queue = queueMod.offlineQueue as { retryFailed: () => Promise<void> };
-    await queue.retryFailed();
-  } catch { /* ignore */ }
-
-  try {
-    const syncMod = await import(DB_PATHS.syncManager as string) as Record<string, unknown>;
-    const sync = syncMod.syncManager as { fullSync: () => Promise<void> };
-    await sync.fullSync();
-  } catch { /* ignore */ }
-}
-
 export function OfflineWrapper({ children }: OfflineWrapperProps) {
   const { isOnline, wasOffline } = useOnlineStatus();
-  const [queueStatus, setQueueStatus] = useState<QueueStatus>({ pending: 0, processing: 0, failed: 0 });
+  const [queueStatus, setQueueStatus] = useState<QueueStatus>(offlineQueue.getStatus());
   const [isSyncing, setIsSyncing] = useState(false);
   const [showBackOnline, setShowBackOnline] = useState(false);
   const mountedRef = useRef(true);
 
   const updateQueueStatus = useCallback(async () => {
-    const status = await getQueueStatus();
-    if (mountedRef.current) setQueueStatus(status);
+    if (mountedRef.current) setQueueStatus(offlineQueue.getStatus());
   }, []);
 
   useEffect(() => {
@@ -76,7 +47,10 @@ export function OfflineWrapper({ children }: OfflineWrapperProps) {
 
   const handleRetry = useCallback(async () => {
     setIsSyncing(true);
-    try { await retryFailedOps(); } finally {
+    try {
+      await offlineQueue.retryFailed();
+      await syncManager.fullSync();
+    } finally {
       if (mountedRef.current) setIsSyncing(false);
       await updateQueueStatus();
     }
