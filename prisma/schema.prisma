@@ -1,0 +1,662 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// USER MODELS
+// ============================================================================
+
+model Admin {
+  id        String   @id @default(cuid())
+  name      String
+  phone     String   @unique
+  password  String
+  role      String   @default("admin")
+  email     String?
+  isActive  Boolean  @default(true)
+  lastLoginAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  activityLogs ActivityLog[]
+}
+
+model SubAdmin {
+  id          String   @id @default(cuid())
+  name        String
+  phone       String   @unique
+  password    String
+  role        String   @default("subadmin")
+  email       String?
+  permissions String   @default("[]") // JSON array of SubAdminPermission
+  adminId     String?
+  isActive    Boolean  @default(true)
+  lastLoginAt DateTime?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  activityLogs ActivityLog[]
+}
+
+model Nurse {
+  id                   String   @id @default(cuid())
+  name                 String
+  phone                String   @unique
+  password             String
+  role                 String   @default("nurse")
+  specialization       String   @default("[]") // JSON array
+  licenseNumber        String?
+  licenseExpiryDate    DateTime?
+  verificationStatus   String   @default("pending") // pending, verified, rejected
+  isAvailable          Boolean  @default(false)
+  isOnline             Boolean  @default(false)
+  lat                  Float?
+  lng                  Float?
+  locationUpdatedAt    DateTime?
+  rating               Float    @default(0)
+  reviewCount          Int      @default(0)
+  completedJobs        Int      @default(0)
+  cancelledJobs        Int      @default(0)
+  totalEarnings        Float    @default(0)
+  availableBalance     Float    @default(0)
+  availableServices    String   @default("[]") // JSON array of service IDs
+  experience           Int      @default(0) // years
+  bio                  String?
+  nationalId           String?
+  address              String?
+  city                 String?
+  governorate          String?
+  district             String?
+  bankAccount          String?
+  walletType           String? // one_cash, jawali, yemen_wallet, saba_cash
+  walletNumber         String?
+  fcmToken             String?
+  identityDocumentUrl  String?
+  licenseDocumentUrl   String?
+  rejectedReason       String?
+  lastActiveAt         DateTime?
+  isActive             Boolean  @default(true)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  activityLogs         ActivityLog[]
+  serviceRequests      ServiceRequest[]
+  emergencyRequests    EmergencyRequest[]
+  serviceAssignments   ServiceAssignment[]
+  emergencyAssignments EmergencyAssignment[]
+  ratingsReceived      Rating[]        @relation("RatingsToNurse")
+  ratingsGiven         Rating[]        @relation("RatingsFromNurse")
+  favorites            FavoriteNurse[]
+  documents            NurseDocument[]
+  nursePayouts         NursePayout[]
+}
+
+model Beneficiary {
+  id                     String   @id @default(cuid())
+  name                   String
+  phone                  String   @unique
+  password               String
+  role                   String   @default("beneficiary")
+  referralCode           String   @unique
+  referredBy             String?
+  address                String?
+  city                   String?
+  governorate            String?
+  district               String?
+  lat                    Float?
+  lng                    Float?
+  emergencyContactName   String?
+  emergencyContactPhone  String?
+  emergencyContactRelation String?
+  dateOfBirth            DateTime?
+  gender                 String? // male, female
+  bloodType              String? // A+, A-, B+, B-, AB+, AB-, O+, O-
+  medicalConditions      String   @default("[]") // JSON array
+  allergies              String   @default("[]") // JSON array
+  loyaltyPoints          Int      @default(0)
+  loyaltyTier            String   @default("bronze") // bronze, silver, gold, platinum
+  totalSpent             Float    @default(0)
+  orderCount             Int      @default(0)
+  fcmToken               String?
+  isActive               Boolean  @default(true)
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  activityLogs           ActivityLog[]
+  serviceRequests        ServiceRequest[]
+  emergencyRequests      EmergencyRequest[]
+  transactions           Transaction[]
+  ratingsGiven           Rating[]          @relation("RatingsFromBeneficiary")
+  favorites              FavoriteNurse[]
+  loyaltyTransactions    LoyaltyTransaction[]
+  referrals              Referral[]        @relation("ReferrerReferrals")
+  complaints             Complaint[]       @relation("ComplaintsFromBeneficiary")
+}
+
+// ============================================================================
+// SERVICE MODELS
+// ============================================================================
+
+model Service {
+  id                 String   @id @default(cuid())
+  nameAr             String
+  nameEn             String
+  descriptionAr      String?
+  descriptionEn      String?
+  basePrice          Float
+  category           String   @default("nursing") // medical, nursing, physiotherapy, elderly_care, pediatric, post_surgery, lab, emergency
+  duration           Int      @default(60) // in minutes
+  icon               String   @default("")
+  image              String?
+  isActive           Boolean  @default(true)
+  isEmergency        Boolean  @default(false)
+  requirements       String   @default("[]") // JSON array
+  includedItems      String   @default("[]") // JSON array
+  sortOrder          Int      @default(0)
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  serviceRequests ServiceRequest[]
+}
+
+// ============================================================================
+// SERVICE REQUEST / ORDER MODELS
+// ============================================================================
+
+model ServiceRequest {
+  id                 String   @id @default(cuid())
+  serviceId          String
+  beneficiaryId      String
+  nurseId            String?
+  status             String   @default("pending") // pending, assigned, accepted, in_progress, completed, cancelled, rejected
+  basePrice          Float    @default(0)
+  nightFee           Float    @default(0)
+  fridayFee          Float    @default(0)
+  emergencyFee       Float    @default(0)
+  discount           Float    @default(0)
+  loyaltyDiscount    Float    @default(0)
+  couponDiscount     Float    @default(0)
+  totalPrice         Float    @default(0)
+  commission         Float    @default(0)
+  nursePayout        Float    @default(0)
+  beneficiaryLat     Float?
+  beneficiaryLng     Float?
+  beneficiaryAddress String?
+  notes              String?
+  scheduledAt        DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  cancelledAt        DateTime?
+  cancelReason       String?
+  cancelledBy        String?
+  isEmergency        Boolean  @default(false)
+  isNightService     Boolean  @default(false)
+  isFridayService    Boolean  @default(false)
+  paymentStatus      String   @default("pending") // pending, completed, failed, refunded
+  paymentMethod      String?  // cash, bank_transfer, wallet_deposit, exchange_transfer, mobile_wallet
+  couponId           String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  service           Service             @relation(fields: [serviceId], references: [id])
+  beneficiary       Beneficiary         @relation(fields: [beneficiaryId], references: [id])
+  nurse             Nurse?              @relation(fields: [nurseId], references: [id])
+  assignments       ServiceAssignment[]
+  transactions      Transaction[]
+  rating            Rating?
+
+  @@index([beneficiaryId])
+  @@index([nurseId])
+  @@index([status])
+}
+
+model ServiceAssignment {
+  id                     String   @id @default(cuid())
+  requestId              String
+  nurseId                String
+  status                 String   @default("pending") // pending, accepted, rejected, completed, cancelled
+  assignedBy             String
+  assignedByRole         String
+  assignedAt             DateTime @default(now())
+  respondedAt            DateTime?
+  rejectedReason         String?
+  estimatedArrivalMinutes Int?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  request ServiceRequest @relation(fields: [requestId], references: [id])
+  nurse   Nurse          @relation(fields: [nurseId], references: [id])
+
+  @@index([nurseId])
+  @@index([requestId])
+}
+
+// ============================================================================
+// EMERGENCY MODELS
+// ============================================================================
+
+model EmergencyRequest {
+  id             String   @id @default(cuid())
+  beneficiaryId  String
+  nurseId        String?
+  type           String   @default("medical") // medical, injury, breathing, cardiac, fall, other
+  description    String
+  lat            Float?
+  lng            Float?
+  address        String?
+  status         String   @default("pending") // pending, dispatched, in_progress, resolved, cancelled
+  priority       String   @default("high") // low, medium, high, urgent
+  responseTime   Int? // in seconds
+  dispatchedAt   DateTime?
+  arrivedAt      DateTime?
+  resolvedAt     DateTime?
+  cancelledAt    DateTime?
+  cancelReason   String?
+  notes          String?
+  feedbackRating Int?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  beneficiary  Beneficiary           @relation(fields: [beneficiaryId], references: [id])
+  nurse        Nurse?                @relation(fields: [nurseId], references: [id])
+  assignments  EmergencyAssignment[]
+  transactions Transaction[]
+
+  @@index([beneficiaryId])
+  @@index([status])
+}
+
+model EmergencyAssignment {
+  id                     String   @id @default(cuid())
+  emergencyRequestId     String
+  nurseId                String
+  status                 String   @default("pending") // pending, accepted, rejected, completed, cancelled
+  distance               Float? // in km
+  estimatedArrivalMinutes Int?
+  assignedAt             DateTime @default(now())
+  respondedAt            DateTime?
+  rejectedReason         String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  emergencyRequest EmergencyRequest @relation(fields: [emergencyRequestId], references: [id])
+  nurse            Nurse            @relation(fields: [nurseId], references: [id])
+
+  @@index([nurseId])
+}
+
+// ============================================================================
+// PAYMENT MODELS
+// ============================================================================
+
+model Transaction {
+  id                   String   @id @default(cuid())
+  requestId            String?
+  emergencyRequestId   String?
+  beneficiaryId        String
+  nurseId              String?
+  amount               Float
+  commission           Float    @default(0)
+  netAmount            Float
+  paymentMethod        String   @default("cash") // cash, bank_transfer, wallet_deposit, exchange_transfer, mobile_wallet
+  status               String   @default("pending") // pending, completed, failed, refunded
+  walletType           String?  // one_cash, jawali, yemen_wallet, saba_cash
+  walletTransactionId  String?
+  bankReference        String?
+  exchangeOfficeName   String?
+  receiptUrl           String?
+  notes                String?
+  processedAt          DateTime?
+  refundedAt           DateTime?
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  beneficiary       Beneficiary       @relation(fields: [beneficiaryId], references: [id])
+  serviceRequest    ServiceRequest?   @relation(fields: [requestId], references: [id])
+  emergencyRequest  EmergencyRequest? @relation(fields: [emergencyRequestId], references: [id])
+
+  @@index([beneficiaryId])
+  @@index([nurseId])
+}
+
+model NursePayout {
+  id           String   @id @default(cuid())
+  nurseId      String
+  amount       Float
+  method       String   @default("cash") // cash, bank_transfer, mobile_wallet
+  status       String   @default("pending") // pending, completed, failed, refunded
+  transactionIds String @default("[]") // JSON array
+  requestedAt  DateTime @default(now())
+  processedAt  DateTime?
+  reference    String?
+  notes        String?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  nurse Nurse @relation(fields: [nurseId], references: [id])
+
+  @@index([nurseId])
+}
+
+model PaymentMethod {
+  id            String   @id @default(cuid())
+  nameAr        String
+  nameEn        String
+  type          String   @default("cash") // cash, bank_transfer, wallet_deposit, exchange_transfer, mobile_wallet
+  icon          String   @default("")
+  isActive      Boolean  @default(true)
+  instructionsAr String?
+  instructionsEn String?
+  sortOrder     Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+}
+
+// ============================================================================
+// CHAT MODELS
+// ============================================================================
+
+model Chat {
+  id           String   @id @default(cuid())
+  participants String   @default("[]") // JSON array of { userId, role, joinedAt }
+  requestId    String?
+  lastMessageContent String?
+  lastMessageSender String?
+  lastMessageAt DateTime?
+  unreadCount  String   @default("{}") // JSON object { userId: count }
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  messages ChatMessage[]
+
+  @@index([requestId])
+}
+
+model ChatMessage {
+  id           String   @id @default(cuid())
+  chatId       String
+  senderId     String
+  senderRole   String
+  content      String
+  type         String   @default("text") // text, image, system, quick_reply
+  imageUrl     String?
+  readBy       String   @default("[]") // JSON array of userIds
+  deliveredTo  String   @default("[]") // JSON array of userIds
+  replyTo      String?  // message ID
+  quickReplies String?  // JSON array of QuickReply
+  isDeleted    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  chat Chat @relation(fields: [chatId], references: [id])
+
+  @@index([chatId])
+}
+
+// ============================================================================
+// NOTIFICATION MODELS
+// ============================================================================
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  userRole  String
+  titleAr   String
+  titleEn   String
+  bodyAr    String
+  bodyEn    String
+  type      String   @default("system") // assignment, payment, emergency, reminder, chat, status_change, appointment, rating, system
+  priority  String   @default("medium") // low, medium, high, urgent
+  data      String   @default("{}") // JSON object
+  read      Boolean  @default(false)
+  actionUrl String?
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([read])
+}
+
+model FCMToken {
+  id        String   @id @default(cuid())
+  userId    String
+  userRole  String
+  token     String
+  platform  String   @default("web") // ios, android, web
+  deviceId  String   @default("default")
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([token])
+}
+
+// ============================================================================
+// RATING & REVIEW MODELS
+// ============================================================================
+
+model Rating {
+  id           String   @id @default(cuid())
+  requestId    String   @unique
+  fromUserId   String
+  toUserId     String
+  fromRole     String
+  toRole       String
+  score        Int      // 1-5
+  comment      String?
+  tags         String   @default("[]") // JSON array of RatingTag
+  isAnonymous  Boolean  @default(false)
+  response     String?
+  respondedAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  serviceRequest  ServiceRequest @relation(fields: [requestId], references: [id])
+  nurseReceiver   Nurse?         @relation("RatingsToNurse", fields: [toUserId], references: [id])
+  nurseGiver      Nurse?         @relation("RatingsFromNurse", fields: [fromUserId], references: [id])
+  beneficiaryGiver Beneficiary?  @relation("RatingsFromBeneficiary", fields: [fromUserId], references: [id])
+
+  @@index([toUserId])
+  @@index([fromUserId])
+}
+
+// ============================================================================
+// COMPLAINT MODEL
+// ============================================================================
+
+model Complaint {
+  id           String   @id @default(cuid())
+  fromUserId   String
+  fromUserRole String
+  againstUserId String
+  againstUserRole String
+  requestId    String?
+  subject      String
+  description  String
+  status       String   @default("open") // open, under_review, resolved, dismissed
+  priority     String   @default("medium") // low, medium, high, urgent
+  resolution   String?
+  resolvedBy   String?
+  resolvedAt   DateTime?
+  attachments  String   @default("[]") // JSON array of URLs
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  beneficiary Beneficiary? @relation("ComplaintsFromBeneficiary", fields: [fromUserId], references: [id])
+
+  @@index([fromUserId])
+  @@index([againstUserId])
+  @@index([status])
+}
+
+// ============================================================================
+// LOYALTY & REFERRAL MODELS
+// ============================================================================
+
+model LoyaltyTransaction {
+  id             String   @id @default(cuid())
+  beneficiaryId  String
+  points         Int
+  type           String   @default("earn") // earn, redeem, expire, bonus
+  referenceId    String?
+  description    String?
+  expiresAt      DateTime?
+  createdAt      DateTime @default(now())
+
+  beneficiary Beneficiary @relation(fields: [beneficiaryId], references: [id])
+
+  @@index([beneficiaryId])
+}
+
+model Referral {
+  id          String   @id @default(cuid())
+  referrerId  String
+  referredId  String
+  code        String
+  reward      Int      @default(0)
+  status      String   @default("pending") // pending, completed, rewarded, expired
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  referrer Beneficiary @relation("ReferrerReferrals", fields: [referrerId], references: [id])
+
+  @@index([referrerId])
+  @@index([code])
+}
+
+model Coupon {
+  id                   String   @id @default(cuid())
+  code                 String   @unique
+  discountPercent      Float
+  maxUses              Int      @default(100)
+  usedCount            Int      @default(0)
+  minOrderAmount       Float    @default(0)
+  maxDiscountAmount    Float?
+  expiresAt            DateTime
+  isActive             Boolean  @default(true)
+  createdById          String
+  applicableCategories String   @default("[]") // JSON array of ServiceCategory
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+}
+
+// ============================================================================
+// FAVORITE NURSE MODEL
+// ============================================================================
+
+model FavoriteNurse {
+  id             String   @id @default(cuid())
+  beneficiaryId  String
+  nurseId        String
+  createdAt      DateTime @default(now())
+
+  beneficiary Beneficiary @relation(fields: [beneficiaryId], references: [id])
+  nurse       Nurse       @relation(fields: [nurseId], references: [id])
+
+  @@unique([beneficiaryId, nurseId])
+  @@index([beneficiaryId])
+}
+
+// ============================================================================
+// NURSE DOCUMENT MODEL
+// ============================================================================
+
+model NurseDocument {
+  id        String   @id @default(cuid())
+  nurseId   String
+  type      String   // identity, license, certificate, other
+  url       String
+  status    String   @default("pending") // pending, verified, rejected
+  reviewedAt DateTime?
+  reviewedBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  nurse Nurse @relation(fields: [nurseId], references: [id])
+
+  @@index([nurseId])
+}
+
+// ============================================================================
+// ADMIN SETTINGS MODEL
+// ============================================================================
+
+model AdminSettings {
+  id                    String   @id @default(cuid())
+  commissionRate        Float    @default(15) // percentage
+  emergencyFee          Float    @default(5000)
+  nightFeePercent       Float    @default(20)
+  fridayFeePercent      Float    @default(15)
+  nightStartHour        Int      @default(22) // 0-23
+  nightEndHour          Int      @default(6) // 0-23
+  minOrderAmount        Float    @default(2000)
+  loyaltyPointsPerOrder Int      @default(10)
+  loyaltyRedemptionThreshold Int @default(100)
+  referralReward        Int      @default(50)
+  maxNurseAssignmentRadius Float @default(20) // in km
+  autoAssignEnabled     Boolean  @default(false)
+  emergencyAutoDispatch Boolean  @default(true)
+  maintenanceMode       Boolean  @default(false)
+  maintenanceMessageAr  String?
+  maintenanceMessageEn  String?
+  supportPhone          String   @default("+967123456789")
+  supportWhatsApp       String   @default("+967123456789")
+  termsAndConditionsAr  String?
+  termsAndConditionsEn  String?
+  privacyPolicyAr       String?
+  privacyPolicyEn       String?
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+// ============================================================================
+// REPORT MODEL
+// ============================================================================
+
+model Report {
+  id              String   @id @default(cuid())
+  type            String   @default("operational") // financial, operational, nurse_performance, beneficiary_activity
+  title           String
+  generatedById   String
+  data            String   @default("{}") // JSON object
+  format          String   @default("json") // pdf, xlsx, csv, json
+  dateRangeStart  DateTime
+  dateRangeEnd    DateTime
+  fileUrl         String?
+  createdAt       DateTime @default(now())
+}
+
+// ============================================================================
+// ACTIVITY LOG MODEL
+// ============================================================================
+
+model ActivityLog {
+  id        String   @id @default(cuid())
+  userId    String
+  userRole  String
+  action    String
+  entity    String   @default("")
+  entityId  String?
+  details   String?
+  ipAddress String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  admin       Admin?       @relation(fields: [userId], references: [id])
+  subAdmin    SubAdmin?    @relation(fields: [userId], references: [id])
+  nurse       Nurse?       @relation(fields: [userId], references: [id])
+  beneficiary Beneficiary? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([action])
+  @@index([createdAt])
+}

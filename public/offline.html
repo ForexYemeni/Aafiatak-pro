@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>عافيتك - غير متصل</title>
+  <meta name="theme-color" content="#9333ea">
+  <link rel="icon" href="/favicon.ico">
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Noto Sans Arabic', 'Segoe UI', Tahoma, Arial, sans-serif;
+      background: linear-gradient(135deg, #f5f3ff 0%, #fce7f3 50%, #f5f3ff 100%);
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      direction: rtl;
+    }
+
+    .container {
+      max-width: 480px;
+      width: 100%;
+      text-align: center;
+    }
+
+    .logo {
+      width: 120px;
+      height: 120px;
+      margin: 0 auto 32px;
+      background: linear-gradient(135deg, #9333ea, #c026d3);
+      border-radius: 28px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      box-shadow: 0 20px 40px rgba(147, 51, 234, 0.3);
+    }
+
+    .logo svg {
+      width: 64px;
+      height: 64px;
+      fill: white;
+    }
+
+    .title {
+      font-size: 28px;
+      font-weight: 700;
+      color: #1f2937;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-size: 16px;
+      color: #6b7280;
+      line-height: 1.8;
+      margin-bottom: 32px;
+    }
+
+    .offline-icon {
+      width: 80px;
+      height: 80px;
+      margin: 0 auto 24px;
+      color: #f59e0b;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.7; transform: scale(0.95); }
+    }
+
+    .message-box {
+      background: white;
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+    }
+
+    .message-title {
+      font-size: 20px;
+      font-weight: 600;
+      color: #d97706;
+      margin-bottom: 8px;
+    }
+
+    .message-text {
+      font-size: 14px;
+      color: #6b7280;
+      line-height: 1.8;
+    }
+
+    .cached-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: #f0fdf4;
+      color: #15803d;
+      padding: 8px 16px;
+      border-radius: 20px;
+      font-size: 13px;
+      margin-bottom: 24px;
+    }
+
+    .cached-indicator svg {
+      width: 16px;
+      height: 16px;
+    }
+
+    .retry-button {
+      background: linear-gradient(135deg, #9333ea, #c026d3);
+      color: white;
+      border: none;
+      padding: 14px 48px;
+      border-radius: 12px;
+      font-size: 16px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      transition: all 0.2s ease;
+      box-shadow: 0 4px 12px rgba(147, 51, 234, 0.3);
+    }
+
+    .retry-button:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 6px 16px rgba(147, 51, 234, 0.4);
+    }
+
+    .retry-button:active {
+      transform: translateY(0);
+    }
+
+    .footer {
+      margin-top: 48px;
+      font-size: 12px;
+      color: #9ca3af;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Logo -->
+    <div class="logo">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+        <rect x="11" y="8" width="2" height="8" rx="1" fill="white"/>
+        <rect x="9" y="10" width="6" height="2" rx="1" fill="white"/>
+      </svg>
+    </div>
+
+    <h1 class="title">عافيتك</h1>
+
+    <!-- Offline Icon -->
+    <svg class="offline-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <line x1="1" y1="1" x2="23" y2="23"></line>
+      <path d="M16.72 11.06A10.94 10.94 0 0 1 19 12.55"></path>
+      <path d="M5 12.55a10.94 10.94 0 0 1 5.17-2.39"></path>
+      <path d="M10.71 5.05A16 16 0 0 1 22.56 9"></path>
+      <path d="M1.42 9a15.91 15.91 0 0 1 4.7-2.88"></path>
+      <path d="M8.53 16.11a6 6 0 0 1 6.95 0"></path>
+      <line x1="12" y1="20" x2="12.01" y2="20"></line>
+    </svg>
+
+    <!-- Message Box -->
+    <div class="message-box">
+      <h2 class="message-title">لا يوجد اتصال بالإنترنت</h2>
+      <p class="message-text">
+        يبدو أنك غير متصل بالإنترنت حالياً.<br>
+        تأكد من اتصالك بالشبكة وحاول مرة أخرى.
+      </p>
+    </div>
+
+    <!-- Cached Data Indicator -->
+    <div class="cached-indicator">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+        <polyline points="22 4 12 14.01 9 11.01"></polyline>
+      </svg>
+      البيانات المحفوظة متاحة للتصفح
+    </div>
+
+    <!-- Retry Button -->
+    <button class="retry-button" onclick="window.location.reload()">
+      إعادة المحاولة
+    </button>
+
+    <!-- Footer -->
+    <div class="footer">
+      <p>عافيتك - الرعاية الصحية المنزلية في اليمن</p>
+    </div>
+  </div>
+
+  <script>
+    // Auto-retry when coming back online
+    window.addEventListener('online', function() {
+      window.location.reload();
+    });
+  </script>
+</body>
+</html>

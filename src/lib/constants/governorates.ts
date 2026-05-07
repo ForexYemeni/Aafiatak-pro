@@ -1,0 +1,26 @@
+export const YEMEN_GOVERNORATES = [
+  { value: 'sanaa_city', label: 'أمانة العاصمة' },
+  { value: 'sanaa', label: 'صنعاء' },
+  { value: 'aden', label: 'عدن' },
+  { value: 'taiz', label: 'تعز' },
+  { value: 'hudaydah', label: 'الحديدة' },
+  { value: 'ibb', label: 'إب' },
+  { value: 'hadhramaut', label: 'حضرموت' },
+  { value: 'dhamar', label: 'ذمار' },
+  { value: 'marib', label: 'مأرب' },
+  { value: 'amran', label: 'عمران' },
+  { value: 'hajjah', label: 'حجة' },
+  { value: 'al_bayda', label: 'البيضاء' },
+  { value: 'al_mahwit', label: 'المحويت' },
+  { value: 'abyan', label: 'أبين' },
+  { value: 'shabwah', label: 'شبوة' },
+  { value: 'lahij', label: 'لحج' },
+  { value: 'al_dhale', label: 'الضالع' },
+  { value: 'raymah', label: 'ريمة' },
+  { value: 'socotra', label: 'سقطرى' },
+  { value: 'al_mahrah', label: 'المهرة' },
+  { value: 'saada', label: 'صعدة' },
+  { value: 'al_jawf', label: 'الجوف' },
+] as const;
+
+export type YemenGovernorateValue = (typeof YEMEN_GOVERNORATES)[number]['value'];
