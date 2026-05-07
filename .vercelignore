@@ -1,6 +1,7 @@
 node_modules
 .next
-db
+db/custom.db
+db/custom.db-journal
 download
 dev.log
 dev.out.log
@@ -8,8 +9,6 @@ server.log
 .git
 .zscripts
 mini-services/*/node_modules
-*.db
-*.db-journal
 worklog.md
 skills
 agent-ctx
