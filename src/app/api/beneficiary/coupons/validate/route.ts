@@ -1,7 +1,7 @@
 // POST /api/beneficiary/coupons/validate - Validate coupon code
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireRole, successResponse, handleApiError, validateRequired, safeJsonParse,
 } from '@/lib/api/helpers';

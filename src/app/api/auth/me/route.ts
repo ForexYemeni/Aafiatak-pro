@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import { authenticateRequest, createErrorResponse } from '@/lib/auth/middleware';
 import type { AppUser, AdminUser, SubAdminUser, NurseUser, BeneficiaryUser, MeResponse } from '@/types';
 

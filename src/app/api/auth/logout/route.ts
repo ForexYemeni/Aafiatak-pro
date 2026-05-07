@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClearAuthCookie, extractUserFromRequest } from '@/lib/auth/middleware';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 
 // ---- POST /api/auth/logout ----
 

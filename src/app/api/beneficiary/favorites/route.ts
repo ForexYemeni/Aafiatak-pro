@@ -3,7 +3,7 @@
 // DELETE /api/beneficiary/favorites - Remove favorite nurse
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireRole, successResponse, handleApiError, validateRequired,
 } from '@/lib/api/helpers';

@@ -1,7 +1,7 @@
 // GET /api/chat - List chats for current user
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireAuth, paginatedResponse, handleApiError,
   parsePagination, paginate, safeJsonParse,

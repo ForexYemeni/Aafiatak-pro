@@ -2,7 +2,7 @@
 // POST /api/chat/[id]/messages - Send message
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireAuth, successResponse, paginatedResponse, handleApiError,
   parsePagination, paginate, safeJsonParse, validateRequired, logActivity,

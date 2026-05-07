@@ -3,7 +3,7 @@
 // DELETE /api/admin/subadmins/[id] - Delete sub-admin
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import { hashPassword } from '@/lib/auth';
 import {
   requireRole, successResponse, handleApiError,

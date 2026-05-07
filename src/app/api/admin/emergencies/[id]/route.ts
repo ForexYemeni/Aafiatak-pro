@@ -2,7 +2,7 @@
 // PATCH /api/admin/emergencies/[id] - Update emergency status
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireRole, successResponse, handleApiError, logActivity,
 } from '@/lib/api/helpers';

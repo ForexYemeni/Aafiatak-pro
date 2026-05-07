@@ -1,7 +1,7 @@
 // PATCH /api/admin/complaints/[id] - Resolve complaint
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireRole, successResponse, handleApiError, logActivity,
 } from '@/lib/api/helpers';

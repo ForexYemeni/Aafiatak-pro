@@ -1,7 +1,7 @@
 // GET /api/beneficiary/tracking/[nurseId] - Track nurse location
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireRole, successResponse, handleApiError,
 } from '@/lib/api/helpers';

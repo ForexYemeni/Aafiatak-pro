@@ -1,7 +1,7 @@
 // GET /api/admin/beneficiaries - List beneficiaries with pagination & filters
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireRole, paginatedResponse, handleApiError,
   parsePagination, paginate, safeJsonParse,

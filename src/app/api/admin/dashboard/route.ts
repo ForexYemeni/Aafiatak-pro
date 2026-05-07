@@ -1,7 +1,7 @@
 // GET /api/admin/dashboard - Dashboard statistics
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import { requireRole, successResponse, handleApiError } from '@/lib/api/helpers';
 
 export async function GET(request: NextRequest) {

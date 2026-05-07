@@ -1,7 +1,7 @@
 // POST /api/notifications/register-token - Register FCM token
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireAuth, successResponse, handleApiError, validateRequired,
 } from '@/lib/api/helpers';

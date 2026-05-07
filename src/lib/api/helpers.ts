@@ -4,7 +4,7 @@
 
 import { NextResponse } from 'next/server';
 import { verifyToken } from '@/lib/auth';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import type { TokenPayload, PaginationMeta, UserRole } from '@/types';
 
 // ---- Response Helpers ----

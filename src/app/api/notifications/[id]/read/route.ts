@@ -1,7 +1,7 @@
 // PATCH /api/notifications/[id]/read - Mark notification as read
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireAuth, successResponse, handleApiError,
 } from '@/lib/api/helpers';

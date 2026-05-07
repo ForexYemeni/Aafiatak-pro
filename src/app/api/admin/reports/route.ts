@@ -2,7 +2,7 @@
 // POST /api/admin/reports - Create report
 
 import { NextRequest } from 'next/server';
-import { db } from '@/lib/db';
+import { db } from '@/lib/prisma';
 import {
   requireRole, successResponse, paginatedResponse, handleApiError,
   parsePagination, paginate, logActivity, safeJsonParse,
