@@ -58,13 +58,18 @@ const NurseSchema = new Schema({
   rejectedReason: { type: String },
 });
 
-// Prevent duplicate discriminator on hot reload
-export const Nurse = (mongoose.models.Nurse ||
-  (User.discriminators && User.discriminators['nurse'])
-) as ReturnType<typeof User.discriminator>;
-
-if (!mongoose.models.Nurse && !(User.discriminators && User.discriminators['nurse'])) {
-  User.discriminator('nurse', NurseSchema);
+// Safe discriminator registration - prevents "Discriminator with name already exists" error
+function getNurseModel() {
+  // Check if model already exists in mongoose.models
+  if (mongoose.models.Nurse) {
+    return mongoose.models.Nurse;
+  }
+  // Check if discriminator already registered
+  if (User.discriminators && User.discriminators['nurse']) {
+    return User.discriminators['nurse'];
+  }
+  // Register new discriminator
+  return User.discriminator('nurse', NurseSchema);
 }
 
-const _NurseModel = mongoose.models.Nurse;
+export const Nurse = getNurseModel();

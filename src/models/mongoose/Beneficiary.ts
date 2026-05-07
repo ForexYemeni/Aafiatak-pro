@@ -50,13 +50,18 @@ const BeneficiarySchema = new Schema({
   orderCount: { type: Number, default: 0 },
 });
 
-// Prevent duplicate discriminator on hot reload
-export const Beneficiary = (mongoose.models.Beneficiary ||
-  (User.discriminators && User.discriminators['beneficiary'])
-) as ReturnType<typeof User.discriminator>;
-
-if (!mongoose.models.Beneficiary && !(User.discriminators && User.discriminators['beneficiary'])) {
-  User.discriminator('beneficiary', BeneficiarySchema);
+// Safe discriminator registration - prevents "Discriminator with name already exists" error
+function getBeneficiaryModel() {
+  // Check if model already exists in mongoose.models
+  if (mongoose.models.Beneficiary) {
+    return mongoose.models.Beneficiary;
+  }
+  // Check if discriminator already registered
+  if (User.discriminators && User.discriminators['beneficiary']) {
+    return User.discriminators['beneficiary'];
+  }
+  // Register new discriminator
+  return User.discriminator('beneficiary', BeneficiarySchema);
 }
 
-const _BeneficiaryModel = mongoose.models.Beneficiary;
+export const Beneficiary = getBeneficiaryModel();
