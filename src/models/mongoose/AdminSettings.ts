@@ -17,6 +17,12 @@ export interface IAdminSettings extends Document {
   maintenanceMessageAr?: string;
   supportPhone: string;
   supportWhatsApp: string;
+  supportPhones: string[];
+  supportWhatsAppNumbers: string[];
+  termsAndConditionsAr: string;
+  privacyPolicyAr: string;
+  loyaltyRedemptionThreshold: number;
+  supportEmail: string;
 }
 
 const AdminSettingsSchema = new Schema<IAdminSettings>({
@@ -36,6 +42,12 @@ const AdminSettingsSchema = new Schema<IAdminSettings>({
   maintenanceMessageAr: { type: String },
   supportPhone: { type: String, default: '+967123456789' },
   supportWhatsApp: { type: String, default: '+967123456789' },
+  supportPhones: [{ type: String }],
+  supportWhatsAppNumbers: [{ type: String }],
+  termsAndConditionsAr: { type: String, default: '' },
+  privacyPolicyAr: { type: String, default: '' },
+  loyaltyRedemptionThreshold: { type: Number, default: 100 },
+  supportEmail: { type: String, default: '' },
 }, { timestamps: true });
 
 export const AdminSettings = mongoose.models.AdminSettings || mongoose.model<IAdminSettings>('AdminSettings', AdminSettingsSchema);

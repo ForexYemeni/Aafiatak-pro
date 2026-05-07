@@ -103,6 +103,7 @@ export default function NurseProfilePage() {
   const [editAddress, setEditAddress] = useState('');
   const [editCity, setEditCity] = useState('');
   const [editGovernorate, setEditGovernorate] = useState('');
+  const [editExperience, setEditExperience] = useState('');
 
   // Password change state
   const [currentPassword, setCurrentPassword] = useState('');
@@ -126,6 +127,7 @@ export default function NurseProfilePage() {
         setEditAddress(p.address ?? '');
         setEditCity(p.city ?? '');
         setEditGovernorate(p.governorate ?? '');
+        setEditExperience(String(p.experience ?? 0));
       }
     } catch {
       // silently handle
@@ -154,11 +156,12 @@ export default function NurseProfilePage() {
           address: editAddress,
           city: editCity,
           governorate: editGovernorate,
+          experience: Number(editExperience) || 0,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        setProfile((prev) => prev ? { ...prev, name: editName, bio: editBio, address: editAddress, city: editCity, governorate: editGovernorate } : null);
+        setProfile((prev) => prev ? { ...prev, name: editName, bio: editBio, address: editAddress, city: editCity, governorate: editGovernorate, experience: Number(editExperience) || 0 } : null);
         updateUser({ name: editName });
         setIsEditing(false);
         showToast('تم تحديث الملف الشخصي بنجاح');
@@ -230,32 +233,7 @@ export default function NurseProfilePage() {
     }
   };
 
-  const handleDocumentUpload = async (type: string) => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*,.pdf';
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const formData = new FormData();
-      formData.append('file', file);
-      formData.append('type', type);
-      try {
-        const res = await authFetch('/api/nurse/documents', {
-          method: 'POST',
-          body: formData,
-        });
-        const data = await res.json();
-        if (data.success) {
-          showToast('تم رفع المستند بنجاح');
-          fetchProfile();
-        }
-      } catch {
-        showToast('حدث خطأ في رفع المستند');
-      }
-    };
-    input.click();
-  };
+
 
   if (isLoading) {
     return (
@@ -393,6 +371,10 @@ export default function NurseProfilePage() {
                 <Input id="gov" value={editGovernorate} onChange={(e) => setEditGovernorate(e.target.value)} />
               </div>
             </div>
+            <div className="space-y-2">
+              <Label htmlFor="experience">سنوات الخبرة</Label>
+              <Input id="experience" type="number" value={editExperience} onChange={(e) => setEditExperience(e.target.value)} min={0} />
+            </div>
             <Button
               className="w-full bg-nurse hover:bg-nurse/90"
               onClick={handleSaveProfile}
@@ -419,66 +401,124 @@ export default function NurseProfilePage() {
         )}
       </GlassCard>
 
-      {/* Documents Section */}
+      {/* Documents Section / Verification */}
       <GlassCard variant="nurse" className="p-4">
-        <h3 className="font-semibold mb-4">المستندات</h3>
-        <div className="space-y-3">
-          {/* Identity Document */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
-            <div className="flex items-center gap-3">
-              <FileText className="w-5 h-5 text-nurse" />
-              <div>
-                <p className="text-sm font-medium">بطاقة الهوية</p>
-                <p className="text-xs text-muted-foreground">
-                  {profile.identityDocumentUrl ? 'تم الرفع' : 'لم يتم الرفع'}
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDocumentUpload('identity')}
-              className="gap-1"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              {profile.identityDocumentUrl ? 'تحديث' : 'رفع'}
-            </Button>
-          </div>
-
-          {/* License Document */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
-            <div className="flex items-center gap-3">
-              <Shield className="w-5 h-5 text-nurse" />
-              <div>
-                <p className="text-sm font-medium">رخصة التمريض</p>
-                <p className="text-xs text-muted-foreground">
-                  {profile.licenseDocumentUrl ? 'تم الرفع' : 'لم يتم الرفع'}
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleDocumentUpload('license')}
-              className="gap-1"
-            >
-              <Upload className="w-3.5 h-3.5" />
-              {profile.licenseDocumentUrl ? 'تحديث' : 'رفع'}
-            </Button>
-          </div>
-
-          {/* Document statuses */}
-          {profile.documents && profile.documents.length > 0 && (
-            <div className="mt-2 space-y-2">
-              {profile.documents.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between text-xs px-1">
-                  <span>{doc.type === 'identity' ? 'الهوية' : doc.type === 'license' ? 'الرخصة' : 'مستند'}</span>
-                  <BadgeStatus status={doc.status} size="sm" />
-                </div>
-              ))}
-            </div>
-          )}
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="font-semibold">توثيق الحساب</h3>
+          <BadgeStatus status={profile.verificationStatus} size="md" />
         </div>
+
+        {profile.verificationStatus === 'verified' ? (
+          <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 dark:bg-green-900/20">
+            <CheckCircle2 className="w-8 h-8 text-green-600" />
+            <div>
+              <p className="font-semibold text-green-700 dark:text-green-400">حساب موثق</p>
+              <p className="text-sm text-green-600/80 dark:text-green-400/80">يمكنك استقبال الطلبات والمهام</p>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {profile.verificationStatus === 'rejected' && profile.rejectedReason && (
+              <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20">
+                <p className="text-xs text-red-600 dark:text-red-400 mb-1">سبب رفض التوثيق</p>
+                <p className="text-sm">{profile.rejectedReason}</p>
+              </div>
+            )}
+
+            <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20">
+              <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
+                يجب توثيق حسابك برفع الهوية الوطنية ومزاولة المهنة لاستقبال الطلبات. لن يتم تعيين أي طلب لك حتى يتم توثيق حسابك.
+              </p>
+            </div>
+
+            {/* Current Document Status */}
+            <div className="grid grid-cols-2 gap-3">
+              <div className={`p-3 rounded-xl border-2 ${profile.identityDocumentUrl ? 'border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10' : 'border-dashed border-border'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {profile.identityDocumentUrl ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-red-400" />
+                  )}
+                  <span className="text-xs font-medium">الهوية الوطنية</span>
+                </div>
+                {profile.identityDocumentUrl ? (
+                  <img src={profile.identityDocumentUrl} alt="الهوية" className="w-full h-20 object-cover rounded-lg" />
+                ) : (
+                  <div className="w-full h-20 bg-muted/30 rounded-lg flex items-center justify-center">
+                    <FileText className="w-8 h-8 text-muted-foreground/50" />
+                  </div>
+                )}
+              </div>
+              <div className={`p-3 rounded-xl border-2 ${profile.licenseDocumentUrl ? 'border-green-300 bg-green-50/50 dark:border-green-800 dark:bg-green-900/10' : 'border-dashed border-border'}`}>
+                <div className="flex items-center gap-2 mb-2">
+                  {profile.licenseDocumentUrl ? (
+                    <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  ) : (
+                    <XCircle className="w-4 h-4 text-red-400" />
+                  )}
+                  <span className="text-xs font-medium">مزاولة المهنة</span>
+                </div>
+                {profile.licenseDocumentUrl ? (
+                  <img src={profile.licenseDocumentUrl} alt="الرخصة" className="w-full h-20 object-cover rounded-lg" />
+                ) : (
+                  <div className="w-full h-20 bg-muted/30 rounded-lg flex items-center justify-center">
+                    <Shield className="w-8 h-8 text-muted-foreground/50" />
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Upload Button */}
+            <Button
+              className="w-full bg-nurse hover:bg-nurse/90 gap-2"
+              onClick={() => {
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = 'image/*,.pdf';
+                input.multiple = true;
+                input.onchange = async (e) => {
+                  const files = (e.target as HTMLInputElement).files;
+                  if (!files || files.length === 0) return;
+                  
+                  for (let i = 0; i < Math.min(files.length, 2); i++) {
+                    const file = files[i];
+                    const docType = i === 0 ? 'identity' : 'license';
+                    const formData = new FormData();
+                    formData.append('file', file);
+                    formData.append('type', docType);
+                    try {
+                      const res = await authFetch('/api/nurse/documents', {
+                        method: 'POST',
+                        body: formData,
+                      });
+                      const data = await res.json();
+                      if (data.success) {
+                        if (docType === 'identity' && data.data?.identityDocumentUrl) {
+                          setProfile(prev => prev ? { ...prev, identityDocumentUrl: data.data.identityDocumentUrl } : null);
+                        } else if (docType === 'license' && data.data?.licenseDocumentUrl) {
+                          setProfile(prev => prev ? { ...prev, licenseDocumentUrl: data.data.licenseDocumentUrl } : null);
+                        }
+                        showToast(`تم رفع ${docType === 'identity' ? 'الهوية الوطنية' : 'مزاولة المهنة'} بنجاح`);
+                      } else {
+                        showToast('حدث خطأ في رفع المستند');
+                      }
+                    } catch {
+                      showToast('حدث خطأ في رفع المستند');
+                    }
+                  }
+                  // Refresh profile to get updated verification status
+                  fetchProfile();
+                };
+                input.click();
+              }}
+            >
+              <Upload className="w-4 h-4" />
+              رفع الهوية والمزاولة
+            </Button>
+            <p className="text-[10px] text-muted-foreground text-center">يمكنك اختيار صورتين معاً - الهوية الوطنية ومزاولة المهنة</p>
+          </div>
+        )}
       </GlassCard>
 
       {/* Change Password */}

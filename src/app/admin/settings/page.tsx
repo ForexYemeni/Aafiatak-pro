@@ -33,6 +33,10 @@ interface SettingsData {
   supportPhone: string;
   supportEmail: string;
   supportWhatsApp: string;
+  supportPhones: string[];
+  supportWhatsAppNumbers: string[];
+  termsAndConditionsAr: string;
+  privacyPolicyAr: string;
 }
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -57,6 +61,10 @@ const defaultSettings: SettingsData = {
   supportPhone: '',
   supportEmail: '',
   supportWhatsApp: '',
+  supportPhones: [],
+  supportWhatsAppNumbers: [],
+  termsAndConditionsAr: '',
+  privacyPolicyAr: '',
 };
 
 export default function AdminSettingsPage() {
@@ -286,41 +294,133 @@ export default function AdminSettingsPage() {
         </GlassCard>
       </motion.div>
 
-      {/* Support Info */}
+      {/* Support Contact Numbers */}
       <motion.div variants={itemAnim}>
         <GlassCard variant="admin">
           <GlassCardHeader>
-            <GlassCardTitle>معلومات الدعم</GlassCardTitle>
+            <GlassCardTitle>أرقام التواصل والدعم</GlassCardTitle>
           </GlassCardHeader>
           <GlassCardContent>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="space-y-6">
+              {/* Phone Numbers */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>أرقام الهاتف</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateField('supportPhones', [...settings.supportPhones, ''])}
+                    className="text-xs"
+                  >
+                    + إضافة رقم
+                  </Button>
+                </div>
+                {settings.supportPhones.length === 0 && (
+                  <p className="text-xs text-muted-foreground">لم يتم إضافة أرقام بعد</p>
+                )}
+                {settings.supportPhones.map((phone, i) => (
+                  <div key={`phone-${i}`} className="flex gap-2">
+                    <Input
+                      value={phone}
+                      onChange={(e) => {
+                        const updated = [...settings.supportPhones];
+                        updated[i] = e.target.value;
+                        updateField('supportPhones', updated);
+                      }}
+                      placeholder="967XXXXXXXX+"
+                      dir="ltr"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        const updated = settings.supportPhones.filter((_, idx) => idx !== i);
+                        updateField('supportPhones', updated);
+                      }}
+                    >
+                      ×
+                    </Button>
+                  </div>
+                ))}
+              </div>
+
+              {/* WhatsApp Numbers */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <Label>أرقام الواتساب</Label>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateField('supportWhatsAppNumbers', [...settings.supportWhatsAppNumbers, ''])}
+                    className="text-xs"
+                  >
+                    + إضافة رقم
+                  </Button>
+                </div>
+                {settings.supportWhatsAppNumbers.length === 0 && (
+                  <p className="text-xs text-muted-foreground">لم يتم إضافة أرقام بعد</p>
+                )}
+                {settings.supportWhatsAppNumbers.map((wa, i) => (
+                  <div key={`wa-${i}`} className="flex gap-2">
+                    <Input
+                      value={wa}
+                      onChange={(e) => {
+                        const updated = [...settings.supportWhatsAppNumbers];
+                        updated[i] = e.target.value;
+                        updateField('supportWhatsAppNumbers', updated);
+                      }}
+                      placeholder="967XXXXXXXX+"
+                      dir="ltr"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        const updated = settings.supportWhatsAppNumbers.filter((_, idx) => idx !== i);
+                        updateField('supportWhatsAppNumbers', updated);
+                      }}
+                    >
+                      ×
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </GlassCardContent>
+        </GlassCard>
+      </motion.div>
+
+      {/* Legal Content */}
+      <motion.div variants={itemAnim}>
+        <GlassCard variant="admin">
+          <GlassCardHeader>
+            <GlassCardTitle>المستندات القانونية</GlassCardTitle>
+          </GlassCardHeader>
+          <GlassCardContent>
+            <div className="space-y-6">
               <div className="space-y-2">
-                <Label>هاتف الدعم</Label>
-                <Input
-                  value={settings.supportPhone}
-                  onChange={(e) => updateField('supportPhone', e.target.value)}
-                  placeholder="967XXXXXXXX+"
-                  dir="ltr"
+                <Label>شروط والأحكام</Label>
+                <Textarea
+                  value={settings.termsAndConditionsAr}
+                  onChange={(e) => updateField('termsAndConditionsAr', e.target.value)}
+                  placeholder="اكتب شروط وأحكام استخدام المنصة هنا..."
+                  rows={8}
+                  className="text-sm"
                 />
+                <p className="text-[10px] text-muted-foreground">يمكنك استخدام HTML لتنسيق النص (عناوين، قوائم، روابط...)</p>
               </div>
               <div className="space-y-2">
-                <Label>بريد الدعم</Label>
-                <Input
-                  value={settings.supportEmail}
-                  onChange={(e) => updateField('supportEmail', e.target.value)}
-                  placeholder="support@aafiatak.com"
-                  dir="ltr"
-                  type="email"
+                <Label>سياسة الخصوصية</Label>
+                <Textarea
+                  value={settings.privacyPolicyAr}
+                  onChange={(e) => updateField('privacyPolicyAr', e.target.value)}
+                  placeholder="اكتب سياسة الخصوصية هنا..."
+                  rows={8}
+                  className="text-sm"
                 />
-              </div>
-              <div className="space-y-2 sm:col-span-2">
-                <Label>واتساب الدعم</Label>
-                <Input
-                  value={settings.supportWhatsApp}
-                  onChange={(e) => updateField('supportWhatsApp', e.target.value)}
-                  placeholder="967XXXXXXXX+"
-                  dir="ltr"
-                />
+                <p className="text-[10px] text-muted-foreground">يمكنك استخدام HTML لتنسيق النص</p>
               </div>
             </div>
           </GlassCardContent>

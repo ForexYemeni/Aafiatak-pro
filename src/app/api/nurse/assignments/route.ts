@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { ServiceRequest, EmergencyRequest } from '@/models/mongoose';
+import { ServiceRequest, EmergencyRequest, Nurse } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
@@ -14,6 +14,21 @@ export async function GET(request: NextRequest) {
 
     if (user.role !== 'nurse') {
       return createErrorResponse('هذا الإجراء متاح للممرضين فقط', 403, 'FORBIDDEN');
+    }
+
+    // Check if nurse is verified
+    const nurse = await Nurse.findById(user.userId).select('verificationStatus identityDocumentUrl licenseDocumentUrl').lean();
+    if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+
+    const isVerified = nurse.verificationStatus === 'verified' && nurse.identityDocumentUrl && nurse.licenseDocumentUrl;
+
+    if (!isVerified) {
+      return Response.json({
+        success: true,
+        data: [],
+        verificationRequired: true,
+        message: 'يجب توثيق حسابك أولاً برفع الهوية الوطنية ومزاولة المهنة',
+      });
     }
 
     const { searchParams } = new URL(request.url);

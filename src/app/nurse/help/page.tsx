@@ -1,7 +1,8 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import {
   HelpCircle,
   Phone,
@@ -10,6 +11,7 @@ import {
   Shield,
   Info,
   ChevronDown,
+  Loader2,
 } from 'lucide-react';
 import {
   Accordion,
@@ -20,6 +22,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { GlassCard } from '@/components/common/glass-card';
 import { PageHeader } from '@/components/layout/page-header';
+import { useAuthFetch } from '@/hooks/use-auth';
 
 // ---- FAQ Data ----
 
@@ -27,7 +30,7 @@ const faqItems = [
   {
     id: 'faq-1',
     question: 'كيف أبدأ في استقبال الطلبات؟',
-    answer: 'بعد التسجيل والتحقق من حسابك، قم بتفعيل حالة التوفر من خلال زر التبديل في صفحة الملف الشخصي. عندما تكون متاحاً، سيتمكن النظام من تعيين طلبات لك.',
+    answer: 'بعد التسجيل والتحقق من حسابك عبر رفع الهوية الوطنية ومزاولة المهنة، قم بتفعيل حالة التوفر من خلال زر التبديل في صفحة الملف الشخصي. عندما تكون متاحاً، سيتمكن النظام من تعيين طلبات لك.',
   },
   {
     id: 'faq-2',
@@ -47,7 +50,7 @@ const faqItems = [
   {
     id: 'faq-5',
     question: 'كيف أرفع مستوى تقييمي؟',
-    answer: 'يمكنك تحسين تقييمك من خلال الالتزام بالمواعيد، تقديم خدمة عالية الجودة، والتواصل الجيد مع المستفيدين. الرد السريع على الطلبات أيضاً يساهم في تحسين تقييمك.',
+    answer: 'يمكنك تحسين تقييمك من خلال الالتزام بالمواعيد، تقديم خدمة عالية الجودة، والتواصل الجيد مع المستفيدين.',
   },
   {
     id: 'faq-6',
@@ -56,8 +59,8 @@ const faqItems = [
   },
   {
     id: 'faq-7',
-    question: 'هل يمكنني تحديث تخصصاتي؟',
-    answer: 'نعم، يمكنك تحديث تخصصاتك والخدمات المتاحة لك من خلال صفحة الملف الشخصي. قد يتطلب إضافة تخصصات جديدة تقديم مستندات إضافية.',
+    question: 'لماذا يجب توثيق حسابي؟',
+    answer: 'توثيق الحساب برفع الهوية الوطنية ومزاولة المهنة شرط أساسي لاستقبال الطلبات. هذا يضمن جودة الخدمة ويحمي المستفيدين والممرضين معاً.',
   },
   {
     id: 'faq-8',
@@ -66,9 +69,49 @@ const faqItems = [
   },
 ];
 
+interface SupportSettings {
+  supportPhone: string;
+  supportWhatsApp: string;
+  supportPhones: string[];
+  supportWhatsAppNumbers: string[];
+}
+
 // ---- Component ----
 
 export default function NurseHelpPage() {
+  const authFetch = useAuthFetch();
+  const [supportSettings, setSupportSettings] = useState<SupportSettings | null>(null);
+  const [isLoadingSupport, setIsLoadingSupport] = useState(true);
+
+  useEffect(() => {
+    const fetchSupport = async () => {
+      try {
+        const res = await authFetch('/api/settings/support');
+        const data = await res.json();
+        if (data.success && data.data) {
+          setSupportSettings(data.data);
+        }
+      } catch {
+        // Use defaults
+      } finally {
+        setIsLoadingSupport(false);
+      }
+    };
+    void fetchSupport();
+  }, [authFetch]);
+
+  const phones = supportSettings?.supportPhones?.length
+    ? supportSettings.supportPhones
+    : supportSettings?.supportPhone
+      ? [supportSettings.supportPhone]
+      : ['+967123456789'];
+
+  const whatsApps = supportSettings?.supportWhatsAppNumbers?.length
+    ? supportSettings.supportWhatsAppNumbers
+    : supportSettings?.supportWhatsApp
+      ? [supportSettings.supportWhatsApp]
+      : ['+967123456789'];
+
   return (
     <div className="space-y-4">
       <PageHeader title="المساعدة والدعم" description="الأسئلة الشائعة والتواصل مع الدعم" />
@@ -79,7 +122,6 @@ export default function NurseHelpPage() {
           <HelpCircle className="w-5 h-5 text-nurse" />
           <h3 className="font-semibold">الأسئلة الشائعة</h3>
         </div>
-
         <Accordion type="single" collapsible className="space-y-2">
           {faqItems.map((item) => (
             <AccordionItem
@@ -104,31 +146,35 @@ export default function NurseHelpPage() {
           <Phone className="w-5 h-5 text-nurse" />
           <h3 className="font-semibold">تواصل مع الدعم</h3>
         </div>
-
         <div className="space-y-3">
-          <Button
-            variant="outline"
-            className="w-full justify-start gap-3 h-12 text-sm"
-            onClick={() => window.open('tel:+967123456789')}
-          >
-            <Phone className="w-5 h-5 text-green-600" />
-            <div className="text-right">
-              <p className="font-medium">اتصل بنا</p>
-              <p className="text-xs text-muted-foreground">+٩٦٧ ١٢٣٤٥٦٧٨٩</p>
-            </div>
-          </Button>
-
-          <Button
-            variant="outline"
-            className="w-full justify-start gap-3 h-12 text-sm"
-            onClick={() => window.open('https://wa.me/967123456789', '_blank')}
-          >
-            <MessageCircle className="w-5 h-5 text-green-600" />
-            <div className="text-right">
-              <p className="font-medium">واتساب</p>
-              <p className="text-xs text-muted-foreground">راسلنا عبر واتساب</p>
-            </div>
-          </Button>
+          {phones.map((phone, i) => (
+            <Button
+              key={`phone-${i}`}
+              variant="outline"
+              className="w-full justify-start gap-3 h-12 text-sm"
+              onClick={() => window.open(`tel:${phone.replace(/\s/g, '')}`)}
+            >
+              <Phone className="w-5 h-5 text-green-600" />
+              <div className="text-right">
+                <p className="font-medium">{i === 0 ? 'اتصل بنا' : `اتصل بنا ${i + 1}`}</p>
+                <p className="text-xs text-muted-foreground" dir="ltr">{phone}</p>
+              </div>
+            </Button>
+          ))}
+          {whatsApps.map((wa, i) => (
+            <Button
+              key={`wa-${i}`}
+              variant="outline"
+              className="w-full justify-start gap-3 h-12 text-sm"
+              onClick={() => window.open(`https://wa.me/${wa.replace(/[^0-9]/g, '')}`, '_blank')}
+            >
+              <MessageCircle className="w-5 h-5 text-green-600" />
+              <div className="text-right">
+                <p className="font-medium">{i === 0 ? 'واتساب' : `واتساب ${i + 1}`}</p>
+                <p className="text-xs text-muted-foreground" dir="ltr">{wa}</p>
+              </div>
+            </Button>
+          ))}
         </div>
       </GlassCard>
 
@@ -138,23 +184,21 @@ export default function NurseHelpPage() {
           <FileText className="w-5 h-5 text-nurse" />
           <h3 className="font-semibold">المستندات القانونية</h3>
         </div>
-
         <div className="space-y-2">
-          <button className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors">
+          <Link href="/nurse/help/terms" className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors">
             <div className="flex items-center gap-3">
               <Shield className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm">شروط والأحكام</span>
             </div>
             <ChevronDown className="w-4 h-4 text-muted-foreground -rotate-90" />
-          </button>
-
-          <button className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors">
+          </Link>
+          <Link href="/nurse/help/privacy" className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors">
             <div className="flex items-center gap-3">
               <FileText className="w-5 h-5 text-muted-foreground" />
               <span className="text-sm">سياسة الخصوصية</span>
             </div>
             <ChevronDown className="w-4 h-4 text-muted-foreground -rotate-90" />
-          </button>
+          </Link>
         </div>
       </GlassCard>
 
@@ -171,7 +215,7 @@ export default function NurseHelpPage() {
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">الإصدار</span>
-            <span className="font-medium">١.٠.٠</span>
+            <span className="font-medium">١.٠.١</span>
           </div>
           <div className="flex items-center justify-between">
             <span className="text-muted-foreground">نوع الحساب</span>

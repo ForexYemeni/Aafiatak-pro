@@ -61,6 +61,8 @@ interface NurseItem {
   experience: number;
   bio: string | null;
   rejectedReason: string | null;
+  identityDocumentUrl: string | null;
+  licenseDocumentUrl: string | null;
   createdAt: string;
 }
 
@@ -303,6 +305,42 @@ export default function AdminNursesPage() {
         <div className="bg-red-50 dark:bg-red-950/20 rounded-xl p-3">
           <p className="text-xs text-red-600 dark:text-red-400 mb-1">سبب الرفض</p>
           <p className="text-sm">{nurse.rejectedReason}</p>
+        </div>
+      )}
+      {/* Documents */}
+      {(nurse.identityDocumentUrl || nurse.licenseDocumentUrl) && (
+        <div>
+          <p className="text-xs text-muted-foreground mb-2">المستندات المرفوعة</p>
+          <div className="grid grid-cols-2 gap-3">
+            {nurse.identityDocumentUrl && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-muted-foreground">الهوية الوطنية</p>
+                <div className="relative rounded-xl overflow-hidden border border-border aspect-[4/3]">
+                  <img
+                    src={nurse.identityDocumentUrl}
+                    alt="الهوية الوطنية"
+                    className="w-full h-full object-cover"
+                    onClick={() => window.open(nurse.identityDocumentUrl!, '_blank')}
+                    role="button"
+                  />
+                </div>
+              </div>
+            )}
+            {nurse.licenseDocumentUrl && (
+              <div className="space-y-1">
+                <p className="text-[10px] text-muted-foreground">مزاولة المهنة</p>
+                <div className="relative rounded-xl overflow-hidden border border-border aspect-[4/3]">
+                  <img
+                    src={nurse.licenseDocumentUrl}
+                    alt="مزاولة المهنة"
+                    className="w-full h-full object-cover"
+                    onClick={() => window.open(nurse.licenseDocumentUrl!, '_blank')}
+                    role="button"
+                  />
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
       <div className="text-xs text-muted-foreground">

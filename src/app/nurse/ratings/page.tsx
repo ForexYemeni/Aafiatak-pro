@@ -71,7 +71,8 @@ export default function NurseRatingsPage() {
       const res = await authFetch('/api/nurse/ratings?limit=100');
       const data = await res.json();
       if (data.success && data.data) {
-        setRatings(data.data as RatingItem[]);
+        const ratingsArray = Array.isArray(data.data) ? data.data : (data.data.ratings || []);
+        setRatings(ratingsArray as RatingItem[]);
       }
     } catch {
       // silently handle
