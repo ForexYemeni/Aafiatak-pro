@@ -29,6 +29,14 @@ const adminBottomItems: BottomNavItem[] = [
   { label: 'المزيد', href: '/admin/settings', icon: MoreHorizontal },
 ];
 
+const subadminBottomItems: BottomNavItem[] = [
+  { label: 'الرئيسية', href: '/admin', icon: Home },
+  { label: 'الممرضون', href: '/admin/nurses', icon: Stethoscope },
+  { label: 'الطلبات', href: '/admin/orders', icon: ClipboardList },
+  { label: 'الطوارئ', href: '/admin/emergencies', icon: AlertTriangle },
+  { label: 'المزيد', href: '/admin/subadmin-settings', icon: MoreHorizontal },
+];
+
 const nurseBottomItems: BottomNavItem[] = [
   { label: 'المهام', href: '/nurse', icon: ClipboardList },
   { label: 'الجدول', href: '/nurse/schedule', icon: Stethoscope },
@@ -48,8 +56,9 @@ const beneficiaryBottomItems: BottomNavItem[] = [
 function getBottomItems(role: UserRole): BottomNavItem[] {
   switch (role) {
     case 'admin':
-    case 'subadmin':
       return adminBottomItems;
+    case 'subadmin':
+      return subadminBottomItems;
     case 'nurse':
       return nurseBottomItems;
     case 'beneficiary':

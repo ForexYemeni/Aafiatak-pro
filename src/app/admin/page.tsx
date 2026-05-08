@@ -125,6 +125,7 @@ export default function AdminDashboardPage() {
     setIsLoading(true);
     setError(null);
     try {
+      // Dashboard stats - uses requireRole (works for both admin & subadmin)
       const res = await authFetch('/api/admin/dashboard');
       const json = await res.json();
       if (json.success && json.data) {
@@ -133,56 +134,74 @@ export default function AdminDashboardPage() {
         setError(json.message ?? 'فشل تحميل البيانات');
       }
 
-      const ordersRes = await authFetch('/api/admin/orders?limit=5&page=1');
-      const ordersJson = await ordersRes.json();
-      if (ordersJson.success && ordersJson.data) {
-        // API returns { data: { orders: [...], total, ... } }
-        const ordersArray = ordersJson.data.orders ?? ordersJson.data;
-        const orders = (Array.isArray(ordersArray) ? ordersArray : []).map((o: Record<string, unknown>) => ({
-          id: String(o.id ?? o._id ?? ''),
-          beneficiaryName: String((o.beneficiary as Record<string, unknown>)?.name ?? 'غير معروف'),
-          serviceName: String((o.service as Record<string, unknown>)?.nameAr ?? 'خدمة'),
-          status: String(o.status ?? 'pending'),
-          totalPrice: Number(o.totalPrice ?? o.basePrice ?? 0),
-          createdAt: String(o.createdAt ?? new Date().toISOString()),
-        }));
-        setRecentOrders(orders);
+      // Recent orders - may fail with 403 for subadmins without manage_orders permission
+      try {
+        const ordersRes = await authFetch('/api/admin/orders?limit=5&page=1');
+        if (ordersRes.ok) {
+          const ordersJson = await ordersRes.json();
+          if (ordersJson.success && ordersJson.data) {
+            const ordersArray = ordersJson.data.orders ?? ordersJson.data;
+            const orders = (Array.isArray(ordersArray) ? ordersArray : []).map((o: Record<string, unknown>) => ({
+              id: String(o.id ?? o._id ?? ''),
+              beneficiaryName: String((o.beneficiary as Record<string, unknown>)?.name ?? (o as any).beneficiaryName ?? 'غير معروف'),
+              serviceName: String((o.service as Record<string, unknown>)?.nameAr ?? (o as any).serviceName ?? 'خدمة'),
+              status: String(o.status ?? 'pending'),
+              totalPrice: Number(o.totalPrice ?? o.basePrice ?? 0),
+              createdAt: String(o.createdAt ?? new Date().toISOString()),
+            }));
+            setRecentOrders(orders);
+          }
+        }
+      } catch {
+        // Permission denied or network error - skip orders section
       }
 
-      const nursesRes = await authFetch('/api/admin/nurses?limit=3&page=1');
-      const nursesJson = await nursesRes.json();
+      // Recent nurses - may fail with 403 for subadmins without manage_nurses permission
       const nurses: RecentRegistration[] = [];
-      if (nursesJson.success && nursesJson.data) {
-        // API returns { data: { nurses: [...], total, ... } }
-        const nursesArray = nursesJson.data.nurses ?? nursesJson.data;
-        const nursesList = Array.isArray(nursesArray) ? nursesArray : [];
-        for (const n of nursesList as Record<string, unknown>[]) {
-          nurses.push({
-            id: String(n.id ?? n._id ?? ''),
-            name: String(n.name ?? ''),
-            type: 'nurse',
-            status: String(n.verificationStatus ?? n.status ?? 'pending'),
-            createdAt: String(n.createdAt ?? new Date().toISOString()),
-          });
+      try {
+        const nursesRes = await authFetch('/api/admin/nurses?limit=3&page=1');
+        if (nursesRes.ok) {
+          const nursesJson = await nursesRes.json();
+          if (nursesJson.success && nursesJson.data) {
+            const nursesArray = nursesJson.data.nurses ?? nursesJson.data;
+            const nursesList = Array.isArray(nursesArray) ? nursesArray : [];
+            for (const n of nursesList as Record<string, unknown>[]) {
+              nurses.push({
+                id: String(n.id ?? n._id ?? ''),
+                name: String(n.name ?? ''),
+                type: 'nurse',
+                status: String(n.verificationStatus ?? n.status ?? 'pending'),
+                createdAt: String(n.createdAt ?? new Date().toISOString()),
+              });
+            }
+          }
         }
+      } catch {
+        // Permission denied or network error - skip nurses section
       }
 
-      const benRes = await authFetch('/api/admin/beneficiaries?limit=3&page=1');
-      const benJson = await benRes.json();
+      // Recent beneficiaries - may fail with 403 for subadmins without manage_beneficiaries permission
       const beneficiaries: RecentRegistration[] = [];
-      if (benJson.success && benJson.data) {
-        // API returns { data: { beneficiaries: [...], total, ... } }
-        const benArray = benJson.data.beneficiaries ?? benJson.data;
-        const benList = Array.isArray(benArray) ? benArray : [];
-        for (const b of benList as Record<string, unknown>[]) {
-          beneficiaries.push({
-            id: String(b.id ?? b._id ?? ''),
-            name: String(b.name ?? ''),
-            type: 'beneficiary',
-            status: String(b.status ?? 'active'),
-            createdAt: String(b.createdAt ?? new Date().toISOString()),
-          });
+      try {
+        const benRes = await authFetch('/api/admin/beneficiaries?limit=3&page=1');
+        if (benRes.ok) {
+          const benJson = await benRes.json();
+          if (benJson.success && benJson.data) {
+            const benArray = benJson.data.beneficiaries ?? benJson.data;
+            const benList = Array.isArray(benArray) ? benArray : [];
+            for (const b of benList as Record<string, unknown>[]) {
+              beneficiaries.push({
+                id: String(b.id ?? b._id ?? ''),
+                name: String(b.name ?? ''),
+                type: 'beneficiary',
+                status: String(b.status ?? 'active'),
+                createdAt: String(b.createdAt ?? new Date().toISOString()),
+              });
+            }
+          }
         }
+      } catch {
+        // Permission denied or network error - skip beneficiaries section
       }
 
       setRecentRegistrations(
