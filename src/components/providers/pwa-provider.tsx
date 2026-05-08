@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 
 const OfflineWrapper = dynamic(
@@ -12,18 +12,24 @@ function ServiceWorkerRegistrar() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Register service worker
+    // Register service worker - fail silently if not available
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/sw.js').catch(() => {});
+      navigator.serviceWorker.register('/sw.js').catch(() => {
+        // Service worker not available, this is fine
+      });
     }
 
-    // Initialize IndexedDB and offline queue
+    // Initialize IndexedDB and offline queue - fail silently
     Promise.all([
-      import('@/lib/db/indexeddb'),
-      import('@/lib/db/offline-queue'),
+      import('@/lib/db/indexeddb').catch(() => null),
+      import('@/lib/db/offline-queue').catch(() => null),
     ]).then(([dbModule, queueModule]) => {
-      void dbModule.localDb.init().catch(() => {});
-      queueModule.offlineQueue.start(30000);
+      if (dbModule?.localDb) {
+        void dbModule.localDb.init().catch(() => {});
+      }
+      if (queueModule?.offlineQueue) {
+        queueModule.offlineQueue.start(30000);
+      }
 
       // Listen for sync messages from service worker
       if ('serviceWorker' in navigator) {

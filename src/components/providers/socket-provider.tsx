@@ -4,6 +4,7 @@ import {
   createContext,
   useContext,
   useEffect,
+  useState,
   useMemo,
   type ReactNode,
 } from 'react';
@@ -29,10 +30,12 @@ const SOCKET_PORT = 3003;
 export function SocketProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const token = useAuthStore((s) => s.token);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
+  const [isConnected, setIsConnected] = useState(false);
 
-  // Create socket lazily via useMemo - it's derived from auth state
   const socket = useMemo<Socket | null>(() => {
-    if (!isAuthenticated || !token) return null;
+    // Don't create socket until hydration is complete
+    if (!hasHydrated || !isAuthenticated || !token) return null;
 
     const newSocket = io('/?XTransformPort=' + SOCKET_PORT, {
       auth: { token },
@@ -43,16 +46,23 @@ export function SocketProvider({ children }: { children: ReactNode }) {
     });
 
     return newSocket;
-  }, [isAuthenticated, token]);
+  }, [hasHydrated, isAuthenticated, token]);
 
-  // Track connection state via ref (no setState in effect)
-  const isConnected = socket !== null && socket.connected;
-
-  // Sync socket event listeners
   useEffect(() => {
-    if (!socket) return;
+    if (!socket) {
+      setIsConnected(false);
+      return;
+    }
+
+    const onConnect = () => setIsConnected(true);
+    const onDisconnect = () => setIsConnected(false);
+
+    socket.on('connect', onConnect);
+    socket.on('disconnect', onDisconnect);
 
     return () => {
+      socket.off('connect', onConnect);
+      socket.off('disconnect', onDisconnect);
       socket.disconnect();
     };
   }, [socket]);

@@ -42,6 +42,15 @@ import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
 
 // ============================================================================
+// Seeded pseudo-random to avoid hydration mismatch
+// ============================================================================
+
+function seededRandom(seed: number): number {
+  const x = Math.sin(seed * 9301 + 49297) * 233280;
+  return x - Math.floor(x);
+}
+
+// ============================================================================
 // Validation Schemas
 // ============================================================================
 
@@ -201,21 +210,21 @@ function FloatingParticles() {
           key={i}
           className="absolute rounded-full bg-white/20 dark:bg-white/10"
           style={{
-            width: Math.random() * 4 + 2,
-            height: Math.random() * 4 + 2,
-            left: `${Math.random() * 100}%`,
-            top: `${Math.random() * 100}%`,
+            width: seededRandom(i * 4) * 4 + 2,
+            height: seededRandom(i * 4 + 1) * 4 + 2,
+            left: `${seededRandom(i * 4 + 2) * 100}%`,
+            top: `${seededRandom(i * 4 + 3) * 100}%`,
           }}
           animate={{
             y: [0, -30, 0],
-            x: [0, Math.random() * 20 - 10, 0],
+            x: [0, seededRandom(i * 7) * 20 - 10, 0],
             opacity: [0.3, 0.8, 0.3],
           }}
           transition={{
-            duration: Math.random() * 4 + 3,
+            duration: seededRandom(i * 7 + 1) * 4 + 3,
             repeat: Infinity,
             ease: 'easeInOut',
-            delay: Math.random() * 3,
+            delay: seededRandom(i * 7 + 2) * 3,
           }}
         />
       ))}
@@ -464,21 +473,21 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
             key={i}
             className="absolute rounded-full bg-white/15"
             style={{
-              width: Math.random() * 6 + 2,
-              height: Math.random() * 6 + 2,
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              width: seededRandom(i * 4 + 100) * 6 + 2,
+              height: seededRandom(i * 4 + 101) * 6 + 2,
+              left: `${seededRandom(i * 4 + 102) * 100}%`,
+              top: `${seededRandom(i * 4 + 103) * 100}%`,
             }}
             animate={{
               y: [0, -40, 0],
-              x: [0, Math.random() * 30 - 15, 0],
+              x: [0, seededRandom(i * 7 + 200) * 30 - 15, 0],
               opacity: [0.2, 0.6, 0.2],
             }}
             transition={{
-              duration: Math.random() * 5 + 3,
+              duration: seededRandom(i * 7 + 201) * 5 + 3,
               repeat: Infinity,
               ease: 'easeInOut',
-              delay: Math.random() * 3,
+              delay: seededRandom(i * 7 + 202) * 3,
             }}
           />
         ))}
@@ -676,7 +685,7 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get('redirect');
 
-  const { login, registerNurse, registerBeneficiary, isAuthenticated, user, isLoading, error, clearError } =
+  const { login, registerNurse, registerBeneficiary, isAuthenticated, user, isLoading, error, clearError, _hasHydrated } =
     useAuthStore();
 
   const [activeTab, setActiveTab] = useState<string>('login');
@@ -689,6 +698,9 @@ function LoginPageContent() {
   const justLoggedOut = searchParams.get('logout') === 'true';
 
   useEffect(() => {
+    // Wait for hydration before checking auth state
+    if (!_hasHydrated) return;
+
     if (isAuthenticated && user && !justLoggedOut && !showLoadingScreen) {
       // Show the loading screen first
       setShowLoadingScreen(true);
@@ -696,7 +708,7 @@ function LoginPageContent() {
     if (justLoggedOut && !isAuthenticated) {
       router.replace('/');
     }
-  }, [isAuthenticated, user, justLoggedOut, showLoadingScreen]);
+  }, [isAuthenticated, user, justLoggedOut, showLoadingScreen, _hasHydrated]);
 
   const handleLoadingComplete = useCallback(() => {
     if (user) {
@@ -1443,12 +1455,12 @@ function LoginPageContent() {
 export default function LoginPage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-sky-50 dark:from-purple-950 dark:via-gray-950 dark:to-sky-950" dir="rtl">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg animate-pulse">
-            <Heart className="w-8 h-8 text-white" fill="currentColor" />
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 via-purple-700 to-sky-700" dir="rtl">
+        <div className="text-center">
+          <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-white/20 backdrop-blur-xl border border-white/30">
+            <Heart className="w-8 h-8 text-white animate-pulse" fill="currentColor" />
           </div>
-          <p className="text-muted-foreground text-sm">جارٍ التحميل...</p>
+          <p className="text-white/70 text-sm">جارٍ تحميل صفحة تسجيل الدخول...</p>
         </div>
       </div>
     }>
