@@ -287,3 +287,30 @@ Stage Summary:
 - Nurse sees messages from beneficiary within 3 seconds
 - Beneficiary sees messages from nurse within 3 seconds
 - Chat lists auto-refresh for new conversations
+
+---
+Task ID: 3
+Agent: main
+Task: Fix chat navigation for all roles + floating bubble overlap + count badges on tabs
+
+Work Log:
+- Added "المحادثة" to nurse bottom nav (replaced "الجدول") with MessageCircle icon
+- Added "المحادثة" to beneficiary bottom nav (replaced "نقاطي") with MessageCircle icon
+- Added "المحادثات" to nurse sidebar and beneficiary sidebar
+- Added "المحادثات" to admin sidebar (under الشكاوى) for admin/subadmin
+- Created admin chat list page at /admin/chat with role badges and search
+- Created admin chat detail page at /admin/chat/[id] with polling and send capability
+- Removed FloatingChatBubble from beneficiary layout (was overlapping with emergency button)
+- Added ?counts=true endpoint to /api/nurse/assignments returning {new, active, completed}
+- Added ?counts=true endpoint to /api/beneficiary/orders returning {active, completed, cancelled}
+- Updated nurse tasks page: fetches counts separately, shows badges on ALL tabs always
+- Updated beneficiary orders page: fetches counts separately, shows badges on ALL tabs always
+- Quick stats on nurse page now use real counts from API instead of filtering current tab data
+- Deployed to Vercel production
+
+Stage Summary:
+- All roles now have chat access via bottom nav and sidebar
+- No more floating bubble overlap with emergency button
+- Admin can view and participate in chats with nurses and beneficiaries
+- Count badges show on all tabs without needing to click them
+- Real-time counts from database instead of filtering current view
