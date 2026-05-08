@@ -264,3 +264,26 @@ Stage Summary:
 - Tracking API now returns nurseName, nursePhone, nurseRating, nurseSpecialization, isOnline, location, eta
 - Beneficiary can now see nurse details and directly call/chat/track from orders list and order detail pages
 - Track button available for assigned, accepted, and in_progress statuses
+
+---
+Task ID: 2
+Agent: main
+Task: Fix pricing showing 0 in orders + chat not working between beneficiary and nurse
+
+Work Log:
+- Investigated pricing issue: DB stores flat fields (totalPrice, basePrice) but frontend expects nested pricing object
+- Fixed GET /api/beneficiary/orders to wrap flat pricing fields into pricing object
+- Investigated chat issues: messages saved via HTTP but other party never sees them (no polling, no socket)
+- Fixed nurse chat list page: changed ChatItem interface to match API response fields (participantName, lastMessage, lastMessageTime, unreadCount as number)
+- Fixed nurse chat detail: corrected message parsing (API returns {messages: [...], total, page, pages})
+- Added 3-second polling to both beneficiary and nurse chat detail pages
+- Added 10-second auto-refresh to both chat list pages
+- Added Phone and MessageCircle icons to nurse chat detail
+- Deployed to Vercel production
+
+Stage Summary:
+- Pricing now displays correctly in orders list (ر.ي with actual amount instead of 0)
+- Chat works between beneficiary and nurse via HTTP API + polling
+- Nurse sees messages from beneficiary within 3 seconds
+- Beneficiary sees messages from nurse within 3 seconds
+- Chat lists auto-refresh for new conversations
