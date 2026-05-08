@@ -162,7 +162,7 @@ export default function ServiceRequestPage() {
         body: JSON.stringify({
           serviceId: service.id,
           scheduledAt: scheduledDate && scheduledTime ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString() : undefined,
-          address,
+          address: address || `${lat}, ${lng}`,
           lat: lat || 15.3694,
           lng: lng || 44.1910,
           notes: notes || undefined,
@@ -189,7 +189,7 @@ export default function ServiceRequestPage() {
     switch (currentStep) {
       case 0: return !!service;
       case 1: return true;
-      case 2: return address.length > 0;
+      case 2: return lat !== 0 && lng !== 0;
       case 3: return !!paymentMethod;
       case 4: return true;
       default: return false;
@@ -377,6 +377,8 @@ export default function ServiceRequestPage() {
                   setLng(loc.longitude);
                   if (loc.address && loc.address !== `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`) {
                     setAddress(loc.address);
+                  } else if (!address) {
+                    setAddress(`${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`);
                   }
                 }}
                 value={address}
@@ -384,14 +386,21 @@ export default function ServiceRequestPage() {
                 label="تحديد موقعي"
               />
               <div className="space-y-2">
-                <Label htmlFor="address">العنوان بالتفصيل</Label>
+                <Label htmlFor="address" className="flex items-center gap-1">
+                  تفاصيل إضافية للعنوان
+                  <span className="text-xs text-muted-foreground font-normal">(اختياري)</span>
+                </Label>
                 <Textarea
                   id="address"
-                  placeholder="مثال: شارع الزبيري، بجوار مستشفى الثورة، الطابق الثالث..."
+                  placeholder="مثال: بجوار مستشفى الثورة، الطابق الثالث..."
                   value={address}
                   onChange={(e) => setAddress(e.target.value)}
                   dir="rtl"
+                  rows={2}
                 />
+                <p className="text-xs text-muted-foreground">
+                  أضف أي تفاصيل تساعد الممرض/ـة في الوصول إليك
+                </p>
               </div>
             </GlassCard>
           )}
