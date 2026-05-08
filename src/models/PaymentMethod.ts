@@ -4,13 +4,12 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export type PaymentMethodTypeEnum = 'wallet_deposit' | 'bank_transfer' | 'cash';
 export type WalletTypeEnum =
   | 'jeep' | 'jawali' | 'cash_wallet' | 'one_cash' | 'flousk'
-  | 'saba_cash' | 'balh' | 'tadawul' | 'cashq' | 'yomni'
-  | 'payos' | 'zain_cash' | 'mubashir' | 'rafid' | 'amwal'
-  | 'salaf' | 'halelflos' | 'yemen_wallet';
+  | 'saba_cash' | 'mobile_money' | 'mahfathati' | 'yemen_wallet'
+  | 'al_mutakamila' | 'halelflos';
 export type ExchangeTypeEnum =
   | 'al_najm' | 'yemen_express' | 'al_imtiaz' | 'al_hazmi'
-  | 'al_kabsi' | 'shamsan' | 'al_taiseer' | 'al_amal'
-  | 'al_thiqa' | 'al_safi' | 'al_rashid' | 'al_baraka';
+  | 'al_saifi' | 'al_aidrous' | 'dadiya' | 'al_akwa'
+  | 'al_nasser' | 'al_mumayaz' | 'al_muraisi' | 'al_shabouti';
 
 export interface IPaymentMethod extends Document {
   nameAr: string;
@@ -51,9 +50,8 @@ const paymentMethodSchema = new Schema<IPaymentMethod>(
       type: String,
       enum: [
         'jeep', 'jawali', 'cash_wallet', 'one_cash', 'flousk',
-        'saba_cash', 'balh', 'tadawul', 'cashq', 'yomni',
-        'payos', 'zain_cash', 'mubashir', 'rafid', 'amwal',
-        'salaf', 'halelflos', 'yemen_wallet',
+        'saba_cash', 'mobile_money', 'mahfathati', 'yemen_wallet',
+        'al_mutakamila', 'halelflos',
       ] as const,
       default: null,
     },
@@ -61,8 +59,8 @@ const paymentMethodSchema = new Schema<IPaymentMethod>(
       type: String,
       enum: [
         'al_najm', 'yemen_express', 'al_imtiaz', 'al_hazmi',
-        'al_kabsi', 'shamsan', 'al_taiseer', 'al_amal',
-        'al_thiqa', 'al_safi', 'al_rashid', 'al_baraka',
+        'al_saifi', 'al_aidrous', 'dadiya', 'al_akwa',
+        'al_nasser', 'al_mumayaz', 'al_muraisi', 'al_shabouti',
       ] as const,
       default: null,
     },
