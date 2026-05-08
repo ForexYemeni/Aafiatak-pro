@@ -202,10 +202,18 @@ export function NotificationBell({ className }: NotificationBellProps) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="start" sideOffset={8} dir="rtl">
-        <div className="flex items-center justify-between p-4">
+      <PopoverContent
+        className="w-80 p-0"
+        align="end"
+        side="bottom"
+        sideOffset={8}
+        collisionPadding={16}
+        avoidCollisions={true}
+        dir="rtl"
+      >
+        <div className="flex items-center justify-between p-3">
           <h3 className="font-semibold text-sm">الإشعارات</h3>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Button variant="ghost" size="icon" className="w-7 h-7" onClick={fetchNotifications} title="تحديث">
               <Loader2 className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
@@ -233,7 +241,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
                 <div
                   key={notification.id}
                   className={cn(
-                    'flex items-start gap-3 p-4 transition-colors hover:bg-accent/50 cursor-pointer',
+                    'flex items-start gap-3 p-3 transition-colors hover:bg-accent/50 cursor-pointer',
                     !notification.read && 'bg-primary/5'
                   )}
                   onClick={() => markAsRead(notification.id)}
@@ -246,11 +254,11 @@ export function NotificationBell({ className }: NotificationBellProps) {
                   >
                     {getNotificationIcon(notification.type)}
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className={cn('text-sm', !notification.read && 'font-medium')}>
+                  <div className="flex-1 min-w-0 overflow-hidden">
+                    <p className={cn('text-sm leading-5', !notification.read && 'font-medium')}>
                       {notification.title}
                     </p>
-                    <p className="text-xs text-muted-foreground mt-0.5 truncate">
+                    <p className="text-xs text-muted-foreground mt-0.5 leading-4 line-clamp-2">
                       {notification.body}
                     </p>
                     <p className="text-[10px] text-muted-foreground mt-1">
