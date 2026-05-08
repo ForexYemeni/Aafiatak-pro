@@ -4,12 +4,10 @@ import mongoose, { Schema, Document, Model } from 'mongoose';
 export type PaymentMethodTypeEnum = 'wallet_deposit' | 'bank_transfer' | 'cash';
 export type WalletTypeEnum =
   | 'jeep' | 'jawali' | 'cash_wallet' | 'one_cash' | 'flousk'
-  | 'saba_cash' | 'mobile_money' | 'mahfathati' | 'yemen_wallet'
-  | 'al_mutakamila' | 'halelflos';
+  | 'saba_cash' | 'other';
 export type ExchangeTypeEnum =
   | 'al_najm' | 'yemen_express' | 'al_imtiaz' | 'al_hazmi'
-  | 'al_saifi' | 'al_aidrous' | 'dadiya' | 'al_akwa'
-  | 'al_nasser' | 'al_mumayaz' | 'al_muraisi' | 'al_shabouti';
+  | 'other';
 
 export interface IPaymentMethod extends Document {
   nameAr: string;
@@ -17,6 +15,7 @@ export interface IPaymentMethod extends Document {
   type: PaymentMethodTypeEnum;
   walletType: WalletTypeEnum | null;
   exchangeType: ExchangeTypeEnum | null;
+  customProviderName: string;
   icon: string;
   isActive: boolean;
   instructions: string;
@@ -50,8 +49,7 @@ const paymentMethodSchema = new Schema<IPaymentMethod>(
       type: String,
       enum: [
         'jeep', 'jawali', 'cash_wallet', 'one_cash', 'flousk',
-        'saba_cash', 'mobile_money', 'mahfathati', 'yemen_wallet',
-        'al_mutakamila', 'halelflos',
+        'saba_cash', 'other',
       ] as const,
       default: null,
     },
@@ -59,10 +57,14 @@ const paymentMethodSchema = new Schema<IPaymentMethod>(
       type: String,
       enum: [
         'al_najm', 'yemen_express', 'al_imtiaz', 'al_hazmi',
-        'al_saifi', 'al_aidrous', 'dadiya', 'al_akwa',
-        'al_nasser', 'al_mumayaz', 'al_muraisi', 'al_shabouti',
+        'other',
       ] as const,
       default: null,
+    },
+    customProviderName: {
+      type: String,
+      default: '',
+      trim: true,
     },
     icon: {
       type: String,

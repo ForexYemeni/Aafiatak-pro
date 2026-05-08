@@ -36,7 +36,7 @@ import {
 import { toast } from 'sonner';
 import type { ColumnDef } from '@tanstack/react-table';
 
-// ── Yemeni E-Wallets ─────────────────────────────────────────────
+// ── Yemeni E-Wallets (confirmed Yemeni only) ────────────────────
 const YEMENI_WALLETS: { id: string; nameAr: string; nameEn: string; color: string }[] = [
   { id: 'jeep', nameAr: 'جيب', nameEn: 'Jeeb', color: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400' },
   { id: 'jawali', nameAr: 'جوالي', nameEn: 'Jawali', color: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400' },
@@ -44,27 +44,16 @@ const YEMENI_WALLETS: { id: string; nameAr: string; nameEn: string; color: strin
   { id: 'one_cash', nameAr: 'ون كاش', nameEn: 'One Cash', color: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400' },
   { id: 'flousk', nameAr: 'فلوسك', nameEn: 'Fulousk', color: 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400' },
   { id: 'saba_cash', nameAr: 'سبأ كاش', nameEn: 'Saba Cash', color: 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400' },
-  { id: 'mobile_money', nameAr: 'موبايل موني', nameEn: 'Mobile Money', color: 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900/30 dark:text-indigo-400' },
-  { id: 'mahfathati', nameAr: 'محفظتي', nameEn: 'Mahfathati', color: 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-900/30 dark:text-sky-400' },
-  { id: 'yemen_wallet', nameAr: 'يمن والت', nameEn: 'Yemen Wallet', color: 'bg-stone-100 text-stone-800 border-stone-300 dark:bg-stone-900/30 dark:text-stone-400' },
-  { id: 'al_mutakamila', nameAr: 'المتكاملة', nameEn: 'Al-Mutakamila', color: 'bg-violet-100 text-violet-800 border-violet-300 dark:bg-violet-900/30 dark:text-violet-400' },
-  { id: 'halelflos', nameAr: 'حالف فلوس', nameEn: 'Halelflos', color: 'bg-pink-100 text-pink-800 border-pink-300 dark:bg-pink-900/30 dark:text-pink-400' },
+  { id: 'other', nameAr: 'أخرى', nameEn: 'Other', color: 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/30 dark:text-gray-400' },
 ];
 
-// ── Yemeni Exchange Offices ────────────────────────────────────────
+// ── Yemeni Exchange Offices (confirmed Yemeni only) ─────────────
 const YEMENI_EXCHANGES: { id: string; nameAr: string; nameEn: string; color: string }[] = [
   { id: 'al_najm', nameAr: 'صرافة النجم', nameEn: 'Al-Najm Exchange', color: 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-900/30 dark:text-amber-400' },
   { id: 'yemen_express', nameAr: 'صرافة يمن اكسبرس', nameEn: 'Yemen Express', color: 'bg-blue-100 text-blue-800 border-blue-300 dark:bg-blue-900/30 dark:text-blue-400' },
   { id: 'al_imtiaz', nameAr: 'صرافة الامتياز', nameEn: 'Al-Imtiaz Exchange', color: 'bg-purple-100 text-purple-800 border-purple-300 dark:bg-purple-900/30 dark:text-purple-400' },
   { id: 'al_hazmi', nameAr: 'صرافة الحزمي', nameEn: 'Al-Hazmi Exchange', color: 'bg-green-100 text-green-800 border-green-300 dark:bg-green-900/30 dark:text-green-400' },
-  { id: 'al_saifi', nameAr: 'صرافة الصيفي', nameEn: 'Al-Saifi Exchange', color: 'bg-teal-100 text-teal-800 border-teal-300 dark:bg-teal-900/30 dark:text-teal-400' },
-  { id: 'al_aidrous', nameAr: 'صرافة العيدروس', nameEn: 'Al-Aidrous Exchange', color: 'bg-orange-100 text-orange-800 border-orange-300 dark:bg-orange-900/30 dark:text-orange-400' },
-  { id: 'dadiya', nameAr: 'صرافة دادية', nameEn: 'Dadiya Exchange', color: 'bg-cyan-100 text-cyan-800 border-cyan-300 dark:bg-cyan-900/30 dark:text-cyan-400' },
-  { id: 'al_akwa', nameAr: 'صرافة الأكوع', nameEn: 'Al-Akwa Exchange', color: 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-900/30 dark:text-rose-400' },
-  { id: 'al_nasser', nameAr: 'صرافة الناصر', nameEn: 'Al-Nasser Exchange', color: 'bg-indigo-100 text-indigo-800 border-indigo-300 dark:bg-indigo-900/30 dark:text-indigo-400' },
-  { id: 'al_mumayaz', nameAr: 'صرافة المميز', nameEn: 'Al-Mumayaz Exchange', color: 'bg-lime-100 text-lime-800 border-lime-300 dark:bg-lime-900/30 dark:text-lime-400' },
-  { id: 'al_muraisi', nameAr: 'صرافة المريسي', nameEn: 'Al-Muraisi Exchange', color: 'bg-sky-100 text-sky-800 border-sky-300 dark:bg-sky-900/30 dark:text-sky-400' },
-  { id: 'al_shabouti', nameAr: 'صرافة الشبوطي', nameEn: 'Al-Shabouti Exchange', color: 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-900/30 dark:text-emerald-400' },
+  { id: 'other', nameAr: 'أخرى', nameEn: 'Other', color: 'bg-gray-100 text-gray-800 border-gray-300 dark:bg-gray-900/30 dark:text-gray-400' },
 ];
 
 const walletMap = Object.fromEntries(YEMENI_WALLETS.map(w => [w.id, w]));
@@ -172,6 +161,7 @@ export default function AdminPaymentsPage() {
     type: 'wallet_deposit' as 'wallet_deposit' | 'bank_transfer' | 'cash',
     walletType: 'jeep',
     exchangeType: 'al_najm',
+    customProviderName: '',
     isActive: true,
     accountName: '',
     accountNumber: '',
@@ -288,10 +278,21 @@ export default function AdminPaymentsPage() {
 
       if (pmForm.type === 'wallet_deposit') {
         payload.walletType = pmForm.walletType;
-        const w = walletMap[pmForm.walletType];
-        if (w) {
-          payload.nameAr = w.nameAr;
-          payload.nameEn = w.nameEn;
+        if (pmForm.walletType === 'other') {
+          if (!pmForm.customProviderName.trim()) {
+            toast.error('يرجى إدخال اسم المحفظة');
+            setIsSavingPm(false);
+            return;
+          }
+          payload.nameAr = pmForm.customProviderName.trim();
+          payload.nameEn = pmForm.customProviderName.trim();
+          payload.customProviderName = pmForm.customProviderName.trim();
+        } else {
+          const w = walletMap[pmForm.walletType];
+          if (w) {
+            payload.nameAr = w.nameAr;
+            payload.nameEn = w.nameEn;
+          }
         }
         if (!pmForm.accountNumber) {
           toast.error('يرجى إدخال رقم المحفظة');
@@ -305,10 +306,21 @@ export default function AdminPaymentsPage() {
         }
       } else if (pmForm.type === 'bank_transfer') {
         payload.exchangeType = pmForm.exchangeType;
-        const ex = exchangeMap[pmForm.exchangeType];
-        if (ex) {
-          payload.nameAr = ex.nameAr;
-          payload.nameEn = ex.nameEn;
+        if (pmForm.exchangeType === 'other') {
+          if (!pmForm.customProviderName.trim()) {
+            toast.error('يرجى إدخال اسم الصرافة');
+            setIsSavingPm(false);
+            return;
+          }
+          payload.nameAr = 'صرافة ' + pmForm.customProviderName.trim();
+          payload.nameEn = pmForm.customProviderName.trim() + ' Exchange';
+          payload.customProviderName = pmForm.customProviderName.trim();
+        } else {
+          const ex = exchangeMap[pmForm.exchangeType];
+          if (ex) {
+            payload.nameAr = ex.nameAr;
+            payload.nameEn = ex.nameEn;
+          }
         }
         if (!pmForm.accountNumber) {
           toast.error('يرجى إدخال رقم الهاتف');
@@ -370,6 +382,7 @@ export default function AdminPaymentsPage() {
       type,
       walletType: 'jeep',
       exchangeType: 'al_najm',
+      customProviderName: '',
       isActive: true,
       accountName: '',
       accountNumber: '',
@@ -384,6 +397,7 @@ export default function AdminPaymentsPage() {
       type: (pm.type as 'wallet_deposit' | 'bank_transfer' | 'cash') || 'wallet_deposit',
       walletType: pm.walletType ?? 'jeep',
       exchangeType: pm.exchangeType ?? 'al_najm',
+      customProviderName: (pm as any).customProviderName || '',
       isActive: pm.isActive,
       accountName: pm.accountName || '',
       accountNumber: pm.accountNumber || '',
@@ -819,7 +833,7 @@ export default function AdminPaymentsPage() {
             {pmForm.type === 'wallet_deposit' && (
               <div className="space-y-2">
                 <Label className="font-semibold">نوع المحفظة *</Label>
-                <Select value={pmForm.walletType} onValueChange={(v) => setPmForm({ ...pmForm, walletType: v })}>
+                <Select value={pmForm.walletType} onValueChange={(v) => setPmForm({ ...pmForm, walletType: v, customProviderName: '' })}>
                   <SelectTrigger className="h-12">
                     <SelectValue />
                   </SelectTrigger>
@@ -834,6 +848,13 @@ export default function AdminPaymentsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {pmForm.walletType === 'other' && (
+                  <Input
+                    value={pmForm.customProviderName}
+                    onChange={(e) => setPmForm({ ...pmForm, customProviderName: e.target.value })}
+                    placeholder="أدخل اسم المحفظة الإلكترونية"
+                  />
+                )}
               </div>
             )}
 
@@ -841,7 +862,7 @@ export default function AdminPaymentsPage() {
             {pmForm.type === 'bank_transfer' && (
               <div className="space-y-2">
                 <Label className="font-semibold">اسم الصرافة *</Label>
-                <Select value={pmForm.exchangeType} onValueChange={(v) => setPmForm({ ...pmForm, exchangeType: v })}>
+                <Select value={pmForm.exchangeType} onValueChange={(v) => setPmForm({ ...pmForm, exchangeType: v, customProviderName: '' })}>
                   <SelectTrigger className="h-12">
                     <SelectValue />
                   </SelectTrigger>
@@ -856,6 +877,13 @@ export default function AdminPaymentsPage() {
                     ))}
                   </SelectContent>
                 </Select>
+                {pmForm.exchangeType === 'other' && (
+                  <Input
+                    value={pmForm.customProviderName}
+                    onChange={(e) => setPmForm({ ...pmForm, customProviderName: e.target.value })}
+                    placeholder="أدخل اسم الصرافة"
+                  />
+                )}
               </div>
             )}
 

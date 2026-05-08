@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
     // If countsOnly, return counts for all tabs at once
     if (countsOnly) {
       const [activeCount, completedCount, cancelledCount] = await Promise.all([
-        ServiceRequest.countDocuments({ beneficiaryId: user.userId, status: { $in: ['pending', 'assigned', 'accepted', 'in_progress'] } }),
+        ServiceRequest.countDocuments({ beneficiaryId: user.userId, status: { $in: ['pending', 'assigned', 'accepted', 'in_progress', 'awaiting_payment'] } }),
         ServiceRequest.countDocuments({ beneficiaryId: user.userId, status: 'completed' }),
         ServiceRequest.countDocuments({ beneficiaryId: user.userId, status: { $in: ['cancelled', 'rejected'] } }),
       ]);
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { serviceId, scheduledAt, notes, address, lat, lng, isEmergency, paymentMethod, couponCode, loyaltyPointsToRedeem } = body;
+    const { serviceId, scheduledAt, notes, address, lat, lng, isEmergency, paymentMethod, paymentMethodId, couponCode, loyaltyPointsToRedeem, hasPaymentProof } = body;
 
     if (!serviceId) {
       return createErrorResponse('معرف الخدمة مطلوب', 400, 'VALIDATION_ERROR');
@@ -165,11 +165,16 @@ export async function POST(request: NextRequest) {
       couponDiscount,
     });
 
+    // Determine order status based on payment method
+    // Cash: pending, Non-cash (wallet/bank): awaiting_payment
+    const isCashPayment = paymentMethod === 'cash';
+    const orderStatus = isCashPayment ? 'pending' : 'awaiting_payment';
+
     // Create the order
     const order = await ServiceRequest.create({
       serviceId,
       beneficiaryId: user.userId,
-      status: 'pending',
+      status: orderStatus,
       basePrice: pricing.basePrice,
       nightFee: pricing.nightFee,
       fridayFee: pricing.fridayFee,
@@ -186,8 +191,10 @@ export async function POST(request: NextRequest) {
       isEmergency: isEmergency || false,
       isNightService,
       isFridayService,
-      paymentStatus: 'pending',
+      paymentStatus: isCashPayment ? 'pending' : 'awaiting_confirmation',
       paymentMethod: paymentMethod || 'cash',
+      paymentMethodId: paymentMethodId || null,
+      hasPaymentProof: hasPaymentProof || false,
       couponId,
     });
 
@@ -199,10 +206,36 @@ export async function POST(request: NextRequest) {
     // Update beneficiary order count
     await Beneficiary.findByIdAndUpdate(user.userId, { $inc: { orderCount: 1 } });
 
+    // Create notification for admin about new order
+    try {
+      const beneficiary = await Beneficiary.findById(user.userId).select('name phone').lean();
+      const adminMsg = isCashPayment
+        ? `طلب خدمة جديد: ${service.nameAr} من ${beneficiary?.name || 'مستفيد'} - ${pricing.totalPrice} ر.ي`
+        : `طلب خدمة جديد بانتظار تأكيد الدفع: ${service.nameAr} من ${beneficiary?.name || 'مستفيد'} - ${pricing.totalPrice} ر.ي`;
+
+      // Find admin users to notify
+      const { User } = await import('@/models/mongoose');
+      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      for (const admin of admins) {
+        await Notification.create({
+          userId: admin._id,
+          userRole: 'admin',
+          titleAr: isCashPayment ? 'طلب خدمة جديد' : 'طلب جديد بانتظار تأكيد الدفع',
+          bodyAr: adminMsg,
+          type: isEmergency ? 'emergency' : 'assignment',
+          priority: isEmergency ? 'urgent' : 'high',
+          data: { orderId: order._id.toString(), serviceId },
+          read: false,
+        });
+      }
+    } catch {
+      // Notification creation should not block order creation
+    }
+
     return Response.json({
       success: true,
       data: { ...order.toObject(), id: order._id.toString() },
-      message: 'تم إنشاء الطلب بنجاح',
+      message: isCashPayment ? 'تم إنشاء الطلب بنجاح' : 'تم إنشاء الطلب - يرجى إرسال إثبات الدفع عبر الواتساب',
     }, { status: 201 });
   } catch (error) {
     console.error('[BENEFICIARY ORDERS CREATE ERROR]', error);

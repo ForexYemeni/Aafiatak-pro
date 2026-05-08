@@ -4,7 +4,7 @@ export interface IServiceRequest extends Document {
   serviceId: Types.ObjectId;
   beneficiaryId: Types.ObjectId;
   nurseId?: Types.ObjectId;
-  status: 'pending' | 'assigned' | 'accepted' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'pending' | 'assigned' | 'accepted' | 'in_progress' | 'completed' | 'cancelled' | 'awaiting_payment';
   basePrice: number;
   nightFee: number;
   fridayFee: number;
@@ -25,8 +25,10 @@ export interface IServiceRequest extends Document {
   isEmergency: boolean;
   isNightService: boolean;
   isFridayService: boolean;
-  paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded';
+  paymentStatus: 'pending' | 'completed' | 'failed' | 'refunded' | 'awaiting_confirmation';
   paymentMethod?: string;
+  paymentMethodId?: string;
+  hasPaymentProof?: boolean;
   couponId?: Types.ObjectId;
 }
 
@@ -34,7 +36,7 @@ const ServiceRequestSchema = new Schema<IServiceRequest>({
   serviceId: { type: Schema.Types.ObjectId, ref: 'Service', required: true },
   beneficiaryId: { type: Schema.Types.ObjectId, ref: 'Beneficiary', required: true },
   nurseId: { type: Schema.Types.ObjectId, ref: 'Nurse' },
-  status: { type: String, enum: ['pending', 'assigned', 'accepted', 'in_progress', 'completed', 'cancelled'], default: 'pending' },
+  status: { type: String, enum: ['pending', 'assigned', 'accepted', 'in_progress', 'completed', 'cancelled', 'awaiting_payment'], default: 'pending' },
   basePrice: { type: Number, default: 0 },
   nightFee: { type: Number, default: 0 },
   fridayFee: { type: Number, default: 0 },
@@ -55,8 +57,10 @@ const ServiceRequestSchema = new Schema<IServiceRequest>({
   isEmergency: { type: Boolean, default: false },
   isNightService: { type: Boolean, default: false },
   isFridayService: { type: Boolean, default: false },
-  paymentStatus: { type: String, enum: ['pending', 'completed', 'failed', 'refunded'], default: 'pending' },
+  paymentStatus: { type: String, enum: ['pending', 'completed', 'failed', 'refunded', 'awaiting_confirmation'], default: 'pending' },
   paymentMethod: { type: String },
+  paymentMethodId: { type: String },
+  hasPaymentProof: { type: Boolean, default: false },
   couponId: { type: Schema.Types.ObjectId, ref: 'Coupon' },
 }, { timestamps: true });
 

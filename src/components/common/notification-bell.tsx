@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Bell, Check, MessageSquare, CreditCard, AlertTriangle, Calendar, Star, Settings } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { Bell, Check, MessageSquare, CreditCard, AlertTriangle, Calendar, Star, Settings, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -12,10 +12,11 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import type { NotificationType } from '@/types';
 
 // ============================================================================
-// Mock notification data (will be replaced with real data)
+// Real notification interface from API
 // ============================================================================
 
 interface NotificationItem {
@@ -24,41 +25,15 @@ interface NotificationItem {
   body: string;
   type: NotificationType;
   read: boolean;
-  createdAt: Date;
+  createdAt: string;
+  actionUrl?: string;
 }
-
-const mockNotifications: NotificationItem[] = [
-  {
-    id: '1',
-    title: 'طلب جديد',
-    body: 'لديك طلب خدمة جديد من مستفيد',
-    type: 'assignment',
-    read: false,
-    createdAt: new Date(Date.now() - 5 * 60 * 1000),
-  },
-  {
-    id: '2',
-    title: 'دفعة مستلمة',
-    body: 'تم استلام دفعة بقيمة ٥,٠٠٠ ر.ي',
-    type: 'payment',
-    read: false,
-    createdAt: new Date(Date.now() - 30 * 60 * 1000),
-  },
-  {
-    id: '3',
-    title: 'تنبيه طوارئ',
-    body: 'طلب طوارئ جديد في منطقتك',
-    type: 'emergency',
-    read: true,
-    createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
-  },
-];
 
 // ============================================================================
 // Notification icon by type
 // ============================================================================
 
-function getNotificationIcon(type: NotificationType) {
+function getNotificationIcon(type: NotificationType | string) {
   switch (type) {
     case 'assignment':
       return <MessageSquare className="w-4 h-4" />;
@@ -72,12 +47,14 @@ function getNotificationIcon(type: NotificationType) {
       return <Star className="w-4 h-4" />;
     case 'system':
       return <Settings className="w-4 h-4" />;
+    case 'status_change':
+      return <Settings className="w-4 h-4" />;
     default:
       return <Bell className="w-4 h-4" />;
   }
 }
 
-function getNotificationColor(type: NotificationType): string {
+function getNotificationColor(type: NotificationType | string): string {
   switch (type) {
     case 'emergency':
       return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
@@ -96,7 +73,8 @@ function getNotificationColor(type: NotificationType): string {
 // Relative time helper
 // ============================================================================
 
-function getRelativeTimeString(date: Date): string {
+function getRelativeTimeString(dateStr: string): string {
+  const date = new Date(dateStr);
   const now = new Date();
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
@@ -118,21 +96,72 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ className }: NotificationBellProps) {
-  const [notifications, setNotifications] = useState<NotificationItem[]>(mockNotifications);
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const token = useAuthStore((s) => s.token);
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isOpen, setIsOpen] = useState(false);
 
-  const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+  const fetchNotifications = useCallback(async () => {
+    if (!token) return;
+    setIsLoading(true);
+    try {
+      const res = await fetch('/api/notifications?limit=20', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        const notifs = data.data.notifications || [];
+        setNotifications(notifs);
+        setUnreadCount(data.data.unreadCount || 0);
+      }
+    } catch {
+      // silent - keep existing notifications
+    } finally {
+      setIsLoading(false);
+    }
+  }, [token]);
+
+  // Fetch on mount and periodically
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 30000); // poll every 30s
+    return () => clearInterval(interval);
+  }, [fetchNotifications]);
+
+  // Fetch when popover opens
+  useEffect(() => {
+    if (isOpen) fetchNotifications();
+  }, [isOpen, fetchNotifications]);
+
+  const markAsRead = async (id: string) => {
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
+    setUnreadCount((prev) => Math.max(0, prev - 1));
+    try {
+      await fetch(`/api/notifications/${id}/read`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      // silent
+    }
   };
 
-  const markAllAsRead = () => {
+  const markAllAsRead = async () => {
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setUnreadCount(0);
+    try {
+      await fetch('/api/notifications/read-all', {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      // silent
+    }
   };
 
   return (
-    <Popover>
+    <Popover open={isOpen} onOpenChange={setIsOpen}>
       <PopoverTrigger asChild>
         <Button variant="ghost" size="icon" className={cn('w-9 h-9 relative', className)}>
           <Bell className="w-4 h-4" />
@@ -149,20 +178,25 @@ export function NotificationBell({ className }: NotificationBellProps) {
       <PopoverContent className="w-80 p-0" align="start" dir="rtl">
         <div className="flex items-center justify-between p-4">
           <h3 className="font-semibold text-sm">الإشعارات</h3>
-          {unreadCount > 0 && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-xs h-auto py-1 px-2"
-              onClick={markAllAsRead}
-            >
-              تحديد الكل كمقروء
+          <div className="flex items-center gap-2">
+            <Button variant="ghost" size="icon" className="w-7 h-7" onClick={fetchNotifications} title="تحديث">
+              <Loader2 className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
-          )}
+            {unreadCount > 0 && (
+              <Button variant="ghost" size="sm" className="text-xs h-auto py-1 px-2" onClick={markAllAsRead}>
+                تحديد الكل كمقروء
+              </Button>
+            )}
+          </div>
         </div>
         <Separator />
         <ScrollArea className="max-h-80">
-          {notifications.length === 0 ? (
+          {isLoading && notifications.length === 0 ? (
+            <div className="p-4 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              جاري التحميل...
+            </div>
+          ) : notifications.length === 0 ? (
             <div className="p-4 text-center text-sm text-muted-foreground">
               لا توجد إشعارات
             </div>

@@ -15,18 +15,26 @@ import {
   Stethoscope,
   AlertCircle,
   ChevronLeft,
+  Smartphone,
+  Building2,
+  HandCoins,
+  Copy,
+  Check,
+  MessageCircle,
+  Upload,
+  Image as ImageIcon,
+  X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { GlassCard } from '@/components/common/glass-card';
 import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { Currency, formatYemeniRial } from '@/components/common/currency';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useToast } from '@/hooks/use-toast';
-import type { ApiResponse, Service, PaymentType, ServicePricing } from '@/types';
+import type { ApiResponse, Service, ServicePricing } from '@/types';
 
 interface StepInfo {
   number: number;
@@ -42,12 +50,36 @@ const steps: StepInfo[] = [
   { number: 5, title: 'تأكيد الطلب', icon: CheckCircle2 },
 ];
 
-const paymentMethods: { value: PaymentType; label: string; description: string }[] = [
-  { value: 'cash', label: 'نقدي', description: 'الدفع عند وصول الممرض/ـة' },
-  { value: 'mobile_wallet', label: 'محفظة إلكترونية', description: 'ون كاش / جوالي / سبأ كاش' },
-  { value: 'bank_transfer', label: 'تحويل بنكي', description: 'تحويل مباشر للحساب البنكي' },
-  { value: 'exchange_transfer', label: 'تحويل صراف', description: 'عبر مكاتب الصرافة' },
-];
+// Payment method from API
+interface PaymentMethodItem {
+  id: string;
+  nameAr: string;
+  nameEn: string;
+  type: string;
+  walletType: string | null;
+  exchangeType: string | null;
+  customProviderName: string;
+  icon: string;
+  isActive: boolean;
+  instructions: string;
+  accountName: string;
+  accountNumber: string;
+}
+
+// Copy button helper
+function CopyBtn({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const handleCopy = async () => {
+    try { await navigator.clipboard.writeText(text); } catch { /* fallback */ }
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+  return (
+    <button onClick={handleCopy} className="shrink-0 p-1.5 rounded-lg hover:bg-muted transition-colors" title="نسخ">
+      {copied ? <Check className="w-3.5 h-3.5 text-green-600" /> : <Copy className="w-3.5 h-3.5 text-muted-foreground" />}
+    </button>
+  );
+}
 
 export default function ServiceRequestPage() {
   const router = useRouter();
@@ -68,11 +100,22 @@ export default function ServiceRequestPage() {
   const [lat, setLat] = useState(0);
   const [lng, setLng] = useState(0);
   const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentType>('cash');
+  const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState<string>('');
   const [couponCode, setCouponCode] = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [isEmergency, setIsEmergency] = useState(false);
   const [pricing, setPricing] = useState<ServicePricing | null>(null);
+
+  // Payment methods from API
+  const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>([]);
+  const [emergencyFee, setEmergencyFee] = useState(5000);
+  const [supportWhatsApp, setSupportWhatsApp] = useState('+967123456789');
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
+
+  // Get selected payment method details
+  const selectedPaymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethodId);
+  const isCashPayment = selectedPaymentMethod?.type === 'cash';
 
   const fetchService = useCallback(async () => {
     if (!token || !serviceId) return;
@@ -93,9 +136,47 @@ export default function ServiceRequestPage() {
     }
   }, [token, serviceId]);
 
+  const fetchPaymentMethods = useCallback(async () => {
+    try {
+      const res = await fetch('/api/payments/methods');
+      const data = await res.json();
+      if (data.success && data.data) {
+        const methods = Array.isArray(data.data) ? data.data : [];
+        setPaymentMethods(methods);
+        // Auto-select cash if available
+        const cashMethod = methods.find((m: PaymentMethodItem) => m.type === 'cash');
+        if (cashMethod) setSelectedPaymentMethodId(cashMethod.id);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
+  const fetchSettings = useCallback(async () => {
+    try {
+      const [feeRes, supportRes] = await Promise.all([
+        fetch('/api/settings/emergency-fee'),
+        fetch('/api/settings/support'),
+      ]);
+      const feeData = await feeRes.json();
+      if (feeData.success && feeData.data) {
+        setEmergencyFee(feeData.data.emergencyFee || 5000);
+      }
+      const supportData = await supportRes.json();
+      if (supportData.success && supportData.data) {
+        const wa = supportData.data.supportWhatsAppNumbers?.[0] || supportData.data.supportWhatsApp || '+967123456789';
+        setSupportWhatsApp(wa);
+      }
+    } catch {
+      // silent
+    }
+  }, []);
+
   useEffect(() => {
     fetchService();
-  }, [fetchService]);
+    fetchPaymentMethods();
+    fetchSettings();
+  }, [fetchService, fetchPaymentMethods, fetchSettings]);
 
   // Calculate pricing when relevant fields change
   useEffect(() => {
@@ -103,9 +184,9 @@ export default function ServiceRequestPage() {
     const basePrice = service.basePrice;
     const nightFee = 0;
     const fridayFee = 0;
-    const emergencyFee = isEmergency ? basePrice * 0.5 : 0;
+    const emergencyFeeAmount = isEmergency ? emergencyFee : 0;
     const loyaltyDiscount = 0;
-    const subtotal = basePrice + nightFee + fridayFee + emergencyFee;
+    const subtotal = basePrice + nightFee + fridayFee + emergencyFeeAmount;
     const discount = couponDiscount;
     const totalPrice = Math.max(0, subtotal - discount - loyaltyDiscount);
     const commission = totalPrice * 0.15;
@@ -115,7 +196,7 @@ export default function ServiceRequestPage() {
       basePrice,
       nightFee,
       fridayFee,
-      emergencyFee,
+      emergencyFee: emergencyFeeAmount,
       discount,
       loyaltyDiscount,
       couponDiscount: couponDiscount,
@@ -123,7 +204,7 @@ export default function ServiceRequestPage() {
       commission,
       nursePayout,
     });
-  }, [service, isEmergency, couponDiscount]);
+  }, [service, isEmergency, couponDiscount, emergencyFee]);
 
   const validateCoupon = async () => {
     if (!token || !couponCode || !service) return;
@@ -149,8 +230,18 @@ export default function ServiceRequestPage() {
     }
   };
 
+  const handlePaymentProofChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setPaymentProofFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => setPaymentProofPreview(reader.result as string);
+      reader.readAsDataURL(file);
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!token || !service || !pricing) return;
+    if (!token || !service || !pricing || !selectedPaymentMethod) return;
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/beneficiary/orders', {
@@ -167,13 +258,24 @@ export default function ServiceRequestPage() {
           lng: lng || 44.1910,
           notes: notes || undefined,
           isEmergency,
-          paymentMethod,
+          paymentMethod: selectedPaymentMethod.type,
+          paymentMethodId: selectedPaymentMethodId,
           couponCode: couponCode || undefined,
+          hasPaymentProof: !isCashPayment && !!paymentProofFile,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        toast({ title: 'تم إنشاء الطلب بنجاح' });
+        const orderId = data.data?.id || data.data?._id?.toString() || '';
+
+        // If non-cash payment, open WhatsApp with professional message
+        if (!isCashPayment) {
+          const msg = buildWhatsAppMessage(orderId, service, pricing);
+          const waUrl = `https://wa.me/${supportWhatsApp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
+          window.open(waUrl, '_blank');
+        }
+
+        toast({ title: isCashPayment ? 'تم إنشاء الطلب بنجاح' : 'تم إنشاء الطلب - يرجى إرسال إثبات الدفع عبر الواتساب' });
         router.push('/beneficiary/orders');
       } else {
         toast({ title: data.message ?? 'فشل إنشاء الطلب', variant: 'destructive' });
@@ -185,12 +287,34 @@ export default function ServiceRequestPage() {
     }
   };
 
+  const buildWhatsAppMessage = (orderId: string, svc: Service, prc: ServicePricing) => {
+    const lines = [
+      '🏥 *عافيتك - طلب خدمة جديدة*',
+      '━━━━━━━━━━━━━━━━━━',
+      `📋 *رقم الطلب:* #${orderId.slice(-6).toUpperCase()}`,
+      `🩺 *الخدمة:* ${svc.nameAr}`,
+      `💰 *المبلغ:* ${formatYemeniRial(prc.totalPrice)}`,
+    ];
+    if (prc.emergencyFee > 0) {
+      lines.push(`🚨 *رسوم الطوارئ:* ${formatYemeniRial(prc.emergencyFee)}`);
+    }
+    lines.push(`👤 *المستفيد:* ${useAuthStore.getState().user?.name || 'غير محدد'}`);
+    lines.push(`📱 *رقم المستفيد:* ${useAuthStore.getState().user?.phone || 'غير محدد'}`);
+    if (address) lines.push(`📍 *العنوان:* ${address}`);
+    if (selectedPaymentMethod) {
+      lines.push(`💳 *طريقة الدفع:* ${selectedPaymentMethod.nameAr}`);
+    }
+    lines.push('━━━━━━━━━━━━━━━━━━');
+    lines.push('📎 إثبات الدفع مرفق');
+    return lines.join('\n');
+  };
+
   const canProceed = (): boolean => {
     switch (currentStep) {
       case 0: return !!service;
       case 1: return true;
       case 2: return lat !== 0 && lng !== 0;
-      case 3: return !!paymentMethod;
+      case 3: return !!selectedPaymentMethodId;
       case 4: return true;
       default: return false;
     }
@@ -219,14 +343,42 @@ export default function ServiceRequestPage() {
     );
   }
 
+  // Group payment methods by type
+  const walletMethods = paymentMethods.filter(pm => pm.type === 'wallet_deposit');
+  const bankMethods = paymentMethods.filter(pm => pm.type === 'bank_transfer');
+  const cashMethods = paymentMethods.filter(pm => pm.type === 'cash');
+
+  const getTypeIcon = (type: string) => {
+    switch (type) {
+      case 'wallet_deposit': return <Smartphone className="w-5 h-5" />;
+      case 'bank_transfer': return <Building2 className="w-5 h-5" />;
+      case 'cash': return <HandCoins className="w-5 h-5" />;
+      default: return <CreditCard className="w-5 h-5" />;
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'wallet_deposit': return 'bg-purple-50 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800';
+      case 'bank_transfer': return 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800';
+      case 'cash': return 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800';
+      default: return 'bg-muted border-border';
+    }
+  };
+
+  const getTypeLabel = (type: string) => {
+    switch (type) {
+      case 'wallet_deposit': return 'إيداع محفظة';
+      case 'bank_transfer': return 'تحويل بنكي';
+      case 'cash': return 'نقدي عند الوصول';
+      default: return type;
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
-      <motion.div
-        initial={{ opacity: 0, y: -10 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="flex items-center gap-3"
-      >
+      <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
           <ArrowRight className="w-5 h-5" />
         </Button>
@@ -247,20 +399,14 @@ export default function ServiceRequestPage() {
               <button
                 onClick={() => index <= currentStep && setCurrentStep(index)}
                 className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                  isActive
-                    ? 'bg-beneficiary text-beneficiary-foreground'
-                    : isCompleted
-                    ? 'bg-beneficiary/10 text-beneficiary'
-                    : 'glass text-muted-foreground'
+                  isActive ? 'bg-beneficiary text-beneficiary-foreground' : isCompleted ? 'bg-beneficiary/10 text-beneficiary' : 'glass text-muted-foreground'
                 }`}
               >
                 <Icon className="w-4 h-4" />
                 <span className="hidden sm:inline">{step.title}</span>
                 <span className="sm:hidden">{step.number}</span>
               </button>
-              {index < steps.length - 1 && (
-                <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0" />
-              )}
+              {index < steps.length - 1 && <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0" />}
             </div>
           );
         })}
@@ -268,13 +414,7 @@ export default function ServiceRequestPage() {
 
       {/* Step Content */}
       <AnimatePresence mode="wait">
-        <motion.div
-          key={currentStep}
-          initial={{ opacity: 0, x: -20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: 20 }}
-          transition={{ duration: 0.2 }}
-        >
+        <motion.div key={currentStep} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.2 }}>
           {/* Step 1: Service Details */}
           {currentStep === 0 && (
             <GlassCard variant="beneficiary" className="space-y-6">
@@ -287,15 +427,9 @@ export default function ServiceRequestPage() {
                   <p className="text-sm text-muted-foreground">{service.descriptionAr}</p>
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="glass rounded-xl p-4 text-center">
-                  <Currency amount={service.basePrice} className="text-lg text-beneficiary" />
-                  <p className="text-xs text-muted-foreground mt-1">السعر الأساسي</p>
-                </div>
-                <div className="glass rounded-xl p-4 text-center">
-                  <p className="text-lg font-bold">{service.duration} دقيقة</p>
-                  <p className="text-xs text-muted-foreground mt-1">المدة المتوقعة</p>
-                </div>
+              <div className="glass rounded-xl p-4 text-center">
+                <Currency amount={service.basePrice} className="text-lg text-beneficiary" />
+                <p className="text-xs text-muted-foreground mt-1">السعر الأساسي</p>
               </div>
               {service.isEmergency && (
                 <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400">
@@ -305,12 +439,7 @@ export default function ServiceRequestPage() {
               )}
               <div className="space-y-3">
                 <Label>ملاحظات إضافية</Label>
-                <Textarea
-                  placeholder="أضف أي ملاحظات للخدمة..."
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  dir="rtl"
-                />
+                <Textarea placeholder="أضف أي ملاحظات للخدمة..." value={notes} onChange={(e) => setNotes(e.target.value)} dir="rtl" />
               </div>
               <div className="flex items-center gap-3 p-3 rounded-xl glass">
                 <input
@@ -321,9 +450,17 @@ export default function ServiceRequestPage() {
                   className="w-5 h-5 rounded border-2 border-beneficiary text-beneficiary focus:ring-beneficiary"
                 />
                 <Label htmlFor="emergency-check" className="cursor-pointer">
-                  طلب طوارئ (رسوم إضافية ٥٠٪)
+                  طلب طوارئ (رسوم إضافية {formatYemeniRial(emergencyFee)})
                 </Label>
               </div>
+              {isEmergency && pricing && pricing.emergencyFee > 0 && (
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-red-700 dark:text-red-400 font-medium">السعر بعد رسوم الطوارئ</span>
+                    <Currency amount={pricing.totalPrice} className="text-lg text-red-600 dark:text-red-400 font-bold" />
+                  </div>
+                </motion.div>
+              )}
             </GlassCard>
           )}
 
@@ -336,26 +473,11 @@ export default function ServiceRequestPage() {
               </h2>
               <div className="space-y-2">
                 <Label htmlFor="date">التاريخ</Label>
-                <Input
-                  id="date"
-                  type="date"
-                  value={scheduledDate}
-                  onChange={(e) => setScheduledDate(e.target.value)}
-                  min={new Date().toISOString().split('T')[0]}
-                  dir="ltr"
-                  className="text-left"
-                />
+                <Input id="date" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} min={new Date().toISOString().split('T')[0]} dir="ltr" className="text-left" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="time">الوقت</Label>
-                <Input
-                  id="time"
-                  type="time"
-                  value={scheduledTime}
-                  onChange={(e) => setScheduledTime(e.target.value)}
-                  dir="ltr"
-                  className="text-left"
-                />
+                <Input id="time" type="time" value={scheduledTime} onChange={(e) => setScheduledTime(e.target.value)} dir="ltr" className="text-left" />
               </div>
               <p className="text-xs text-muted-foreground flex items-center gap-1">
                 <Clock className="w-3.5 h-3.5" />
@@ -390,17 +512,8 @@ export default function ServiceRequestPage() {
                   تفاصيل إضافية للعنوان
                   <span className="text-xs text-muted-foreground font-normal">(اختياري)</span>
                 </Label>
-                <Textarea
-                  id="address"
-                  placeholder="مثال: بجوار مستشفى الثورة، الطابق الثالث..."
-                  value={address}
-                  onChange={(e) => setAddress(e.target.value)}
-                  dir="rtl"
-                  rows={2}
-                />
-                <p className="text-xs text-muted-foreground">
-                  أضف أي تفاصيل تساعد الممرض/ـة في الوصول إليك
-                </p>
+                <Textarea id="address" placeholder="مثال: بجوار مستشفى الثورة، الطابق الثالث..." value={address} onChange={(e) => setAddress(e.target.value)} dir="rtl" rows={2} />
+                <p className="text-xs text-muted-foreground">أضف أي تفاصيل تساعد الممرض/ـة في الوصول إليك</p>
               </div>
             </GlassCard>
           )}
@@ -412,28 +525,144 @@ export default function ServiceRequestPage() {
                 <CreditCard className="w-5 h-5 text-beneficiary" />
                 طريقة الدفع
               </h2>
-              <RadioGroup
-                value={paymentMethod}
-                onValueChange={(val) => setPaymentMethod(val as PaymentType)}
-                className="space-y-3"
-              >
-                {paymentMethods.map((method) => (
-                  <label
-                    key={method.value}
-                    className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all ${
-                      paymentMethod === method.value
-                        ? 'bg-beneficiary/10 border-2 border-beneficiary'
-                        : 'glass border-2 border-transparent'
-                    }`}
-                  >
-                    <RadioGroupItem value={method.value} id={method.value} />
-                    <div className="flex-1">
-                      <p className="font-medium text-sm">{method.label}</p>
-                      <p className="text-xs text-muted-foreground">{method.description}</p>
+
+              {paymentMethods.length === 0 ? (
+                <div className="text-center py-8">
+                  <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
+                  <p className="text-sm text-muted-foreground">لا توجد طرق دفع متاحة حالياً</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {/* Cash Methods */}
+                  {cashMethods.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
+                        <HandCoins className="w-4 h-4" /> نقدي عند الوصول
+                      </p>
+                      {cashMethods.map(pm => (
+                        <label key={pm.id} className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border-2 ${
+                          selectedPaymentMethodId === pm.id ? 'border-green-500 bg-green-50 dark:bg-green-900/20' : 'border-transparent glass'
+                        }`}>
+                          <input type="radio" name="payment" checked={selectedPaymentMethodId === pm.id} onChange={() => setSelectedPaymentMethodId(pm.id)} className="w-4 h-4 text-green-600" />
+                          <div className="flex-1">
+                            <p className="font-medium text-sm">{pm.nameAr}</p>
+                            {pm.instructions && <p className="text-xs text-muted-foreground mt-0.5">{pm.instructions}</p>}
+                          </div>
+                        </label>
+                      ))}
                     </div>
-                  </label>
-                ))}
-              </RadioGroup>
+                  )}
+
+                  {/* Wallet Methods */}
+                  {walletMethods.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-purple-700 dark:text-purple-400 flex items-center gap-2">
+                        <Smartphone className="w-4 h-4" /> إيداع محفظة إلكترونية
+                      </p>
+                      {walletMethods.map(pm => (
+                        <label key={pm.id} className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border-2 ${
+                          selectedPaymentMethodId === pm.id ? 'border-purple-500 bg-purple-50 dark:bg-purple-900/20' : 'border-transparent glass'
+                        }`}>
+                          <input type="radio" name="payment" checked={selectedPaymentMethodId === pm.id} onChange={() => setSelectedPaymentMethodId(pm.id)} className="w-4 h-4 text-purple-600" />
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium text-sm">{pm.nameAr}</p>
+                              <span className="text-[10px] text-muted-foreground">{pm.nameEn}</span>
+                            </div>
+                            {selectedPaymentMethodId === pm.id && (
+                              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-2 pt-2 border-t border-border">
+                                {pm.accountName && (
+                                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+                                    <span className="text-xs text-muted-foreground shrink-0">الاسم:</span>
+                                    <span className="text-sm font-medium flex-1 truncate">{pm.accountName}</span>
+                                    <CopyBtn text={pm.accountName} />
+                                  </div>
+                                )}
+                                {pm.accountNumber && (
+                                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+                                    <span className="text-xs text-muted-foreground shrink-0">الرقم:</span>
+                                    <span className="text-sm font-mono font-bold tracking-wider flex-1" dir="ltr">{pm.accountNumber}</span>
+                                    <CopyBtn text={pm.accountNumber} />
+                                  </div>
+                                )}
+                                {pm.instructions && <p className="text-xs text-muted-foreground">{pm.instructions}</p>}
+                              </motion.div>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Bank/Exchange Methods */}
+                  {bankMethods.length > 0 && (
+                    <div className="space-y-2">
+                      <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
+                        <Building2 className="w-4 h-4" /> تحويل بنكي / صرافة
+                      </p>
+                      {bankMethods.map(pm => (
+                        <label key={pm.id} className={`flex items-center gap-4 p-4 rounded-xl cursor-pointer transition-all border-2 ${
+                          selectedPaymentMethodId === pm.id ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20' : 'border-transparent glass'
+                        }`}>
+                          <input type="radio" name="payment" checked={selectedPaymentMethodId === pm.id} onChange={() => setSelectedPaymentMethodId(pm.id)} className="w-4 h-4 text-blue-600" />
+                          <div className="flex-1 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium text-sm">{pm.nameAr}</p>
+                              <span className="text-[10px] text-muted-foreground">{pm.nameEn}</span>
+                            </div>
+                            {selectedPaymentMethodId === pm.id && (
+                              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-2 pt-2 border-t border-border">
+                                {pm.accountName && (
+                                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+                                    <span className="text-xs text-muted-foreground shrink-0">الاسم:</span>
+                                    <span className="text-sm font-medium flex-1 truncate">{pm.accountName}</span>
+                                    <CopyBtn text={pm.accountName} />
+                                  </div>
+                                )}
+                                {pm.accountNumber && (
+                                  <div className="flex items-center gap-2 p-2 rounded-lg bg-muted/50">
+                                    <span className="text-xs text-muted-foreground shrink-0">الهاتف:</span>
+                                    <span className="text-sm font-mono font-bold tracking-wider flex-1" dir="ltr">{pm.accountNumber}</span>
+                                    <CopyBtn text={pm.accountNumber} />
+                                  </div>
+                                )}
+                                {pm.instructions && <p className="text-xs text-muted-foreground">{pm.instructions}</p>}
+                              </motion.div>
+                            )}
+                          </div>
+                        </label>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Payment Proof Upload for non-cash */}
+                  {selectedPaymentMethod && !isCashPayment && (
+                    <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-3 pt-4 border-t border-border">
+                      <Label className="flex items-center gap-2 font-semibold">
+                        <Upload className="w-4 h-4 text-beneficiary" />
+                        إثبات الدفع (اختياري)
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        قم بتحويل المبلغ ثم ارفع صورة إثبات الدفع. يمكنك أيضاً إرسالها عبر الواتساب بعد تأكيد الطلب.
+                      </p>
+                      {paymentProofPreview ? (
+                        <div className="relative rounded-xl overflow-hidden border border-border">
+                          <img src={paymentProofPreview} alt="إثبات الدفع" className="w-full max-h-48 object-cover" />
+                          <button onClick={() => { setPaymentProofFile(null); setPaymentProofPreview(null); }} className="absolute top-2 left-2 p-1.5 rounded-full bg-black/50 text-white hover:bg-black/70">
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="flex flex-col items-center justify-center gap-3 p-6 rounded-xl border-2 border-dashed border-border hover:border-beneficiary/50 cursor-pointer transition-colors">
+                          <ImageIcon className="w-8 h-8 text-muted-foreground" />
+                          <span className="text-sm text-muted-foreground">اضغط لرفع صورة إثبات الدفع</span>
+                          <input type="file" accept="image/*" className="hidden" onChange={handlePaymentProofChange} />
+                        </label>
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+              )}
 
               {/* Coupon */}
               <div className="space-y-3 pt-4 border-t border-border">
@@ -442,21 +671,8 @@ export default function ServiceRequestPage() {
                   كوبون خصم (اختياري)
                 </Label>
                 <div className="flex gap-2">
-                  <Input
-                    placeholder="أدخل كود الكوبون"
-                    value={couponCode}
-                    onChange={(e) => setCouponCode(e.target.value)}
-                    dir="ltr"
-                    className="flex-1"
-                  />
-                  <Button
-                    variant="outline"
-                    className="border-beneficiary text-beneficiary shrink-0"
-                    onClick={validateCoupon}
-                    disabled={!couponCode}
-                  >
-                    تطبيق
-                  </Button>
+                  <Input placeholder="أدخل كود الكوبون" value={couponCode} onChange={(e) => setCouponCode(e.target.value)} dir="ltr" className="flex-1" />
+                  <Button variant="outline" className="border-beneficiary text-beneficiary shrink-0" onClick={validateCoupon} disabled={!couponCode}>تطبيق</Button>
                 </div>
                 {couponDiscount > 0 && (
                   <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
@@ -494,9 +710,38 @@ export default function ServiceRequestPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-muted-foreground text-sm">طريقة الدفع</span>
-                  <span className="font-medium text-sm">{paymentMethods.find((m) => m.value === paymentMethod)?.label}</span>
+                  <span className="font-medium text-sm">{selectedPaymentMethod?.nameAr || 'غير محدد'}</span>
                 </div>
+                {!isCashPayment && (
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground text-sm">إثبات الدفع</span>
+                    <span className="font-medium text-sm">{paymentProofFile ? '✓ مرفق' : 'سيتم إرساله عبر الواتساب'}</span>
+                  </div>
+                )}
               </div>
+
+              {/* Payment Details for non-cash */}
+              {selectedPaymentMethod && !isCashPayment && (
+                <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 space-y-2">
+                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">تفاصيل التحويل</p>
+                  {selectedPaymentMethod.accountName && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">الاسم:</span>
+                      <span className="text-sm font-medium">{selectedPaymentMethod.accountName}</span>
+                    </div>
+                  )}
+                  {selectedPaymentMethod.accountNumber && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">{selectedPaymentMethod.type === 'wallet_deposit' ? 'الرقم:' : 'الهاتف:'}</span>
+                      <span className="text-sm font-mono font-bold" dir="ltr">{selectedPaymentMethod.accountNumber}</span>
+                    </div>
+                  )}
+                  <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1 mt-2">
+                    <MessageCircle className="w-3.5 h-3.5" />
+                    بعد التأكيد سيتم فتح الواتساب لإرسال إثبات الدفع
+                  </p>
+                </div>
+              )}
 
               {/* Pricing Breakdown */}
               <div className="space-y-3 pt-4 border-t border-border">
@@ -546,37 +791,24 @@ export default function ServiceRequestPage() {
 
       {/* Navigation Buttons */}
       <div className="flex items-center justify-between gap-4 pt-4">
-        <Button
-          variant="outline"
-          onClick={() => setCurrentStep((prev) => Math.max(0, prev - 1))}
-          disabled={currentStep === 0}
-          className="gap-2"
-        >
+        <Button variant="outline" onClick={() => setCurrentStep((prev) => Math.max(0, prev - 1))} disabled={currentStep === 0} className="gap-2">
           <ChevronLeft className="w-4 h-4" />
           السابق
         </Button>
 
         {currentStep < steps.length - 1 ? (
-          <Button
-            onClick={() => setCurrentStep((prev) => Math.min(steps.length - 1, prev + 1))}
-            disabled={!canProceed()}
-            className="bg-beneficiary hover:bg-beneficiary/90 text-beneficiary-foreground gap-2"
-          >
+          <Button onClick={() => setCurrentStep((prev) => Math.min(steps.length - 1, prev + 1))} disabled={!canProceed()} className="bg-beneficiary hover:bg-beneficiary/90 text-beneficiary-foreground gap-2">
             التالي
             <ChevronLeft className="w-4 h-4 rotate-180" />
           </Button>
         ) : (
-          <Button
-            onClick={handleSubmit}
-            disabled={isSubmitting || !canProceed()}
-            className="bg-beneficiary hover:bg-beneficiary/90 text-beneficiary-foreground gap-2 min-w-[120px]"
-          >
+          <Button onClick={handleSubmit} disabled={isSubmitting || !canProceed() || !selectedPaymentMethodId} className="bg-beneficiary hover:bg-beneficiary/90 text-beneficiary-foreground gap-2 min-w-[160px]">
             {isSubmitting ? (
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : (
               <>
                 <CheckCircle2 className="w-4 h-4" />
-                تأكيد الطلب
+                {isCashPayment ? 'تأكيد الطلب' : 'تأكيد وإرسال إثبات الدفع'}
               </>
             )}
           </Button>

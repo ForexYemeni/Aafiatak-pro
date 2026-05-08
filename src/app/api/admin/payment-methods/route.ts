@@ -7,6 +7,22 @@ import PaymentMethod from '@/models/PaymentMethod';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+const walletNames: Record<string, { ar: string; en: string }> = {
+  jeep: { ar: 'جيب', en: 'Jeeb' },
+  jawali: { ar: 'جوالي', en: 'Jawali' },
+  cash_wallet: { ar: 'كاش', en: 'Cash' },
+  one_cash: { ar: 'ون كاش', en: 'One Cash' },
+  flousk: { ar: 'فلوسك', en: 'Fulousk' },
+  saba_cash: { ar: 'سبأ كاش', en: 'Saba Cash' },
+};
+
+const exchangeNames: Record<string, { ar: string; en: string }> = {
+  al_najm: { ar: 'صرافة النجم', en: 'Al-Najm Exchange' },
+  yemen_express: { ar: 'صرافة يمن اكسبرس', en: 'Yemen Express' },
+  al_imtiaz: { ar: 'صرافة الامتياز', en: 'Al-Imtiaz Exchange' },
+  al_hazmi: { ar: 'صرافة الحزمي', en: 'Al-Hazmi Exchange' },
+};
+
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -45,6 +61,7 @@ export async function POST(request: NextRequest) {
       type: body.type,
       walletType: body.type === 'wallet_deposit' ? (body.walletType || null) : null,
       exchangeType: body.type === 'bank_transfer' ? (body.exchangeType || null) : null,
+      customProviderName: body.customProviderName || '',
       icon: body.icon || '',
       isActive: body.isActive !== false,
       instructions: body.instructions || '',
@@ -55,43 +72,26 @@ export async function POST(request: NextRequest) {
     // Auto-generate name from wallet/exchange type if not provided
     if (!pmData.nameAr) {
       if (body.type === 'wallet_deposit' && body.walletType) {
-        const walletNames: Record<string, { ar: string; en: string }> = {
-          jeep: { ar: 'جيب', en: 'Jeeb' },
-          jawali: { ar: 'جوالي', en: 'Jawali' },
-          cash_wallet: { ar: 'كاش', en: 'Cash' },
-          one_cash: { ar: 'ون كاش', en: 'One Cash' },
-          flousk: { ar: 'فلوسك', en: 'Fulousk' },
-          saba_cash: { ar: 'سبأ كاش', en: 'Saba Cash' },
-          mobile_money: { ar: 'موبايل موني', en: 'Mobile Money' },
-          mahfathati: { ar: 'محفظتي', en: 'Mahfathati' },
-          yemen_wallet: { ar: 'يمن والت', en: 'Yemen Wallet' },
-          al_mutakamila: { ar: 'المتكاملة', en: 'Al-Mutakamila' },
-          halelflos: { ar: 'حالف فلوس', en: 'Halelflos' },
-        };
-        const wn = walletNames[body.walletType];
-        if (wn) {
-          pmData.nameAr = wn.ar;
-          pmData.nameEn = wn.en;
+        if (body.walletType === 'other') {
+          pmData.nameAr = body.customProviderName || 'محفظة أخرى';
+          pmData.nameEn = body.customProviderName || 'Other Wallet';
+        } else {
+          const wn = walletNames[body.walletType];
+          if (wn) {
+            pmData.nameAr = wn.ar;
+            pmData.nameEn = wn.en;
+          }
         }
       } else if (body.type === 'bank_transfer' && body.exchangeType) {
-        const exchangeNames: Record<string, { ar: string; en: string }> = {
-          al_najm: { ar: 'صرافة النجم', en: 'Al-Najm Exchange' },
-          yemen_express: { ar: 'صرافة يمن اكسبرس', en: 'Yemen Express' },
-          al_imtiaz: { ar: 'صرافة الامتياز', en: 'Al-Imtiaz Exchange' },
-          al_hazmi: { ar: 'صرافة الحزمي', en: 'Al-Hazmi Exchange' },
-          al_saifi: { ar: 'صرافة الصيفي', en: 'Al-Saifi Exchange' },
-          al_aidrous: { ar: 'صرافة العيدروس', en: 'Al-Aidrous Exchange' },
-          dadiya: { ar: 'صرافة دادية', en: 'Dadiya Exchange' },
-          al_akwa: { ar: 'صرافة الأكوع', en: 'Al-Akwa Exchange' },
-          al_nasser: { ar: 'صرافة الناصر', en: 'Al-Nasser Exchange' },
-          al_mumayaz: { ar: 'صرافة المميز', en: 'Al-Mumayaz Exchange' },
-          al_muraisi: { ar: 'صرافة المريسي', en: 'Al-Muraisi Exchange' },
-          al_shabouti: { ar: 'صرافة الشبوطي', en: 'Al-Shabouti Exchange' },
-        };
-        const en = exchangeNames[body.exchangeType];
-        if (en) {
-          pmData.nameAr = en.ar;
-          pmData.nameEn = en.en;
+        if (body.exchangeType === 'other') {
+          pmData.nameAr = 'صرافة ' + (body.customProviderName || 'أخرى');
+          pmData.nameEn = (body.customProviderName || 'Other') + ' Exchange';
+        } else {
+          const en = exchangeNames[body.exchangeType];
+          if (en) {
+            pmData.nameAr = en.ar;
+            pmData.nameEn = en.en;
+          }
         }
       } else if (body.type === 'cash') {
         pmData.nameAr = 'نقدي عند وصول الممرض';
