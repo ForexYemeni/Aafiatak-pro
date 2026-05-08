@@ -6,7 +6,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
-import { logActivity } from '@/lib/api/helpers';
+import { logActivity, creditNurseEarnings } from '@/lib/api/helpers';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -22,7 +22,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
     // Can only execute orders that are pending or assigned
-    if (!['pending', 'assigned', 'accepted'].includes(order.status)) {
+    if (!['pending', 'assigned', 'accepted', 'in_progress'].includes(order.status)) {
       return createErrorResponse('لا يمكن تنفيذ هذا الطلب في حالته الحالية', 400, 'INVALID_STATUS');
     }
 
@@ -32,6 +32,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     order.startedAt = order.startedAt || new Date();
     if (notes) order.notes = notes;
     await order.save();
+
+    // Credit nurse earnings if nurse is assigned
+    if (order.nurseId && order.nursePayout > 0) {
+      await creditNurseEarnings({
+        requestId: order._id.toString(),
+        nurseId: order.nurseId.toString(),
+        beneficiaryId: order.beneficiaryId.toString(),
+        amount: order.totalPrice || 0,
+        commission: order.commission || 0,
+        nursePayout: order.nursePayout || 0,
+        paymentMethod: order.paymentMethod,
+      });
+    }
 
     // Notify beneficiary
     try {
@@ -55,8 +68,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         await Notification.create({
           userId: order.nurseId,
           userRole: 'nurse',
-          titleAr: 'تم إلغاء تعيينك',
-          bodyAr: 'تم تنفيذ الطلب مباشرة من قبل الإدارة ولم يعد بحاجة لخدمتك',
+          titleAr: 'تم إكمال الطلب المعين لك',
+          bodyAr: 'تم إكمال الطلب وتم إضافة أرباحك إلى رصيدك المتاح',
           type: 'status_change',
           priority: 'medium',
           data: { requestId: id, status: 'completed', executedBy: 'admin' },

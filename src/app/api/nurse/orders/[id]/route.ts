@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { creditNurseEarnings } from '@/lib/api/helpers';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -66,6 +67,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       order.status = 'completed';
       order.completedAt = new Date();
       await order.save();
+
+      // Credit nurse earnings
+      if (order.nurseId && order.nursePayout > 0) {
+        await creditNurseEarnings({
+          requestId: order._id.toString(),
+          nurseId: order.nurseId.toString(),
+          beneficiaryId: order.beneficiaryId.toString(),
+          amount: order.totalPrice || 0,
+          commission: order.commission || 0,
+          nursePayout: order.nursePayout || 0,
+          paymentMethod: order.paymentMethod,
+        });
+      }
 
       // Notify beneficiary
       try {

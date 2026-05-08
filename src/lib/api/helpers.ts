@@ -5,7 +5,7 @@
 // ============================================================================
 
 import { connectDB } from '@/lib/mongodb';
-import { ActivityLog } from '@/models/mongoose';
+import { ActivityLog, Nurse, Transaction } from '@/models/mongoose';
 import { verifyToken } from '@/lib/auth';
 import type { PaginationMeta } from '@/types';
 
@@ -298,4 +298,55 @@ export function calculatePricing(params: {
     commission: Math.round(commission),
     nursePayout: Math.round(nursePayout),
   };
+}
+
+// ---- Nurse Earnings Credit Helper ----
+
+/**
+ * Credit nurse earnings when an order is completed.
+ * Updates nurse.totalEarnings, nurse.availableBalance, nurse.completedJobs,
+ * and creates a Transaction record.
+ * Guarded against double-credit by checking if a Transaction already exists for this requestId.
+ */
+export async function creditNurseEarnings(params: {
+  requestId: string;
+  nurseId: string;
+  beneficiaryId: string;
+  amount: number;
+  commission: number;
+  nursePayout: number;
+  paymentMethod?: string;
+}): Promise<void> {
+  try {
+    // Guard against double-credit
+    const existingTx = await Transaction.findOne({ requestId: params.requestId });
+    if (existingTx) {
+      // Already credited, skip
+      return;
+    }
+
+    // Update nurse earnings
+    const nurse = await Nurse.findById(params.nurseId);
+    if (!nurse) return;
+
+    nurse.totalEarnings += params.nursePayout;
+    nurse.availableBalance += params.nursePayout;
+    nurse.completedJobs += 1;
+    await nurse.save();
+
+    // Create transaction record
+    await Transaction.create({
+      requestId: params.requestId,
+      beneficiaryId: params.beneficiaryId,
+      nurseId: params.nurseId,
+      amount: params.amount,
+      commission: params.commission,
+      netAmount: params.nursePayout,
+      paymentMethod: params.paymentMethod || 'cash',
+      status: 'completed',
+    });
+  } catch (error) {
+    console.error('[CREDIT NURSE EARNINGS ERROR]', error);
+    // Don't throw - we don't want to block order completion
+  }
 }

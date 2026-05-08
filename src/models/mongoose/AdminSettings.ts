@@ -23,6 +23,8 @@ export interface IAdminSettings extends Document {
   privacyPolicyAr: string;
   loyaltyRedemptionThreshold: number;
   supportEmail: string;
+  withdrawalFee: number;
+  enabledWalletTypes: string[];
 }
 
 const AdminSettingsSchema = new Schema<IAdminSettings>({
@@ -48,6 +50,8 @@ const AdminSettingsSchema = new Schema<IAdminSettings>({
   privacyPolicyAr: { type: String, default: '' },
   loyaltyRedemptionThreshold: { type: Number, default: 100 },
   supportEmail: { type: String, default: '' },
+  withdrawalFee: { type: Number, default: 200 },
+  enabledWalletTypes: [{ type: String }],
 }, { timestamps: true });
 
 export const AdminSettings = mongoose.models.AdminSettings || mongoose.model<IAdminSettings>('AdminSettings', AdminSettingsSchema);

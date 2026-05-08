@@ -6,8 +6,6 @@ import {
   Stethoscope,
   Eye,
   ShieldCheck,
-  ToggleLeft,
-  ToggleRight,
   RefreshCw,
   Phone,
   Star,
@@ -19,6 +17,12 @@ import {
   AlertTriangle,
   FileText,
   Loader2,
+  ArrowDownToLine,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  Wallet,
+  Search,
 } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
@@ -36,6 +40,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Dialog,
   DialogContent,
@@ -51,6 +56,7 @@ import {
   DrawerTitle,
 } from '@/components/ui/drawer';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { Currency } from '@/components/common/currency';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import type { ColumnDef } from '@tanstack/react-table';
@@ -84,6 +90,24 @@ interface NurseItem {
   address?: string | null;
 }
 
+interface WithdrawalItem {
+  id: string;
+  nurseId: string;
+  nurseName: string;
+  nursePhone: string;
+  amount: number;
+  withdrawalFee: number;
+  netAmount: number;
+  walletType: string;
+  walletNumber: string;
+  walletHolderName: string;
+  status: 'pending' | 'approved' | 'rejected' | 'processed';
+  adminNotes: string;
+  processedAt: string | null;
+  rejectedReason: string | null;
+  createdAt: string;
+}
+
 const specializationLabels: Record<string, string> = {
   general_nursing: 'تمريض عام',
   critical_care: 'رعاية حرجة',
@@ -103,6 +127,11 @@ const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
 export default function AdminNursesPage() {
   const authFetch = useAuthFetch();
   const isMobile = useIsMobile();
+
+  // Active tab
+  const [activeTab, setActiveTab] = useState('nurses');
+
+  // Nurses state
   const [nurses, setNurses] = useState<NurseItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -139,6 +168,24 @@ export default function AdminNursesPage() {
   const [isDeleting, setIsDeleting] = useState(false);
   const [deleteConfirmName, setDeleteConfirmName] = useState('');
 
+  // Withdrawal state
+  const [withdrawals, setWithdrawals] = useState<WithdrawalItem[]>([]);
+  const [withdrawalsLoading, setWithdrawalsLoading] = useState(false);
+  const [withdrawalStatusFilter, setWithdrawalStatusFilter] = useState('all');
+  const [withdrawalSearch, setWithdrawalSearch] = useState('');
+  const [withdrawalPage, setWithdrawalPage] = useState(1);
+  const [withdrawalTotalPages, setWithdrawalTotalPages] = useState(1);
+
+  // Withdrawal action dialog
+  const [withdrawalAction, setWithdrawalAction] = useState<WithdrawalItem | null>(null);
+  const [withdrawalActionType, setWithdrawalActionType] = useState<'approve' | 'reject'>('approve');
+  const [withdrawalActionLoading, setWithdrawalActionLoading] = useState(false);
+  const [withdrawalAdminNotes, setWithdrawalAdminNotes] = useState('');
+  const [withdrawalRejectReason, setWithdrawalRejectReason] = useState('');
+
+  // Withdrawal detail dialog
+  const [withdrawalDetail, setWithdrawalDetail] = useState<WithdrawalItem | null>(null);
+
   const handleViewNurse = useCallback(async (nurse: NurseItem) => {
     setViewTarget(nurse);
     setViewLoading(true);
@@ -156,7 +203,6 @@ export default function AdminNursesPage() {
     }
   }, [authFetch]);
 
-  // Load documents separately (lazy loading for speed)
   const handleLoadDocuments = useCallback(async (nurseId: string) => {
     setDocLoading(true);
     try {
@@ -196,9 +242,37 @@ export default function AdminNursesPage() {
     }
   }, [authFetch, page, search, statusFilter, specFilter]);
 
+  const fetchWithdrawals = useCallback(async () => {
+    setWithdrawalsLoading(true);
+    try {
+      const params = new URLSearchParams({
+        page: String(withdrawalPage),
+        limit: '10',
+        ...(withdrawalStatusFilter !== 'all' ? { status: withdrawalStatusFilter } : {}),
+        ...(withdrawalSearch ? { search: withdrawalSearch } : {}),
+      });
+      const res = await authFetch(`/api/admin/withdrawals?${params}`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        setWithdrawals(json.data.withdrawals || []);
+        setWithdrawalTotalPages(json.data.pages || 1);
+      }
+    } catch {
+      toast.error('فشل تحميل طلبات السحب');
+    } finally {
+      setWithdrawalsLoading(false);
+    }
+  }, [authFetch, withdrawalPage, withdrawalStatusFilter, withdrawalSearch]);
+
   useEffect(() => {
     void fetchNurses();
   }, [fetchNurses]);
+
+  useEffect(() => {
+    if (activeTab === 'withdrawals') {
+      void fetchWithdrawals();
+    }
+  }, [activeTab, fetchWithdrawals]);
 
   const handleVerify = async () => {
     if (!verifyTarget) return;
@@ -246,7 +320,6 @@ export default function AdminNursesPage() {
     }
   };
 
-  // Block/unblock nurse
   const handleBlock = async () => {
     if (!blockTarget) return;
     setIsBlocking(true);
@@ -275,7 +348,6 @@ export default function AdminNursesPage() {
     }
   };
 
-  // Delete nurse permanently
   const handleDelete = async () => {
     if (!deleteTarget) return;
     if (deleteConfirmName !== deleteTarget.name) {
@@ -301,6 +373,36 @@ export default function AdminNursesPage() {
       setIsDeleting(false);
       setDeleteTarget(null);
       setDeleteConfirmName('');
+    }
+  };
+
+  // Handle withdrawal approve/reject
+  const handleWithdrawalAction = async () => {
+    if (!withdrawalAction) return;
+    setWithdrawalActionLoading(true);
+    try {
+      const res = await authFetch(`/api/admin/withdrawals/${withdrawalAction.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: withdrawalActionType === 'approve' ? 'processed' : 'rejected',
+          adminNotes: withdrawalAdminNotes || undefined,
+          rejectedReason: withdrawalActionType === 'reject' ? withdrawalRejectReason : undefined,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(withdrawalActionType === 'approve' ? 'تم تحويل الأموال للممرض بنجاح' : 'تم رفض طلب السحب وإرجاع المبلغ');
+        void fetchWithdrawals();
+      } else {
+        toast.error(json.message ?? 'فشل العملية');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    } finally {
+      setWithdrawalActionLoading(false);
+      setWithdrawalAction(null);
+      setWithdrawalAdminNotes('');
+      setWithdrawalRejectReason('');
     }
   };
 
@@ -416,7 +518,6 @@ export default function AdminNursesPage() {
 
   const ViewContent = ({ nurse }: { nurse: NurseItem }) => (
     <div className="space-y-4 p-4">
-      {/* Header */}
       <div className="flex items-center gap-4">
         <Avatar className="w-16 h-16">
           <AvatarFallback className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 text-xl">
@@ -439,7 +540,6 @@ export default function AdminNursesPage() {
         </div>
       </div>
 
-      {/* Info grid */}
       <div className="grid grid-cols-2 gap-3">
         <div className="glass rounded-xl p-3">
           <p className="text-xs text-muted-foreground">التخصص</p>
@@ -501,7 +601,6 @@ export default function AdminNursesPage() {
         </div>
       )}
 
-      {/* Documents - Lazy loaded */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <p className="text-xs text-muted-foreground">المستندات</p>
@@ -597,6 +696,24 @@ export default function AdminNursesPage() {
     </div>
   );
 
+  // Withdrawal status helpers
+  const wStatusLabels: Record<string, string> = {
+    pending: 'قيد المراجعة',
+    approved: 'تمت الموافقة',
+    rejected: 'مرفوض',
+    processed: 'تم التحويل',
+  };
+
+  const wStatusColors: Record<string, string> = {
+    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
+    approved: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+    processed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
+    rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
+  };
+
+  // Count pending withdrawals
+  const pendingCount = withdrawals.filter(w => w.status === 'pending').length;
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       {/* Image Lightbox */}
@@ -636,54 +753,274 @@ export default function AdminNursesPage() {
       </AnimatePresence>
 
       <motion.div variants={itemAnim}>
-        <PageHeader title="إدارة الممرضين" description="إدارة وتوثيق الممرضين المسجلين" />
+        <PageHeader title="إدارة الممرضين" description="إدارة الممرضين وطلبات السحب" />
       </motion.div>
 
+      {/* Tabs */}
       <motion.div variants={itemAnim}>
-        <GlassCard variant="admin">
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <SearchInput placeholder="بحث بالاسم أو الهاتف..." onChange={setSearch} className="flex-1" />
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-44">
-                <SelectValue placeholder="الحالة" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع الحالات</SelectItem>
-                <SelectItem value="active">نشط</SelectItem>
-                <SelectItem value="inactive">غير نشط</SelectItem>
-                <SelectItem value="pending">قيد المراجعة</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={specFilter} onValueChange={setSpecFilter}>
-              <SelectTrigger className="w-full sm:w-44">
-                <SelectValue placeholder="التخصص" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع التخصصات</SelectItem>
-                {Object.entries(specializationLabels).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="w-full grid grid-cols-2">
+            <TabsTrigger value="nurses" className="gap-2">
+              <Stethoscope className="w-4 h-4" />
+              الممرضون
+            </TabsTrigger>
+            <TabsTrigger value="withdrawals" className="gap-2 relative">
+              <Wallet className="w-4 h-4" />
+              طلبات السحب
+              {pendingCount > 0 && (
+                <Badge className="absolute -top-2 -left-2 h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-red-500 text-white">
+                  {pendingCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+
+          {/* ===== Nurses Tab ===== */}
+          <TabsContent value="nurses" className="space-y-4">
+            <GlassCard variant="admin">
+              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+                <SearchInput placeholder="بحث بالاسم أو الهاتف..." onChange={setSearch} className="flex-1" />
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-44">
+                    <SelectValue placeholder="الحالة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">جميع الحالات</SelectItem>
+                    <SelectItem value="active">نشط</SelectItem>
+                    <SelectItem value="inactive">غير نشط</SelectItem>
+                    <SelectItem value="pending">قيد المراجعة</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Select value={specFilter} onValueChange={setSpecFilter}>
+                  <SelectTrigger className="w-full sm:w-44">
+                    <SelectValue placeholder="التخصص" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">جميع التخصصات</SelectItem>
+                    {Object.entries(specializationLabels).map(([key, label]) => (
+                      <SelectItem key={key} value={key}>{label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="icon" onClick={() => void fetchNurses()}>
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              </div>
+            </GlassCard>
+
+            <DataTable
+              columns={columns}
+              data={nurses}
+              isLoading={isLoading}
+              emptyMessage="لا يوجد ممرضون"
+              emptyAction={{ label: 'تحديث', onClick: () => void fetchNurses() }}
+              rowActions={rowActions as never}
+              currentPage={page}
+              pageCount={totalPages}
+              onPageChange={setPage}
+            />
+          </TabsContent>
+
+          {/* ===== Withdrawals Tab ===== */}
+          <TabsContent value="withdrawals" className="space-y-4">
+            {/* Filters */}
+            <GlassCard variant="admin">
+              <div className="flex flex-col sm:flex-row gap-4 mb-4">
+                <div className="relative flex-1">
+                  <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    placeholder="بحث بالاسم أو رقم المحفظة..."
+                    value={withdrawalSearch}
+                    onChange={(e) => setWithdrawalSearch(e.target.value)}
+                    className="pr-10"
+                  />
+                </div>
+                <Select value={withdrawalStatusFilter} onValueChange={setWithdrawalStatusFilter}>
+                  <SelectTrigger className="w-full sm:w-44">
+                    <SelectValue placeholder="الحالة" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">جميع الحالات</SelectItem>
+                    <SelectItem value="pending">قيد المراجعة</SelectItem>
+                    <SelectItem value="approved">تمت الموافقة</SelectItem>
+                    <SelectItem value="processed">تم التحويل</SelectItem>
+                    <SelectItem value="rejected">مرفوض</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button variant="outline" size="icon" onClick={() => void fetchWithdrawals()}>
+                  <RefreshCw className="w-4 h-4" />
+                </Button>
+              </div>
+            </GlassCard>
+
+            {/* Withdrawal Cards */}
+            {withdrawalsLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-admin" />
+              </div>
+            ) : withdrawals.length === 0 ? (
+              <GlassCard variant="admin" className="p-8">
+                <EmptyState
+                  icon={<ArrowDownToLine className="w-10 h-10 text-muted-foreground" />}
+                  title="لا توجد طلبات سحب"
+                  description="ستظهر طلبات السحب هنا عندما يطلب الممرضون سحب أرباحهم"
+                />
+              </GlassCard>
+            ) : (
+              <div className="space-y-3">
+                {withdrawals.map((w) => (
+                  <motion.div
+                    key={w.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={`rounded-2xl border p-4 transition-all ${
+                      w.status === 'pending' ? 'border-yellow-300 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/10' :
+                      'border-border bg-card'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      {/* Nurse info */}
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
+                          w.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
+                          w.status === 'processed' ? 'bg-green-100 dark:bg-green-900/30' :
+                          w.status === 'approved' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                          'bg-red-100 dark:bg-red-900/30'
+                        }`}>
+                          <Wallet className={`w-5 h-5 ${
+                            w.status === 'pending' ? 'text-yellow-600' :
+                            w.status === 'processed' ? 'text-green-600' :
+                            w.status === 'approved' ? 'text-blue-600' :
+                            'text-red-600'
+                          }`} />
+                        </div>
+                        <div>
+                          <p className="font-semibold text-sm">{w.nurseName}</p>
+                          <p className="text-xs text-muted-foreground" dir="ltr">{w.nursePhone}</p>
+                        </div>
+                      </div>
+
+                      {/* Status badge */}
+                      <Badge className={`text-[10px] shrink-0 ${wStatusColors[w.status] || ''}`} variant="outline">
+                        {wStatusLabels[w.status] || w.status}
+                      </Badge>
+                    </div>
+
+                    {/* Amount & Wallet Details */}
+                    <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      <div className="rounded-xl bg-muted/30 p-2.5">
+                        <p className="text-[10px] text-muted-foreground">مبلغ السحب</p>
+                        <p className="text-sm font-bold"><Currency amount={w.amount} /></p>
+                      </div>
+                      <div className="rounded-xl bg-muted/30 p-2.5">
+                        <p className="text-[10px] text-muted-foreground">رسوم السحب</p>
+                        <p className="text-sm font-bold text-red-600">-<Currency amount={w.withdrawalFee} /></p>
+                      </div>
+                      <div className="rounded-xl bg-muted/30 p-2.5">
+                        <p className="text-[10px] text-muted-foreground">صافي التحويل</p>
+                        <p className="text-sm font-bold text-green-600"><Currency amount={w.netAmount} /></p>
+                      </div>
+                      <div className="rounded-xl bg-muted/30 p-2.5">
+                        <p className="text-[10px] text-muted-foreground">تاريخ الطلب</p>
+                        <p className="text-sm font-medium"><DateFormatter date={w.createdAt} format="date" /></p>
+                      </div>
+                    </div>
+
+                    {/* Wallet Info */}
+                    <div className="mt-3 p-3 rounded-xl bg-muted/30 border border-border/50">
+                      <p className="text-[10px] text-muted-foreground mb-1.5">تفاصيل المحفظة</p>
+                      <div className="grid grid-cols-3 gap-2 text-xs">
+                        <div>
+                          <span className="text-muted-foreground">النوع: </span>
+                          <span className="font-medium">{w.walletType}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">الرقم: </span>
+                          <span className="font-medium" dir="ltr">{w.walletNumber}</span>
+                        </div>
+                        <div>
+                          <span className="text-muted-foreground">الاسم: </span>
+                          <span className="font-medium">{w.walletHolderName}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Rejected Reason */}
+                    {w.status === 'rejected' && w.rejectedReason && (
+                      <div className="mt-3 p-2.5 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+                        <p className="text-[10px] text-red-600 dark:text-red-400">سبب الرفض: {w.rejectedReason}</p>
+                      </div>
+                    )}
+
+                    {/* Processed Notice */}
+                    {w.status === 'processed' && (
+                      <div className="mt-3 p-2.5 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
+                        <p className="text-[10px] text-green-700 dark:text-green-400">
+                          تم تحويل الأموال إلى محفظة {w.walletType} باسم {w.walletHolderName} رقم {w.walletNumber}
+                          {w.processedAt && ` في ${new Date(w.processedAt).toLocaleDateString('ar')}`}
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Actions for pending */}
+                    {w.status === 'pending' && (
+                      <div className="mt-3 flex items-center gap-2">
+                        <Button
+                          size="sm"
+                          className="bg-green-600 hover:bg-green-700 gap-1.5 flex-1"
+                          onClick={() => {
+                            setWithdrawalAction(w);
+                            setWithdrawalActionType('approve');
+                          }}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          تحويل الأموال
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="destructive"
+                          className="gap-1.5 flex-1"
+                          onClick={() => {
+                            setWithdrawalAction(w);
+                            setWithdrawalActionType('reject');
+                          }}
+                        >
+                          <XCircle className="w-3.5 h-3.5" />
+                          رفض
+                        </Button>
+                      </div>
+                    )}
+                  </motion.div>
                 ))}
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" onClick={() => void fetchNurses()}>
-              <RefreshCw className="w-4 h-4" />
-            </Button>
-          </div>
-        </GlassCard>
-      </motion.div>
 
-      <motion.div variants={itemAnim}>
-        <DataTable
-          columns={columns}
-          data={nurses}
-          isLoading={isLoading}
-          emptyMessage="لا يوجد ممرضون"
-          emptyAction={{ label: 'تحديث', onClick: () => void fetchNurses() }}
-          rowActions={rowActions as never}
-          currentPage={page}
-          pageCount={totalPages}
-          onPageChange={setPage}
-        />
+                {/* Pagination */}
+                {withdrawalTotalPages > 1 && (
+                  <div className="flex items-center justify-center gap-2 pt-4">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={withdrawalPage <= 1}
+                      onClick={() => setWithdrawalPage(p => p - 1)}
+                    >
+                      السابق
+                    </Button>
+                    <span className="text-sm text-muted-foreground">
+                      {withdrawalPage} / {withdrawalTotalPages}
+                    </span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={withdrawalPage >= withdrawalTotalPages}
+                      onClick={() => setWithdrawalPage(p => p + 1)}
+                    >
+                      التالي
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
       </motion.div>
 
       {/* View Drawer/Dialog */}
@@ -851,6 +1188,103 @@ export default function AdminNursesPage() {
               variant="destructive"
             >
               {isDeleting ? 'جارٍ الحذف...' : 'حذف نهائياً'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Withdrawal Action Dialog */}
+      <Dialog open={!!withdrawalAction} onOpenChange={(open) => {
+        if (!open) {
+          setWithdrawalAction(null);
+          setWithdrawalAdminNotes('');
+          setWithdrawalRejectReason('');
+        }
+      }}>
+        <DialogContent dir="rtl" className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              {withdrawalActionType === 'approve' ? (
+                <>
+                  <CheckCircle2 className="w-5 h-5 text-green-600" />
+                  تحويل الأموال
+                </>
+              ) : (
+                <>
+                  <XCircle className="w-5 h-5 text-red-600" />
+                  رفض طلب السحب
+                </>
+              )}
+            </DialogTitle>
+            <DialogDescription>
+              {withdrawalActionType === 'approve'
+                ? `سيتم تحويل المبلغ إلى محفظة ${withdrawalAction?.walletType} باسم ${withdrawalAction?.walletHolderName}`
+                : `سيتم رفض طلب السحب وإرجاع المبلغ (${withdrawalAction ? <Currency amount={withdrawalAction.amount} /> : ''}) إلى رصيد الممرض`}
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Withdrawal Details Summary */}
+          {withdrawalAction && (
+            <div className="p-3 rounded-xl bg-muted/30 border border-border/50 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">الممرض</span>
+                <span className="font-medium">{withdrawalAction.nurseName}</span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">مبلغ السحب</span>
+                <span className="font-medium"><Currency amount={withdrawalAction.amount} /></span>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">رسوم السحب</span>
+                <span className="text-red-600">-<Currency amount={withdrawalAction.withdrawalFee} /></span>
+              </div>
+              <div className="flex items-center justify-between text-sm font-semibold">
+                <span>صافي التحويل</span>
+                <span className="text-green-600"><Currency amount={withdrawalAction.netAmount} /></span>
+              </div>
+              <Separator />
+              <div className="text-xs space-y-1">
+                <p><span className="text-muted-foreground">المحفظة:</span> {withdrawalAction.walletType}</p>
+                <p><span className="text-muted-foreground">الرقم:</span> <span dir="ltr">{withdrawalAction.walletNumber}</span></p>
+                <p><span className="text-muted-foreground">الاسم:</span> {withdrawalAction.walletHolderName}</p>
+              </div>
+            </div>
+          )}
+
+          {withdrawalActionType === 'reject' && (
+            <div className="space-y-2">
+              <Label>سبب الرفض *</Label>
+              <Textarea
+                value={withdrawalRejectReason}
+                onChange={(e) => setWithdrawalRejectReason(e.target.value)}
+                placeholder="أدخل سبب رفض طلب السحب..."
+                rows={3}
+              />
+            </div>
+          )}
+
+          {withdrawalActionType === 'approve' && (
+            <div className="space-y-2">
+              <Label>ملاحظات (اختياري)</Label>
+              <Textarea
+                value={withdrawalAdminNotes}
+                onChange={(e) => setWithdrawalAdminNotes(e.target.value)}
+                placeholder="ملاحظات إضافية..."
+                rows={2}
+              />
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => { setWithdrawalAction(null); setWithdrawalAdminNotes(''); setWithdrawalRejectReason(''); }} disabled={withdrawalActionLoading}>
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleWithdrawalAction}
+              disabled={withdrawalActionLoading || (withdrawalActionType === 'reject' && !withdrawalRejectReason)}
+              className={withdrawalActionType === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-destructive hover:bg-destructive/90'}
+            >
+              {withdrawalActionLoading ? 'جارٍ التنفيذ...' : withdrawalActionType === 'approve' ? 'تأكيد التحويل' : 'رفض الطلب'}
             </Button>
           </DialogFooter>
         </DialogContent>

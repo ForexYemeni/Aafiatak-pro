@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Settings, Save, Loader2 } from 'lucide-react';
+import { Settings, Save, Loader2, Wallet, X } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { useAuthFetch } from '@/hooks/use-auth';
@@ -37,6 +37,8 @@ interface SettingsData {
   supportWhatsAppNumbers: string[];
   termsAndConditionsAr: string;
   privacyPolicyAr: string;
+  withdrawalFee: number;
+  enabledWalletTypes: string[];
 }
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -65,6 +67,8 @@ const defaultSettings: SettingsData = {
   supportWhatsAppNumbers: [],
   termsAndConditionsAr: '',
   privacyPolicyAr: '',
+  withdrawalFee: 200,
+  enabledWalletTypes: ['جيب', 'جوالي', 'فلوسك', 'حوالة بنكية'],
 };
 
 export default function AdminSettingsPage() {
@@ -194,6 +198,81 @@ export default function AdminSettingsPage() {
                   min={0}
                   max={23}
                 />
+              </div>
+            </div>
+          </GlassCardContent>
+        </GlassCard>
+      </motion.div>
+
+      {/* Withdrawal & Nurse Payout Settings */}
+      <motion.div variants={itemAnim}>
+        <GlassCard variant="admin">
+          <GlassCardHeader>
+            <GlassCardTitle className="flex items-center gap-2">
+              <Wallet className="w-5 h-5" />
+              إعدادات سحب الأرباح
+            </GlassCardTitle>
+          </GlassCardHeader>
+          <GlassCardContent>
+            <div className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label>رسوم السحب (ر.ي)</Label>
+                  <Input
+                    type="number"
+                    value={settings.withdrawalFee}
+                    onChange={(e) => updateField('withdrawalFee', Number(e.target.value))}
+                    min={0}
+                  />
+                  <p className="text-[10px] text-muted-foreground">رسوم تُخصم تلقائياً من كل طلب سحب أرباح</p>
+                </div>
+              </div>
+
+              <Separator />
+
+              {/* Wallet Types */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <Label>أنواع المحافظ المتاحة للسحب</Label>
+                    <p className="text-[10px] text-muted-foreground">المحافظ التي يمكن للممرضين اختيارها عند طلب السحب</p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => updateField('enabledWalletTypes', [...settings.enabledWalletTypes, ''])}
+                    className="text-xs"
+                  >
+                    + إضافة محفظة
+                  </Button>
+                </div>
+                {settings.enabledWalletTypes.length === 0 && (
+                  <p className="text-xs text-muted-foreground">لم يتم إضافة محافظ بعد</p>
+                )}
+                {settings.enabledWalletTypes.map((wallet, i) => (
+                  <div key={`wallet-${i}`} className="flex gap-2">
+                    <Input
+                      value={wallet}
+                      onChange={(e) => {
+                        const updated = [...settings.enabledWalletTypes];
+                        updated[i] = e.target.value;
+                        updateField('enabledWalletTypes', updated);
+                      }}
+                      placeholder="اسم المحفظة"
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="shrink-0 text-destructive hover:bg-destructive/10"
+                      onClick={() => {
+                        const updated = settings.enabledWalletTypes.filter((_, idx) => idx !== i);
+                        updateField('enabledWalletTypes', updated);
+                      }}
+                    >
+                      <X className="w-4 h-4" />
+                    </Button>
+                  </div>
+                ))}
               </div>
             </div>
           </GlassCardContent>

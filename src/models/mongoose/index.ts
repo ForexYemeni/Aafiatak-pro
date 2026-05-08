@@ -61,3 +61,7 @@ export type { IActivityLog } from './ActivityLog';
 // Admin settings model
 export { AdminSettings } from './AdminSettings';
 export type { IAdminSettings } from './AdminSettings';
+
+// Withdrawal request model
+export { WithdrawalRequest } from './WithdrawalRequest';
+export type { IWithdrawalRequest } from './WithdrawalRequest';
