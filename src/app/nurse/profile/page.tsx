@@ -648,29 +648,25 @@ export default function NurseProfilePage() {
               <Label htmlFor="bio">نبذة عنك</Label>
               <Textarea id="bio" value={editBio} onChange={(e) => setEditBio(e.target.value)} rows={3} />
             </div>
-            {/* GPS Auto-Detect Location */}
+            {/* GPS Auto-Detect Location - Single field */}
             <GpsLocationButton
               onLocationDetected={(loc) => {
                 setEditGovernorate(loc.governorate || editGovernorate);
                 setEditCity(loc.district || loc.city || editCity);
                 setEditAddress(loc.address || editAddress);
               }}
-              size="sm"
-              className="w-full"
-              label="تحديد موقعي الجغرافي تلقائياً"
+              value={editAddress}
+              placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+              label="تحديد موقعي"
             />
-            <div className="space-y-2">
-              <Label htmlFor="address">العنوان</Label>
-              <Input id="address" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />
-            </div>
             <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="city">المدينة</Label>
-                <Input id="city" value={editCity} onChange={(e) => setEditCity(e.target.value)} />
-              </div>
               <div className="space-y-2">
                 <Label htmlFor="gov">المحافظة</Label>
                 <Input id="gov" value={editGovernorate} onChange={(e) => setEditGovernorate(e.target.value)} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="city">المدينة</Label>
+                <Input id="city" value={editCity} onChange={(e) => setEditCity(e.target.value)} />
               </div>
             </div>
             <div className="space-y-2">

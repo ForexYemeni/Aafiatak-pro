@@ -28,6 +28,7 @@ import {
 } from '@/components/ui/select';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { YEMEN_GOVERNORATES } from '@/lib/constants/governorates';
+import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -229,9 +230,18 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
           )}
         </div>
 
-        {/* Governorate */}
+        {/* Governorate + GPS Auto-Detect */}
         <div className="space-y-2">
           <Label>المحافظة</Label>
+          <GpsLocationButton
+            onLocationDetected={(loc) => {
+              if (loc.governorateValue) {
+                setValue('governorate', loc.governorateValue);
+              }
+            }}
+            placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+            label="تحديد موقعي"
+          />
           <Select onValueChange={(value) => setValue('governorate', value)}>
             <SelectTrigger className="text-right">
               <MapPin className="w-4 h-4 text-muted-foreground ml-2" />

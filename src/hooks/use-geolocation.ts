@@ -111,19 +111,21 @@ export function useGeolocation(): UseGeolocationReturn {
   const [location, setLocation] = useState<LocationData | null>(null);
   const [isDetecting, setIsDetecting] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const cacheRef = useRef<LocationData | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
 
   const detectLocation = useCallback(async (): Promise<LocationData | null> => {
-    // Return cached result if available
-    if (cacheRef.current) {
-      return cacheRef.current;
+    // Cancel any previous request
+    if (abortRef.current) {
+      abortRef.current.abort();
     }
+    const abortController = new AbortController();
+    abortRef.current = abortController;
 
     setIsDetecting(true);
     setError(null);
 
     try {
-      // Step 1: Get GPS position
+      // Step 1: Get GPS position (fast - usually 1-3 seconds)
       const position = await new Promise<GeolocationPosition>((resolve, reject) => {
         if (!navigator.geolocation) {
           reject(new Error('المتصفح لا يدعم تحديد الموقع الجغرافي'));
@@ -146,28 +148,33 @@ export function useGeolocation(): UseGeolocationReturn {
           }
         }, {
           enableHighAccuracy: true,
-          timeout: 15000,
-          maximumAge: 60000,
+          timeout: 8000,   // Reduced from 15s to 8s
+          maximumAge: 30000, // Reduced from 60s to 30s for fresher data
         });
       });
 
+      // Check if aborted
+      if (abortController.signal.aborted) return null;
+
       const { latitude, longitude, accuracy } = position.coords;
 
-      // Step 2: Reverse geocode using Nominatim
-      let addressData: {
-        address: string;
-        governorate: string;
-        governorateValue: string;
-        district: string;
-        city: string;
-      } = {
-        address: '',
+      // Step 2: Return basic location IMMEDIATELY with coords as address
+      // This makes the detection feel instant - user sees results right away
+      const basicLocation: LocationData = {
+        latitude,
+        longitude,
+        accuracy,
+        address: `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
         governorate: '',
         governorateValue: '',
         district: '',
         city: '',
       };
-      
+
+      setLocation(basicLocation);
+
+      // Step 3: Do reverse geocoding in background (non-blocking)
+      // This enriches the location data without blocking the user
       try {
         const response = await fetch(
           `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&accept-language=ar&addressdetails=1`,
@@ -175,48 +182,46 @@ export function useGeolocation(): UseGeolocationReturn {
             headers: {
               'User-Agent': 'Aafiatak-Healthcare-Platform/1.0',
             },
+            signal: abortController.signal,
           }
         );
 
-        if (response.ok) {
+        if (response.ok && !abortController.signal.aborted) {
           const data = await response.json();
           const addr = data.address || {};
           
           const govMapping = mapGovernorate(addr.state || addr.region || addr.county || '');
-          
-          addressData = {
-            address: data.display_name || '',
+
+          const enrichedLocation: LocationData = {
+            latitude,
+            longitude,
+            accuracy,
+            address: data.display_name || basicLocation.address,
             governorate: govMapping.label,
             governorateValue: govMapping.value,
             district: addr.city || addr.town || addr.village || addr.suburb || addr.district || addr.neighbourhood || '',
             city: addr.city || addr.town || addr.village || addr.county || '',
           };
+
+          setLocation(enrichedLocation);
+          return enrichedLocation;
         }
-      } catch {
-        // Reverse geocoding failed, continue with GPS data only
+      } catch (geoErr: any) {
+        // If it's an abort, silently ignore
+        if (geoErr?.name === 'AbortError') return null;
+        // Reverse geocoding failed - we already have basic location with coords
       }
 
-      const locationData: LocationData = {
-        latitude,
-        longitude,
-        accuracy,
-        address: addressData.address || `${latitude.toFixed(6)}, ${longitude.toFixed(6)}`,
-        governorate: addressData.governorate,
-        governorateValue: addressData.governorateValue,
-        district: addressData.district,
-        city: addressData.city,
-      };
-
-      setLocation(locationData);
-      cacheRef.current = locationData;
-      
-      return locationData;
+      return basicLocation;
     } catch (err) {
+      if (abortController.signal.aborted) return null;
       const message = err instanceof Error ? err.message : 'حدث خطأ أثناء تحديد الموقع';
       setError(message);
       return null;
     } finally {
-      setIsDetecting(false);
+      if (!abortController.signal.aborted) {
+        setIsDetecting(false);
+      }
     }
   }, []);
 

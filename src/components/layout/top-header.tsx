@@ -64,8 +64,9 @@ function getDashboardPath(role: UserRole): string {
 function getProfilePath(role: UserRole): string {
   switch (role) {
     case 'admin':
-    case 'subadmin':
       return '/admin/settings';
+    case 'subadmin':
+      return '/admin/subadmin-settings';
     case 'nurse':
       return '/nurse/profile';
     case 'beneficiary':
@@ -78,8 +79,9 @@ function getProfilePath(role: UserRole): string {
 function getSettingsPath(role: UserRole): string {
   switch (role) {
     case 'admin':
-    case 'subadmin':
       return '/admin/settings';
+    case 'subadmin':
+      return '/admin/subadmin-settings';
     case 'nurse':
       return '/nurse/profile';
     case 'beneficiary':

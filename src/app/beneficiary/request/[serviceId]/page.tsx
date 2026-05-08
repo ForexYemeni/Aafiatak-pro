@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { GlassCard } from '@/components/common/glass-card';
+import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { Currency, formatYemeniRial } from '@/components/common/currency';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useToast } from '@/hooks/use-toast';
@@ -370,6 +371,18 @@ export default function ServiceRequestPage() {
                 <MapPin className="w-5 h-5 text-beneficiary" />
                 عنوان الخدمة
               </h2>
+              <GpsLocationButton
+                onLocationDetected={(loc) => {
+                  setLat(loc.latitude);
+                  setLng(loc.longitude);
+                  if (loc.address && loc.address !== `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`) {
+                    setAddress(loc.address);
+                  }
+                }}
+                value={address}
+                placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+                label="تحديد موقعي"
+              />
               <div className="space-y-2">
                 <Label htmlFor="address">العنوان بالتفصيل</Label>
                 <Textarea
@@ -380,29 +393,6 @@ export default function ServiceRequestPage() {
                   dir="rtl"
                 />
               </div>
-              <Button
-                variant="outline"
-                className="w-full gap-2"
-                onClick={() => {
-                  if (navigator.geolocation) {
-                    navigator.geolocation.getCurrentPosition((pos) => {
-                      setLat(pos.coords.latitude);
-                      setLng(pos.coords.longitude);
-                      toast({ title: 'تم تحديد موقعك بنجاح' });
-                    }, () => {
-                      toast({ title: 'لم يتم تحديد الموقع', variant: 'destructive' });
-                    });
-                  }
-                }}
-              >
-                <MapPin className="w-4 h-4" />
-                تحديد موقعي تلقائياً
-              </Button>
-              {(lat !== 0 || lng !== 0) && (
-                <p className="text-xs text-green-600 dark:text-green-400">
-                  تم تحديد الموقع: {lat.toFixed(4)}, {lng.toFixed(4)}
-                </p>
-              )}
             </GlassCard>
           )}
 

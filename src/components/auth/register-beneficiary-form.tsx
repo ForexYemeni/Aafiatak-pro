@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/select';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { YEMEN_GOVERNORATES } from '@/lib/constants/governorates';
+import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -184,9 +185,21 @@ export function RegisterBeneficiaryForm({ onBack, className }: RegisterBeneficia
           )}
         </div>
 
-        {/* Address */}
+        {/* Address + GPS Auto-Detect */}
         <div className="space-y-2">
           <Label htmlFor="ben-address">العنوان</Label>
+          <GpsLocationButton
+            onLocationDetected={(loc) => {
+              if (loc.address && loc.address !== `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`) {
+                setValue('address', loc.address);
+              }
+              if (loc.governorateValue) {
+                setValue('governorate', loc.governorateValue);
+              }
+            }}
+            placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+            label="تحديد موقعي"
+          />
           <div className="relative">
             <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input

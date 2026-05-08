@@ -293,7 +293,7 @@ export default function ProfilePage() {
             <p className="text-sm font-medium" dir="ltr">{profile?.phone ?? 'ـ'}</p>
           </div>
 
-          {/* GPS Auto-Detect Location */}
+          {/* GPS Auto-Detect Location - Single field */}
           {isEditing && (
             <GpsLocationButton
               onLocationDetected={(loc) => {
@@ -301,9 +301,9 @@ export default function ProfilePage() {
                 setEditCity(loc.district || loc.city || editCity);
                 setEditAddress(loc.address || editAddress);
               }}
-              size="sm"
-              className="w-full"
-              label="تحديد موقعي الجغرافي تلقائياً"
+              value={editAddress}
+              placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+              label="تحديد موقعي"
             />
           )}
 

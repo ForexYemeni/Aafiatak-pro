@@ -271,8 +271,8 @@ export default function SubadminSettingsPage() {
             </GlassCardTitle>
           </GlassCardHeader>
           <GlassCardContent>
-            <div className="space-y-6">
-              {/* GPS Auto-Detect Location Button */}
+            <div className="space-y-4">
+              {/* GPS Auto-Detect Location - Single field with button */}
               <GpsLocationButton
                 onLocationDetected={(loc) => {
                   setProfile(prev => ({
@@ -286,13 +286,14 @@ export default function SubadminSettingsPage() {
                   setLatStr(String(loc.latitude));
                   setLngStr(String(loc.longitude));
                 }}
-                size="default"
-                className="w-full"
-                label="تحديد موقعي الجغرافي تلقائياً"
+                value={profile.address}
+                placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+                label="تحديد موقعي"
+                showMapLink={!!(latStr && lngStr)}
               />
 
+              {/* Governorate + District in one row */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Governorate */}
                 <div className="space-y-2">
                   <Label>المحافظة</Label>
                   <Select
@@ -311,8 +312,6 @@ export default function SubadminSettingsPage() {
                     </SelectContent>
                   </Select>
                 </div>
-
-                {/* District */}
                 <div className="space-y-2">
                   <Label>المديرية</Label>
                   <Input
@@ -322,53 +321,6 @@ export default function SubadminSettingsPage() {
                   />
                 </div>
               </div>
-
-              {/* Address */}
-              <div className="space-y-2">
-                <Label>العنوان التفصيلي</Label>
-                <Input
-                  value={profile.address}
-                  onChange={(e) => setProfile({ ...profile, address: e.target.value })}
-                  placeholder="الحي، الشارع، أقرب نقطة دالة..."
-                />
-              </div>
-
-              {/* Coordinates */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>خط العرض (Latitude)</Label>
-                  <Input
-                    type="text"
-                    value={latStr}
-                    onChange={(e) => setLatStr(e.target.value)}
-                    placeholder="15.3694"
-                    dir="ltr"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>خط الطول (Longitude)</Label>
-                  <Input
-                    type="text"
-                    value={lngStr}
-                    onChange={(e) => setLngStr(e.target.value)}
-                    placeholder="44.1910"
-                    dir="ltr"
-                  />
-                </div>
-              </div>
-
-              {/* Map preview link */}
-              {latStr && lngStr && !isNaN(parseFloat(latStr)) && !isNaN(parseFloat(lngStr)) && (
-                <a
-                  href={`https://www.google.com/maps?q=${latStr},${lngStr}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-2 text-sm text-blue-600 hover:text-blue-800"
-                >
-                  <MapPin className="w-4 h-4" />
-                  عرض الموقع على الخريطة
-                </a>
-              )}
             </div>
           </GlassCardContent>
         </GlassCard>

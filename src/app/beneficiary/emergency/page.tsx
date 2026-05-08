@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { GlassCard } from '@/components/common/glass-card';
+import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useToast } from '@/hooks/use-toast';
@@ -242,23 +243,23 @@ export default function EmergencyPage() {
 
       {/* Location */}
       <GlassCard variant="beneficiary" className="space-y-3">
-        <div className="flex items-center justify-between">
-          <Label className="flex items-center gap-2 font-semibold">
-            <MapPin className="w-4 h-4 text-red-500" />
-            الموقع
-          </Label>
-          {isDetectingLocation && (
-            <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-          )}
-        </div>
-        {(lat !== 0 || lng !== 0) ? (
-          <p className="text-sm text-green-600 dark:text-green-400 flex items-center gap-1">
-            <CheckCircle2 className="w-3.5 h-3.5" />
-            تم تحديد الموقع تلقائياً
-          </p>
-        ) : (
-          <p className="text-sm text-muted-foreground">لم يتم تحديد الموقع بعد</p>
-        )}
+        <Label className="flex items-center gap-2 font-semibold">
+          <MapPin className="w-4 h-4 text-red-500" />
+          الموقع
+        </Label>
+        <GpsLocationButton
+          onLocationDetected={(loc) => {
+            setLat(loc.latitude);
+            setLng(loc.longitude);
+            if (loc.address && loc.address !== `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`) {
+              setAddress(loc.address);
+            }
+            setIsDetectingLocation(false);
+          }}
+          value={address}
+          placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+          label="تحديد موقعي"
+        />
         <div className="space-y-2">
           <Label htmlFor="emergency-address">العنوان (اختياري)</Label>
           <Textarea
@@ -269,31 +270,6 @@ export default function EmergencyPage() {
             dir="rtl"
           />
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          className="gap-2"
-          onClick={() => {
-            if (navigator.geolocation) {
-              setIsDetectingLocation(true);
-              navigator.geolocation.getCurrentPosition(
-                (pos) => {
-                  setLat(pos.coords.latitude);
-                  setLng(pos.coords.longitude);
-                  setIsDetectingLocation(false);
-                  toast({ title: 'تم تحديث الموقع' });
-                },
-                () => {
-                  setIsDetectingLocation(false);
-                  toast({ title: 'فشل تحديد الموقع', variant: 'destructive' });
-                }
-              );
-            }
-          }}
-        >
-          <MapPin className="w-3.5 h-3.5" />
-          إعادة تحديد الموقع
-        </Button>
       </GlassCard>
 
       {/* Submit Button */}
