@@ -58,6 +58,22 @@ export default function OrdersPage() {
   const [orders, setOrders] = useState<OrderWithDetails[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [pagination, setPagination] = useState<PaginationMeta | null>(null);
+  const [counts, setCounts] = useState({ active: 0, completed: 0, cancelled: 0 });
+
+  const fetchCounts = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/beneficiary/orders?counts=true', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setCounts(data.data as { active: number; completed: number; cancelled: number });
+      }
+    } catch {
+      // silently handle
+    }
+  }, [token]);
 
   const fetchOrders = useCallback(async () => {
     if (!token) return;
@@ -95,7 +111,8 @@ export default function OrdersPage() {
 
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
+    fetchCounts();
+  }, [fetchOrders, fetchCounts]);
 
   const cancelOrder = async (orderId: string) => {
     if (!token) return;
@@ -156,14 +173,28 @@ export default function OrdersPage() {
         <TabsList className="w-full grid grid-cols-3">
           <TabsTrigger value="active" className="gap-1">
             النشطة
-            {pagination && activeTab === 'active' && pagination.total > 0 && (
-              <Badge variant="destructive" className="w-5 h-5 p-0 text-[10px] flex items-center justify-center">
-                {pagination.total}
+            {counts.active > 0 && (
+              <Badge variant="destructive" className="h-5 min-w-[20px] p-0 text-[10px] flex items-center justify-center">
+                {counts.active}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="completed">المكتملة</TabsTrigger>
-          <TabsTrigger value="cancelled">الملغاة</TabsTrigger>
+          <TabsTrigger value="completed" className="gap-1">
+            المكتملة
+            {counts.completed > 0 && (
+              <Badge variant="secondary" className="h-5 min-w-[20px] p-0 text-[10px] flex items-center justify-center">
+                {counts.completed}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="cancelled" className="gap-1">
+            الملغاة
+            {counts.cancelled > 0 && (
+              <Badge variant="outline" className="h-5 min-w-[20px] p-0 text-[10px] flex items-center justify-center">
+                {counts.cancelled}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         {(['active', 'completed', 'cancelled'] as TabKey[]).map((tab) => (

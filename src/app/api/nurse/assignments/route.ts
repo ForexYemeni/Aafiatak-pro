@@ -33,6 +33,20 @@ export async function GET(request: NextRequest) {
 
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'active';
+    const countsOnly = searchParams.get('counts') === 'true';
+
+    // If countsOnly, return counts for all tabs at once
+    if (countsOnly) {
+      const [newCount, activeCount, completedCount] = await Promise.all([
+        ServiceRequest.countDocuments({ nurseId: user.userId, status: 'assigned' }),
+        ServiceRequest.countDocuments({ nurseId: user.userId, status: { $in: ['accepted', 'in_progress'] } }),
+        ServiceRequest.countDocuments({ nurseId: user.userId, status: 'completed' }),
+      ]);
+      return Response.json({
+        success: true,
+        data: { new: newCount, active: activeCount, completed: completedCount },
+      });
+    }
 
     const filter: any = { nurseId: user.userId };
     if (status === 'active') {

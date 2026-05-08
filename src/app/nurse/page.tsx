@@ -118,9 +118,22 @@ export default function NurseTasksPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [counts, setCounts] = useState({ new: 0, active: 0, completed: 0 });
   const authFetch = useAuthFetch();
   const user = useAuthStore((s) => s.user);
   const orderUpdates = useOrderUpdates();
+
+  const fetchCounts = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/nurse/assignments?counts=true');
+      const data = await res.json();
+      if (data.success && data.data) {
+        setCounts(data.data as { new: number; active: number; completed: number });
+      }
+    } catch {
+      // silently handle
+    }
+  }, [authFetch]);
 
   const fetchAssignments = useCallback(async () => {
     try {
@@ -145,14 +158,16 @@ export default function NurseTasksPage() {
   useEffect(() => {
     setIsLoading(true);
     fetchAssignments();
-  }, [fetchAssignments]);
+    fetchCounts();
+  }, [fetchAssignments, fetchCounts]);
 
   // Refresh on real-time order updates
   useEffect(() => {
     if (orderUpdates.latestOrderUpdate) {
       fetchAssignments();
+      fetchCounts();
     }
-  }, [orderUpdates.latestOrderUpdate, fetchAssignments]);
+  }, [orderUpdates.latestOrderUpdate, fetchAssignments, fetchCounts]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
@@ -262,15 +277,15 @@ export default function NurseTasksPage() {
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3">
         <GlassCard variant="nurse" className="p-3 text-center">
-          <p className="text-2xl font-bold text-nurse">{toArabicNum(assignments.filter(a => a.status === 'assigned').length || 0)}</p>
+          <p className="text-2xl font-bold text-nurse">{toArabicNum(counts.new)}</p>
           <p className="text-xs text-muted-foreground">جديدة</p>
         </GlassCard>
         <GlassCard variant="nurse" className="p-3 text-center">
-          <p className="text-2xl font-bold text-sky-600">{toArabicNum(assignments.filter(a => ['accepted', 'in_progress'].includes(a.status)).length || 0)}</p>
+          <p className="text-2xl font-bold text-sky-600">{toArabicNum(counts.active)}</p>
           <p className="text-xs text-muted-foreground">نشطة</p>
         </GlassCard>
         <GlassCard variant="nurse" className="p-3 text-center">
-          <p className="text-2xl font-bold text-green-600">{toArabicNum(assignments.filter(a => a.status === 'completed').length || 0)}</p>
+          <p className="text-2xl font-bold text-green-600">{toArabicNum(counts.completed)}</p>
           <p className="text-xs text-muted-foreground">مكتملة</p>
         </GlassCard>
       </div>
@@ -280,14 +295,28 @@ export default function NurseTasksPage() {
         <TabsList className="w-full grid grid-cols-3">
           <TabsTrigger value="new" className="gap-1">
             الجديدة
-            {assignments.length > 0 && activeTab === 'new' && (
-              <Badge variant="destructive" className="h-5 w-5 p-0 text-[10px] flex items-center justify-center">
-                {toArabicNum(assignments.length)}
+            {counts.new > 0 && (
+              <Badge variant="destructive" className="h-5 min-w-[20px] p-0 text-[10px] flex items-center justify-center">
+                {toArabicNum(counts.new)}
               </Badge>
             )}
           </TabsTrigger>
-          <TabsTrigger value="active">النشطة</TabsTrigger>
-          <TabsTrigger value="completed">المكتملة</TabsTrigger>
+          <TabsTrigger value="active" className="gap-1">
+            النشطة
+            {counts.active > 0 && (
+              <Badge className="h-5 min-w-[20px] p-0 text-[10px] flex items-center justify-center bg-sky-600">
+                {toArabicNum(counts.active)}
+              </Badge>
+            )}
+          </TabsTrigger>
+          <TabsTrigger value="completed" className="gap-1">
+            المكتملة
+            {counts.completed > 0 && (
+              <Badge variant="secondary" className="h-5 min-w-[20px] p-0 text-[10px] flex items-center justify-center">
+                {toArabicNum(counts.completed)}
+              </Badge>
+            )}
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value={activeTab} className="mt-4">

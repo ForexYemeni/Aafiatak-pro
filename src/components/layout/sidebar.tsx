@@ -54,6 +54,7 @@ const adminNavItems: NavItem[] = [
   { label: 'الكوبونات', href: '/admin/coupons', icon: Tags, permission: 'manage_payments' },
   { label: 'التقييمات', href: '/admin/ratings', icon: Star, permission: 'view_reports' },
   { label: 'الشكاوى', href: '/admin/complaints', icon: MessageSquare, permission: 'manage_chat' },
+  { label: 'المحادثات', href: '/admin/chat', icon: MessageSquare, permission: 'manage_chat' },
   { label: 'المديرون الفرعيون', href: '/admin/subadmins', icon: Shield, adminOnly: true },
   { label: 'سجل النشاط', href: '/admin/activity/page', icon: ScrollText, permission: 'view_reports' },
   { label: 'إعداداتي', href: '/admin/subadmin-settings', icon: UserCog, alwaysVisibleToSubadmin: true },
@@ -64,6 +65,7 @@ const nurseNavItems: NavItem[] = [
   { label: 'لوحة التحكم', href: '/nurse', icon: LayoutDashboard },
   { label: 'الطلبات المتاحة', href: '/nurse/requests', icon: ClipboardList },
   { label: 'طلباتي', href: '/nurse/my-requests', icon: Stethoscope },
+  { label: 'المحادثات', href: '/nurse/chat', icon: MessageSquare },
   { label: 'الأرباح', href: '/nurse/earnings', icon: CreditCard },
   { label: 'الملف الشخصي', href: '/nurse/profile', icon: Users },
 ];
@@ -72,6 +74,7 @@ const beneficiaryNavItems: NavItem[] = [
   { label: 'الرئيسية', href: '/beneficiary', icon: LayoutDashboard },
   { label: 'الخدمات', href: '/beneficiary', icon: Stethoscope },
   { label: 'طلباتي', href: '/beneficiary/orders', icon: ClipboardList },
+  { label: 'المحادثات', href: '/beneficiary/chat', icon: MessageSquare },
   { label: 'الطوارئ', href: '/beneficiary/emergency', icon: AlertTriangle },
   { label: 'نقاط الولاء', href: '/beneficiary/loyalty', icon: Heart },
   { label: 'الملف الشخصي', href: '/beneficiary/profile', icon: Users },

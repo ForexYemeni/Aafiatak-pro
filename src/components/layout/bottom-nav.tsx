@@ -10,6 +10,7 @@ import {
   AlertTriangle,
   User,
   MoreHorizontal,
+  MessageCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
@@ -39,7 +40,7 @@ const subadminBottomItems: BottomNavItem[] = [
 
 const nurseBottomItems: BottomNavItem[] = [
   { label: 'المهام', href: '/nurse', icon: ClipboardList },
-  { label: 'الجدول', href: '/nurse/schedule', icon: Stethoscope },
+  { label: 'المحادثة', href: '/nurse/chat', icon: MessageCircle },
   { label: 'الأرباح', href: '/nurse/earnings', icon: Home },
   { label: 'الإشعارات', href: '/nurse/notifications', icon: AlertTriangle },
   { label: 'المزيد', href: '/nurse/profile', icon: MoreHorizontal },
@@ -48,8 +49,8 @@ const nurseBottomItems: BottomNavItem[] = [
 const beneficiaryBottomItems: BottomNavItem[] = [
   { label: 'الرئيسية', href: '/beneficiary', icon: Home },
   { label: 'طلباتي', href: '/beneficiary/orders', icon: ClipboardList },
+  { label: 'المحادثة', href: '/beneficiary/chat', icon: MessageCircle },
   { label: 'الطوارئ', href: '/beneficiary/emergency', icon: AlertTriangle },
-  { label: 'نقاطي', href: '/beneficiary/loyalty', icon: Stethoscope },
   { label: 'الملف', href: '/beneficiary/profile', icon: User },
 ];
 

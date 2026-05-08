@@ -22,6 +22,20 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const status = searchParams.get('status');
+    const countsOnly = searchParams.get('counts') === 'true';
+
+    // If countsOnly, return counts for all tabs at once
+    if (countsOnly) {
+      const [activeCount, completedCount, cancelledCount] = await Promise.all([
+        ServiceRequest.countDocuments({ beneficiaryId: user.userId, status: { $in: ['pending', 'assigned', 'accepted', 'in_progress'] } }),
+        ServiceRequest.countDocuments({ beneficiaryId: user.userId, status: 'completed' }),
+        ServiceRequest.countDocuments({ beneficiaryId: user.userId, status: { $in: ['cancelled', 'rejected'] } }),
+      ]);
+      return Response.json({
+        success: true,
+        data: { active: activeCount, completed: completedCount, cancelled: cancelledCount },
+      });
+    }
 
     const filter: any = { beneficiaryId: user.userId };
     if (status) {

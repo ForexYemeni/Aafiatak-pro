@@ -4,7 +4,6 @@ import { useEffect, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '@/components/layout/app-shell';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { FloatingChatBubble } from '@/components/common/floating-chat-bubble';
 
 export default function BeneficiaryLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
@@ -36,7 +35,6 @@ export default function BeneficiaryLayout({ children }: { children: ReactNode })
   return (
     <div className="bg-gradient-beneficiary min-h-screen">
       <AppShell>{children}</AppShell>
-      <FloatingChatBubble onClick={() => router.push('/beneficiary/chat')} />
     </div>
   );
 }
