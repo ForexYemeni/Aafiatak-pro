@@ -12,6 +12,8 @@ import {
   Plus,
   ArrowLeft,
   RefreshCw,
+  Search,
+  Loader2,
 } from 'lucide-react';
 import {
   LineChart,
@@ -33,8 +35,11 @@ import { Currency } from '@/components/common/currency';
 import { DateFormatter } from '@/components/common/date-formatter';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 
 interface DashboardData {
   totalBeneficiaries: number;
@@ -115,11 +120,19 @@ function formatDateLabel(dateStr: string): string {
 
 export default function AdminDashboardPage() {
   const authFetch = useAuthFetch();
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [recentRegistrations, setRecentRegistrations] = useState<RecentRegistration[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  // Quick search state
+  const [quickSearch, setQuickSearch] = useState('');
+  const [searchResults, setSearchResults] = useState<any[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showSearchResults, setShowSearchResults] = useState(false);
 
   const fetchDashboard = async () => {
     setIsLoading(true);
@@ -220,6 +233,36 @@ export default function AdminDashboardPage() {
     void fetchDashboard();
   }, []);
 
+  // Quick search handler
+  const handleQuickSearch = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const q = quickSearch.trim();
+    if (!q) return;
+
+    setIsSearching(true);
+    setShowSearchResults(true);
+    try {
+      const res = await authFetch(`/api/admin/orders?limit=5&search=${encodeURIComponent(q)}`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        const ordersArray = json.data.orders ?? json.data;
+        setSearchResults(Array.isArray(ordersArray) ? ordersArray : []);
+      } else {
+        setSearchResults([]);
+      }
+    } catch {
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  // Open order details
+  const openOrderDetails = (order: any) => {
+    // Navigate to orders page with the order ID, which will show it in a dialog
+    router.push(`/admin/orders?search=${encodeURIComponent(order.id.slice(-6))}`);
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-6">
@@ -280,6 +323,115 @@ export default function AdminDashboardPage() {
           <RefreshCw className="w-4 h-4" />
           تحديث
         </Button>
+      </motion.div>
+
+      {/* Quick Search */}
+      <motion.div variants={item}>
+        <GlassCard variant="admin" className="overflow-visible">
+          <div className="space-y-4">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-admin/10 flex items-center justify-center">
+                <Search className="w-5 h-5 text-admin" />
+              </div>
+              <div>
+                <h3 className="font-bold text-sm">بحث سريع</h3>
+                <p className="text-xs text-muted-foreground">ابحث برقم الطلب أو اسم المستفيد أو رقم الهاتف</p>
+              </div>
+            </div>
+            <form onSubmit={handleQuickSearch} className="flex gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                <Input
+                  value={quickSearch}
+                  onChange={(e) => {
+                    setQuickSearch(e.target.value);
+                    if (!e.target.value.trim()) {
+                      setShowSearchResults(false);
+                      setSearchResults([]);
+                    }
+                  }}
+                  placeholder="أدخل رقم الطلب (مثل 72397E) أو اسم المستفيد أو رقم الهاتف..."
+                  className="pr-9 h-12 text-sm"
+                  dir="rtl"
+                />
+              </div>
+              <Button
+                type="submit"
+                className="bg-admin hover:bg-admin/90 h-12 px-6 gap-2"
+                disabled={isSearching || !quickSearch.trim()}
+              >
+                {isSearching ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4" />}
+                بحث
+              </Button>
+            </form>
+
+            {/* Search Results */}
+            {showSearchResults && (
+              <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="space-y-2">
+                {isSearching ? (
+                  <div className="flex items-center justify-center py-6 gap-2 text-sm text-muted-foreground">
+                    <Loader2 className="w-5 h-5 animate-spin text-admin" />
+                    جاري البحث...
+                  </div>
+                ) : searchResults.length === 0 ? (
+                  <div className="text-center py-6">
+                    <Search className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                    <p className="text-sm text-muted-foreground">لم يتم العثور على نتائج</p>
+                    <Link href={`/admin/orders?search=${encodeURIComponent(quickSearch)}`}>
+                      <Button variant="link" size="sm" className="text-admin mt-1">
+                        البحث المتقدم في الطلبات
+                      </Button>
+                    </Link>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">تم العثور على {searchResults.length} نتيجة</p>
+                      <Link href={`/admin/orders?search=${encodeURIComponent(quickSearch)}`}>
+                        <Button variant="link" size="sm" className="text-admin text-xs p-0 h-auto">
+                          عرض الكل في الطلبات ←
+                        </Button>
+                      </Link>
+                    </div>
+                    <div className="space-y-2">
+                      {searchResults.map((order: any) => (
+                        <button
+                          key={order.id || order._id}
+                          onClick={() => openOrderDetails(order)}
+                          className="w-full text-right p-3 rounded-xl border border-border hover:border-admin/30 hover:bg-admin/5 transition-all"
+                        >
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-lg bg-admin/10 flex items-center justify-center">
+                                <ClipboardList className="w-4 h-4 text-admin" />
+                              </div>
+                              <div>
+                                <div className="flex items-center gap-2">
+                                  <span className="font-mono text-xs font-bold text-admin">#{(order.id || order._id?.toString() || '').slice(-6).toUpperCase()}</span>
+                                  <BadgeStatus status={order.status} size="sm" />
+                                  {order.isEmergency && <Badge variant="destructive" className="text-[9px] px-1 py-0">طوارئ</Badge>}
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-0.5">
+                                  {order.beneficiaryName || 'غير معروف'} • {order.serviceName || 'خدمة'}
+                                </p>
+                              </div>
+                            </div>
+                            <div className="text-left">
+                              <Currency amount={order.totalPrice || 0} className="text-sm font-bold" />
+                              <p className="text-[10px] text-muted-foreground">
+                                {order.beneficiaryPhone && <span dir="ltr">{order.beneficiaryPhone}</span>}
+                              </p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </motion.div>
+            )}
+          </div>
+        </GlassCard>
       </motion.div>
 
       {/* Stat Cards */}

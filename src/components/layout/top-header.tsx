@@ -117,8 +117,7 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
     switch (role) {
       case 'admin':
       case 'subadmin':
-        // Search could go to nurses or beneficiaries
-        router.push(`/admin/nurses?search=${encodeURIComponent(searchQuery)}`);
+        router.push(`/admin/orders?search=${encodeURIComponent(searchQuery)}`);
         break;
       case 'nurse':
         router.push(`/nurse/requests`);
