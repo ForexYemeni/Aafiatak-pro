@@ -24,7 +24,11 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
 
     const filter: any = { beneficiaryId: user.userId };
-    if (status) filter.status = status;
+    if (status) {
+      // Support comma-separated status values for filtering multiple statuses
+      const statuses = status.split(',').map(s => s.trim()).filter(Boolean);
+      filter.status = statuses.length === 1 ? statuses[0] : { $in: statuses };
+    }
 
     const [orders, total] = await Promise.all([
       ServiceRequest.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),

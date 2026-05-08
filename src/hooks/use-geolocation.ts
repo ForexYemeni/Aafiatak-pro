@@ -94,13 +94,39 @@ function mapGovernorate(englishName: string): { label: string; value: string } {
     return { label: mapped, value };
   }
   for (const [key, arabicLabel] of Object.entries(GOVERNORATE_MAP)) {
-    if (englishName.toLowerCase().includes(key.toLowerCase()) || 
+    if (englishName.toLowerCase().includes(key.toLowerCase()) ||
         key.toLowerCase().includes(englishName.toLowerCase())) {
       const value = ARABIC_TO_VALUE_MAP[arabicLabel] || '';
       return { label: arabicLabel, value };
     }
   }
   return { label: englishName, value: '' };
+}
+
+// Helper to get geolocation position with specified options
+function getPosition(options: PositionOptions): Promise<GeolocationPosition> {
+  return new Promise((resolve, reject) => {
+    if (!navigator.geolocation) {
+      reject(new Error('المتصفح لا يدعم تحديد الموقع الجغرافي'));
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(resolve, (err) => {
+      switch (err.code) {
+        case err.PERMISSION_DENIED:
+          reject(new Error('تم رفض إذن تحديد الموقع. يرجى تفعيل خدمات الموقع'));
+          break;
+        case err.POSITION_UNAVAILABLE:
+          reject(new Error('معلومات الموقع غير متوفرة'));
+          break;
+        case err.TIMEOUT:
+          reject(new Error('انتهت مهلة تحديد الموقع. يرجى المحاولة مرة أخرى'));
+          break;
+        default:
+          reject(new Error('حدث خطأ أثناء تحديد الموقع'));
+      }
+    }, options);
+  });
 }
 
 export function useGeolocation(): UseGeolocationReturn {
@@ -118,37 +144,17 @@ export function useGeolocation(): UseGeolocationReturn {
     setError(null);
 
     try {
-      // Step 1: Get GPS position ONLY — this is the only blocking step
-      const position = await new Promise<GeolocationPosition>((resolve, reject) => {
-        if (!navigator.geolocation) {
-          reject(new Error('المتصفح لا يدعم تحديد الموقع الجغرافي'));
-          return;
-        }
-
-        navigator.geolocation.getCurrentPosition(resolve, (err) => {
-          switch (err.code) {
-            case err.PERMISSION_DENIED:
-              reject(new Error('تم رفض إذن تحديد الموقع. يرجى تفعيل خدمات الموقع'));
-              break;
-            case err.POSITION_UNAVAILABLE:
-              reject(new Error('معلومات الموقع غير متوفرة'));
-              break;
-            case err.TIMEOUT:
-              reject(new Error('انتهت مهلة تحديد الموقع. يرجى المحاولة مرة أخرى'));
-              break;
-            default:
-              reject(new Error('حدث خطأ أثناء تحديد الموقع'));
-          }
-        }, {
-          enableHighAccuracy: true,
-          timeout: 5000,
-          maximumAge: 0, // Always get fresh position
-        });
+      // PHASE 1: Fast position using WiFi/cell towers (~1-2 seconds)
+      // This gives an approximate location almost instantly
+      const position = await getPosition({
+        enableHighAccuracy: false,  // Use WiFi/cell first - MUCH faster
+        timeout: 8000,              // 8 second timeout
+        maximumAge: 300000,         // Accept cached positions up to 5 minutes old
       });
 
       const { latitude, longitude, accuracy } = position.coords;
 
-      // Step 2: Return IMMEDIATELY — no waiting for reverse geocoding
+      // Return immediately with basic coordinates
       const basicLocation: LocationData = {
         latitude,
         longitude,
@@ -161,14 +167,40 @@ export function useGeolocation(): UseGeolocationReturn {
       };
 
       setLocation(basicLocation);
-      // IMPORTANT: Set detecting to false RIGHT HERE so UI responds instantly
       setIsDetecting(false);
 
-      // Step 3: Reverse geocode in background (fire-and-forget)
-      // This will NOT block the UI or the return value
       const currentLat = latitude;
       const currentLng = longitude;
-      
+
+      // PHASE 2: Try to get a more accurate position in the background
+      // This is fire-and-forget - we already have a usable position
+      getPosition({
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 0,
+      })
+        .then((precisePos) => {
+          const preciseLocation: LocationData = {
+            latitude: precisePos.coords.latitude,
+            longitude: precisePos.coords.longitude,
+            accuracy: precisePos.coords.accuracy,
+            address: `${precisePos.coords.latitude.toFixed(6)}, ${precisePos.coords.longitude.toFixed(6)}`,
+            governorate: '',
+            governorateValue: '',
+            district: '',
+            city: '',
+          };
+          setLocation(preciseLocation);
+          // Notify enrichment callback with precise coords
+          if (enrichCallbackRef.current) {
+            enrichCallbackRef.current(preciseLocation);
+          }
+        })
+        .catch(() => {
+          // Precise position failed - we already have approximate position, that's fine
+        });
+
+      // PHASE 3: Reverse geocode in background (fire-and-forget)
       fetch(
         `https://nominatim.openstreetmap.org/reverse?format=json&lat=${currentLat}&lon=${currentLng}&accept-language=ar&addressdetails=1`,
         {
@@ -196,7 +228,7 @@ export function useGeolocation(): UseGeolocationReturn {
 
           // Update local state
           setLocation(enrichedLocation);
-          
+
           // Notify the component that address was enriched
           if (enrichCallbackRef.current) {
             enrichCallbackRef.current(enrichedLocation);

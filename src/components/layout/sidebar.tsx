@@ -70,7 +70,7 @@ const nurseNavItems: NavItem[] = [
 
 const beneficiaryNavItems: NavItem[] = [
   { label: 'الرئيسية', href: '/beneficiary', icon: LayoutDashboard },
-  { label: 'الخدمات', href: '/beneficiary/services', icon: Stethoscope },
+  { label: 'الخدمات', href: '/beneficiary', icon: Stethoscope },
   { label: 'طلباتي', href: '/beneficiary/orders', icon: ClipboardList },
   { label: 'الطوارئ', href: '/beneficiary/emergency', icon: AlertTriangle },
   { label: 'نقاط الولاء', href: '/beneficiary/loyalty', icon: Heart },

@@ -47,9 +47,9 @@ const nurseBottomItems: BottomNavItem[] = [
 
 const beneficiaryBottomItems: BottomNavItem[] = [
   { label: 'الرئيسية', href: '/beneficiary', icon: Home },
-  { label: 'الخدمات', href: '/beneficiary/services', icon: Stethoscope },
   { label: 'طلباتي', href: '/beneficiary/orders', icon: ClipboardList },
   { label: 'الطوارئ', href: '/beneficiary/emergency', icon: AlertTriangle },
+  { label: 'نقاطي', href: '/beneficiary/loyalty', icon: Stethoscope },
   { label: 'الملف', href: '/beneficiary/profile', icon: User },
 ];
 

@@ -68,10 +68,21 @@ export default function OrdersPage() {
       const res = await fetch(`/api/beneficiary/orders?status=${statusMapByTab[activeTab]}&limit=20`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data: ApiResponse<OrderWithDetails[]> = await res.json();
-      if (data.success && data.data) {
-        setOrders(data.data);
-        if (data.pagination) setPagination(data.pagination);
+      const data = await res.json();
+      if (data.success) {
+        // API returns { data: { orders, total, page, pages } } format
+        const ordersArray = data.data?.orders || data.data || [];
+        setOrders(Array.isArray(ordersArray) ? ordersArray : []);
+        if (data.data?.total !== undefined) {
+          setPagination({
+            total: data.data.total || 0,
+            page: data.data.page || 1,
+            limit: 20,
+            totalPages: data.data.pages || 1,
+          });
+        } else if (data.pagination) {
+          setPagination(data.pagination);
+        }
       }
     } catch {
       setOrders([]);

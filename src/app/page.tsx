@@ -1089,13 +1089,6 @@ function LoginPageContent() {
                             {beneficiaryForm.formState.errors.address && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.address.message}</p>}
                           </div>
                           <div className="space-y-2">
-                            <Label>المحافظة</Label>
-                            <Select onValueChange={(v) => beneficiaryForm.setValue('governorate', v)}>
-                              <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="اختر المحافظة" /></SelectTrigger>
-                              <SelectContent>{YEMEN_GOVERNORATES.map((gov) => (<SelectItem key={gov.value} value={gov.value}>{gov.label}</SelectItem>))}</SelectContent>
-                            </Select>
-                          </div>
-                          <div className="space-y-2">
                             <Label htmlFor="ben-referral">كود الإحالة (اختياري)</Label>
                             <Input id="ben-referral" placeholder="AF-XXXXXX" className="text-right h-11 rounded-xl" dir="ltr" {...beneficiaryForm.register('referralCode')} />
                           </div>
@@ -1179,13 +1172,6 @@ function LoginPageContent() {
                             size="sm"
                             className="w-full"
                           />
-                          <div className="space-y-2">
-                            <Label>المحافظة</Label>
-                            <Select onValueChange={(v) => nurseForm.setValue('governorate', v)}>
-                              <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="اختر المحافظة" /></SelectTrigger>
-                              <SelectContent>{YEMEN_GOVERNORATES.map((gov) => (<SelectItem key={gov.value} value={gov.value}>{gov.label}</SelectItem>))}</SelectContent>
-                            </Select>
-                          </div>
                           <div className="space-y-2">
                             <Label htmlFor="nurse-password">كلمة المرور</Label>
                             <div className="relative">
@@ -1405,10 +1391,6 @@ function LoginPageContent() {
                             {beneficiaryForm.formState.errors.address && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.address.message}</p>}
                           </div>
                           <div className="space-y-1.5">
-                            <Label className="text-xs">المحافظة</Label>
-                            <Select onValueChange={(v) => beneficiaryForm.setValue('governorate', v)}><SelectTrigger className="h-10 rounded-xl"><SelectValue placeholder="اختر المحافظة" /></SelectTrigger><SelectContent>{YEMEN_GOVERNORATES.map((gov) => (<SelectItem key={gov.value} value={gov.value}>{gov.label}</SelectItem>))}</SelectContent></Select>
-                          </div>
-                          <div className="space-y-1.5">
                             <Label htmlFor="m-ben-referral" className="text-xs">كود الإحالة (اختياري)</Label>
                             <Input id="m-ben-referral" placeholder="AF-XXXXXX" className="text-right h-10 rounded-xl" dir="ltr" {...beneficiaryForm.register('referralCode')} />
                           </div>
@@ -1462,10 +1444,6 @@ function LoginPageContent() {
                             size="sm"
                             className="w-full"
                           />
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">المحافظة</Label>
-                            <Select onValueChange={(v) => nurseForm.setValue('governorate', v)}><SelectTrigger className="h-10 rounded-xl"><SelectValue placeholder="اختر المحافظة" /></SelectTrigger><SelectContent>{YEMEN_GOVERNORATES.map((gov) => (<SelectItem key={gov.value} value={gov.value}>{gov.label}</SelectItem>))}</SelectContent></Select>
-                          </div>
                           <div className="space-y-1.5">
                             <Label htmlFor="m-nurse-password" className="text-xs">كلمة المرور</Label>
                             <div className="relative"><Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-10 rounded-xl" dir="ltr" {...nurseForm.register('password')} /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
