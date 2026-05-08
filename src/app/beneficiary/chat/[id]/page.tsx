@@ -143,6 +143,33 @@ export default function ChatDetailPage() {
     if (chatId) fetchMessages();
   }, [chatId, fetchMessages]);
 
+  // Polling for new messages every 3 seconds (fallback for when socket is not available)
+  useEffect(() => {
+    if (!chatId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await authFetch(`/api/chat/${chatId}/messages?limit=50`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          const msgs = data.data.messages || data.data;
+          if (Array.isArray(msgs)) {
+            setMessages(prev => {
+              // Only update if there are new messages
+              if (msgs.length !== prev.length) return msgs;
+              if (msgs.length > 0 && prev.length > 0 && msgs[msgs.length - 1].id !== prev[prev.length - 1].id) {
+                return msgs;
+              }
+              return prev;
+            });
+          }
+        }
+      } catch {
+        // silently handle
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [chatId, authFetch]);
+
   // Socket listeners for real-time messages
   useEffect(() => {
     if (!service || !chatId) return;

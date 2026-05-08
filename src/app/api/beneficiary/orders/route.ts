@@ -64,6 +64,16 @@ export async function GET(request: NextRequest) {
         nurseRating: nurse?.rating || 0,
         nurseIsOnline: nurse?.isOnline || false,
         serviceName: service?.nameAr || null,
+        // Wrap flat pricing fields into pricing object for frontend compatibility
+        pricing: {
+          basePrice: o.basePrice || 0,
+          nightFee: o.nightFee || 0,
+          fridayFee: o.fridayFee || 0,
+          emergencyFee: o.emergencyFee || 0,
+          discount: o.discount || 0,
+          totalPrice: o.totalPrice || 0,
+          couponDiscount: o.discount || 0,
+        },
       };
     });
 

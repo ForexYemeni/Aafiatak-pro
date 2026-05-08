@@ -10,6 +10,9 @@ import {
   Check,
   Clock,
   Paperclip,
+  Loader2,
+  Phone,
+  MessageCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,7 +21,6 @@ import { EmptyState } from '@/components/common/empty-state';
 import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { useChat } from '@/hooks/use-socket';
 import { formatTimeOnly, toArabicNum } from '@/components/common/date-formatter';
 import Link from 'next/link';
 
@@ -33,13 +35,13 @@ interface ChatMessage {
   type: string;
   imageUrl: string | null;
   readBy: string[];
-  deliveredTo: string[];
   createdAt: string;
-  quickReplies: Array<{
-    id: string;
-    labelAr: string;
-    value: string;
-  }> | null;
+}
+
+interface ChatInfo {
+  id: string;
+  participantName: string;
+  participantPhone: string | null;
 }
 
 // ---- Quick Reply Suggestions ----
@@ -55,24 +57,44 @@ const quickReplies = [
 
 export default function NurseChatDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [chatId, setChatId] = useState<string>('');
+  const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
-  const [otherName, setOtherName] = useState('مستفيد');
-  const [otherOnline, setOtherOnline] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const authFetch = useAuthFetch();
   const user = useAuthStore((s) => s.user);
 
-  // Socket chat hook
-  const { sendMessage, startTyping, stopTyping, isTyping: otherTyping } = useChat(chatId);
-
   // Resolve params
   useEffect(() => {
     params.then((p) => setChatId(p.id));
   }, [params]);
+
+  // Fetch chat info
+  useEffect(() => {
+    if (!chatId) return;
+    const fetchChatInfo = async () => {
+      try {
+        const res = await authFetch('/api/chat');
+        const data = await res.json();
+        if (data.success && data.data) {
+          const found = data.data.find((c: any) => c.id === chatId);
+          if (found) {
+            setChatInfo({
+              id: found.id,
+              participantName: found.participantName || 'مستفيد',
+              participantPhone: found.participantPhone || null,
+            });
+          }
+        }
+      } catch {
+        // silently handle
+      }
+    };
+    fetchChatInfo();
+  }, [chatId, authFetch]);
 
   const fetchMessages = useCallback(async () => {
     if (!chatId) return;
@@ -80,7 +102,9 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
       const res = await authFetch(`/api/chat/${chatId}/messages?limit=100`);
       const data = await res.json();
       if (data.success && data.data) {
-        setMessages((data.data as ChatMessage[]).reverse());
+        // API returns { messages: [...], total, page, pages }
+        const msgs = data.data.messages || data.data;
+        setMessages(Array.isArray(msgs) ? msgs : []);
       }
     } catch {
       // silently handle
@@ -90,8 +114,36 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
   }, [authFetch, chatId]);
 
   useEffect(() => {
-    fetchMessages();
-  }, [fetchMessages]);
+    if (chatId) fetchMessages();
+  }, [chatId, fetchMessages]);
+
+  // Polling for new messages every 3 seconds
+  useEffect(() => {
+    if (!chatId) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await authFetch(`/api/chat/${chatId}/messages?limit=100`);
+        const data = await res.json();
+        if (data.success && data.data) {
+          const msgs = data.data.messages || data.data;
+          if (Array.isArray(msgs)) {
+            setMessages(prev => {
+              // Only update if there are new messages
+              if (msgs.length !== prev.length) return msgs;
+              // Check if last message is different
+              if (msgs.length > 0 && prev.length > 0 && msgs[msgs.length - 1].id !== prev[prev.length - 1].id) {
+                return msgs;
+              }
+              return prev;
+            });
+          }
+        }
+      } catch {
+        // silently handle
+      }
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [chatId, authFetch]);
 
   // Auto-scroll to bottom
   useEffect(() => {
@@ -99,11 +151,10 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
   }, [messages]);
 
   const handleSendMessage = async () => {
-    if (!newMessage.trim() || isSending) return;
+    if (!newMessage.trim() || isSending || !chatId) return;
     const content = newMessage.trim();
     setNewMessage('');
     setIsSending(true);
-    stopTyping();
 
     try {
       const res = await authFetch(`/api/chat/${chatId}/messages`, {
@@ -112,10 +163,13 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
       });
       const data = await res.json();
       if (data.success && data.data) {
-        setMessages((prev) => [...prev, data.data as ChatMessage]);
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === data.data.id);
+          if (exists) return prev;
+          return [...prev, data.data as ChatMessage];
+        });
       }
     } catch {
-      // silently handle - re-add message to input
       setNewMessage(content);
     } finally {
       setIsSending(false);
@@ -123,6 +177,7 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
   };
 
   const handleQuickReply = async (value: string) => {
+    if (isSending || !chatId) return;
     setNewMessage('');
     setIsSending(true);
     try {
@@ -132,7 +187,11 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
       });
       const data = await res.json();
       if (data.success && data.data) {
-        setMessages((prev) => [...prev, data.data as ChatMessage]);
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === data.data.id);
+          if (exists) return prev;
+          return [...prev, data.data as ChatMessage];
+        });
       }
     } catch {
       // silently handle
@@ -141,54 +200,21 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
     }
   };
 
-  const handleInputChange = (value: string) => {
-    setNewMessage(value);
-    if (value.length > 0) {
-      startTyping();
-    } else {
-      stopTyping();
-    }
-  };
-
-  const handleImageUpload = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = 'image/*';
-    input.onchange = async (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-      const formData = new FormData();
-      formData.append('file', file);
-      try {
-        const uploadRes = await authFetch('/api/upload', {
-          method: 'POST',
-          body: formData,
-        });
-        const uploadData = await uploadRes.json();
-        if (uploadData.success && uploadData.data?.url) {
-          const msgRes = await authFetch(`/api/chat/${chatId}/messages`, {
-            method: 'POST',
-            body: JSON.stringify({
-              content: '📷 صورة',
-              type: 'image',
-              imageUrl: uploadData.data.url,
-            }),
-          });
-          const msgData = await msgRes.json();
-          if (msgData.success && msgData.data) {
-            setMessages((prev) => [...prev, msgData.data as ChatMessage]);
-          }
-        }
-      } catch {
-        // silently handle
-      }
-    };
-    input.click();
-  };
-
   const isMyMessage = (msg: ChatMessage): boolean => {
-    return msg.senderId === user?.id;
+    return msg.senderId === user?.id || msg.senderId === user?._id;
   };
+
+  if (!chatId && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <MessageCircle className="w-12 h-12 text-muted-foreground" />
+        <p className="text-muted-foreground">لم يتم العثور على المحادثة</p>
+        <Link href="/nurse/chat">
+          <Button variant="outline">العودة للمحادثات</Button>
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] -m-4 md:-m-6">
@@ -200,20 +226,23 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
           </Button>
         </Link>
         <div className="flex items-center gap-3 flex-1">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-nurse/10 text-nurse flex items-center justify-center text-sm font-semibold">
-              {otherName.slice(0, 2)}
-            </div>
-            {otherOnline && (
-              <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-card" />
-            )}
+          <div className="w-10 h-10 rounded-full bg-nurse/10 text-nurse flex items-center justify-center text-sm font-semibold">
+            {chatInfo?.participantName?.slice(0, 2) || 'م'}
           </div>
-          <div>
-            <p className="font-semibold text-sm">{otherName}</p>
-            <p className="text-[10px] text-muted-foreground">
-              {otherTyping ? 'يكتب...' : otherOnline ? 'متصل الآن' : 'غير متصل'}
-            </p>
+          <div className="flex-1 min-w-0">
+            <p className="font-semibold text-sm truncate">{chatInfo?.participantName || 'مستفيد'}</p>
+            <p className="text-[10px] text-muted-foreground">محادثة نشطة</p>
           </div>
+          {chatInfo?.participantPhone && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="shrink-0"
+              onClick={() => window.open(`tel:${chatInfo.participantPhone}`)}
+            >
+              <Phone className="w-4 h-4" />
+            </Button>
+          )}
         </div>
       </div>
 
@@ -221,7 +250,7 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
       <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
-            <div className="w-8 h-8 border-4 border-nurse/30 border-t-nurse rounded-full animate-spin" />
+            <Loader2 className="w-8 h-8 text-nurse animate-spin" />
           </div>
         ) : messages.length === 0 ? (
           <EmptyState
@@ -233,7 +262,7 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
           <>
             {messages.map((msg, index) => {
               const mine = isMyMessage(msg);
-              const isRead = msg.readBy.length > 1;
+              const isRead = msg.readBy && msg.readBy.length > 1;
 
               return (
                 <motion.div
@@ -286,27 +315,6 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
         )}
       </div>
 
-      {/* Typing Indicator */}
-      <AnimatePresence>
-        {otherTyping && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="px-4 pb-1"
-          >
-            <div className="flex items-center gap-2 text-xs text-muted-foreground">
-              <div className="flex gap-1">
-                <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '0ms' }} />
-                <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '150ms' }} />
-                <span className="w-1.5 h-1.5 bg-muted-foreground rounded-full animate-bounce" style={{ animationDelay: '300ms' }} />
-              </div>
-              <span>يكتب...</span>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* Quick Replies */}
       {messages.length > 0 && (
         <div className="flex gap-2 px-4 pb-2 overflow-x-auto scrollbar-none">
@@ -329,22 +337,25 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
             variant="ghost"
             size="icon"
             className="shrink-0"
-            onClick={handleImageUpload}
+            onClick={() => {
+              // Image upload - coming soon
+            }}
           >
             <ImageIcon className="w-5 h-5 text-muted-foreground" />
           </Button>
-          <div className="flex-1 relative">
+          <div className="flex-1">
             <Input
               placeholder="اكتب رسالة..."
               value={newMessage}
-              onChange={(e) => handleInputChange(e.target.value)}
+              onChange={(e) => setNewMessage(e.target.value)}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
                   handleSendMessage();
                 }
               }}
-              className="pr-4 pl-12 rounded-full"
+              className="rounded-2xl"
+              dir="rtl"
             />
           </div>
           <Button
@@ -353,7 +364,11 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
             onClick={handleSendMessage}
             disabled={!newMessage.trim() || isSending}
           >
-            <Send className="w-5 h-5" />
+            {isSending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Send className="w-5 h-5" />
+            )}
           </Button>
         </div>
       </div>

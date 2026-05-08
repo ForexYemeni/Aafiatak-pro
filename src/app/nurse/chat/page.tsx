@@ -16,20 +16,18 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { getRelativeTime, toArabicNum } from '@/components/common/date-formatter';
 import Link from 'next/link';
 
-// ---- Types ----
+// ---- Types matching the API response ----
 
 interface ChatItem {
   id: string;
-  participants: Array<{
-    userId: string;
-    role: string;
-    joinedAt: string;
-  }>;
-  lastMessageContent: string | null;
-  lastMessageSender: string | null;
-  lastMessageAt: string | null;
-  unreadCount: Record<string, number>;
-  isActive: boolean;
+  participantName: string;
+  participantRole: string;
+  participantPhone: string | null;
+  participantAvatar: string | null;
+  lastMessage: string;
+  lastMessageTime: string;
+  unreadCount: number;
+  requestId: string | null;
 }
 
 // ---- Component ----
@@ -39,7 +37,6 @@ export default function NurseChatPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const authFetch = useAuthFetch();
-  const user = useAuthStore((s) => s.user);
 
   const fetchChats = useCallback(async () => {
     try {
@@ -57,21 +54,14 @@ export default function NurseChatPage() {
 
   useEffect(() => {
     fetchChats();
+    // Auto-refresh every 10 seconds for new messages
+    const interval = setInterval(fetchChats, 10000);
+    return () => clearInterval(interval);
   }, [fetchChats]);
-
-  const getOtherParticipant = (chat: ChatItem) => {
-    return chat.participants.find((p) => p.userId !== user?.id);
-  };
-
-  const getUnreadCount = (chat: ChatItem): number => {
-    if (!user?.id) return 0;
-    return chat.unreadCount[user.id] ?? 0;
-  };
 
   const filteredChats = chats.filter((chat) => {
     if (!searchQuery) return true;
-    const other = getOtherParticipant(chat);
-    return other?.userId?.toLowerCase().includes(searchQuery.toLowerCase());
+    return chat.participantName?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   if (isLoading) {
@@ -107,57 +97,52 @@ export default function NurseChatPage() {
           />
         ) : (
           <div className="space-y-2">
-            {filteredChats.map((chat, index) => {
-              const other = getOtherParticipant(chat);
-              const unread = getUnreadCount(chat);
-
-              return (
-                <motion.div
-                  key={chat.id}
-                  initial={{ opacity: 0, y: 10 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: index * 0.05 }}
-                >
-                  <Link href={`/nurse/chat/${chat.id}`}>
-                    <GlassCard variant="nurse" className={`p-4 transition-all hover:shadow-md ${unread > 0 ? 'ring-1 ring-nurse/20' : ''}`}>
-                      <div className="flex items-center gap-3">
-                        <Avatar className="w-12 h-12">
-                          <AvatarFallback className="bg-nurse/10 text-nurse text-sm">
-                            مستفيد
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="font-semibold text-sm truncate">
-                              مستفيد
-                            </p>
-                            {chat.lastMessageAt && (
-                              <span className="text-[10px] text-muted-foreground shrink-0">
-                                {getRelativeTime(new Date(chat.lastMessageAt))}
-                              </span>
-                            )}
-                          </div>
-                          <div className="flex items-center justify-between mt-0.5">
-                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                              {chat.lastMessageContent ?? 'لا توجد رسائل'}
-                            </p>
-                            {unread > 0 && (
-                              <Badge
-                                variant="destructive"
-                                className="h-5 min-w-[20px] text-[10px] flex items-center justify-center shrink-0"
-                              >
-                                {toArabicNum(unread)}
-                              </Badge>
-                            )}
-                          </div>
+            {filteredChats.map((chat, index) => (
+              <motion.div
+                key={chat.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: index * 0.05 }}
+              >
+                <Link href={`/nurse/chat/${chat.id}`}>
+                  <GlassCard variant="nurse" className={`p-4 transition-all hover:shadow-md ${chat.unreadCount > 0 ? 'ring-1 ring-nurse/20' : ''}`}>
+                    <div className="flex items-center gap-3">
+                      <Avatar className="w-12 h-12">
+                        <AvatarFallback className="bg-nurse/10 text-nurse text-sm">
+                          {chat.participantName?.slice(0, 2) || 'م'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="font-semibold text-sm truncate">
+                            {chat.participantName || 'مستفيد'}
+                          </p>
+                          {chat.lastMessageTime && (
+                            <span className="text-[10px] text-muted-foreground shrink-0">
+                              {getRelativeTime(new Date(chat.lastMessageTime))}
+                            </span>
+                          )}
                         </div>
-                        <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0" />
+                        <div className="flex items-center justify-between mt-0.5">
+                          <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                            {chat.lastMessage || 'لا توجد رسائل'}
+                          </p>
+                          {chat.unreadCount > 0 && (
+                            <Badge
+                              variant="destructive"
+                              className="h-5 min-w-[20px] text-[10px] flex items-center justify-center shrink-0"
+                            >
+                              {toArabicNum(chat.unreadCount)}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
-                    </GlassCard>
-                  </Link>
-                </motion.div>
-              );
-            })}
+                      <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0" />
+                    </div>
+                  </GlassCard>
+                </Link>
+              </motion.div>
+            ))}
           </div>
         )}
       </PullToRefresh>

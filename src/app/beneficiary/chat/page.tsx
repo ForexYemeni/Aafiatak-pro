@@ -50,7 +50,20 @@ export default function ChatPage() {
 
   useEffect(() => {
     fetchChats();
-  }, [fetchChats]);
+    // Auto-refresh every 10 seconds for new messages
+    const interval = setInterval(async () => {
+      try {
+        const res = await authFetch('/api/chat');
+        const data = await res.json();
+        if (data.success && data.data) {
+          setChats(Array.isArray(data.data) ? data.data : []);
+        }
+      } catch {
+        // silently handle
+      }
+    }, 10000);
+    return () => clearInterval(interval);
+  }, [fetchChats, authFetch]);
 
   const filteredChats = chats.filter((chat) =>
     chat.participantName.includes(searchQuery) || chat.lastMessage.includes(searchQuery)
