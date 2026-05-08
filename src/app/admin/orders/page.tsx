@@ -335,6 +335,21 @@ export default function AdminOrdersPage() {
 
   const columns: ColumnDef<OrderItem, unknown>[] = [
     {
+      accessorKey: 'id',
+      header: 'رقم الطلب',
+      cell: ({ row }) => {
+        const shortId = '#' + row.original.id.slice(-6).toUpperCase();
+        return (
+          <span
+            className="font-mono text-xs font-bold text-admin"
+            title={row.original.id}
+          >
+            {shortId}
+          </span>
+        );
+      },
+    },
+    {
       accessorKey: 'beneficiaryName',
       header: 'المستفيد',
       cell: ({ row }) => (
@@ -693,6 +708,7 @@ export default function AdminOrdersPage() {
           emptyMessage="لا توجد طلبات"
           emptyAction={{ label: 'تحديث', onClick: () => void fetchOrders() }}
           rowActions={rowActions as never}
+          onRowClick={(row) => setViewTarget(row as unknown as OrderItem)}
           currentPage={page}
           pageCount={totalPages}
           onPageChange={setPage}

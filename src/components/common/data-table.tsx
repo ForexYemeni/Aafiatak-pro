@@ -58,6 +58,7 @@ interface DataTableProps<TData, TValue> {
     onClick: () => void;
   };
   rowActions?: RowAction[];
+  onRowClick?: (row: TData) => void;
   pageSize?: number;
   pageCount?: number;
   currentPage?: number;
@@ -121,6 +122,7 @@ export function DataTable<TData, TValue>({
   emptyMessage = 'لا توجد بيانات للعرض',
   emptyAction,
   rowActions = [],
+  onRowClick,
   pageSize = 10,
   pageCount,
   currentPage = 1,
@@ -251,7 +253,14 @@ export function DataTable<TData, TValue>({
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows.map((row) => (
-              <TableRow key={row.id} className="hover:bg-accent/30 transition-colors">
+              <TableRow
+                key={row.id}
+                className={cn(
+                  'hover:bg-accent/30 transition-colors',
+                  onRowClick && 'cursor-pointer'
+                )}
+                onClick={() => onRowClick?.(row.original)}
+              >
                 {row.getVisibleCells().map((cell) => (
                   <TableCell key={cell.id} className="text-right">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
