@@ -22,21 +22,19 @@ export async function GET(request: NextRequest) {
 
     const isVerified = nurse.verificationStatus === 'verified' && nurse.identityDocumentUrl && nurse.licenseDocumentUrl;
 
-    if (!isVerified) {
-      return Response.json({
-        success: true,
-        data: [],
-        verificationRequired: true,
-        message: 'يجب توثيق حسابك أولاً برفع الهوية الوطنية ومزاولة المهنة',
-      });
-    }
-
     const { searchParams } = new URL(request.url);
     const status = searchParams.get('status') || 'active';
     const countsOnly = searchParams.get('counts') === 'true';
 
-    // If countsOnly, return counts for all tabs at once
+    // If countsOnly, return counts for all tabs (zeros for unverified nurses)
     if (countsOnly) {
+      if (!isVerified) {
+        return Response.json({
+          success: true,
+          data: { new: 0, active: 0, completed: 0 },
+          verificationRequired: true,
+        });
+      }
       const [newCount, activeCount, completedCount] = await Promise.all([
         ServiceRequest.countDocuments({ nurseId: user.userId, status: 'assigned' }),
         ServiceRequest.countDocuments({ nurseId: user.userId, status: { $in: ['accepted', 'in_progress'] } }),
@@ -45,6 +43,15 @@ export async function GET(request: NextRequest) {
       return Response.json({
         success: true,
         data: { new: newCount, active: activeCount, completed: completedCount },
+      });
+    }
+
+    if (!isVerified) {
+      return Response.json({
+        success: true,
+        data: [],
+        verificationRequired: true,
+        message: 'يجب توثيق حسابك أولاً برفع الهوية الوطنية ومزاولة المهنة',
       });
     }
 

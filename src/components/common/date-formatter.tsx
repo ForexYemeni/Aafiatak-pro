@@ -10,7 +10,8 @@ interface DateFormatterProps {
 
 const arabicNumerals = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
 
-function toArabicNum(num: number | string): string {
+function toArabicNum(num: number | string | undefined | null): string {
+  if (num === undefined || num === null) return '٠';
   return String(num).replace(/\d/g, (d) => arabicNumerals[parseInt(d, 10)]);
 }
 

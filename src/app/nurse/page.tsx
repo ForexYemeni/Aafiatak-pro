@@ -396,22 +396,6 @@ export default function NurseTasksPage() {
         )}
       </AnimatePresence>
 
-      {/* Quick Stats */}
-      <div className="grid grid-cols-3 gap-3">
-        <GlassCard variant="nurse" className="p-3 text-center">
-          <p className="text-2xl font-bold text-nurse">{toArabicNum(counts.new)}</p>
-          <p className="text-xs text-muted-foreground">جديدة</p>
-        </GlassCard>
-        <GlassCard variant="nurse" className="p-3 text-center">
-          <p className="text-2xl font-bold text-sky-600">{toArabicNum(counts.active)}</p>
-          <p className="text-xs text-muted-foreground">نشطة</p>
-        </GlassCard>
-        <GlassCard variant="nurse" className="p-3 text-center">
-          <p className="text-2xl font-bold text-green-600">{toArabicNum(counts.completed)}</p>
-          <p className="text-xs text-muted-foreground">مكتملة</p>
-        </GlassCard>
-      </div>
-
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
         <TabsList className="w-full grid grid-cols-3">
