@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Stethoscope,
@@ -23,10 +23,19 @@ import {
   Clock,
   Wallet,
   Search,
+  Users,
+  Shield,
+  Activity,
+  TrendingUp,
+  ChevronLeft,
+  ChevronRight,
+  Power,
+  PowerOff,
+  Send,
+  Banknote,
 } from 'lucide-react';
-import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
-import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
+import { GlassCard } from '@/components/common/glass-card';
 import { SearchInput } from '@/components/common/search-input';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { EmptyState } from '@/components/common/empty-state';
@@ -41,6 +50,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
   DialogContent,
@@ -59,8 +69,9 @@ import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { Currency } from '@/components/common/currency';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
-import type { ColumnDef } from '@tanstack/react-table';
+import { cn } from '@/lib/utils';
 
+// ─── Types ───────────────────────────────────────────────────────
 interface NurseItem {
   id: string;
   name: string;
@@ -108,6 +119,7 @@ interface WithdrawalItem {
   createdAt: string;
 }
 
+// ─── Constants ───────────────────────────────────────────────────
 const specializationLabels: Record<string, string> = {
   general_nursing: 'تمريض عام',
   critical_care: 'رعاية حرجة',
@@ -121,9 +133,39 @@ const specializationLabels: Record<string, string> = {
   emergency: 'طوارئ',
 };
 
-const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
-const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
+const wStatusLabels: Record<string, string> = {
+  pending: 'قيد المراجعة',
+  approved: 'تمت الموافقة',
+  rejected: 'مرفوض',
+  processed: 'تم التحويل',
+};
 
+const wStatusColors: Record<string, string> = {
+  pending: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200 dark:border-amber-800',
+  approved: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
+  processed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
+  rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
+};
+
+// ─── Animation Variants ──────────────────────────────────────────
+const container = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.06 } },
+};
+const itemAnim = {
+  hidden: { opacity: 0, y: 20 },
+  show: { opacity: 1, y: 0, transition: { type: 'spring', stiffness: 300, damping: 24 } },
+};
+const cardHover = {
+  scale: 1.015,
+  transition: { type: 'spring', stiffness: 400, damping: 25 },
+};
+const statCardVariants = {
+  hidden: { opacity: 0, scale: 0.9 },
+  show: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 25 } },
+};
+
+// ─── Component ───────────────────────────────────────────────────
 export default function AdminNursesPage() {
   const authFetch = useAuthFetch();
   const isMobile = useIsMobile();
@@ -150,7 +192,12 @@ export default function AdminNursesPage() {
   const [viewTarget, setViewTarget] = useState<NurseItem | null>(null);
   const [viewLoading, setViewLoading] = useState(false);
   const [docLoading, setDocLoading] = useState(false);
-  const [docData, setDocData] = useState<{ identityDocumentData: string | null; licenseDocumentData: string | null; identityDocumentUrl: string | null; licenseDocumentUrl: string | null } | null>(null);
+  const [docData, setDocData] = useState<{
+    identityDocumentData: string | null;
+    licenseDocumentData: string | null;
+    identityDocumentUrl: string | null;
+    licenseDocumentUrl: string | null;
+  } | null>(null);
 
   // Image lightbox
   const [lightboxImage, setLightboxImage] = useState<{ src: string; alt: string } | null>(null);
@@ -183,9 +230,30 @@ export default function AdminNursesPage() {
   const [withdrawalAdminNotes, setWithdrawalAdminNotes] = useState('');
   const [withdrawalRejectReason, setWithdrawalRejectReason] = useState('');
 
-  // Withdrawal detail dialog
-  const [withdrawalDetail, setWithdrawalDetail] = useState<WithdrawalItem | null>(null);
+  const user = useAuthStore((s) => s.user);
+  const isSubadmin = user?.role === 'subadmin';
 
+  // ─── Computed Stats ──────────────────────────────────────────
+  const nurseStats = useMemo(() => ({
+    total: nurses.length,
+    verified: nurses.filter(n => n.verificationStatus === 'verified').length,
+    pending: nurses.filter(n => n.verificationStatus === 'pending' || n.verificationStatus === 'unverified').length,
+    active: nurses.filter(n => n.isActive && !n.isBlocked).length,
+  }), [nurses]);
+
+  const withdrawalStats = useMemo(() => ({
+    pendingAmount: withdrawals
+      .filter(w => w.status === 'pending')
+      .reduce((sum, w) => sum + w.netAmount, 0),
+    processedAmount: withdrawals
+      .filter(w => w.status === 'processed')
+      .reduce((sum, w) => sum + w.netAmount, 0),
+    pendingCount: withdrawals.filter(w => w.status === 'pending').length,
+  }), [withdrawals]);
+
+  const pendingCount = withdrawalStats.pendingCount;
+
+  // ─── Data Fetching ───────────────────────────────────────────
   const handleViewNurse = useCallback(async (nurse: NurseItem) => {
     setViewTarget(nurse);
     setViewLoading(true);
@@ -274,6 +342,7 @@ export default function AdminNursesPage() {
     }
   }, [activeTab, fetchWithdrawals]);
 
+  // ─── Action Handlers ─────────────────────────────────────────
   const handleVerify = async () => {
     if (!verifyTarget) return;
     setIsVerifying(true);
@@ -356,9 +425,7 @@ export default function AdminNursesPage() {
     }
     setIsDeleting(true);
     try {
-      const res = await authFetch(`/api/admin/nurses/${deleteTarget.id}`, {
-        method: 'DELETE',
-      });
+      const res = await authFetch(`/api/admin/nurses/${deleteTarget.id}`, { method: 'DELETE' });
       const json = await res.json();
       if (json.success) {
         toast.success('تم حذف الممرض/ـة نهائياً');
@@ -376,7 +443,6 @@ export default function AdminNursesPage() {
     }
   };
 
-  // Handle withdrawal approve/reject
   const handleWithdrawalAction = async () => {
     if (!withdrawalAction) return;
     setWithdrawalActionLoading(true);
@@ -391,7 +457,11 @@ export default function AdminNursesPage() {
       });
       const json = await res.json();
       if (json.success) {
-        toast.success(withdrawalActionType === 'approve' ? 'تم تحويل الأموال للممرض بنجاح' : 'تم رفض طلب السحب وإرجاع المبلغ');
+        toast.success(
+          withdrawalActionType === 'approve'
+            ? 'تم تحويل الأموال للممرض بنجاح'
+            : 'تم رفض طلب السحب وإرجاع المبلغ'
+        );
         void fetchWithdrawals();
       } else {
         toast.error(json.message ?? 'فشل العملية');
@@ -406,161 +476,75 @@ export default function AdminNursesPage() {
     }
   };
 
-  const columns: ColumnDef<NurseItem, unknown>[] = [
-    {
-      accessorKey: 'name',
-      header: 'الاسم',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-3">
-          <Avatar className="w-8 h-8">
-            <AvatarFallback className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 text-xs">
-              {row.original.name.slice(0, 2)}
+  // ─── View Content ────────────────────────────────────────────
+  const ViewContent = ({ nurse }: { nurse: NurseItem }) => (
+    <div className="space-y-5 p-5">
+      {/* Profile Header */}
+      <div className="flex items-center gap-4">
+        <div className="relative">
+          <Avatar className="w-20 h-20 ring-2 ring-primary/20 ring-offset-2 ring-offset-background">
+            <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-600 text-white text-2xl font-bold">
+              {nurse.name.slice(0, 2)}
             </AvatarFallback>
           </Avatar>
-          <div>
-            <div className="flex items-center gap-1.5">
-              <p className="font-medium text-sm">{row.original.name}</p>
-              {row.original.isBlocked && <Ban className="w-3 h-3 text-red-500" />}
+          {nurse.isBlocked ? (
+            <div className="absolute -bottom-1 -left-1 w-6 h-6 rounded-full bg-red-500 flex items-center justify-center ring-2 ring-background">
+              <Ban className="w-3.5 h-3.5 text-white" />
             </div>
-            <p className="text-xs text-muted-foreground">{row.original.phone}</p>
+          ) : nurse.isActive ? (
+            <div className="absolute -bottom-1 -left-1 w-6 h-6 rounded-full bg-green-500 flex items-center justify-center ring-2 ring-background">
+              <Activity className="w-3.5 h-3.5 text-white" />
+            </div>
+          ) : null}
+        </div>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h3 className="text-xl font-bold">{nurse.name}</h3>
+            {nurse.isBlocked && (
+              <Badge variant="destructive" className="text-[10px]">
+                <Ban className="w-3 h-3 ml-0.5" />محظور
+              </Badge>
+            )}
           </div>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'specialization',
-      header: 'التخصص',
-      cell: ({ row }) => (
-        <div className="flex flex-wrap gap-1">
-          {(row.original.specialization || []).slice(0, 2).map((s) => (
-            <Badge key={s} variant="outline" className="text-[10px] h-5">
-              {specializationLabels[s] ?? s}
-            </Badge>
-          ))}
-          {(row.original.specialization || []).length > 2 && (
-            <Badge variant="outline" className="text-[10px] h-5">+{(row.original.specialization || []).length - 2}</Badge>
-          )}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'verificationStatus',
-      header: 'حالة التوثيق',
-      cell: ({ row }) => <BadgeStatus status={row.original.verificationStatus} />,
-    },
-    {
-      accessorKey: 'rating',
-      header: 'التقييم',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-          <span className="text-sm">{row.original.rating.toFixed(1)}</span>
-          <span className="text-xs text-muted-foreground">({row.original.reviewCount})</span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'isActive',
-      header: 'الحالة',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1.5">
-          <BadgeStatus status={row.original.isActive ? 'active' : 'inactive'} />
-          {row.original.isBlocked && (
-            <Badge variant="destructive" className="text-[9px] h-4 px-1">محظور</Badge>
-          )}
-        </div>
-      ),
-    },
-  ];
-
-  const user = useAuthStore((s) => s.user);
-  const isSubadmin = user?.role === 'subadmin';
-
-  const rowActions = [
-    {
-      label: 'عرض التفاصيل',
-      icon: <Eye className="w-4 h-4" />,
-      onClick: (row: Record<string, unknown>) => handleViewNurse(row as unknown as NurseItem),
-    },
-    {
-      label: 'توثيق',
-      icon: <ShieldCheck className="w-4 h-4" />,
-      onClick: (row: Record<string, unknown>) => {
-        setVerifyTarget(row as unknown as NurseItem);
-        setVerifyAction('verify');
-      },
-    },
-    {
-      label: 'رفض التوثيق',
-      icon: <X className="w-4 h-4" />,
-      onClick: (row: Record<string, unknown>) => {
-        setVerifyTarget(row as unknown as NurseItem);
-        setVerifyAction('reject');
-      },
-      variant: 'destructive' as const,
-    },
-    {
-      label: (row: Record<string, unknown>) => ((row as unknown as NurseItem).isActive ? 'تعطيل' : 'تفعيل'),
-      onClick: (row: Record<string, unknown>) => setToggleTarget(row as unknown as NurseItem),
-    },
-    {
-      label: (row: Record<string, unknown>) => ((row as unknown as NurseItem).isBlocked ? 'إلغاء الحظر' : 'حظر'),
-      icon: <Ban className="w-4 h-4" />,
-      onClick: (row: Record<string, unknown>) => setBlockTarget(row as unknown as NurseItem),
-    },
-    ...(!isSubadmin ? [{
-      label: 'حذف نهائي',
-      icon: <Trash2 className="w-4 h-4" />,
-      onClick: (row: Record<string, unknown>) => setDeleteTarget(row as unknown as NurseItem),
-      variant: 'destructive' as const,
-    }] : []),
-  ];
-
-  const ViewContent = ({ nurse }: { nurse: NurseItem }) => (
-    <div className="space-y-4 p-4">
-      <div className="flex items-center gap-4">
-        <Avatar className="w-16 h-16">
-          <AvatarFallback className="bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400 text-xl">
-            {nurse.name.slice(0, 2)}
-          </AvatarFallback>
-        </Avatar>
-        <div>
-          <div className="flex items-center gap-2">
-            <h3 className="text-lg font-semibold">{nurse.name}</h3>
-            {nurse.isBlocked && <Badge variant="destructive" className="text-[10px]"><Ban className="w-3 h-3 ml-0.5" />محظور</Badge>}
-          </div>
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2 mt-1.5">
             <Phone className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">{nurse.phone}</span>
+            <span className="text-sm text-muted-foreground" dir="ltr">{nurse.phone}</span>
           </div>
-          <div className="flex items-center gap-2 mt-1">
-            <Star className="w-3.5 h-3.5 text-yellow-500 fill-yellow-500" />
-            <span className="text-sm">{nurse.rating.toFixed(1)} ({nurse.reviewCount} تقييم)</span>
+          <div className="flex items-center gap-2 mt-1.5">
+            <Star className="w-4 h-4 text-amber-500 fill-amber-500" />
+            <span className="text-sm font-medium">{nurse.rating.toFixed(1)}</span>
+            <span className="text-xs text-muted-foreground">({nurse.reviewCount} تقييم)</span>
+            <Separator orientation="vertical" className="h-4 mx-1" />
+            <span className="text-xs text-muted-foreground">{nurse.completedJobs} وظيفة مكتملة</span>
           </div>
         </div>
       </div>
 
+      {/* Info Grid */}
       <div className="grid grid-cols-2 gap-3">
-        <div className="glass rounded-xl p-3">
-          <p className="text-xs text-muted-foreground">التخصص</p>
-          <p className="text-sm font-medium">{(nurse.specialization || []).map((s) => specializationLabels[s] ?? s).join('، ') || 'غير محدد'}</p>
+        <div className="rounded-xl bg-muted/40 backdrop-blur-sm p-3 border border-border/30">
+          <p className="text-[11px] text-muted-foreground mb-1">التخصص</p>
+          <p className="text-sm font-medium">
+            {(nurse.specialization || []).map((s) => specializationLabels[s] ?? s).join('، ') || 'غير محدد'}
+          </p>
         </div>
-        <div className="glass rounded-xl p-3">
-          <p className="text-xs text-muted-foreground">الخبرة</p>
+        <div className="rounded-xl bg-muted/40 backdrop-blur-sm p-3 border border-border/30">
+          <p className="text-[11px] text-muted-foreground mb-1">الخبرة</p>
           <p className="text-sm font-medium">{nurse.experience} سنوات</p>
         </div>
-        <div className="glass rounded-xl p-3">
-          <p className="text-xs text-muted-foreground">الوظائف المكتملة</p>
+        <div className="rounded-xl bg-muted/40 backdrop-blur-sm p-3 border border-border/30">
+          <p className="text-[11px] text-muted-foreground mb-1">الوظائف المكتملة</p>
           <p className="text-sm font-medium">{nurse.completedJobs}</p>
         </div>
-        <div className="glass rounded-xl p-3">
-          <p className="text-xs text-muted-foreground">حالة التوثيق</p>
+        <div className="rounded-xl bg-muted/40 backdrop-blur-sm p-3 border border-border/30">
+          <p className="text-[11px] text-muted-foreground mb-1">حالة التوثيق</p>
           <BadgeStatus status={nurse.verificationStatus} size="sm" />
         </div>
       </div>
 
+      {/* Location */}
       {(nurse.governorate || nurse.lat) && (
-        <div className="glass rounded-xl p-3 space-y-2">
+        <div className="rounded-xl bg-muted/40 backdrop-blur-sm p-3 border border-border/30 space-y-2">
           <div className="flex items-center gap-2 text-sm">
             <MapPin className="w-4 h-4 text-red-500" />
             <span className="font-medium">
@@ -574,7 +558,7 @@ export default function AdminNursesPage() {
               href={`https://www.google.com/maps?q=${nurse.lat},${nurse.lng}`}
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800"
+              className="flex items-center gap-2 text-xs text-primary hover:underline"
             >
               <MapPin className="w-3 h-3" />
               عرض على الخريطة ({Number(nurse.lat).toFixed(4)}, {Number(nurse.lng).toFixed(4)})
@@ -582,44 +566,51 @@ export default function AdminNursesPage() {
           )}
         </div>
       )}
+
+      {/* Bio */}
       {nurse.bio && (
-        <div>
-          <p className="text-xs text-muted-foreground mb-1">نبذة</p>
-          <p className="text-sm">{nurse.bio}</p>
-        </div>
-      )}
-      {nurse.rejectedReason && (
-        <div className="bg-red-50 dark:bg-red-950/20 rounded-xl p-3">
-          <p className="text-xs text-red-600 dark:text-red-400 mb-1">سبب الرفض</p>
-          <p className="text-sm">{nurse.rejectedReason}</p>
-        </div>
-      )}
-      {nurse.isBlocked && nurse.blockedReason && (
-        <div className="bg-red-50 dark:bg-red-950/20 rounded-xl p-3">
-          <p className="text-xs text-red-600 dark:text-red-400 mb-1">سبب الحظر</p>
-          <p className="text-sm">{nurse.blockedReason}</p>
+        <div className="rounded-xl bg-muted/40 backdrop-blur-sm p-3 border border-border/30">
+          <p className="text-[11px] text-muted-foreground mb-1">نبذة</p>
+          <p className="text-sm leading-relaxed">{nurse.bio}</p>
         </div>
       )}
 
-      <div className="space-y-2">
+      {/* Rejected Reason */}
+      {nurse.rejectedReason && (
+        <div className="rounded-xl bg-red-50 dark:bg-red-950/20 p-3 border border-red-200/60 dark:border-red-800/60">
+          <p className="text-[11px] text-red-600 dark:text-red-400 mb-1 font-medium">سبب الرفض</p>
+          <p className="text-sm text-red-700 dark:text-red-300">{nurse.rejectedReason}</p>
+        </div>
+      )}
+
+      {/* Block Reason */}
+      {nurse.isBlocked && nurse.blockedReason && (
+        <div className="rounded-xl bg-red-50 dark:bg-red-950/20 p-3 border border-red-200/60 dark:border-red-800/60">
+          <p className="text-[11px] text-red-600 dark:text-red-400 mb-1 font-medium">سبب الحظر</p>
+          <p className="text-sm text-red-700 dark:text-red-300">{nurse.blockedReason}</p>
+        </div>
+      )}
+
+      {/* Documents */}
+      <div className="space-y-3">
         <div className="flex items-center justify-between">
-          <p className="text-xs text-muted-foreground">المستندات</p>
+          <p className="text-sm font-medium">المستندات</p>
           {!docData && !docLoading && (
             <Button
               variant="outline"
               size="sm"
               onClick={() => handleLoadDocuments(nurse.id)}
-              className="text-xs h-7"
+              className="text-xs h-7 gap-1"
             >
-              <Eye className="w-3 h-3 ml-1" />
+              <Eye className="w-3 h-3" />
               عرض المستندات
             </Button>
           )}
         </div>
 
         {docLoading && (
-          <div className="flex items-center justify-center py-4">
-            <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
             <span className="mr-2 text-xs text-muted-foreground">جاري تحميل المستندات...</span>
           </div>
         )}
@@ -627,13 +618,21 @@ export default function AdminNursesPage() {
         {docData && (
           <div className="grid grid-cols-2 gap-3">
             {(() => {
-              const identitySrc = docData.identityDocumentData || (docData.identityDocumentUrl && !docData.identityDocumentUrl.startsWith('data:stored/') ? docData.identityDocumentUrl : null);
-              const licenseSrc = docData.licenseDocumentData || (docData.licenseDocumentUrl && !docData.licenseDocumentUrl.startsWith('data:stored/') ? docData.licenseDocumentUrl : null);
+              const identitySrc =
+                docData.identityDocumentData ||
+                (docData.identityDocumentUrl && !docData.identityDocumentUrl.startsWith('data:stored/')
+                  ? docData.identityDocumentUrl
+                  : null);
+              const licenseSrc =
+                docData.licenseDocumentData ||
+                (docData.licenseDocumentUrl && !docData.licenseDocumentUrl.startsWith('data:stored/')
+                  ? docData.licenseDocumentUrl
+                  : null);
 
               if (!identitySrc && !licenseSrc) {
                 return (
-                  <div className="col-span-2 text-center py-4 text-muted-foreground">
-                    <FileText className="w-6 h-6 mx-auto mb-1 opacity-30" />
+                  <div className="col-span-2 text-center py-6 text-muted-foreground">
+                    <FileText className="w-8 h-8 mx-auto mb-2 opacity-30" />
                     <p className="text-xs">لم يتم رفع مستندات بعد</p>
                   </div>
                 );
@@ -641,48 +640,42 @@ export default function AdminNursesPage() {
 
               return (
                 <>
-                  {identitySrc ? (
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground">الهوية الوطنية</p>
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] text-muted-foreground font-medium">الهوية الوطنية</p>
+                    {identitySrc ? (
                       <div
-                        className="relative rounded-xl overflow-hidden border border-border aspect-[4/3] cursor-pointer group"
+                        className="relative rounded-xl overflow-hidden border border-border/50 aspect-[4/3] cursor-pointer group"
                         onClick={() => setLightboxImage({ src: identitySrc, alt: 'الهوية الوطنية' })}
                       >
                         <img src={identitySrc} alt="الهوية الوطنية" className="w-full h-full object-contain bg-muted/20" />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
-                          <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-all" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center">
+                          <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-all duration-200" />
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground">الهوية الوطنية</p>
-                      <div className="rounded-xl border-2 border-dashed border-border/50 aspect-[4/3] flex items-center justify-center">
+                    ) : (
+                      <div className="rounded-xl border-2 border-dashed border-border/40 aspect-[4/3] flex items-center justify-center">
                         <p className="text-[10px] text-muted-foreground">لم يتم الرفع</p>
                       </div>
-                    </div>
-                  )}
-                  {licenseSrc ? (
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground">مزاولة المهنة</p>
+                    )}
+                  </div>
+                  <div className="space-y-1.5">
+                    <p className="text-[11px] text-muted-foreground font-medium">مزاولة المهنة</p>
+                    {licenseSrc ? (
                       <div
-                        className="relative rounded-xl overflow-hidden border border-border aspect-[4/3] cursor-pointer group"
+                        className="relative rounded-xl overflow-hidden border border-border/50 aspect-[4/3] cursor-pointer group"
                         onClick={() => setLightboxImage({ src: licenseSrc, alt: 'مزاولة المهنة' })}
                       >
                         <img src={licenseSrc} alt="مزاولة المهنة" className="w-full h-full object-contain bg-muted/20" />
-                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-all flex items-center justify-center">
-                          <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-all" />
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-all duration-200 flex items-center justify-center">
+                          <ZoomIn className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-all duration-200" />
                         </div>
                       </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-1">
-                      <p className="text-[10px] text-muted-foreground">مزاولة المهنة</p>
-                      <div className="rounded-xl border-2 border-dashed border-border/50 aspect-[4/3] flex items-center justify-center">
+                    ) : (
+                      <div className="rounded-xl border-2 border-dashed border-border/40 aspect-[4/3] flex items-center justify-center">
                         <p className="text-[10px] text-muted-foreground">لم يتم الرفع</p>
                       </div>
-                    </div>
-                  )}
+                    )}
+                  </div>
                 </>
               );
             })()}
@@ -690,40 +683,26 @@ export default function AdminNursesPage() {
         )}
       </div>
 
-      <div className="text-xs text-muted-foreground">
-        تاريخ التسجيل: <DateFormatter date={nurse.createdAt} format="date" />
+      {/* Registration Date */}
+      <div className="pt-2 border-t border-border/30">
+        <p className="text-xs text-muted-foreground">
+          تاريخ التسجيل: <DateFormatter date={nurse.createdAt} format="date" />
+        </p>
       </div>
     </div>
   );
 
-  // Withdrawal status helpers
-  const wStatusLabels: Record<string, string> = {
-    pending: 'قيد المراجعة',
-    approved: 'تمت الموافقة',
-    rejected: 'مرفوض',
-    processed: 'تم التحويل',
-  };
-
-  const wStatusColors: Record<string, string> = {
-    pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-200 dark:border-yellow-800',
-    approved: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400 border-blue-200 dark:border-blue-800',
-    processed: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-200 dark:border-green-800',
-    rejected: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-200 dark:border-red-800',
-  };
-
-  // Count pending withdrawals
-  const pendingCount = withdrawals.filter(w => w.status === 'pending').length;
-
+  // ─── Render ──────────────────────────────────────────────────
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-      {/* Image Lightbox */}
+      {/* ═══ Image Lightbox ═══ */}
       <AnimatePresence>
         {lightboxImage && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center p-4"
+            className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-sm flex items-center justify-center p-4"
             onClick={() => setLightboxImage(null)}
           >
             <motion.div
@@ -744,7 +723,7 @@ export default function AdminNursesPage() {
                 alt={lightboxImage.alt}
                 className="w-full h-full object-contain rounded-2xl shadow-2xl"
               />
-              <p className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white text-sm px-4 py-2 rounded-full">
+              <p className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 backdrop-blur-sm text-white text-sm px-4 py-2 rounded-full">
                 {lightboxImage.alt}
               </p>
             </motion.div>
@@ -752,33 +731,82 @@ export default function AdminNursesPage() {
         )}
       </AnimatePresence>
 
+      {/* ═══ Page Header ═══ */}
       <motion.div variants={itemAnim}>
         <PageHeader title="إدارة الممرضين" description="إدارة الممرضين وطلبات السحب" />
       </motion.div>
 
-      {/* Tabs */}
+      {/* ═══ Tabs ═══ */}
       <motion.div variants={itemAnim}>
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
-          <TabsList className="w-full grid grid-cols-2">
-            <TabsTrigger value="nurses" className="gap-2">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="w-full grid grid-cols-2 h-12">
+            <TabsTrigger value="nurses" className="gap-2 text-sm">
               <Stethoscope className="w-4 h-4" />
               الممرضون
             </TabsTrigger>
-            <TabsTrigger value="withdrawals" className="gap-2 relative">
+            <TabsTrigger value="withdrawals" className="gap-2 relative text-sm">
               <Wallet className="w-4 h-4" />
               طلبات السحب
               {pendingCount > 0 && (
-                <Badge className="absolute -top-2 -left-2 h-5 w-5 p-0 flex items-center justify-center text-[10px] bg-red-500 text-white">
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute -top-2 -left-2 min-w-[20px] h-5 px-1 flex items-center justify-center text-[10px] bg-red-500 text-white rounded-full font-bold"
+                >
                   {pendingCount}
-                </Badge>
+                </motion.span>
               )}
             </TabsTrigger>
           </TabsList>
 
-          {/* ===== Nurses Tab ===== */}
-          <TabsContent value="nurses" className="space-y-4">
-            <GlassCard variant="admin">
-              <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          {/* ═══════════════════════════════════════════════════════
+              NURSES TAB
+              ═══════════════════════════════════════════════════════ */}
+          <TabsContent value="nurses" className="space-y-5">
+            {/* ─── Stats Cards ─── */}
+            <motion.div
+              variants={container}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-2 md:grid-cols-4 gap-3"
+            >
+              <motion.div variants={statCardVariants}>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 p-4 text-white shadow-lg shadow-sky-500/20">
+                  <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+                  <Users className="w-8 h-8 mb-2 opacity-80" />
+                  <p className="text-2xl font-bold">{nurseStats.total}</p>
+                  <p className="text-xs text-sky-100">إجمالي الممرضين</p>
+                </div>
+              </motion.div>
+              <motion.div variants={statCardVariants}>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 text-white shadow-lg shadow-emerald-500/20">
+                  <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+                  <ShieldCheck className="w-8 h-8 mb-2 opacity-80" />
+                  <p className="text-2xl font-bold">{nurseStats.verified}</p>
+                  <p className="text-xs text-emerald-100">موثقون</p>
+                </div>
+              </motion.div>
+              <motion.div variants={statCardVariants}>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 p-4 text-white shadow-lg shadow-amber-500/20">
+                  <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+                  <Shield className="w-8 h-8 mb-2 opacity-80" />
+                  <p className="text-2xl font-bold">{nurseStats.pending}</p>
+                  <p className="text-xs text-amber-100">قيد المراجعة</p>
+                </div>
+              </motion.div>
+              <motion.div variants={statCardVariants}>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-teal-500 to-teal-700 p-4 text-white shadow-lg shadow-teal-500/20">
+                  <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+                  <Activity className="w-8 h-8 mb-2 opacity-80" />
+                  <p className="text-2xl font-bold">{nurseStats.active}</p>
+                  <p className="text-xs text-teal-100">نشطون</p>
+                </div>
+              </motion.div>
+            </motion.div>
+
+            {/* ─── Search & Filters ─── */}
+            <GlassCard variant="admin" className="backdrop-blur-xl">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <SearchInput placeholder="بحث بالاسم أو الهاتف..." onChange={setSearch} className="flex-1" />
                 <Select value={statusFilter} onValueChange={setStatusFilter}>
                   <SelectTrigger className="w-full sm:w-44">
@@ -802,30 +830,300 @@ export default function AdminNursesPage() {
                     ))}
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="icon" onClick={() => void fetchNurses()}>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => void fetchNurses()}
+                  className="shrink-0"
+                >
                   <RefreshCw className="w-4 h-4" />
                 </Button>
               </div>
             </GlassCard>
 
-            <DataTable
-              columns={columns}
-              data={nurses}
-              isLoading={isLoading}
-              emptyMessage="لا يوجد ممرضون"
-              emptyAction={{ label: 'تحديث', onClick: () => void fetchNurses() }}
-              rowActions={rowActions as never}
-              currentPage={page}
-              pageCount={totalPages}
-              onPageChange={setPage}
-            />
+            {/* ─── Nurses Cards Grid ─── */}
+            {isLoading ? (
+              <div className="flex items-center justify-center py-16">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">جاري تحميل الممرضين...</p>
+                </div>
+              </div>
+            ) : nurses.length === 0 ? (
+              <GlassCard variant="admin" className="p-8">
+                <EmptyState
+                  icon={<Stethoscope className="w-10 h-10 text-muted-foreground" />}
+                  title="لا يوجد ممرضون"
+                  description="لم يتم العثور على ممرضين مطابقين لمعايير البحث"
+                  action={{ label: 'تحديث', onClick: () => void fetchNurses() }}
+                />
+              </GlassCard>
+            ) : (
+              <motion.div
+                variants={container}
+                initial="hidden"
+                animate="show"
+                className="grid grid-cols-1 md:grid-cols-2 gap-4"
+              >
+                {nurses.map((nurse) => (
+                  <motion.div
+                    key={nurse.id}
+                    variants={itemAnim}
+                    whileHover={cardHover}
+                    className="group relative rounded-2xl border border-border/50 bg-card/80 backdrop-blur-sm shadow-sm hover:shadow-xl transition-shadow duration-300 overflow-hidden"
+                  >
+                    {/* Gradient accent top bar */}
+                    <div
+                      className={cn(
+                        'h-1.5 w-full',
+                        nurse.isBlocked
+                          ? 'bg-gradient-to-l from-red-500 to-red-400'
+                          : nurse.verificationStatus === 'verified'
+                            ? 'bg-gradient-to-l from-emerald-500 to-emerald-400'
+                            : nurse.verificationStatus === 'pending'
+                              ? 'bg-gradient-to-l from-amber-500 to-amber-400'
+                              : 'bg-gradient-to-l from-sky-500 to-sky-400'
+                      )}
+                    />
+
+                    <div className="p-4">
+                      {/* Card Header: Avatar + Info + Status */}
+                      <div className="flex items-start gap-3">
+                        <div className="relative shrink-0">
+                          <Avatar className="w-14 h-14 ring-2 ring-offset-2 ring-offset-card group-hover:ring-primary/30 transition-all">
+                            <AvatarFallback className="bg-gradient-to-br from-sky-400 to-sky-600 text-white text-lg font-bold">
+                              {nurse.name.slice(0, 2)}
+                            </AvatarFallback>
+                          </Avatar>
+                          {/* Online indicator */}
+                          <div
+                            className={cn(
+                              'absolute -bottom-0.5 -left-0.5 w-4 h-4 rounded-full ring-2 ring-card',
+                              nurse.isActive && !nurse.isBlocked ? 'bg-green-500' : 'bg-gray-400'
+                            )}
+                          />
+                        </div>
+
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <h3 className="font-bold text-base truncate">{nurse.name}</h3>
+                            {nurse.isBlocked && (
+                              <Badge variant="destructive" className="text-[9px] h-4 px-1.5 shrink-0">
+                                <Ban className="w-2.5 h-2.5 ml-0.5" />محظور
+                              </Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                            <Phone className="w-3 h-3" />
+                            <span dir="ltr">{nurse.phone}</span>
+                          </div>
+                          {nurse.governorate && (
+                            <div className="flex items-center gap-1.5 mt-0.5 text-xs text-muted-foreground">
+                              <MapPin className="w-3 h-3" />
+                              <span>{nurse.governorate}</span>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Verification Badge */}
+                        <div className="shrink-0">
+                          <BadgeStatus status={nurse.verificationStatus} size="sm" />
+                        </div>
+                      </div>
+
+                      {/* Specialization Badges */}
+                      <div className="flex flex-wrap gap-1.5 mt-3">
+                        {(nurse.specialization || []).slice(0, 3).map((s) => (
+                          <Badge
+                            key={s}
+                            variant="outline"
+                            className="text-[10px] h-5 px-2 bg-muted/40 border-border/40"
+                          >
+                            {specializationLabels[s] ?? s}
+                          </Badge>
+                        ))}
+                        {(nurse.specialization || []).length > 3 && (
+                          <Badge variant="outline" className="text-[10px] h-5 px-2 bg-muted/40">
+                            +{nurse.specialization.length - 3}
+                          </Badge>
+                        )}
+                      </div>
+
+                      {/* Stats Row */}
+                      <div className="flex items-center gap-4 mt-3 pt-3 border-t border-border/30">
+                        <div className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                          <span className="text-sm font-semibold">{nurse.rating.toFixed(1)}</span>
+                          <span className="text-[10px] text-muted-foreground">({nurse.reviewCount})</span>
+                        </div>
+                        <Separator orientation="vertical" className="h-4" />
+                        <div className="text-[11px] text-muted-foreground">
+                          {nurse.completedJobs} وظيفة
+                        </div>
+                        <Separator orientation="vertical" className="h-4" />
+                        <div className="text-[11px] text-muted-foreground">
+                          {nurse.experience} سنة خبرة
+                        </div>
+                      </div>
+
+                      {/* Action Buttons */}
+                      <div className="flex items-center gap-1.5 mt-3 pt-3 border-t border-border/30">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1 text-xs"
+                          onClick={() => handleViewNurse(nurse)}
+                        >
+                          <Eye className="w-3.5 h-3.5" />
+                          عرض
+                        </Button>
+                        {nurse.verificationStatus !== 'verified' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1 text-xs text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950/20"
+                            onClick={() => {
+                              setVerifyTarget(nurse);
+                              setVerifyAction('verify');
+                            }}
+                          >
+                            <ShieldCheck className="w-3.5 h-3.5" />
+                            توثيق
+                          </Button>
+                        )}
+                        {nurse.verificationStatus !== 'rejected' && nurse.verificationStatus !== 'verified' && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                            onClick={() => {
+                              setVerifyTarget(nurse);
+                              setVerifyAction('reject');
+                            }}
+                          >
+                            <X className="w-3.5 h-3.5" />
+                            رفض
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            'h-8 gap-1 text-xs',
+                            nurse.isActive
+                              ? 'text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-950/20'
+                              : 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950/20'
+                          )}
+                          onClick={() => setToggleTarget(nurse)}
+                        >
+                          {nurse.isActive ? (
+                            <><PowerOff className="w-3.5 h-3.5" />تعطيل</>
+                          ) : (
+                            <><Power className="w-3.5 h-3.5" />تفعيل</>
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            'h-8 gap-1 text-xs',
+                            nurse.isBlocked
+                              ? 'text-green-600 hover:text-green-700 hover:bg-green-50 dark:hover:bg-green-950/20'
+                              : 'text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950/20'
+                          )}
+                          onClick={() => setBlockTarget(nurse)}
+                        >
+                          <Ban className="w-3.5 h-3.5" />
+                          {nurse.isBlocked ? 'فك الحظر' : 'حظر'}
+                        </Button>
+                        {!isSubadmin && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 gap-1 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20"
+                            onClick={() => setDeleteTarget(nurse)}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            حذف
+                          </Button>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </motion.div>
+            )}
+
+            {/* Nurses Pagination */}
+            {totalPages > 1 && !isLoading && nurses.length > 0 && (
+              <div className="flex items-center justify-center gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page <= 1}
+                  onClick={() => setPage(p => p - 1)}
+                  className="gap-1"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                  السابق
+                </Button>
+                <span className="text-sm text-muted-foreground font-medium">
+                  {page} / {totalPages}
+                </span>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= totalPages}
+                  onClick={() => setPage(p => p + 1)}
+                  className="gap-1"
+                >
+                  التالي
+                  <ChevronLeft className="w-4 h-4" />
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
-          {/* ===== Withdrawals Tab ===== */}
-          <TabsContent value="withdrawals" className="space-y-4">
-            {/* Filters */}
-            <GlassCard variant="admin">
-              <div className="flex flex-col sm:flex-row gap-4 mb-4">
+          {/* ═══════════════════════════════════════════════════════
+              WITHDRAWALS TAB
+              ═══════════════════════════════════════════════════════ */}
+          <TabsContent value="withdrawals" className="space-y-5">
+            {/* ─── Withdrawal Stats Cards ─── */}
+            <motion.div
+              variants={container}
+              initial="hidden"
+              animate="show"
+              className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+            >
+              <motion.div variants={statCardVariants}>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 p-4 text-white shadow-lg shadow-amber-500/20">
+                  <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+                  <Clock className="w-8 h-8 mb-2 opacity-80" />
+                  <p className="text-2xl font-bold"><Currency amount={withdrawalStats.pendingAmount} /></p>
+                  <p className="text-xs text-amber-100">مبالغ قيد الانتظار ({withdrawalStats.pendingCount} طلب)</p>
+                </div>
+              </motion.div>
+              <motion.div variants={statCardVariants}>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 text-white shadow-lg shadow-emerald-500/20">
+                  <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+                  <TrendingUp className="w-8 h-8 mb-2 opacity-80" />
+                  <p className="text-2xl font-bold"><Currency amount={withdrawalStats.processedAmount} /></p>
+                  <p className="text-xs text-emerald-100">إجمالي التحويلات</p>
+                </div>
+              </motion.div>
+              <motion.div variants={statCardVariants}>
+                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-sky-500 to-sky-700 p-4 text-white shadow-lg shadow-sky-500/20">
+                  <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+                  <Banknote className="w-8 h-8 mb-2 opacity-80" />
+                  <p className="text-2xl font-bold">{withdrawals.length}</p>
+                  <p className="text-xs text-sky-100">إجمالي الطلبات</p>
+                </div>
+              </motion.div>
+            </motion.div>
+
+            {/* ─── Withdrawal Filters ─── */}
+            <GlassCard variant="admin" className="backdrop-blur-xl">
+              <div className="flex flex-col sm:flex-row gap-3">
                 <div className="relative flex-1">
                   <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
                   <Input
@@ -847,16 +1145,19 @@ export default function AdminNursesPage() {
                     <SelectItem value="rejected">مرفوض</SelectItem>
                   </SelectContent>
                 </Select>
-                <Button variant="outline" size="icon" onClick={() => void fetchWithdrawals()}>
+                <Button variant="outline" size="icon" onClick={() => void fetchWithdrawals()} className="shrink-0">
                   <RefreshCw className="w-4 h-4" />
                 </Button>
               </div>
             </GlassCard>
 
-            {/* Withdrawal Cards */}
+            {/* ─── Withdrawal Cards ─── */}
             {withdrawalsLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <Loader2 className="w-8 h-8 animate-spin text-admin" />
+              <div className="flex items-center justify-center py-16">
+                <div className="flex flex-col items-center gap-3">
+                  <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                  <p className="text-sm text-muted-foreground">جاري تحميل طلبات السحب...</p>
+                </div>
               </div>
             ) : withdrawals.length === 0 ? (
               <GlassCard variant="admin" className="p-8">
@@ -867,119 +1168,143 @@ export default function AdminNursesPage() {
                 />
               </GlassCard>
             ) : (
-              <div className="space-y-3">
+              <motion.div
+                variants={container}
+                initial="hidden"
+                animate="show"
+                className="space-y-3"
+              >
                 {withdrawals.map((w) => (
                   <motion.div
                     key={w.id}
-                    initial={{ opacity: 0, y: 10 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className={`rounded-2xl border p-4 transition-all ${
-                      w.status === 'pending' ? 'border-yellow-300 dark:border-yellow-800 bg-yellow-50/50 dark:bg-yellow-950/10' :
-                      'border-border bg-card'
-                    }`}
+                    variants={itemAnim}
+                    whileHover={{ scale: 1.005 }}
+                    className={cn(
+                      'relative rounded-2xl border p-4 transition-all duration-300 overflow-hidden',
+                      w.status === 'pending'
+                        ? 'border-amber-300/60 dark:border-amber-800/60 bg-gradient-to-l from-amber-50/80 to-amber-50/30 dark:from-amber-950/20 dark:to-amber-950/5 shadow-sm hover:shadow-md'
+                        : 'border-border/50 bg-card/80 backdrop-blur-sm shadow-sm hover:shadow-md'
+                    )}
                   >
+                    {/* Pending pulsing glow */}
+                    {w.status === 'pending' && (
+                      <div className="absolute top-0 right-0 w-3 h-3 m-3">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75 animate-ping" />
+                        <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500" />
+                      </div>
+                    )}
+
+                    {/* Card Header */}
                     <div className="flex items-start justify-between gap-3">
-                      {/* Nurse info */}
                       <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${
-                          w.status === 'pending' ? 'bg-yellow-100 dark:bg-yellow-900/30' :
+                        <div className={cn(
+                          'w-12 h-12 rounded-xl flex items-center justify-center shrink-0',
+                          w.status === 'pending' ? 'bg-amber-100 dark:bg-amber-900/30' :
                           w.status === 'processed' ? 'bg-green-100 dark:bg-green-900/30' :
                           w.status === 'approved' ? 'bg-blue-100 dark:bg-blue-900/30' :
                           'bg-red-100 dark:bg-red-900/30'
-                        }`}>
-                          <Wallet className={`w-5 h-5 ${
-                            w.status === 'pending' ? 'text-yellow-600' :
+                        )}>
+                          <Wallet className={cn(
+                            'w-6 h-6',
+                            w.status === 'pending' ? 'text-amber-600' :
                             w.status === 'processed' ? 'text-green-600' :
                             w.status === 'approved' ? 'text-blue-600' :
                             'text-red-600'
-                          }`} />
+                          )} />
                         </div>
                         <div>
-                          <p className="font-semibold text-sm">{w.nurseName}</p>
-                          <p className="text-xs text-muted-foreground" dir="ltr">{w.nursePhone}</p>
+                          <p className="font-bold text-sm">{w.nurseName}</p>
+                          <p className="text-xs text-muted-foreground mt-0.5" dir="ltr">{w.nursePhone}</p>
                         </div>
                       </div>
-
-                      {/* Status badge */}
-                      <Badge className={`text-[10px] shrink-0 ${wStatusColors[w.status] || ''}`} variant="outline">
+                      <Badge className={cn('text-[10px] shrink-0', wStatusColors[w.status] || '')} variant="outline">
                         {wStatusLabels[w.status] || w.status}
                       </Badge>
                     </div>
 
-                    {/* Amount & Wallet Details */}
-                    <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-3">
-                      <div className="rounded-xl bg-muted/30 p-2.5">
+                    {/* Amount Grid */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mt-3">
+                      <div className="rounded-xl bg-muted/30 backdrop-blur-sm p-2.5">
                         <p className="text-[10px] text-muted-foreground">مبلغ السحب</p>
-                        <p className="text-sm font-bold"><Currency amount={w.amount} /></p>
+                        <p className="text-sm font-bold mt-0.5"><Currency amount={w.amount} /></p>
                       </div>
-                      <div className="rounded-xl bg-muted/30 p-2.5">
+                      <div className="rounded-xl bg-muted/30 backdrop-blur-sm p-2.5">
                         <p className="text-[10px] text-muted-foreground">رسوم السحب</p>
-                        <p className="text-sm font-bold text-red-600">-<Currency amount={w.withdrawalFee} /></p>
+                        <p className="text-sm font-bold text-red-600 mt-0.5">-<Currency amount={w.withdrawalFee} /></p>
                       </div>
-                      <div className="rounded-xl bg-muted/30 p-2.5">
+                      <div className="rounded-xl bg-muted/30 backdrop-blur-sm p-2.5">
                         <p className="text-[10px] text-muted-foreground">صافي التحويل</p>
-                        <p className="text-sm font-bold text-green-600"><Currency amount={w.netAmount} /></p>
+                        <p className="text-sm font-bold text-green-600 mt-0.5"><Currency amount={w.netAmount} /></p>
                       </div>
-                      <div className="rounded-xl bg-muted/30 p-2.5">
+                      <div className="rounded-xl bg-muted/30 backdrop-blur-sm p-2.5">
                         <p className="text-[10px] text-muted-foreground">تاريخ الطلب</p>
-                        <p className="text-sm font-medium"><DateFormatter date={w.createdAt} format="date" /></p>
+                        <p className="text-sm font-medium mt-0.5"><DateFormatter date={w.createdAt} format="date" /></p>
                       </div>
                     </div>
 
-                    {/* Wallet Info */}
-                    <div className="mt-3 p-3 rounded-xl bg-muted/30 border border-border/50">
-                      <p className="text-[10px] text-muted-foreground mb-1.5">تفاصيل المحفظة</p>
-                      <div className="grid grid-cols-3 gap-2 text-xs">
-                        <div>
-                          <span className="text-muted-foreground">النوع: </span>
-                          <span className="font-medium">{w.walletType}</span>
+                    {/* Wallet Details Mini-Card */}
+                    <div className="mt-3 p-3 rounded-xl bg-muted/20 backdrop-blur-sm border border-border/30">
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <Send className="w-3.5 h-3.5 text-muted-foreground" />
+                        <p className="text-[11px] font-medium text-muted-foreground">تفاصيل المحفظة</p>
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        <div className="rounded-lg bg-background/50 p-2">
+                          <p className="text-[9px] text-muted-foreground">النوع</p>
+                          <p className="text-xs font-semibold mt-0.5">{w.walletType}</p>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">الرقم: </span>
-                          <span className="font-medium" dir="ltr">{w.walletNumber}</span>
+                        <div className="rounded-lg bg-background/50 p-2">
+                          <p className="text-[9px] text-muted-foreground">الرقم</p>
+                          <p className="text-xs font-semibold mt-0.5 font-mono" dir="ltr">{w.walletNumber}</p>
                         </div>
-                        <div>
-                          <span className="text-muted-foreground">الاسم: </span>
-                          <span className="font-medium">{w.walletHolderName}</span>
+                        <div className="rounded-lg bg-background/50 p-2">
+                          <p className="text-[9px] text-muted-foreground">الاسم</p>
+                          <p className="text-xs font-semibold mt-0.5 truncate">{w.walletHolderName}</p>
                         </div>
                       </div>
                     </div>
 
                     {/* Rejected Reason */}
                     {w.status === 'rejected' && w.rejectedReason && (
-                      <div className="mt-3 p-2.5 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
-                        <p className="text-[10px] text-red-600 dark:text-red-400">سبب الرفض: {w.rejectedReason}</p>
+                      <div className="mt-3 p-2.5 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200/60 dark:border-red-800/60">
+                        <div className="flex items-start gap-1.5">
+                          <XCircle className="w-3.5 h-3.5 text-red-500 mt-0.5 shrink-0" />
+                          <p className="text-[11px] text-red-600 dark:text-red-400">سبب الرفض: {w.rejectedReason}</p>
+                        </div>
                       </div>
                     )}
 
                     {/* Processed Notice */}
                     {w.status === 'processed' && (
-                      <div className="mt-3 p-2.5 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-800">
-                        <p className="text-[10px] text-green-700 dark:text-green-400">
-                          تم تحويل الأموال إلى محفظة {w.walletType} باسم {w.walletHolderName} رقم {w.walletNumber}
-                          {w.processedAt && ` في ${new Date(w.processedAt).toLocaleDateString('ar')}`}
-                        </p>
+                      <div className="mt-3 p-2.5 rounded-xl bg-green-50 dark:bg-green-950/20 border border-green-200/60 dark:border-green-800/60">
+                        <div className="flex items-start gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-green-500 mt-0.5 shrink-0" />
+                          <p className="text-[11px] text-green-700 dark:text-green-400">
+                            تم تحويل الأموال إلى محفظة {w.walletType} باسم {w.walletHolderName} رقم {w.walletNumber}
+                            {w.processedAt && ` في ${new Date(w.processedAt).toLocaleDateString('ar')}`}
+                          </p>
+                        </div>
                       </div>
                     )}
 
-                    {/* Actions for pending */}
+                    {/* Actions for Pending */}
                     {w.status === 'pending' && (
-                      <div className="mt-3 flex items-center gap-2">
+                      <div className="mt-3 pt-3 border-t border-border/30 flex items-center gap-2">
                         <Button
                           size="sm"
-                          className="bg-green-600 hover:bg-green-700 gap-1.5 flex-1"
+                          className="bg-gradient-to-l from-green-600 to-green-500 hover:from-green-700 hover:to-green-600 gap-1.5 flex-1 text-white shadow-md shadow-green-500/20"
                           onClick={() => {
                             setWithdrawalAction(w);
                             setWithdrawalActionType('approve');
                           }}
                         >
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <Wallet className="w-4 h-4" />
                           تحويل الأموال
                         </Button>
                         <Button
                           size="sm"
-                          variant="destructive"
-                          className="gap-1.5 flex-1"
+                          variant="outline"
+                          className="gap-1.5 flex-1 border-red-300 text-red-600 hover:bg-red-50 hover:text-red-700 dark:border-red-800 dark:hover:bg-red-950/20 dark:hover:text-red-400"
                           onClick={() => {
                             setWithdrawalAction(w);
                             setWithdrawalActionType('reject');
@@ -993,18 +1318,20 @@ export default function AdminNursesPage() {
                   </motion.div>
                 ))}
 
-                {/* Pagination */}
+                {/* Withdrawal Pagination */}
                 {withdrawalTotalPages > 1 && (
-                  <div className="flex items-center justify-center gap-2 pt-4">
+                  <div className="flex items-center justify-center gap-3 pt-4">
                     <Button
                       variant="outline"
                       size="sm"
                       disabled={withdrawalPage <= 1}
                       onClick={() => setWithdrawalPage(p => p - 1)}
+                      className="gap-1"
                     >
+                      <ChevronRight className="w-4 h-4" />
                       السابق
                     </Button>
-                    <span className="text-sm text-muted-foreground">
+                    <span className="text-sm text-muted-foreground font-medium">
                       {withdrawalPage} / {withdrawalTotalPages}
                     </span>
                     <Button
@@ -1012,28 +1339,33 @@ export default function AdminNursesPage() {
                       size="sm"
                       disabled={withdrawalPage >= withdrawalTotalPages}
                       onClick={() => setWithdrawalPage(p => p + 1)}
+                      className="gap-1"
                     >
                       التالي
+                      <ChevronLeft className="w-4 h-4" />
                     </Button>
                   </div>
                 )}
-              </div>
+              </motion.div>
             )}
           </TabsContent>
         </Tabs>
       </motion.div>
 
-      {/* View Drawer/Dialog */}
+      {/* ═══ View Drawer/Dialog ═══ */}
       {viewTarget && (
         isMobile ? (
           <Drawer open={!!viewTarget} onOpenChange={(open) => { if (!open) { setViewTarget(null); setDocData(null); } }}>
             <DrawerContent>
               <DrawerHeader>
-                <DrawerTitle>تفاصيل الممرض/ـة</DrawerTitle>
+                <DrawerTitle className="flex items-center gap-2">
+                  <Stethoscope className="w-5 h-5 text-primary" />
+                  تفاصيل الممرض/ـة
+                </DrawerTitle>
               </DrawerHeader>
               {viewLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-admin" />
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
               ) : (
                 <ViewContent nurse={viewTarget} />
@@ -1042,13 +1374,16 @@ export default function AdminNursesPage() {
           </Drawer>
         ) : (
           <Dialog open={!!viewTarget} onOpenChange={(open) => { if (!open) { setViewTarget(null); setDocData(null); } }}>
-            <DialogContent dir="rtl" className="max-w-md">
+            <DialogContent dir="rtl" className="max-w-lg">
               <DialogHeader>
-                <DialogTitle>تفاصيل الممرض/ـة</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                  <Stethoscope className="w-5 h-5 text-primary" />
+                  تفاصيل الممرض/ـة
+                </DialogTitle>
               </DialogHeader>
               {viewLoading ? (
                 <div className="flex items-center justify-center py-12">
-                  <Loader2 className="w-8 h-8 animate-spin text-admin" />
+                  <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
               ) : (
                 <ViewContent nurse={viewTarget} />
@@ -1058,12 +1393,16 @@ export default function AdminNursesPage() {
         )
       )}
 
-      {/* Verify/Reject Dialog */}
+      {/* ═══ Verify/Reject Dialog ═══ */}
       <Dialog open={!!verifyTarget} onOpenChange={(open) => { if (!open) { setVerifyTarget(null); setRejectedReason(''); } }}>
         <DialogContent dir="rtl">
           <DialogHeader>
-            <DialogTitle>
-              {verifyAction === 'verify' ? 'توثيق الممرض/ـة' : 'رفض توثيق الممرض/ـة'}
+            <DialogTitle className="flex items-center gap-2">
+              {verifyAction === 'verify' ? (
+                <><ShieldCheck className="w-5 h-5 text-emerald-600" />توثيق الممرض/ـة</>
+              ) : (
+                <><XCircle className="w-5 h-5 text-red-600" />رفض توثيق الممرض/ـة</>
+              )}
             </DialogTitle>
             <DialogDescription>
               {verifyAction === 'verify'
@@ -1089,7 +1428,7 @@ export default function AdminNursesPage() {
             <Button
               onClick={handleVerify}
               disabled={isVerifying || (verifyAction === 'reject' && !rejectedReason)}
-              className={verifyAction === 'reject' ? 'bg-destructive hover:bg-destructive/90' : 'bg-admin hover:bg-admin/90'}
+              className={verifyAction === 'reject' ? 'bg-destructive hover:bg-destructive/90' : 'bg-emerald-600 hover:bg-emerald-700'}
             >
               {isVerifying ? 'جارٍ التنفيذ...' : verifyAction === 'verify' ? 'توثيق' : 'رفض'}
             </Button>
@@ -1097,7 +1436,7 @@ export default function AdminNursesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Toggle Confirm */}
+      {/* ═══ Toggle Confirm ═══ */}
       <ConfirmDialog
         open={!!toggleTarget}
         onOpenChange={(open) => { if (!open) setToggleTarget(null); }}
@@ -1108,7 +1447,7 @@ export default function AdminNursesPage() {
         onConfirm={handleToggle}
       />
 
-      {/* Block Dialog */}
+      {/* ═══ Block Dialog ═══ */}
       <Dialog open={!!blockTarget} onOpenChange={(open) => { if (!open) { setBlockTarget(null); setBlockReason(''); } }}>
         <DialogContent dir="rtl">
           <DialogHeader>
@@ -1148,7 +1487,7 @@ export default function AdminNursesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Delete Dialog */}
+      {/* ═══ Delete Dialog ═══ */}
       <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setDeleteConfirmName(''); } }}>
         <DialogContent dir="rtl">
           <DialogHeader>
@@ -1161,7 +1500,7 @@ export default function AdminNursesPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-2 space-y-3">
-            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800">
+            <div className="p-3 rounded-xl bg-red-50 dark:bg-red-950/20 border border-red-200/60 dark:border-red-800/60">
               <div className="flex items-start gap-2">
                 <AlertTriangle className="w-5 h-5 text-red-600 mt-0.5 shrink-0" />
                 <p className="text-sm text-red-700 dark:text-red-400">
@@ -1193,14 +1532,17 @@ export default function AdminNursesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Withdrawal Action Dialog */}
-      <Dialog open={!!withdrawalAction} onOpenChange={(open) => {
-        if (!open) {
-          setWithdrawalAction(null);
-          setWithdrawalAdminNotes('');
-          setWithdrawalRejectReason('');
-        }
-      }}>
+      {/* ═══ Withdrawal Action Dialog ═══ */}
+      <Dialog
+        open={!!withdrawalAction}
+        onOpenChange={(open) => {
+          if (!open) {
+            setWithdrawalAction(null);
+            setWithdrawalAdminNotes('');
+            setWithdrawalRejectReason('');
+          }
+        }}
+      >
         <DialogContent dir="rtl" className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
@@ -1219,13 +1561,13 @@ export default function AdminNursesPage() {
             <DialogDescription>
               {withdrawalActionType === 'approve'
                 ? `سيتم تحويل المبلغ إلى محفظة ${withdrawalAction?.walletType} باسم ${withdrawalAction?.walletHolderName}`
-                : `سيتم رفض طلب السحب وإرجاع المبلغ (${withdrawalAction ? <Currency amount={withdrawalAction.amount} /> : ''}) إلى رصيد الممرض`}
+                : `سيتم رفض طلب السحب وإرجاع المبلغ إلى رصيد الممرض`}
             </DialogDescription>
           </DialogHeader>
 
           {/* Withdrawal Details Summary */}
           {withdrawalAction && (
-            <div className="p-3 rounded-xl bg-muted/30 border border-border/50 space-y-2">
+            <div className="p-3 rounded-xl bg-muted/30 border border-border/30 space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">الممرض</span>
                 <span className="font-medium">{withdrawalAction.nurseName}</span>
@@ -1238,12 +1580,13 @@ export default function AdminNursesPage() {
                 <span className="text-muted-foreground">رسوم السحب</span>
                 <span className="text-red-600">-<Currency amount={withdrawalAction.withdrawalFee} /></span>
               </div>
+              <Separator />
               <div className="flex items-center justify-between text-sm font-semibold">
                 <span>صافي التحويل</span>
                 <span className="text-green-600"><Currency amount={withdrawalAction.netAmount} /></span>
               </div>
               <Separator />
-              <div className="text-xs space-y-1">
+              <div className="text-xs space-y-1 pt-1">
                 <p><span className="text-muted-foreground">المحفظة:</span> {withdrawalAction.walletType}</p>
                 <p><span className="text-muted-foreground">الرقم:</span> <span dir="ltr">{withdrawalAction.walletNumber}</span></p>
                 <p><span className="text-muted-foreground">الاسم:</span> {withdrawalAction.walletHolderName}</p>
@@ -1276,7 +1619,15 @@ export default function AdminNursesPage() {
           )}
 
           <DialogFooter>
-            <Button variant="outline" onClick={() => { setWithdrawalAction(null); setWithdrawalAdminNotes(''); setWithdrawalRejectReason(''); }} disabled={withdrawalActionLoading}>
+            <Button
+              variant="outline"
+              onClick={() => {
+                setWithdrawalAction(null);
+                setWithdrawalAdminNotes('');
+                setWithdrawalRejectReason('');
+              }}
+              disabled={withdrawalActionLoading}
+            >
               إلغاء
             </Button>
             <Button
@@ -1284,7 +1635,11 @@ export default function AdminNursesPage() {
               disabled={withdrawalActionLoading || (withdrawalActionType === 'reject' && !withdrawalRejectReason)}
               className={withdrawalActionType === 'approve' ? 'bg-green-600 hover:bg-green-700' : 'bg-destructive hover:bg-destructive/90'}
             >
-              {withdrawalActionLoading ? 'جارٍ التنفيذ...' : withdrawalActionType === 'approve' ? 'تأكيد التحويل' : 'رفض الطلب'}
+              {withdrawalActionLoading
+                ? 'جارٍ التنفيذ...'
+                : withdrawalActionType === 'approve'
+                  ? 'تأكيد التحويل'
+                  : 'رفض الطلب'}
             </Button>
           </DialogFooter>
         </DialogContent>

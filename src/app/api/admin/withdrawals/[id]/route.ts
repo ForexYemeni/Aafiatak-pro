@@ -2,10 +2,10 @@
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
+import mongoose from 'mongoose';
 import { connectDB } from '@/lib/mongodb';
 import { WithdrawalRequest, Nurse } from '@/models/mongoose';
 import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
-import { logActivity } from '@/lib/api/helpers';
 
 export async function PATCH(
   request: NextRequest,
@@ -13,15 +13,28 @@ export async function PATCH(
 ) {
   try {
     await connectDB();
-    const { user, error } = await requireSubadminPermission(request, 'manage_nurses');
-    if (error) return error;
+    const authResult = await requireSubadminPermission(request, 'manage_nurses');
+    if (authResult.error) return authResult.error;
+    const user = authResult.user;
 
     const { id } = await params;
-    const body = await request.json();
+
+    // Validate ObjectId format
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+      return createErrorResponse('معرف طلب السحب غير صالح', 400, 'INVALID_ID');
+    }
+
+    let body;
+    try {
+      body = await request.json();
+    } catch {
+      return createErrorResponse('بيانات الطلب غير صالحة', 400, 'INVALID_BODY');
+    }
+
     const { status, adminNotes, rejectedReason } = body;
 
-    if (!['approved', 'rejected', 'processed'].includes(status)) {
-      return createErrorResponse('حالة غير صالحة', 400, 'VALIDATION_ERROR');
+    if (!status || !['approved', 'rejected', 'processed'].includes(status)) {
+      return createErrorResponse('حالة غير صالحة. يجب أن تكون: approved أو rejected أو processed', 400, 'VALIDATION_ERROR');
     }
 
     const withdrawal = await WithdrawalRequest.findById(id);
@@ -35,32 +48,32 @@ export async function PATCH(
 
     // If rejected, return the amount to nurse's available balance
     if (status === 'rejected') {
-      const nurse = await Nurse.findById(withdrawal.nurseId);
-      if (nurse) {
-        nurse.availableBalance += withdrawal.amount;
-        await nurse.save();
+      try {
+        const nurse = await Nurse.findById(withdrawal.nurseId);
+        if (nurse) {
+          nurse.availableBalance = (nurse.availableBalance || 0) + (withdrawal.amount || 0);
+          await nurse.save();
+        }
+      } catch (nurseError) {
+        console.error('[WITHDRAWAL REJECT - NURSE UPDATE ERROR]', nurseError);
+        // Continue with the rejection even if nurse update fails
       }
     }
 
     // Update withdrawal request
-    withdrawal.status = status;
-    withdrawal.processedBy = user!.userId;
-    withdrawal.processedAt = new Date();
-    if (adminNotes) withdrawal.adminNotes = adminNotes;
-    if (status === 'rejected' && rejectedReason) {
-      withdrawal.rejectedReason = rejectedReason;
+    try {
+      withdrawal.status = status;
+      withdrawal.processedBy = new mongoose.Types.ObjectId(user.userId);
+      withdrawal.processedAt = new Date();
+      if (adminNotes) withdrawal.adminNotes = adminNotes;
+      if (status === 'rejected' && rejectedReason) {
+        withdrawal.rejectedReason = rejectedReason;
+      }
+      await withdrawal.save();
+    } catch (saveError) {
+      console.error('[WITHDRAWAL SAVE ERROR]', saveError);
+      return createErrorResponse('حدث خطأ أثناء حفظ تحديث طلب السحب', 500, 'SAVE_ERROR');
     }
-    await withdrawal.save();
-
-    await logActivity({
-      userId: user!.userId,
-      userRole: user!.role,
-      action: status === 'rejected' ? 'reject_withdrawal' : 'approve_withdrawal',
-      entity: 'WithdrawalRequest',
-      entityId: id,
-      details: `${status === 'rejected' ? 'رفض' : 'موافقة على'} طلب سحب ${withdrawal.amount} ريال للممرض ${withdrawal.nurseName}`,
-      request,
-    });
 
     return Response.json({
       success: true,
@@ -69,10 +82,16 @@ export async function PATCH(
         status: withdrawal.status,
         processedAt: withdrawal.processedAt.toISOString(),
       },
-      message: status === 'rejected' ? 'تم رفض طلب السحب وإرجاع المبلغ للممرض' : 'تم الموافقة على طلب السحب بنجاح',
+      message: status === 'rejected'
+        ? 'تم رفض طلب السحب وإرجاع المبلغ للممرض'
+        : 'تم الموافقة على طلب السحب وتحويل الأموال بنجاح',
     });
   } catch (error) {
     console.error('[ADMIN WITHDRAWAL UPDATE ERROR]', error);
-    return createErrorResponse('حدث خطأ أثناء معالجة طلب السحب', 500, 'INTERNAL_ERROR');
+    return createErrorResponse(
+      `حدث خطأ أثناء معالجة طلب السحب: ${error instanceof Error ? error.message : 'خطأ غير معروف'}`,
+      500,
+      'INTERNAL_ERROR'
+    );
   }
 }
