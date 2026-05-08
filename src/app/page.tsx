@@ -1503,7 +1503,7 @@ function LoginPageContent() {
                                 variant="light"
                                 registration={nurseForm.register('name')}
                                 error={nurseNameShake ? undefined : nurseForm.formState.errors.name?.message}
-                                className={nurseNameShake ? 'border-red-400!' : ''}
+                                className={nurseNameShake ? '!border-red-400' : ''}
                               />
                             </motion.div>
                             {nurseNameWarning && (
@@ -1921,7 +1921,7 @@ function LoginPageContent() {
                                   variant="dark"
                                   registration={nurseForm.register('name')}
                                   error={nurseNameShake ? undefined : nurseForm.formState.errors.name?.message}
-                                  className={cn('h-10', nurseNameShake && 'border-red-400/60!')}
+                                  className={cn('h-10', nurseNameShake && '!border-red-400/60')}
                                 />
                               </motion.div>
                               {nurseNameWarning && (
