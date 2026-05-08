@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
     const [nurses, total] = await Promise.all([
       Nurse.find(filter)
         .select('-password -identityDocumentData -licenseDocumentData')
-        .sort({ createdAt: -1 })
+        .sort({ isOnline: -1, rating: -1, createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),

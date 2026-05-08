@@ -1,8 +1,8 @@
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
-import { ClipboardList, Eye, UserPlus, RefreshCw, Phone, MessageCircle, MapPin, Clock, Calendar, Banknote, User, Stethoscope, Navigation } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ClipboardList, Eye, UserPlus, RefreshCw, Phone, MessageCircle, MapPin, Clock, Calendar, Banknote, User, Stethoscope, Navigation, X, CheckCircle2, Search, Loader2, Star, Map } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -13,11 +13,10 @@ import { Currency } from '@/components/common/currency';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Separator } from '@/components/ui/separator';
+import { Input } from '@/components/ui/input';
 import {
   Dialog,
   DialogContent,
@@ -59,8 +58,12 @@ interface OrderItem {
 interface NurseOption {
   id: string;
   name: string;
+  phone?: string;
   specialization: string[];
   rating: number;
+  completedJobs: number;
+  isOnline: boolean;
+  isAvailable: boolean;
   lat?: number;
   lng?: number;
   distance?: number;
@@ -83,6 +86,19 @@ const paymentStatusLabels: Record<string, string> = {
   refunded: 'مسترد',
 };
 
+const specializationLabels: Record<string, string> = {
+  general_nursing: 'تمريض عام',
+  critical_care: 'رعاية حرجة',
+  pediatric: 'أطفال',
+  elderly_care: 'مسنين',
+  physiotherapy: 'علاج طبيعي',
+  wound_care: 'جروح',
+  iv_therapy: 'علاج وريدي',
+  mental_health: 'صحة نفسية',
+  post_surgery: 'بعد الجراحة',
+  emergency: 'طوارئ',
+};
+
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
 const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
 
@@ -96,10 +112,10 @@ function calculateDistance(lat1: number, lng1: number, lat2: number, lng2: numbe
   const R = 6371;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+  const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
     Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
-    Math.sin(dLng/2) * Math.sin(dLng/2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    Math.sin(dLng / 2) * Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
   return Math.round(R * c * 10) / 10;
 }
 
@@ -115,16 +131,13 @@ export default function AdminOrdersPage() {
   // Assign dialog
   const [assignTarget, setAssignTarget] = useState<OrderItem | null>(null);
   const [nurses, setNurses] = useState<NurseOption[]>([]);
+  const [isLoadingNurses, setIsLoadingNurses] = useState(false);
   const [selectedNurse, setSelectedNurse] = useState('');
   const [isAssigning, setIsAssigning] = useState(false);
+  const [nurseSearch, setNurseSearch] = useState('');
 
   // View dialog
   const [viewTarget, setViewTarget] = useState<OrderItem | null>(null);
-
-  // Status update
-  const [statusTarget, setStatusTarget] = useState<OrderItem | null>(null);
-  const [newStatus, setNewStatus] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
 
   // Auto-refresh
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -164,18 +177,25 @@ export default function AdminOrdersPage() {
   }, [fetchOrders]);
 
   const fetchAvailableNurses = async (orderLat?: number, orderLng?: number) => {
+    setIsLoadingNurses(true);
+    setNurseSearch('');
     try {
-      const res = await authFetch('/api/admin/nurses?limit=100&status=active');
+      // Fetch ALL verified nurses (not status=active which doesn't exist)
+      const res = await authFetch('/api/admin/nurses?limit=200&status=verified');
       const json = await res.json();
       if (json.success && json.data) {
         const nursesArray = json.data.nurses ?? json.data;
         let nurseList = (Array.isArray(nursesArray) ? nursesArray : []).map((n: Record<string, unknown>) => ({
           id: String(n.id ?? n._id ?? ''),
           name: String(n.name ?? ''),
+          phone: String(n.phone ?? ''),
           specialization: Array.isArray(n.specialization) ? n.specialization : [],
           rating: Number(n.rating ?? 0),
-          lat: Number(n.lat ?? 0) || undefined,
-          lng: Number(n.lng ?? 0) || undefined,
+          completedJobs: Number(n.completedJobs ?? 0),
+          isOnline: Boolean(n.isOnline),
+          isAvailable: Boolean(n.isAvailable),
+          lat: (n.lat != null && n.lat !== 0) ? Number(n.lat) : undefined,
+          lng: (n.lng != null && n.lng !== 0) ? Number(n.lng) : undefined,
           distance: undefined as number | undefined,
         }));
 
@@ -198,21 +218,25 @@ export default function AdminOrdersPage() {
       }
     } catch {
       toast.error('فشل تحميل قائمة الممرضين');
+    } finally {
+      setIsLoadingNurses(false);
     }
   };
 
-  const handleAssign = async () => {
-    if (!assignTarget || !selectedNurse) return;
+  const handleDirectAssign = async (nurseId: string) => {
+    if (!assignTarget) return;
     setIsAssigning(true);
+    setSelectedNurse(nurseId);
     try {
       const res = await authFetch(`/api/admin/orders/${assignTarget.id}/assign`, {
         method: 'POST',
-        body: JSON.stringify({ nurseId: selectedNurse }),
+        body: JSON.stringify({ nurseId }),
       });
       const json = await res.json();
       if (json.success) {
         toast.success('تم تعيين الممرض/ـة بنجاح');
         void fetchOrders();
+        setAssignTarget(null);
       } else {
         toast.error(json.message ?? 'فشل التعيين');
       }
@@ -220,34 +244,30 @@ export default function AdminOrdersPage() {
       toast.error('حدث خطأ أثناء التعيين');
     } finally {
       setIsAssigning(false);
-      setAssignTarget(null);
       setSelectedNurse('');
     }
   };
 
-  const handleStatusUpdate = async () => {
-    if (!statusTarget || !newStatus) return;
-    setIsUpdating(true);
-    try {
-      const res = await authFetch(`/api/admin/orders/${statusTarget.id}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: newStatus }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('تم تحديث حالة الطلب');
-        void fetchOrders();
-      } else {
-        toast.error(json.message ?? 'فشل التحديث');
-      }
-    } catch {
-      toast.error('حدث خطأ');
-    } finally {
-      setIsUpdating(false);
-      setStatusTarget(null);
-      setNewStatus('');
-    }
+  const openAssignDialog = (order: OrderItem) => {
+    setAssignTarget(order);
+    setSelectedNurse('');
+    void fetchAvailableNurses(order.beneficiaryLat, order.beneficiaryLng);
   };
+
+  // Filter nurses by search
+  const filteredNurses = nurses.filter(n => {
+    if (!nurseSearch) return true;
+    const q = nurseSearch.toLowerCase();
+    return (
+      n.name.toLowerCase().includes(q) ||
+      n.phone?.includes(q) ||
+      n.specialization.some(s => (specializationLabels[s] ?? s).toLowerCase().includes(q))
+    );
+  });
+
+  // Separate nearby nurses (< 10km) and other nurses
+  const nearbyNurses = filteredNurses.filter(n => n.distance !== undefined && n.distance <= 10);
+  const otherNurses = filteredNurses.filter(n => n.distance === undefined || n.distance > 10);
 
   const columns: ColumnDef<OrderItem, unknown>[] = [
     {
@@ -311,18 +331,8 @@ export default function AdminOrdersPage() {
     },
     {
       label: 'تعيين ممرض/ـة',
-      onClick: (row: Record<string, unknown>) => {
-        const order = row as unknown as OrderItem;
-        setAssignTarget(order);
-        void fetchAvailableNurses(order.beneficiaryLat, order.beneficiaryLng);
-      },
-    },
-    {
-      label: 'تحديث الحالة',
-      onClick: (row: Record<string, unknown>) => {
-        setStatusTarget(row as unknown as OrderItem);
-        setNewStatus((row as unknown as OrderItem).status);
-      },
+      onClick: (row: Record<string, unknown>) => openAssignDialog(row as unknown as OrderItem),
+      visible: (row: Record<string, unknown>) => !(row as unknown as OrderItem).nurseId,
     },
   ];
 
@@ -334,6 +344,49 @@ export default function AdminOrdersPage() {
     { value: 'completed', label: 'مكتمل' },
     { value: 'cancelled', label: 'ملغي' },
   ];
+
+  const NurseCard = ({ nurse, onSelect, isSelected, isAssigning }: { nurse: NurseOption; onSelect: (id: string) => void; isSelected: boolean; isAssigning: boolean }) => (
+    <button
+      onClick={() => onSelect(nurse.id)}
+      disabled={isAssigning}
+      className={`w-full text-right p-3 rounded-xl border-2 transition-all ${
+        isSelected
+          ? 'border-admin bg-admin/5 dark:bg-admin/10 shadow-md'
+          : 'border-border hover:border-admin/30 hover:shadow-sm'
+      } ${isAssigning && isSelected ? 'opacity-70' : ''}`}
+    >
+      <div className="flex items-center gap-3">
+        <div className="relative">
+          <Avatar className="w-10 h-10">
+            <AvatarFallback className="text-xs bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
+              {nurse.name.slice(0, 2)}
+            </AvatarFallback>
+          </Avatar>
+          {nurse.isOnline && (
+            <span className="absolute -bottom-0.5 -left-0.5 w-3 h-3 bg-green-500 border-2 border-background rounded-full" />
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2">
+            <p className="text-sm font-medium truncate">{nurse.name}</p>
+            {nurse.isOnline && <Badge className="text-[9px] px-1 py-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">متصل</Badge>}
+          </div>
+          <p className="text-[10px] text-muted-foreground truncate">
+            {nurse.specialization.slice(0, 2).map(s => specializationLabels[s] ?? s).join(' • ')}
+          </p>
+        </div>
+        <div className="text-left shrink-0">
+          {nurse.distance !== undefined && (
+            <p className="text-xs font-bold text-admin">{nurse.distance} كم</p>
+          )}
+          <div className="flex items-center gap-0.5">
+            <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+            <span className="text-xs font-medium">{nurse.rating.toFixed(1)}</span>
+          </div>
+        </div>
+      </div>
+    </button>
+  );
 
   const OrderDetailView = ({ order }: { order: OrderItem }) => (
     <div className="space-y-4">
@@ -456,6 +509,17 @@ export default function AdminOrdersPage() {
           موعد التنفيذ: <DateFormatter date={order.scheduledAt} format="full" />
         </div>
       )}
+
+      {/* Direct assign button if no nurse */}
+      {!order.nurseId && (
+        <Button
+          onClick={() => { setViewTarget(null); openAssignDialog(order); }}
+          className="w-full bg-admin hover:bg-admin/90 gap-2"
+        >
+          <UserPlus className="w-4 h-4" />
+          تعيين ممرض/ـة لهذا الطلب
+        </Button>
+      )}
     </div>
   );
 
@@ -511,119 +575,117 @@ export default function AdminOrdersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Assign Nurse Dialog - with nearby suggestions */}
-      <Dialog open={!!assignTarget} onOpenChange={(open) => { if (!open) setAssignTarget(null); }}>
+      {/* Assign Nurse Dialog - Direct assignment with nearby nurses */}
+      <Dialog open={!!assignTarget} onOpenChange={(open) => { if (!open) { setAssignTarget(null); setSelectedNurse(''); } }}>
         <DialogContent dir="rtl" className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>تعيين ممرض/ـة</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-admin" />
+              تعيين ممرض/ـة
+            </DialogTitle>
             <DialogDescription>
-              {assignTarget?.beneficiaryLat ? 'الممرضون مرتبون حسب القرب من موقع المستفيد' : 'اختر ممرض/ـة لتعيينه/ا للطلب'}
+              اضغط على الممرض/ـة لتعيينه/ا مباشرة للطلب
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3 py-2">
-            <Label>اختر ممرض/ـة</Label>
-            <Select value={selectedNurse} onValueChange={setSelectedNurse}>
-              <SelectTrigger>
-                <SelectValue placeholder="اختر ممرض/ـة" />
-              </SelectTrigger>
-              <SelectContent>
-                {nurses.map((n) => (
-                  <SelectItem key={n.id} value={n.id}>
-                    <div className="flex items-center gap-2">
-                      <span>{n.name}</span>
-                      {n.distance !== undefined && (
-                        <span className="text-xs text-muted-foreground">({n.distance} كم)</span>
-                      )}
-                      <span className="text-xs text-amber-500">({n.rating.toFixed(1)} ⭐)</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-
-            {/* Nearby nurses list */}
-            {nurses.length > 0 && assignTarget?.beneficiaryLat && (
-              <div className="space-y-2 mt-3">
-                <p className="text-xs text-muted-foreground">الممرضون الأقرب للموقع:</p>
-                <div className="space-y-2 max-h-60 overflow-y-auto">
-                  {nurses.slice(0, 10).map((n) => (
-                    <button
-                      key={n.id}
-                      onClick={() => setSelectedNurse(n.id)}
-                      className={`w-full text-right p-3 rounded-xl border transition-colors ${
-                        selectedNurse === n.id
-                          ? 'border-admin bg-admin/5 dark:bg-admin/10'
-                          : 'border-border hover:border-admin/30'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback className="text-xs bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400">
-                              {n.name.slice(0, 2)}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium">{n.name}</p>
-                            <p className="text-[10px] text-muted-foreground">
-                              {Array.isArray(n.specialization) ? n.specialization.slice(0, 2).join(' • ') : ''}
-                            </p>
-                          </div>
-                        </div>
-                        <div className="text-left">
-                          {n.distance !== undefined && (
-                            <p className="text-xs font-medium text-muted-foreground">{n.distance} كم</p>
-                          )}
-                          <p className="text-xs text-amber-500">{n.rating.toFixed(1)} ⭐</p>
-                        </div>
-                      </div>
-                    </button>
-                  ))}
+          <div className="space-y-4 py-2">
+            {/* Order info */}
+            {assignTarget && (
+              <div className="glass rounded-xl p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{assignTarget.beneficiaryName}</p>
+                    <p className="text-xs text-muted-foreground">{assignTarget.serviceName}</p>
+                  </div>
+                  <Currency amount={assignTarget.totalPrice} className="text-sm" />
                 </div>
+                {assignTarget.beneficiaryLat && assignTarget.beneficiaryLng && (
+                  <a href={`https://www.google.com/maps?q=${assignTarget.beneficiaryLat},${assignTarget.beneficiaryLng}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 mt-1">
+                    <MapPin className="w-3 h-3" /> موقع المستفيد
+                  </a>
+                )}
+              </div>
+            )}
+
+            {/* Search nurses */}
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                value={nurseSearch}
+                onChange={(e) => setNurseSearch(e.target.value)}
+                placeholder="بحث بالاسم أو التخصص..."
+                className="pr-9"
+              />
+            </div>
+
+            {isLoadingNurses ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 text-admin animate-spin" />
+                <span className="mr-2 text-sm text-muted-foreground">جارٍ تحميل الممرضين...</span>
+              </div>
+            ) : nurses.length === 0 ? (
+              <div className="text-center py-8">
+                <Stethoscope className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">لا يوجد ممرضون موثقون حالياً</p>
+              </div>
+            ) : (
+              <div className="space-y-4 max-h-[50vh] overflow-y-auto">
+                {/* Nearby Nurses */}
+                {nearbyNurses.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <MapPin className="w-4 h-4 text-admin" />
+                      <Label className="text-sm font-semibold">الممرضون الأقرب ({nearbyNurses.length})</Label>
+                    </div>
+                    <div className="space-y-2">
+                      {nearbyNurses.map((n) => (
+                        <NurseCard
+                          key={n.id}
+                          nurse={n}
+                          onSelect={handleDirectAssign}
+                          isSelected={selectedNurse === n.id}
+                          isAssigning={isAssigning}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Other Nurses */}
+                {otherNurses.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <Stethoscope className="w-4 h-4 text-muted-foreground" />
+                      <Label className="text-sm font-semibold text-muted-foreground">
+                        {nearbyNurses.length > 0 ? 'ممرضون آخرون' : 'الممرضون المتاحون'} ({otherNurses.length})
+                      </Label>
+                    </div>
+                    <div className="space-y-2">
+                      {otherNurses.slice(0, 20).map((n) => (
+                        <NurseCard
+                          key={n.id}
+                          nurse={n}
+                          onSelect={handleDirectAssign}
+                          isSelected={selectedNurse === n.id}
+                          isAssigning={isAssigning}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {filteredNurses.length === 0 && nurseSearch && (
+                  <p className="text-center text-sm text-muted-foreground py-4">لا توجد نتائج مطابقة</p>
+                )}
               </div>
             )}
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignTarget(null)} disabled={isAssigning}>
-              إلغاء
-            </Button>
-            <Button
-              onClick={handleAssign}
-              disabled={isAssigning || !selectedNurse}
-              className="bg-admin hover:bg-admin/90"
-            >
-              {isAssigning ? 'جارٍ التعيين...' : 'تعيين'}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
 
-      {/* Status Update Dialog */}
-      <Dialog open={!!statusTarget} onOpenChange={(open) => { if (!open) setStatusTarget(null); }}>
-        <DialogContent dir="rtl">
-          <DialogHeader>
-            <DialogTitle>تحديث حالة الطلب</DialogTitle>
-            <DialogDescription>اختر الحالة الجديدة للطلب</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <Label>الحالة الجديدة</Label>
-            <Select value={newStatus} onValueChange={setNewStatus}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(statusLabels).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setStatusTarget(null)} disabled={isUpdating}>إلغاء</Button>
-            <Button onClick={handleStatusUpdate} disabled={isUpdating} className="bg-admin hover:bg-admin/90">
-              {isUpdating ? 'جارٍ التحديث...' : 'تحديث'}
-            </Button>
-          </DialogFooter>
+          {isAssigning && (
+            <div className="flex items-center justify-center gap-2 py-2 text-sm text-admin">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              جارٍ التعيين...
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </motion.div>
