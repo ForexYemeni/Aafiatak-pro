@@ -28,6 +28,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { SearchInput } from '@/components/common/search-input';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { toArabicNum } from '@/components/common/date-formatter';
 import type { ApiResponse, Service, ServiceCategory } from '@/types';
 
 const categoryIcons: Record<string, React.ElementType> = {
@@ -73,6 +74,7 @@ export default function BeneficiaryHomePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
+  const [activeCoupons, setActiveCoupons] = useState<Array<{code: string; discountPercent: number; maxDiscountAmount?: number}>>([]);
 
   const fetchServices = useCallback(async () => {
     if (!token) return;
@@ -118,6 +120,20 @@ export default function BeneficiaryHomePage() {
   useEffect(() => {
     fetchActiveOrdersCount();
   }, [fetchActiveOrdersCount]);
+
+  // Fetch active coupons
+  useEffect(() => {
+    const fetchCoupons = async () => {
+      try {
+        const res = await fetch('/api/admin/coupons?active=true&limit=3');
+        const data = await res.json();
+        if (data.success && data.data?.coupons) {
+          setActiveCoupons(data.data.coupons.filter((c: any) => new Date(c.expiresAt) > new Date()));
+        }
+      } catch { /* silent */ }
+    };
+    fetchCoupons();
+  }, []);
 
   const categories: { key: string; label: string; icon: React.ElementType }[] = [
     { key: 'all', label: 'الكل', icon: Sparkles },
@@ -166,24 +182,35 @@ export default function BeneficiaryHomePage() {
       />
 
       {/* Coupon Banner */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0.95 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 0.1 }}
-      >
-        <GlassCard variant="beneficiary" className="flex items-center gap-4 py-4">
-          <div className="w-12 h-12 rounded-xl bg-beneficiary/10 flex items-center justify-center shrink-0">
-            <Tag className="w-6 h-6 text-beneficiary" />
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="font-semibold text-sm">كوبون خصم ١٠٪</p>
-            <p className="text-xs text-muted-foreground">استخدم كود AF10 عند الطلب</p>
-          </div>
-          <Button size="sm" className="bg-beneficiary hover:bg-beneficiary/90 text-beneficiary-foreground shrink-0">
-            نسخ الكود
-          </Button>
-        </GlassCard>
-      </motion.div>
+      {activeCoupons.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.1 }}
+          className="space-y-3"
+        >
+          {activeCoupons.map((coupon) => (
+            <GlassCard key={coupon.code} variant="beneficiary" className="flex items-center gap-4 py-4">
+              <div className="w-12 h-12 rounded-xl bg-beneficiary/10 flex items-center justify-center shrink-0">
+                <Tag className="w-6 h-6 text-beneficiary" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm">خصم {toArabicNum(coupon.discountPercent)}٪</p>
+                <p className="text-xs text-muted-foreground">استخدم كود {coupon.code} عند الطلب</p>
+              </div>
+              <Button
+                size="sm"
+                className="bg-beneficiary hover:bg-beneficiary/90 text-beneficiary-foreground shrink-0"
+                onClick={() => {
+                  navigator.clipboard.writeText(coupon.code);
+                }}
+              >
+                نسخ الكود
+              </Button>
+            </GlassCard>
+          ))}
+        </motion.div>
+      )}
 
       {/* Service Categories Horizontal Scroll */}
       <div className="relative">

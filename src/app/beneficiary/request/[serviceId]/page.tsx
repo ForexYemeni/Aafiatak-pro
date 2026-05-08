@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -34,6 +34,7 @@ import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { Currency, formatYemeniRial } from '@/components/common/currency';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useToast } from '@/hooks/use-toast';
+import { toArabicNum } from '@/components/common/date-formatter';
 import type { ApiResponse, Service, ServicePricing } from '@/types';
 
 interface StepInfo {
@@ -113,6 +114,21 @@ export default function ServiceRequestPage() {
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
 
+  // Pricing settings from API
+  const [commissionRate, setCommissionRate] = useState(15);
+  const [nightFeeEnabled, setNightFeeEnabled] = useState(false);
+  const [nightFeePercent, setNightFeePercent] = useState(0);
+  const [nightStartHour, setNightStartHour] = useState(22);
+  const [nightEndHour, setNightEndHour] = useState(6);
+  const [fridayFeeEnabled, setFridayFeeEnabled] = useState(false);
+  const [fridayFeePercent, setFridayFeePercent] = useState(0);
+
+  // Loyalty points
+  const [loyaltyPoints, setLoyaltyPoints] = useState(0);
+  const [loyaltyRedemptionRate, setLoyaltyRedemptionRate] = useState(0);
+  const [loyaltyRedemptionThreshold, setLoyaltyRedemptionThreshold] = useState(100);
+  const [useLoyaltyPoints, setUseLoyaltyPoints] = useState(false);
+
   // Get selected payment method details
   const selectedPaymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethodId);
   const isCashPayment = selectedPaymentMethod?.type === 'cash';
@@ -154,13 +170,22 @@ export default function ServiceRequestPage() {
 
   const fetchSettings = useCallback(async () => {
     try {
-      const [feeRes, supportRes] = await Promise.all([
-        fetch('/api/settings/emergency-fee'),
+      const [pricingRes, supportRes] = await Promise.all([
+        fetch('/api/settings/pricing'),
         fetch('/api/settings/support'),
       ]);
-      const feeData = await feeRes.json();
-      if (feeData.success && feeData.data) {
-        setEmergencyFee(feeData.data.emergencyFee || 5000);
+      const pricingData = await pricingRes.json();
+      if (pricingData.success && pricingData.data) {
+        setEmergencyFee(pricingData.data.emergencyFee || 5000);
+        setCommissionRate(pricingData.data.commissionRate || 15);
+        setNightFeeEnabled(pricingData.data.nightFeeEnabled ?? false);
+        setNightFeePercent(pricingData.data.nightFeePercent || 0);
+        setNightStartHour(pricingData.data.nightStartHour || 22);
+        setNightEndHour(pricingData.data.nightEndHour || 6);
+        setFridayFeeEnabled(pricingData.data.fridayFeeEnabled ?? false);
+        setFridayFeePercent(pricingData.data.fridayFeePercent || 0);
+        setLoyaltyRedemptionRate(pricingData.data.loyaltyRedemptionRate || 0);
+        setLoyaltyRedemptionThreshold(pricingData.data.loyaltyRedemptionThreshold || 100);
       }
       const supportData = await supportRes.json();
       if (supportData.success && supportData.data) {
@@ -172,24 +197,61 @@ export default function ServiceRequestPage() {
     }
   }, []);
 
+  // Fetch loyalty points
+  const fetchLoyalty = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/beneficiary/loyalty', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const data = await res.json();
+      if (data.success && data.data) {
+        setLoyaltyPoints(data.data.loyaltyPoints || 0);
+      }
+    } catch { /* silent */ }
+  }, [token]);
+
   useEffect(() => {
     fetchService();
     fetchPaymentMethods();
     fetchSettings();
-  }, [fetchService, fetchPaymentMethods, fetchSettings]);
+    fetchLoyalty();
+  }, [fetchService, fetchPaymentMethods, fetchSettings, fetchLoyalty]);
 
   // Calculate pricing when relevant fields change
   useEffect(() => {
     if (!service) return;
     const basePrice = service.basePrice;
-    const nightFee = 0;
-    const fridayFee = 0;
+
+    // Calculate night fee
+    let nightFee = 0;
+    if (nightFeeEnabled && scheduledTime) {
+      const hour = parseInt(scheduledTime.split(':')[0]);
+      const isNight = nightStartHour > nightEndHour
+        ? (hour >= nightStartHour || hour < nightEndHour)
+        : (hour >= nightStartHour && hour < nightEndHour);
+      if (isNight) {
+        nightFee = Math.round(basePrice * (nightFeePercent / 100));
+      }
+    }
+
+    // Calculate Friday fee
+    let fridayFee = 0;
+    if (fridayFeeEnabled && scheduledDate) {
+      const dayOfWeek = new Date(scheduledDate).getDay();
+      if (dayOfWeek === 5) { // Friday
+        fridayFee = Math.round(basePrice * (fridayFeePercent / 100));
+      }
+    }
+
     const emergencyFeeAmount = isEmergency ? emergencyFee : 0;
-    const loyaltyDiscount = 0;
+    const loyaltyDiscount = (useLoyaltyPoints && loyaltyRedemptionRate > 0 && loyaltyPoints >= loyaltyRedemptionThreshold)
+      ? Math.round(loyaltyPoints / loyaltyRedemptionRate)
+      : 0;
     const subtotal = basePrice + nightFee + fridayFee + emergencyFeeAmount;
     const discount = couponDiscount;
     const totalPrice = Math.max(0, subtotal - discount - loyaltyDiscount);
-    const commission = totalPrice * 0.15;
+    const commission = Math.round(totalPrice * (commissionRate / 100));
     const nursePayout = totalPrice - commission;
 
     setPricing({
@@ -204,7 +266,7 @@ export default function ServiceRequestPage() {
       commission,
       nursePayout,
     });
-  }, [service, isEmergency, couponDiscount, emergencyFee]);
+  }, [service, isEmergency, couponDiscount, emergencyFee, commissionRate, nightFeeEnabled, nightFeePercent, nightStartHour, nightEndHour, fridayFeeEnabled, fridayFeePercent, scheduledDate, scheduledTime, useLoyaltyPoints, loyaltyPoints, loyaltyRedemptionRate, loyaltyRedemptionThreshold]);
 
   const validateCoupon = async () => {
     if (!token || !couponCode || !service) return;
@@ -681,6 +743,22 @@ export default function ServiceRequestPage() {
                     <CheckCircle2 className="w-4 h-4" />
                     خصم الكوبون: {formatYemeniRial(couponDiscount)}
                   </p>
+                )}
+
+                {/* Loyalty Points Toggle */}
+                {loyaltyPoints >= loyaltyRedemptionThreshold && loyaltyRedemptionRate > 0 && (
+                  <div className="flex items-center gap-3 p-3 rounded-xl glass">
+                    <input
+                      type="checkbox"
+                      id="loyalty-check"
+                      checked={useLoyaltyPoints}
+                      onChange={(e) => setUseLoyaltyPoints(e.target.checked)}
+                      className="w-5 h-5 rounded border-2 border-beneficiary text-beneficiary focus:ring-beneficiary"
+                    />
+                    <Label htmlFor="loyalty-check" className="cursor-pointer">
+                      استخدام {toArabicNum(loyaltyPoints)} نقطة ولاء (خصم {formatYemeniRial(Math.round(loyaltyPoints / loyaltyRedemptionRate))})
+                    </Label>
+                  </div>
                 )}
               </div>
             </GlassCard>

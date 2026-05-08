@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
@@ -29,7 +29,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { GlassCard } from '@/components/common/glass-card';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
@@ -38,6 +38,7 @@ import { useAuthFetch } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { toArabicNum } from '@/components/common/date-formatter';
 import { compressImage } from '@/lib/utils/image-compress';
+import { toast as sonnerToast } from 'sonner';
 import Link from 'next/link';
 
 // ---- Types ----
@@ -66,6 +67,7 @@ interface NurseProfile {
   licenseDocumentUrl: string | null;
   identityDocumentData: string | null;
   licenseDocumentData: string | null;
+  avatar: string | null;
   rejectedReason: string | null;
 }
 
@@ -126,6 +128,7 @@ export default function NurseProfilePage() {
 
   const authFetch = useAuthFetch();
   const updateUser = useAuthStore((s) => s.updateUser);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
 
   const fetchProfile = useCallback(async () => {
     try {
@@ -420,6 +423,33 @@ export default function NurseProfilePage() {
     return !!(preview || data || (url && !url.startsWith('data:stored/')));
   };
 
+  // Handle avatar change
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      const compressed = await compressImage(file);
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        const res = await authFetch('/api/nurse/profile', {
+          method: 'PATCH',
+          body: JSON.stringify({ avatar: base64 }),
+        });
+        const data = await res.json();
+        if (data.success) {
+          sonnerToast.success('تم تحديث الصورة الشخصية');
+          fetchProfile();
+        } else {
+          sonnerToast.error('فشل تحديث الصورة');
+        }
+      };
+      reader.readAsDataURL(compressed);
+    } catch {
+      sonnerToast.error('حدث خطأ أثناء معالجة الصورة');
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="space-y-4">
@@ -568,13 +598,20 @@ export default function NurseProfilePage() {
         <div className="flex flex-col items-center text-center">
           <div className="relative mb-4">
             <Avatar className="w-24 h-24 text-2xl">
+              {profile.avatar ? (
+                <AvatarImage src={profile.avatar} alt={profile.name} />
+              ) : null}
               <AvatarFallback className="bg-nurse/10 text-nurse text-2xl">
-                {profile.name.slice(0, 2)}
+                {profile.name?.split(' ').map(n => n[0]).join('').slice(0, 2) || 'م'}
               </AvatarFallback>
             </Avatar>
-            <button className="absolute bottom-0 right-0 w-8 h-8 bg-nurse text-nurse-foreground rounded-full flex items-center justify-center shadow-md">
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              className="absolute bottom-0 right-0 w-8 h-8 bg-nurse text-nurse-foreground rounded-full flex items-center justify-center shadow-md"
+            >
               <Camera className="w-4 h-4" />
             </button>
+            <input type="file" accept="image/*" className="hidden" ref={avatarInputRef} onChange={handleAvatarChange} />
           </div>
 
           <h2 className="text-xl font-bold mb-1">{profile.name}</h2>

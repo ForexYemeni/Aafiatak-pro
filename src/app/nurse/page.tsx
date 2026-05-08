@@ -166,6 +166,7 @@ export default function NurseTasksPage() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [counts, setCounts] = useState({ new: 0, active: 0, completed: 0 });
   const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
+  const [profileCompleteness, setProfileCompleteness] = useState(0);
   const authFetch = useAuthFetch();
   const user = useAuthStore((s) => s.user);
   const orderUpdates = useOrderUpdates();
@@ -178,6 +179,20 @@ export default function NurseTasksPage() {
       if (data.success && data.data) {
         const status = data.data.verificationStatus || 'unverified';
         setVerificationStatus(status);
+        
+        // Calculate profile completeness
+        const fields = [
+          !!data.data.name,
+          !!data.data.phone,
+          !!data.data.specialization?.length,
+          !!data.data.governorate,
+          !!data.data.address,
+          !!data.data.identityDocumentUrl,
+          !!data.data.licenseDocumentUrl,
+          !!data.data.licenseNumber,
+        ];
+        const filled = fields.filter(Boolean).length;
+        setProfileCompleteness(Math.round((filled / fields.length) * 100));
       }
     } catch {
       // If profile fetch fails, default to unverified from auth store
@@ -360,6 +375,22 @@ export default function NurseTasksPage() {
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       {vConfig.description}
                     </p>
+                    <div className="mt-2">
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
+                        <span>اكتمال الملف</span>
+                        <span className="font-bold">{toArabicNum(profileCompleteness)}%</span>
+                      </div>
+                      <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                        <motion.div
+                          initial={{ width: 0 }}
+                          animate={{ width: `${profileCompleteness}%` }}
+                          transition={{ duration: 0.8, ease: 'easeOut' }}
+                          className={`h-full rounded-full ${
+                            profileCompleteness >= 70 ? 'bg-amber-500' : 'bg-red-500'
+                          }`}
+                        />
+                      </div>
+                    </div>
                   </div>
                   <ChevronLeft className="w-5 h-5 text-muted-foreground shrink-0" />
                 </div>

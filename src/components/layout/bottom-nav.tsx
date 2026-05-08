@@ -11,6 +11,9 @@ import {
   User,
   MoreHorizontal,
   MessageCircle,
+  Wallet,
+  Bell,
+  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
@@ -26,7 +29,7 @@ const adminBottomItems: BottomNavItem[] = [
   { label: 'الرئيسية', href: '/admin', icon: Home },
   { label: 'الممرضون', href: '/admin/nurses', icon: Stethoscope },
   { label: 'الطلبات', href: '/admin/orders', icon: ClipboardList },
-  { label: 'الطوارئ', href: '/admin/emergencies', icon: AlertTriangle },
+  { label: 'الخريطة', href: '/admin/map', icon: MapPin },
   { label: 'المزيد', href: '/admin/settings', icon: MoreHorizontal },
 ];
 
@@ -41,8 +44,8 @@ const subadminBottomItems: BottomNavItem[] = [
 const nurseBottomItems: BottomNavItem[] = [
   { label: 'المهام', href: '/nurse', icon: ClipboardList },
   { label: 'المحادثة', href: '/nurse/chat', icon: MessageCircle },
-  { label: 'الأرباح', href: '/nurse/earnings', icon: Home },
-  { label: 'الإشعارات', href: '/nurse/notifications', icon: AlertTriangle },
+  { label: 'الأرباح', href: '/nurse/earnings', icon: Wallet },
+  { label: 'الإشعارات', href: '/nurse/notifications', icon: Bell },
   { label: 'المزيد', href: '/nurse/profile', icon: MoreHorizontal },
 ];
 
