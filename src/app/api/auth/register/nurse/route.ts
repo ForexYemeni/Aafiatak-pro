@@ -17,7 +17,7 @@ import {
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
-    const { name, phone, password, specialization, experience, governorate, district, licenseNumber } = await request.json();
+    const { name, phone, password, specialization, experience, governorate, district, licenseNumber, address } = await request.json();
 
     if (!name || !phone || !password) {
       return createErrorResponse('الاسم ورقم الهاتف وكلمة المرور مطلوبون', 400, 'VALIDATION_ERROR');
@@ -51,6 +51,7 @@ export async function POST(request: NextRequest) {
       governorate,
       district,
       licenseNumber,
+      address,
       verificationStatus: 'unverified',
       isActive: true,
     });

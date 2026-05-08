@@ -54,3 +54,52 @@
 ### Verification
 - Ran `bun run lint` - no new lint errors introduced in modified files
 - Pre-existing lint errors (in data-table.tsx and socket-provider.tsx) are unrelated to these changes
+
+---
+Task ID: 2
+Agent: full-stack-developer
+Task: Redesign login/register pages with professional design
+
+Work Log:
+- Read and analyzed existing page.tsx (1496 lines), types/index.ts, and nurse registration API route
+- Removed `confirmPassword` from both `nurseRegisterSchema` and `beneficiaryRegisterSchema` Zod schemas
+- Removed `.refine()` password match validation from both schemas
+- Removed `confirmPassword` from form default values for both nurse and beneficiary forms
+- Removed `showConfirmPassword` state variable
+- Removed all confirmPassword form fields from 4 locations (desktop beneficiary, desktop nurse, mobile beneficiary, mobile nurse)
+- Added `address` field to `nurseRegisterSchema` with min 1 validation and message 'العنوان التفصيلي مطلوب'
+- Added `address` to nurse form default values
+- Added address input field with MapPin icon in both desktop and mobile nurse registration forms
+- Added address auto-fill from GPS location detection in nurse forms
+- Updated `onNurseRegister` to include `address: data.address` in the registerNurse call
+- Changed nurse name label from "الاسم الكامل" to "الاسم الرباعي"
+- Changed nurse name placeholder to "الاسم الرباعي (أربعة أجزاء)"
+- Added custom validation: when nurse form submitted, if name has <4 words, triggers shake animation and warning message
+- Implemented shake animation using framer-motion with x keyframes [0, -10, 10, -8, 8, -4, 4, 0] over 0.5s
+- Added red border highlight during shake via conditional className
+- Added `nurseNameShake` and `nurseNameWarning` state variables for controlling animation
+- Replaced 10-item specializations array with expanded 25-item list
+- Added `AlertTriangle` icon import from lucide-react for the name warning
+- Created `PasswordStrengthBar` component with colored strength indicator (5 segments)
+- Created `getPasswordStrength` helper function for calculating password strength
+- Added password strength indicator below all password fields (login + register forms)
+- Added `PasswordStrengthBar` watchers for all 3 form password values
+- Professional design improvements:
+  - Added gradient background sections for form field groups (personal, professional, location, security)
+  - Each section has a colored header with icon and Arabic label
+  - Improved register role toggle buttons with icon backgrounds that change based on selection
+  - Added shadow effects to active role buttons
+  - Added subtle scale-on-focus micro-interactions (focus:scale-[1.01]) to all input fields
+  - Added transition-all duration-200 to input fields
+  - Consistent rounded-xl styling across all inputs
+  - Card-like grouping with gradient backgrounds and colored borders
+- Added `address?: string` to `RegisterNurseRequest` interface in types/index.ts
+- Updated nurse registration API route to destructure `address` from request body and include in Nurse.create() call
+- Verified build succeeds with `npx next build`
+- Ran ESLint on page.tsx - only pre-existing warning about react-hook-form watch() (not an error)
+
+Stage Summary:
+- All 7 required changes implemented successfully
+- Build passes with no errors
+- No new lint errors introduced
+- Professional redesign includes gradient section grouping, password strength indicator, shake animation for name validation, expanded specializations, and address field for nurses

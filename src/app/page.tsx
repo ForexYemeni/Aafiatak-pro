@@ -21,6 +21,7 @@ import {
   Activity,
   Clock,
   Users,
+  AlertTriangle,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -52,6 +53,26 @@ function seededRandom(seed: number): number {
 }
 
 // ============================================================================
+// Password Strength Calculator
+// ============================================================================
+
+function getPasswordStrength(password: string): { score: number; label: string; color: string } {
+  if (!password) return { score: 0, label: '', color: '' };
+  let score = 0;
+  if (password.length >= 6) score += 1;
+  if (password.length >= 8) score += 1;
+  if (/[A-Z]/.test(password)) score += 1;
+  if (/[0-9]/.test(password)) score += 1;
+  if (/[^A-Za-z0-9]/.test(password)) score += 1;
+
+  if (score <= 1) return { score: 1, label: 'ضعيفة', color: 'bg-red-500' };
+  if (score <= 2) return { score: 2, label: 'متوسطة', color: 'bg-amber-500' };
+  if (score <= 3) return { score: 3, label: 'جيدة', color: 'bg-yellow-500' };
+  if (score <= 4) return { score: 4, label: 'قوية', color: 'bg-emerald-500' };
+  return { score: 5, label: 'قوية جداً', color: 'bg-emerald-600' };
+}
+
+// ============================================================================
 // Validation Schemas
 // ============================================================================
 
@@ -68,43 +89,32 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-const nurseRegisterSchema = z
-  .object({
-    name: z.string().min(1, 'الاسم مطلوب').min(3, 'الاسم يجب أن يكون ٣ أحرف على الأقل'),
-    phone: z
-      .string()
-      .min(1, 'رقم الهاتف مطلوب')
-      .regex(/^(7\d{8}|\+9677\d{7,8}|9677\d{7,8})$/, 'صيغة رقم الهاتف غير صحيحة'),
-    password: z.string().min(1, 'كلمة المرور مطلوبة').min(6, 'كلمة المرور يجب أن تكون ٦ أحرف على الأقل'),
-    confirmPassword: z.string().min(1, 'تأكيد كلمة المرور مطلوب'),
-    specialization: z.string().min(1, 'التخصص مطلوب'),
-    licenseNumber: z.string().min(1, 'رقم الترخيص مطلوب'),
-    governorate: z.string().optional(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'كلمتا المرور غير متطابقتين',
-    path: ['confirmPassword'],
-  });
+const nurseRegisterSchema = z.object({
+  name: z.string().min(1, 'الاسم مطلوب').min(3, 'الاسم يجب أن يكون ٣ أحرف على الأقل'),
+  phone: z
+    .string()
+    .min(1, 'رقم الهاتف مطلوب')
+    .regex(/^(7\d{8}|\+9677\d{7,8}|9677\d{7,8})$/, 'صيغة رقم الهاتف غير صحيحة'),
+  password: z.string().min(1, 'كلمة المرور مطلوبة').min(6, 'كلمة المرور يجب أن تكون ٦ أحرف على الأقل'),
+  specialization: z.string().min(1, 'التخصص مطلوب'),
+  licenseNumber: z.string().min(1, 'رقم الترخيص مطلوب'),
+  address: z.string().min(1, 'العنوان التفصيلي مطلوب'),
+  governorate: z.string().optional(),
+});
 
 type NurseRegisterFormValues = z.infer<typeof nurseRegisterSchema>;
 
-const beneficiaryRegisterSchema = z
-  .object({
-    name: z.string().min(1, 'الاسم مطلوب').min(3, 'الاسم يجب أن يكون ٣ أحرف على الأقل'),
-    phone: z
-      .string()
-      .min(1, 'رقم الهاتف مطلوب')
-      .regex(/^(7\d{8}|\+9677\d{7,8}|9677\d{7,8})$/, 'صيغة رقم الهاتف غير صحيحة'),
-    password: z.string().min(1, 'كلمة المرور مطلوبة').min(6, 'كلمة المرور يجب أن تكون ٦ أحرف على الأقل'),
-    confirmPassword: z.string().min(1, 'تأكيد كلمة المرور مطلوب'),
-    address: z.string().min(1, 'العنوان مطلوب'),
-    governorate: z.string().optional(),
-    referralCode: z.string().optional(),
-  })
-  .refine((data) => data.password === data.confirmPassword, {
-    message: 'كلمتا المرور غير متطابقتين',
-    path: ['confirmPassword'],
-  });
+const beneficiaryRegisterSchema = z.object({
+  name: z.string().min(1, 'الاسم مطلوب').min(3, 'الاسم يجب أن يكون ٣ أحرف على الأقل'),
+  phone: z
+    .string()
+    .min(1, 'رقم الهاتف مطلوب')
+    .regex(/^(7\d{8}|\+9677\d{7,8}|9677\d{7,8})$/, 'صيغة رقم الهاتف غير صحيحة'),
+  password: z.string().min(1, 'كلمة المرور مطلوبة').min(6, 'كلمة المرور يجب أن تكون ٦ أحرف على الأقل'),
+  address: z.string().min(1, 'العنوان مطلوب'),
+  governorate: z.string().optional(),
+  referralCode: z.string().optional(),
+});
 
 type BeneficiaryRegisterFormValues = z.infer<typeof beneficiaryRegisterSchema>;
 
@@ -123,6 +133,21 @@ const specializations = [
   { value: 'mental_health', label: 'الصحة النفسية' },
   { value: 'post_surgery', label: 'رعاية ما بعد الجراحة' },
   { value: 'emergency', label: 'الطوارئ' },
+  { value: 'lab_technician', label: 'مخبري' },
+  { value: 'medical_assistant', label: 'مساعد طبيب' },
+  { value: 'general_practitioner', label: 'طبيب عام' },
+  { value: 'critical_care_doctor', label: 'طبيب عناية' },
+  { value: 'nursery_nurse', label: 'ممرض حضانة' },
+  { value: 'anesthesia', label: 'التخدير' },
+  { value: 'radiology', label: 'الأشعة' },
+  { value: 'pharmacy', label: 'الصيدلة' },
+  { value: 'dentistry', label: 'طب الأسنان' },
+  { value: 'obstetrics', label: 'التوليد والنساء' },
+  { value: 'cardiology_nursing', label: 'تمريض القلب' },
+  { value: 'oncology_nursing', label: 'تمريض الأورام' },
+  { value: 'dialysis_nursing', label: 'تمريض الكلى والغسيل' },
+  { value: 'respiratory_therapy', label: 'العلاج التنفسي' },
+  { value: 'nutrition', label: 'التغذية العلاجية' },
 ];
 
 // ============================================================================
@@ -678,6 +703,45 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
 }
 
 // ============================================================================
+// Password Strength Bar Component
+// ============================================================================
+
+function PasswordStrengthBar({ password }: { password: string }) {
+  const strength = getPasswordStrength(password);
+  if (!password) return null;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, height: 0 }}
+      animate={{ opacity: 1, height: 'auto' }}
+      exit={{ opacity: 0, height: 0 }}
+      className="space-y-1"
+    >
+      <div className="flex gap-1">
+        {Array.from({ length: 5 }).map((_, i) => (
+          <div
+            key={i}
+            className={cn(
+              'h-1 flex-1 rounded-full transition-all duration-300',
+              i < strength.score ? strength.color : 'bg-muted-foreground/20'
+            )}
+          />
+        ))}
+      </div>
+      <p className={cn(
+        'text-[10px] font-medium transition-colors duration-300',
+        strength.score <= 1 ? 'text-red-500' :
+        strength.score <= 2 ? 'text-amber-500' :
+        strength.score <= 3 ? 'text-yellow-500' :
+        'text-emerald-500'
+      )}>
+        قوة كلمة المرور: {strength.label}
+      </p>
+    </motion.div>
+  );
+}
+
+// ============================================================================
 // Main Login Page Component
 // ============================================================================
 
@@ -692,8 +756,9 @@ function LoginPageContent() {
   const [activeTab, setActiveTab] = useState<string>('login');
   const [registerRole, setRegisterRole] = useState<string>('beneficiary');
   const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
+  const [nurseNameShake, setNurseNameShake] = useState(false);
+  const [nurseNameWarning, setNurseNameWarning] = useState(false);
 
   // Handle post-login redirect with loading screen
   const justLoggedOut = searchParams.get('logout') === 'true';
@@ -743,13 +808,28 @@ function LoginPageContent() {
   const nurseForm = useForm<NurseRegisterFormValues>({
     resolver: zodResolver(nurseRegisterSchema),
     defaultValues: {
-      name: '', phone: '', password: '', confirmPassword: '',
-      specialization: '', licenseNumber: '', governorate: '',
+      name: '', phone: '', password: '',
+      specialization: '', licenseNumber: '', address: '', governorate: '',
     },
   });
 
   const onNurseRegister = async (data: NurseRegisterFormValues) => {
     clearError();
+
+    // Validate four-part name (الاسم الرباعي)
+    const nameWords = data.name.trim().split(/\s+/).filter(Boolean);
+    if (nameWords.length < 4) {
+      setNurseNameShake(true);
+      setNurseNameWarning(true);
+      setTimeout(() => {
+        setNurseNameShake(false);
+      }, 600);
+      setTimeout(() => {
+        setNurseNameWarning(false);
+      }, 3000);
+      return;
+    }
+
     try {
       await registerNurse({
         name: data.name,
@@ -757,6 +837,7 @@ function LoginPageContent() {
         password: data.password,
         specialization: data.specialization,
         licenseNumber: data.licenseNumber,
+        address: data.address,
         governorate: data.governorate as never,
       });
     } catch {
@@ -771,7 +852,7 @@ function LoginPageContent() {
   const beneficiaryForm = useForm<BeneficiaryRegisterFormValues>({
     resolver: zodResolver(beneficiaryRegisterSchema),
     defaultValues: {
-      name: '', phone: '', password: '', confirmPassword: '',
+      name: '', phone: '', password: '',
       address: '', governorate: '', referralCode: '',
     },
   });
@@ -791,6 +872,13 @@ function LoginPageContent() {
       // Error handled in store
     }
   };
+
+  // ============================================================================
+  // Password watchers for strength indicator
+  // ============================================================================
+  const loginPasswordValue = loginForm.watch('password');
+  const nursePasswordValue = nurseForm.watch('password');
+  const beneficiaryPasswordValue = beneficiaryForm.watch('password');
 
   // ============================================================================
   // Render
@@ -915,7 +1003,7 @@ function LoginPageContent() {
                             id="login-phone"
                             type="tel"
                             placeholder="7XXXXXXXX"
-                            className="pr-10 text-right h-12 rounded-xl border-border/50 bg-muted/20 focus:bg-background transition-colors"
+                            className="pr-10 text-right h-12 rounded-xl border-border/50 bg-muted/20 focus:bg-background transition-all duration-200 focus:scale-[1.01]"
                             dir="ltr"
                             {...loginForm.register('phone')}
                           />
@@ -936,7 +1024,7 @@ function LoginPageContent() {
                             id="login-password"
                             type={showPassword ? 'text' : 'password'}
                             placeholder="••••••"
-                            className="pr-10 pl-10 text-right h-12 rounded-xl border-border/50 bg-muted/20 focus:bg-background transition-colors"
+                            className="pr-10 pl-10 text-right h-12 rounded-xl border-border/50 bg-muted/20 focus:bg-background transition-all duration-200 focus:scale-[1.01]"
                             dir="ltr"
                             {...loginForm.register('password')}
                           />
@@ -948,6 +1036,7 @@ function LoginPageContent() {
                             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </div>
+                        <PasswordStrengthBar password={loginPasswordValue} />
                         {loginForm.formState.errors.password && (
                           <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-destructive">
                             {loginForm.formState.errors.password.message}
@@ -1003,15 +1092,22 @@ function LoginPageContent() {
                           className={cn(
                             'relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border-2',
                             registerRole === 'beneficiary'
-                              ? 'border-purple-500/50 bg-purple-500/10 text-purple-700 dark:text-purple-400 shadow-lg'
-                              : 'border-border/50 bg-muted/30 text-muted-foreground hover:bg-muted/50'
+                              ? 'border-purple-500/50 bg-gradient-to-br from-purple-500/10 to-purple-600/5 text-purple-700 dark:text-purple-400 shadow-lg shadow-purple-500/10'
+                              : 'border-border/50 bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:border-border/80'
                           )}
                         >
                           {registerRole === 'beneficiary' && (
                             <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-purple-700 opacity-10" />
                           )}
                           <div className="relative z-10">
-                            <User className="w-6 h-6 mx-auto mb-1.5" />
+                            <div className={cn(
+                              'w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center transition-all duration-300',
+                              registerRole === 'beneficiary'
+                                ? 'bg-gradient-to-br from-purple-500 to-purple-700 text-white shadow-md'
+                                : 'bg-muted text-muted-foreground'
+                            )}>
+                              <User className="w-5 h-5" />
+                            </div>
                             <span className="text-sm font-bold">مستفيد</span>
                             <p className="text-[10px] text-muted-foreground mt-0.5">احصل على رعاية منزلية</p>
                           </div>
@@ -1023,15 +1119,22 @@ function LoginPageContent() {
                           className={cn(
                             'relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border-2',
                             registerRole === 'nurse'
-                              ? 'border-sky-500/50 bg-sky-500/10 text-sky-700 dark:text-sky-400 shadow-lg'
-                              : 'border-border/50 bg-muted/30 text-muted-foreground hover:bg-muted/50'
+                              ? 'border-sky-500/50 bg-gradient-to-br from-sky-500/10 to-sky-600/5 text-sky-700 dark:text-sky-400 shadow-lg shadow-sky-500/10'
+                              : 'border-border/50 bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:border-border/80'
                           )}
                         >
                           {registerRole === 'nurse' && (
                             <div className="absolute inset-0 bg-gradient-to-br from-sky-500 to-sky-700 opacity-10" />
                           )}
                           <div className="relative z-10">
-                            <Stethoscope className="w-6 h-6 mx-auto mb-1.5" />
+                            <div className={cn(
+                              'w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center transition-all duration-300',
+                              registerRole === 'nurse'
+                                ? 'bg-gradient-to-br from-sky-500 to-sky-700 text-white shadow-md'
+                                : 'bg-muted text-muted-foreground'
+                            )}>
+                              <Stethoscope className="w-5 h-5" />
+                            </div>
                             <span className="text-sm font-bold">ممرض/ـة</span>
                             <p className="text-[10px] text-muted-foreground mt-0.5">انضم كممرض معتمد</p>
                           </div>
@@ -1051,71 +1154,84 @@ function LoginPageContent() {
                           onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)}
                           className="space-y-4"
                         >
-                          <div className="space-y-2">
-                            <Label htmlFor="ben-name">الاسم الكامل</Label>
-                            <div className="relative">
-                              <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input id="ben-name" placeholder="الاسم الكامل" className="pr-10 text-right h-11 rounded-xl" {...beneficiaryForm.register('name')} />
+                          {/* Personal info section */}
+                          <div className="bg-gradient-to-l from-purple-500/5 via-transparent to-purple-500/5 rounded-2xl p-4 border border-purple-500/10 space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                              <User className="w-4 h-4 text-purple-500" />
+                              <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">المعلومات الشخصية</span>
                             </div>
-                            {beneficiaryForm.formState.errors.name && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.name.message}</p>}
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ben-phone">رقم الهاتف</Label>
-                            <div className="relative">
-                              <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input id="ben-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-11 rounded-xl" dir="ltr" {...beneficiaryForm.register('phone')} />
+                            <div className="space-y-2">
+                              <Label htmlFor="ben-name">الاسم الكامل</Label>
+                              <div className="relative">
+                                <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input id="ben-name" placeholder="الاسم الكامل" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...beneficiaryForm.register('name')} />
+                              </div>
+                              {beneficiaryForm.formState.errors.name && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.name.message}</p>}
                             </div>
-                            {beneficiaryForm.formState.errors.phone && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.phone.message}</p>}
-                          </div>
-                          {/* GPS Location Detection */}
-                          <GpsLocationButton
-                            onLocationDetected={(loc) => {
-                              if (loc.governorate && loc.governorateValue) {
-                                beneficiaryForm.setValue('governorate', loc.governorateValue);
-                              }
-                              if (loc.address || loc.district) {
-                                beneficiaryForm.setValue('address', loc.district || loc.address);
-                              }
-                            }}
-                            size="sm"
-                            className="w-full"
-                          />
-                          <div className="space-y-2">
-                            <Label htmlFor="ben-address">العنوان</Label>
-                            <div className="relative">
-                              <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input id="ben-address" placeholder="عنوانك التفصيلي" className="pr-10 text-right h-11 rounded-xl" {...beneficiaryForm.register('address')} />
+                            <div className="space-y-2">
+                              <Label htmlFor="ben-phone">رقم الهاتف</Label>
+                              <div className="relative">
+                                <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input id="ben-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('phone')} />
+                              </div>
+                              {beneficiaryForm.formState.errors.phone && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.phone.message}</p>}
                             </div>
-                            {beneficiaryForm.formState.errors.address && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.address.message}</p>}
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ben-referral">كود الإحالة (اختياري)</Label>
-                            <Input id="ben-referral" placeholder="AF-XXXXXX" className="text-right h-11 rounded-xl" dir="ltr" {...beneficiaryForm.register('referralCode')} />
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ben-password">كلمة المرور</Label>
-                            <div className="relative">
-                              <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input id="ben-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl" dir="ltr" {...beneficiaryForm.register('password')} />
-                              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              </button>
+
+                          {/* Location section */}
+                          <div className="bg-gradient-to-l from-emerald-500/5 via-transparent to-emerald-500/5 rounded-2xl p-4 border border-emerald-500/10 space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                              <MapPin className="w-4 h-4 text-emerald-500" />
+                              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">معلومات الموقع</span>
                             </div>
-                            {beneficiaryForm.formState.errors.password && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.password.message}</p>}
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="ben-confirm-password">تأكيد كلمة المرور</Label>
-                            <div className="relative">
-                              <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input id="ben-confirm-password" type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl" dir="ltr" {...beneficiaryForm.register('confirmPassword')} />
-                              <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              </button>
+                            <GpsLocationButton
+                              onLocationDetected={(loc) => {
+                                if (loc.governorate && loc.governorateValue) {
+                                  beneficiaryForm.setValue('governorate', loc.governorateValue);
+                                }
+                                if (loc.address || loc.district) {
+                                  beneficiaryForm.setValue('address', loc.district || loc.address);
+                                }
+                              }}
+                              size="sm"
+                              className="w-full"
+                            />
+                            <div className="space-y-2">
+                              <Label htmlFor="ben-address">العنوان</Label>
+                              <div className="relative">
+                                <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input id="ben-address" placeholder="عنوانك التفصيلي" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...beneficiaryForm.register('address')} />
+                              </div>
+                              {beneficiaryForm.formState.errors.address && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.address.message}</p>}
                             </div>
-                            {beneficiaryForm.formState.errors.confirmPassword && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.confirmPassword.message}</p>}
+                            <div className="space-y-2">
+                              <Label htmlFor="ben-referral">كود الإحالة (اختياري)</Label>
+                              <Input id="ben-referral" placeholder="AF-XXXXXX" className="text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('referralCode')} />
+                            </div>
                           </div>
+
+                          {/* Security section */}
+                          <div className="bg-gradient-to-l from-amber-500/5 via-transparent to-amber-500/5 rounded-2xl p-4 border border-amber-500/10 space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Lock className="w-4 h-4 text-amber-500" />
+                              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">الأمان</span>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="ben-password">كلمة المرور</Label>
+                              <div className="relative">
+                                <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input id="ben-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('password')} />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                              </div>
+                              <PasswordStrengthBar password={beneficiaryPasswordValue} />
+                              {beneficiaryForm.formState.errors.password && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.password.message}</p>}
+                            </div>
+                          </div>
+
                           <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                            <Button type="submit" className="w-full h-12 text-base font-bold rounded-xl bg-gradient-to-l from-purple-500 to-purple-700 hover:opacity-90 text-white shadow-lg" disabled={isLoading}>
+                            <Button type="submit" className="w-full h-12 text-base font-bold rounded-xl bg-gradient-to-l from-purple-500 to-purple-700 hover:opacity-90 text-white shadow-lg transition-all duration-300" disabled={isLoading}>
                               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5" />إنشاء حساب مستفيد</span>}
                             </Button>
                           </motion.div>
@@ -1133,69 +1249,123 @@ function LoginPageContent() {
                           onSubmit={nurseForm.handleSubmit(onNurseRegister)}
                           className="space-y-4"
                         >
-                          <div className="space-y-2">
-                            <Label htmlFor="nurse-name">الاسم الكامل</Label>
-                            <div className="relative">
-                              <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input id="nurse-name" placeholder="الاسم الكامل" className="pr-10 text-right h-11 rounded-xl" {...nurseForm.register('name')} />
+                          {/* Personal info section */}
+                          <div className="bg-gradient-to-l from-sky-500/5 via-transparent to-sky-500/5 rounded-2xl p-4 border border-sky-500/10 space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                              <User className="w-4 h-4 text-sky-500" />
+                              <span className="text-xs font-semibold text-sky-600 dark:text-sky-400">المعلومات الشخصية</span>
                             </div>
-                            {nurseForm.formState.errors.name && <p className="text-xs text-destructive">{nurseForm.formState.errors.name.message}</p>}
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="nurse-phone">رقم الهاتف</Label>
-                            <div className="relative">
-                              <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input id="nurse-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-11 rounded-xl" dir="ltr" {...nurseForm.register('phone')} />
+                            <div className="space-y-2">
+                              <Label htmlFor="nurse-name">الاسم الرباعي</Label>
+                              <motion.div
+                                className="relative"
+                                animate={nurseNameShake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
+                                transition={{ duration: 0.5, ease: 'easeInOut' }}
+                              >
+                                <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                  id="nurse-name"
+                                  placeholder="الاسم الرباعي (أربعة أجزاء)"
+                                  className={cn(
+                                    'pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]',
+                                    nurseNameShake && 'border-red-500 focus:border-red-500'
+                                  )}
+                                  {...nurseForm.register('name')}
+                                />
+                              </motion.div>
+                              {nurseNameWarning && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="flex items-center gap-1.5"
+                                >
+                                  <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                                  <p className="text-xs text-red-500 font-medium">يجب أن تكتب اسمك الرباعي (أربعة أجزاء)</p>
+                                </motion.div>
+                              )}
+                              {nurseForm.formState.errors.name && !nurseNameWarning && <p className="text-xs text-destructive">{nurseForm.formState.errors.name.message}</p>}
                             </div>
-                            {nurseForm.formState.errors.phone && <p className="text-xs text-destructive">{nurseForm.formState.errors.phone.message}</p>}
-                          </div>
-                          <div className="space-y-2">
-                            <Label>التخصص</Label>
-                            <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}>
-                              <SelectTrigger className="h-11 rounded-xl"><SelectValue placeholder="اختر التخصص" /></SelectTrigger>
-                              <SelectContent>{specializations.map((spec) => (<SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>))}</SelectContent>
-                            </Select>
-                            {nurseForm.formState.errors.specialization && <p className="text-xs text-destructive">{nurseForm.formState.errors.specialization.message}</p>}
-                          </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="nurse-license">رقم الترخيص</Label>
-                            <Input id="nurse-license" placeholder="رقم ترخيص المهنة" className="text-right h-11 rounded-xl" {...nurseForm.register('licenseNumber')} />
-                            {nurseForm.formState.errors.licenseNumber && <p className="text-xs text-destructive">{nurseForm.formState.errors.licenseNumber.message}</p>}
-                          </div>
-                          {/* GPS Location Detection */}
-                          <GpsLocationButton
-                            onLocationDetected={(loc) => {
-                              if (loc.governorate && loc.governorateValue) {
-                                nurseForm.setValue('governorate', loc.governorateValue);
-                              }
-                            }}
-                            size="sm"
-                            className="w-full"
-                          />
-                          <div className="space-y-2">
-                            <Label htmlFor="nurse-password">كلمة المرور</Label>
-                            <div className="relative">
-                              <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input id="nurse-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl" dir="ltr" {...nurseForm.register('password')} />
-                              <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                                {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              </button>
+                            <div className="space-y-2">
+                              <Label htmlFor="nurse-phone">رقم الهاتف</Label>
+                              <div className="relative">
+                                <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input id="nurse-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...nurseForm.register('phone')} />
+                              </div>
+                              {nurseForm.formState.errors.phone && <p className="text-xs text-destructive">{nurseForm.formState.errors.phone.message}</p>}
                             </div>
-                            {nurseForm.formState.errors.password && <p className="text-xs text-destructive">{nurseForm.formState.errors.password.message}</p>}
                           </div>
-                          <div className="space-y-2">
-                            <Label htmlFor="nurse-confirm-password">تأكيد كلمة المرور</Label>
-                            <div className="relative">
-                              <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                              <Input id="nurse-confirm-password" type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl" dir="ltr" {...nurseForm.register('confirmPassword')} />
-                              <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                                {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              </button>
+
+                          {/* Professional info section */}
+                          <div className="bg-gradient-to-l from-violet-500/5 via-transparent to-violet-500/5 rounded-2xl p-4 border border-violet-500/10 space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Stethoscope className="w-4 h-4 text-violet-500" />
+                              <span className="text-xs font-semibold text-violet-600 dark:text-violet-400">المعلومات المهنية</span>
                             </div>
-                            {nurseForm.formState.errors.confirmPassword && <p className="text-xs text-destructive">{nurseForm.formState.errors.confirmPassword.message}</p>}
+                            <div className="space-y-2">
+                              <Label>التخصص</Label>
+                              <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}>
+                                <SelectTrigger className="h-11 rounded-xl border-border/50 bg-background/50"><SelectValue placeholder="اختر التخصص" /></SelectTrigger>
+                                <SelectContent>{specializations.map((spec) => (<SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>))}</SelectContent>
+                              </Select>
+                              {nurseForm.formState.errors.specialization && <p className="text-xs text-destructive">{nurseForm.formState.errors.specialization.message}</p>}
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="nurse-license">رقم الترخيص</Label>
+                              <Input id="nurse-license" placeholder="رقم ترخيص المهنة" className="text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...nurseForm.register('licenseNumber')} />
+                              {nurseForm.formState.errors.licenseNumber && <p className="text-xs text-destructive">{nurseForm.formState.errors.licenseNumber.message}</p>}
+                            </div>
                           </div>
+
+                          {/* Location section */}
+                          <div className="bg-gradient-to-l from-emerald-500/5 via-transparent to-emerald-500/5 rounded-2xl p-4 border border-emerald-500/10 space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                              <MapPin className="w-4 h-4 text-emerald-500" />
+                              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">معلومات الموقع</span>
+                            </div>
+                            <GpsLocationButton
+                              onLocationDetected={(loc) => {
+                                if (loc.governorate && loc.governorateValue) {
+                                  nurseForm.setValue('governorate', loc.governorateValue);
+                                }
+                                if (loc.address || loc.district) {
+                                  nurseForm.setValue('address', loc.district || loc.address);
+                                }
+                              }}
+                              size="sm"
+                              className="w-full"
+                            />
+                            <div className="space-y-2">
+                              <Label htmlFor="nurse-address">العنوان التفصيلي</Label>
+                              <div className="relative">
+                                <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input id="nurse-address" placeholder="العنوان التفصيلي" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...nurseForm.register('address')} />
+                              </div>
+                              {nurseForm.formState.errors.address && <p className="text-xs text-destructive">{nurseForm.formState.errors.address.message}</p>}
+                            </div>
+                          </div>
+
+                          {/* Security section */}
+                          <div className="bg-gradient-to-l from-amber-500/5 via-transparent to-amber-500/5 rounded-2xl p-4 border border-amber-500/10 space-y-4">
+                            <div className="flex items-center gap-2 mb-1">
+                              <Lock className="w-4 h-4 text-amber-500" />
+                              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">الأمان</span>
+                            </div>
+                            <div className="space-y-2">
+                              <Label htmlFor="nurse-password">كلمة المرور</Label>
+                              <div className="relative">
+                                <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input id="nurse-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...nurseForm.register('password')} />
+                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
+                                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                </button>
+                              </div>
+                              <PasswordStrengthBar password={nursePasswordValue} />
+                              {nurseForm.formState.errors.password && <p className="text-xs text-destructive">{nurseForm.formState.errors.password.message}</p>}
+                            </div>
+                          </div>
+
                           <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                            <Button type="submit" className="w-full h-12 text-base font-bold rounded-xl bg-gradient-to-l from-sky-500 to-sky-700 hover:opacity-90 text-white shadow-lg" disabled={isLoading}>
+                            <Button type="submit" className="w-full h-12 text-base font-bold rounded-xl bg-gradient-to-l from-sky-500 to-sky-700 hover:opacity-90 text-white shadow-lg transition-all duration-300" disabled={isLoading}>
                               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5" />إنشاء حساب ممرض/ـة</span>}
                             </Button>
                           </motion.div>
@@ -1287,7 +1457,7 @@ function LoginPageContent() {
                         <Label htmlFor="m-login-phone" className="text-xs font-medium">رقم الهاتف</Label>
                         <div className="relative">
                           <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input id="m-login-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-muted/20" dir="ltr" {...loginForm.register('phone')} />
+                          <Input id="m-login-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-muted/20 transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...loginForm.register('phone')} />
                         </div>
                         {loginForm.formState.errors.phone && <p className="text-xs text-destructive">{loginForm.formState.errors.phone.message}</p>}
                       </div>
@@ -1297,11 +1467,12 @@ function LoginPageContent() {
                         <Label htmlFor="m-login-password" className="text-xs font-medium">كلمة المرور</Label>
                         <div className="relative">
                           <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input id="m-login-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl border-border/50 bg-muted/20" dir="ltr" {...loginForm.register('password')} />
+                          <Input id="m-login-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl border-border/50 bg-muted/20 transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...loginForm.register('password')} />
                           <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
                             {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                           </button>
                         </div>
+                        <PasswordStrengthBar password={loginPasswordValue} />
                         {loginForm.formState.errors.password && <p className="text-xs text-destructive">{loginForm.formState.errors.password.message}</p>}
                       </div>
 
@@ -1316,7 +1487,7 @@ function LoginPageContent() {
 
                       {/* Submit */}
                       <motion.div whileTap={{ scale: 0.98 }}>
-                        <Button type="submit" className="w-full h-11 text-sm font-bold rounded-xl shadow-lg bg-gradient-to-l from-purple-600 via-purple-700 to-sky-700 hover:opacity-90 text-white" disabled={isLoading}>
+                        <Button type="submit" className="w-full h-11 text-sm font-bold rounded-xl shadow-lg bg-gradient-to-l from-purple-600 via-purple-700 to-sky-700 hover:opacity-90 text-white transition-all duration-300" disabled={isLoading}>
                           {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2">تسجيل الدخول <ArrowLeft className="w-4 h-4" /></span>}
                         </Button>
                       </motion.div>
@@ -1335,12 +1506,20 @@ function LoginPageContent() {
                           className={cn(
                             'rounded-xl p-3 text-center transition-all duration-300 border-2',
                             registerRole === 'beneficiary'
-                              ? 'border-purple-500/50 bg-purple-500/10 text-purple-700 dark:text-purple-400 shadow-md'
+                              ? 'border-purple-500/50 bg-gradient-to-br from-purple-500/10 to-purple-600/5 text-purple-700 dark:text-purple-400 shadow-md shadow-purple-500/10'
                               : 'border-border/50 bg-muted/30 text-muted-foreground'
                           )}
                         >
-                          <User className="w-5 h-5 mx-auto mb-1" />
+                          <div className={cn(
+                            'w-8 h-8 rounded-lg mx-auto mb-1 flex items-center justify-center transition-all duration-300',
+                            registerRole === 'beneficiary'
+                              ? 'bg-gradient-to-br from-purple-500 to-purple-700 text-white'
+                              : 'bg-muted text-muted-foreground'
+                          )}>
+                            <User className="w-4 h-4" />
+                          </div>
                           <span className="text-xs font-bold">مستفيد</span>
+                          <p className="text-[9px] text-muted-foreground mt-0.5">رعاية منزلية</p>
                         </motion.button>
                         <motion.button
                           type="button"
@@ -1349,12 +1528,20 @@ function LoginPageContent() {
                           className={cn(
                             'rounded-xl p-3 text-center transition-all duration-300 border-2',
                             registerRole === 'nurse'
-                              ? 'border-sky-500/50 bg-sky-500/10 text-sky-700 dark:text-sky-400 shadow-md'
+                              ? 'border-sky-500/50 bg-gradient-to-br from-sky-500/10 to-sky-600/5 text-sky-700 dark:text-sky-400 shadow-md shadow-sky-500/10'
                               : 'border-border/50 bg-muted/30 text-muted-foreground'
                           )}
                         >
-                          <Stethoscope className="w-5 h-5 mx-auto mb-1" />
+                          <div className={cn(
+                            'w-8 h-8 rounded-lg mx-auto mb-1 flex items-center justify-center transition-all duration-300',
+                            registerRole === 'nurse'
+                              ? 'bg-gradient-to-br from-sky-500 to-sky-700 text-white'
+                              : 'bg-muted text-muted-foreground'
+                          )}>
+                            <Stethoscope className="w-4 h-4" />
+                          </div>
                           <span className="text-xs font-bold">ممرض/ـة</span>
+                          <p className="text-[9px] text-muted-foreground mt-0.5">ممرض معتمد</p>
                         </motion.button>
                       </div>
                     </div>
@@ -1362,50 +1549,69 @@ function LoginPageContent() {
                     <AnimatePresence mode="wait">
                       {registerRole === 'beneficiary' && (
                         <motion.form key="m-beneficiary-form" initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 15 }} transition={{ duration: 0.2 }} onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)} className="space-y-3">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-ben-name" className="text-xs">الاسم الكامل</Label>
-                            <div className="relative"><User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-name" placeholder="الاسم الكامل" className="pr-10 text-right h-10 rounded-xl" {...beneficiaryForm.register('name')} /></div>
-                            {beneficiaryForm.formState.errors.name && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.name.message}</p>}
+                          {/* Personal info */}
+                          <div className="bg-gradient-to-l from-purple-500/5 via-transparent to-purple-500/5 rounded-xl p-3 border border-purple-500/10 space-y-3">
+                            <div className="flex items-center gap-1.5">
+                              <User className="w-3.5 h-3.5 text-purple-500" />
+                              <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">المعلومات الشخصية</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="m-ben-name" className="text-xs">الاسم الكامل</Label>
+                              <div className="relative"><User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-name" placeholder="الاسم الكامل" className="pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...beneficiaryForm.register('name')} /></div>
+                              {beneficiaryForm.formState.errors.name && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.name.message}</p>}
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="m-ben-phone" className="text-xs">رقم الهاتف</Label>
+                              <div className="relative"><Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('phone')} /></div>
+                              {beneficiaryForm.formState.errors.phone && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.phone.message}</p>}
+                            </div>
                           </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-ben-phone" className="text-xs">رقم الهاتف</Label>
-                            <div className="relative"><Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-10 rounded-xl" dir="ltr" {...beneficiaryForm.register('phone')} /></div>
-                            {beneficiaryForm.formState.errors.phone && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.phone.message}</p>}
+
+                          {/* Location info */}
+                          <div className="bg-gradient-to-l from-emerald-500/5 via-transparent to-emerald-500/5 rounded-xl p-3 border border-emerald-500/10 space-y-3">
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-500" />
+                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">معلومات الموقع</span>
+                            </div>
+                            <GpsLocationButton
+                              onLocationDetected={(loc) => {
+                                if (loc.governorate && loc.governorateValue) {
+                                  beneficiaryForm.setValue('governorate', loc.governorateValue);
+                                }
+                                if (loc.address || loc.district) {
+                                  beneficiaryForm.setValue('address', loc.district || loc.address);
+                                }
+                              }}
+                              size="sm"
+                              className="w-full"
+                            />
+                            <div className="space-y-1.5">
+                              <Label htmlFor="m-ben-address" className="text-xs">العنوان</Label>
+                              <div className="relative"><MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-address" placeholder="عنوانك التفصيلي" className="pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...beneficiaryForm.register('address')} /></div>
+                              {beneficiaryForm.formState.errors.address && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.address.message}</p>}
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="m-ben-referral" className="text-xs">كود الإحالة (اختياري)</Label>
+                              <Input id="m-ben-referral" placeholder="AF-XXXXXX" className="text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('referralCode')} />
+                            </div>
                           </div>
-                          {/* GPS Location Detection */}
-                          <GpsLocationButton
-                            onLocationDetected={(loc) => {
-                              if (loc.governorate && loc.governorateValue) {
-                                beneficiaryForm.setValue('governorate', loc.governorateValue);
-                              }
-                              if (loc.address || loc.district) {
-                                beneficiaryForm.setValue('address', loc.district || loc.address);
-                              }
-                            }}
-                            size="sm"
-                            className="w-full"
-                          />
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-ben-address" className="text-xs">العنوان</Label>
-                            <div className="relative"><MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-address" placeholder="عنوانك التفصيلي" className="pr-10 text-right h-10 rounded-xl" {...beneficiaryForm.register('address')} /></div>
-                            {beneficiaryForm.formState.errors.address && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.address.message}</p>}
+
+                          {/* Security */}
+                          <div className="bg-gradient-to-l from-amber-500/5 via-transparent to-amber-500/5 rounded-xl p-3 border border-amber-500/10 space-y-3">
+                            <div className="flex items-center gap-1.5">
+                              <Lock className="w-3.5 h-3.5 text-amber-500" />
+                              <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">الأمان</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="m-ben-password" className="text-xs">كلمة المرور</Label>
+                              <div className="relative"><Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('password')} /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
+                              <PasswordStrengthBar password={beneficiaryPasswordValue} />
+                              {beneficiaryForm.formState.errors.password && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.password.message}</p>}
+                            </div>
                           </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-ben-referral" className="text-xs">كود الإحالة (اختياري)</Label>
-                            <Input id="m-ben-referral" placeholder="AF-XXXXXX" className="text-right h-10 rounded-xl" dir="ltr" {...beneficiaryForm.register('referralCode')} />
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-ben-password" className="text-xs">كلمة المرور</Label>
-                            <div className="relative"><Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-10 rounded-xl" dir="ltr" {...beneficiaryForm.register('password')} /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
-                            {beneficiaryForm.formState.errors.password && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.password.message}</p>}
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-ben-confirm" className="text-xs">تأكيد كلمة المرور</Label>
-                            <div className="relative"><Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-confirm" type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-10 rounded-xl" dir="ltr" {...beneficiaryForm.register('confirmPassword')} /><button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
-                            {beneficiaryForm.formState.errors.confirmPassword && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.confirmPassword.message}</p>}
-                          </div>
+
                           <motion.div whileTap={{ scale: 0.98 }}>
-                            <Button type="submit" className="w-full h-11 text-sm font-bold rounded-xl bg-gradient-to-l from-purple-500 to-purple-700 hover:opacity-90 text-white shadow-lg" disabled={isLoading}>
+                            <Button type="submit" className="w-full h-11 text-sm font-bold rounded-xl bg-gradient-to-l from-purple-500 to-purple-700 hover:opacity-90 text-white shadow-lg transition-all duration-300" disabled={isLoading}>
                               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />إنشاء حساب مستفيد</span>}
                             </Button>
                           </motion.div>
@@ -1414,48 +1620,108 @@ function LoginPageContent() {
 
                       {registerRole === 'nurse' && (
                         <motion.form key="m-nurse-form" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }} transition={{ duration: 0.2 }} onSubmit={nurseForm.handleSubmit(onNurseRegister)} className="space-y-3">
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-nurse-name" className="text-xs">الاسم الكامل</Label>
-                            <div className="relative"><User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-name" placeholder="الاسم الكامل" className="pr-10 text-right h-10 rounded-xl" {...nurseForm.register('name')} /></div>
-                            {nurseForm.formState.errors.name && <p className="text-xs text-destructive">{nurseForm.formState.errors.name.message}</p>}
+                          {/* Personal info */}
+                          <div className="bg-gradient-to-l from-sky-500/5 via-transparent to-sky-500/5 rounded-xl p-3 border border-sky-500/10 space-y-3">
+                            <div className="flex items-center gap-1.5">
+                              <User className="w-3.5 h-3.5 text-sky-500" />
+                              <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400">المعلومات الشخصية</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="m-nurse-name" className="text-xs">الاسم الرباعي</Label>
+                              <motion.div
+                                className="relative"
+                                animate={nurseNameShake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
+                                transition={{ duration: 0.5, ease: 'easeInOut' }}
+                              >
+                                <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                                <Input
+                                  id="m-nurse-name"
+                                  placeholder="الاسم الرباعي (أربعة أجزاء)"
+                                  className={cn(
+                                    'pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]',
+                                    nurseNameShake && 'border-red-500 focus:border-red-500'
+                                  )}
+                                  {...nurseForm.register('name')}
+                                />
+                              </motion.div>
+                              {nurseNameWarning && (
+                                <motion.div
+                                  initial={{ opacity: 0, y: -5 }}
+                                  animate={{ opacity: 1, y: 0 }}
+                                  className="flex items-center gap-1.5"
+                                >
+                                  <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                                  <p className="text-xs text-red-500 font-medium">يجب أن تكتب اسمك الرباعي (أربعة أجزاء)</p>
+                                </motion.div>
+                              )}
+                              {nurseForm.formState.errors.name && !nurseNameWarning && <p className="text-xs text-destructive">{nurseForm.formState.errors.name.message}</p>}
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="m-nurse-phone" className="text-xs">رقم الهاتف</Label>
+                              <div className="relative"><Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...nurseForm.register('phone')} /></div>
+                              {nurseForm.formState.errors.phone && <p className="text-xs text-destructive">{nurseForm.formState.errors.phone.message}</p>}
+                            </div>
                           </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-nurse-phone" className="text-xs">رقم الهاتف</Label>
-                            <div className="relative"><Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-10 rounded-xl" dir="ltr" {...nurseForm.register('phone')} /></div>
-                            {nurseForm.formState.errors.phone && <p className="text-xs text-destructive">{nurseForm.formState.errors.phone.message}</p>}
+
+                          {/* Professional info */}
+                          <div className="bg-gradient-to-l from-violet-500/5 via-transparent to-violet-500/5 rounded-xl p-3 border border-violet-500/10 space-y-3">
+                            <div className="flex items-center gap-1.5">
+                              <Stethoscope className="w-3.5 h-3.5 text-violet-500" />
+                              <span className="text-[10px] font-semibold text-violet-600 dark:text-violet-400">المعلومات المهنية</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs">التخصص</Label>
+                              <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}><SelectTrigger className="h-10 rounded-xl border-border/50 bg-background/50"><SelectValue placeholder="اختر التخصص" /></SelectTrigger><SelectContent>{specializations.map((spec) => (<SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>))}</SelectContent></Select>
+                              {nurseForm.formState.errors.specialization && <p className="text-xs text-destructive">{nurseForm.formState.errors.specialization.message}</p>}
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="m-nurse-license" className="text-xs">رقم الترخيص</Label>
+                              <Input id="m-nurse-license" placeholder="رقم ترخيص المهنة" className="text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...nurseForm.register('licenseNumber')} />
+                              {nurseForm.formState.errors.licenseNumber && <p className="text-xs text-destructive">{nurseForm.formState.errors.licenseNumber.message}</p>}
+                            </div>
                           </div>
-                          <div className="space-y-1.5">
-                            <Label className="text-xs">التخصص</Label>
-                            <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}><SelectTrigger className="h-10 rounded-xl"><SelectValue placeholder="اختر التخصص" /></SelectTrigger><SelectContent>{specializations.map((spec) => (<SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>))}</SelectContent></Select>
-                            {nurseForm.formState.errors.specialization && <p className="text-xs text-destructive">{nurseForm.formState.errors.specialization.message}</p>}
+
+                          {/* Location info */}
+                          <div className="bg-gradient-to-l from-emerald-500/5 via-transparent to-emerald-500/5 rounded-xl p-3 border border-emerald-500/10 space-y-3">
+                            <div className="flex items-center gap-1.5">
+                              <MapPin className="w-3.5 h-3.5 text-emerald-500" />
+                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">معلومات الموقع</span>
+                            </div>
+                            <GpsLocationButton
+                              onLocationDetected={(loc) => {
+                                if (loc.governorate && loc.governorateValue) {
+                                  nurseForm.setValue('governorate', loc.governorateValue);
+                                }
+                                if (loc.address || loc.district) {
+                                  nurseForm.setValue('address', loc.district || loc.address);
+                                }
+                              }}
+                              size="sm"
+                              className="w-full"
+                            />
+                            <div className="space-y-1.5">
+                              <Label htmlFor="m-nurse-address" className="text-xs">العنوان التفصيلي</Label>
+                              <div className="relative"><MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-address" placeholder="العنوان التفصيلي" className="pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...nurseForm.register('address')} /></div>
+                              {nurseForm.formState.errors.address && <p className="text-xs text-destructive">{nurseForm.formState.errors.address.message}</p>}
+                            </div>
                           </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-nurse-license" className="text-xs">رقم الترخيص</Label>
-                            <Input id="m-nurse-license" placeholder="رقم ترخيص المهنة" className="text-right h-10 rounded-xl" {...nurseForm.register('licenseNumber')} />
-                            {nurseForm.formState.errors.licenseNumber && <p className="text-xs text-destructive">{nurseForm.formState.errors.licenseNumber.message}</p>}
+
+                          {/* Security */}
+                          <div className="bg-gradient-to-l from-amber-500/5 via-transparent to-amber-500/5 rounded-xl p-3 border border-amber-500/10 space-y-3">
+                            <div className="flex items-center gap-1.5">
+                              <Lock className="w-3.5 h-3.5 text-amber-500" />
+                              <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">الأمان</span>
+                            </div>
+                            <div className="space-y-1.5">
+                              <Label htmlFor="m-nurse-password" className="text-xs">كلمة المرور</Label>
+                              <div className="relative"><Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...nurseForm.register('password')} /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
+                              <PasswordStrengthBar password={nursePasswordValue} />
+                              {nurseForm.formState.errors.password && <p className="text-xs text-destructive">{nurseForm.formState.errors.password.message}</p>}
+                            </div>
                           </div>
-                          {/* GPS Location Detection */}
-                          <GpsLocationButton
-                            onLocationDetected={(loc) => {
-                              if (loc.governorate && loc.governorateValue) {
-                                nurseForm.setValue('governorate', loc.governorateValue);
-                              }
-                            }}
-                            size="sm"
-                            className="w-full"
-                          />
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-nurse-password" className="text-xs">كلمة المرور</Label>
-                            <div className="relative"><Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-10 rounded-xl" dir="ltr" {...nurseForm.register('password')} /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
-                            {nurseForm.formState.errors.password && <p className="text-xs text-destructive">{nurseForm.formState.errors.password.message}</p>}
-                          </div>
-                          <div className="space-y-1.5">
-                            <Label htmlFor="m-nurse-confirm" className="text-xs">تأكيد كلمة المرور</Label>
-                            <div className="relative"><Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-confirm" type={showConfirmPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-10 rounded-xl" dir="ltr" {...nurseForm.register('confirmPassword')} /><button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
-                            {nurseForm.formState.errors.confirmPassword && <p className="text-xs text-destructive">{nurseForm.formState.errors.confirmPassword.message}</p>}
-                          </div>
+
                           <motion.div whileTap={{ scale: 0.98 }}>
-                            <Button type="submit" className="w-full h-11 text-sm font-bold rounded-xl bg-gradient-to-l from-sky-500 to-sky-700 hover:opacity-90 text-white shadow-lg" disabled={isLoading}>
+                            <Button type="submit" className="w-full h-11 text-sm font-bold rounded-xl bg-gradient-to-l from-sky-500 to-sky-700 hover:opacity-90 text-white shadow-lg transition-all duration-300" disabled={isLoading}>
                               {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />إنشاء حساب ممرض/ـة</span>}
                             </Button>
                           </motion.div>

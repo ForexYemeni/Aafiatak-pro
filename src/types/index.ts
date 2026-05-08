@@ -806,6 +806,7 @@ export interface RegisterNurseRequest {
   password: string;
   specialization: string;
   licenseNumber: string;
+  address?: string;
   nationalId?: string;
   city?: string;
   governorate?: YemenGovernorate;
