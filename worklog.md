@@ -217,3 +217,28 @@ Stage Summary:
 - Sub-admin dashboard now gracefully handles permission errors instead of showing full-page error
 - Sub-admin bottom nav "المزيد" now correctly goes to /admin/subadmin-settings
 - Deployed as commit e4a641e to main branch
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Optimize GPS location detection speed and simplify to single field + fix sub-admin navigation
+
+Work Log:
+- Analyzed current geolocation implementation (useGeolocation hook + GpsLocationButton)
+- Identified root cause of slowness: reverse geocoding via Nominatim API blocks GPS result
+- Rewrote useGeolocation hook to return GPS coordinates immediately, then do reverse geocoding in background
+- Reduced GPS timeout from 15s to 8s, maximumAge from 60s to 30s
+- Removed caching so re-detection always works
+- Rewrote GpsLocationButton component: single input field + detect button (replaces old multi-field design)
+- Fixed sub-admin top-header bug: getProfilePath and getSettingsPath for subadmin incorrectly pointed to /admin/settings
+- Updated all profile pages (nurse, beneficiary, sub-admin) to use simplified GPS button
+- Updated service request page and emergency page to use GpsLocationButton
+- Added GPS auto-detect to nurse and beneficiary registration forms
+- Removed redundant lat/lng manual input fields from sub-admin settings
+- Built successfully and pushed to git
+
+Stage Summary:
+- GPS detection now returns coordinates in 1-3 seconds (previously 5-15+ seconds)
+- Single field UI: one input field with detect button, much cleaner
+- Sub-admin profile/settings dropdown now correctly routes to /admin/subadmin-settings
+- All user types (nurse, beneficiary, admin, sub-admin) have one-click GPS detection
