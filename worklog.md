@@ -242,3 +242,25 @@ Stage Summary:
 - Single field UI: one input field with detect button, much cleaner
 - Sub-admin profile/settings dropdown now correctly routes to /admin/subadmin-settings
 - All user types (nurse, beneficiary, admin, sub-admin) have one-click GPS detection
+---
+Task ID: 1
+Agent: main
+Task: Show nurse details (name, phone, location) to beneficiary when clicking track on orders
+
+Work Log:
+- Read beneficiary orders page, tracking page, and all related APIs
+- Identified that orders list API was NOT populating nurse/service data
+- Identified that tracking API was missing nurse phone, rating, specialization, and ETA
+- Fixed GET /api/beneficiary/orders to batch-fetch nurse and service data for all orders
+- Fixed GET /api/beneficiary/tracking/[nurseId] to return nurse phone, rating, specialization, ETA, and proper location format
+- Enhanced beneficiary orders page to show nurse phone, call/chat/track buttons for assigned/accepted/in_progress orders
+- Enhanced tracking page with prominent nurse info card including name, phone, specialization, online status, and contact buttons
+- Enhanced order detail page with nurse phone display, online status, and track button for assigned status too
+- Added "waiting for nurse assignment" card when order is pending
+- Deployed to Vercel production
+
+Stage Summary:
+- Orders list API now returns nurseName, nursePhone, nurseRating, nurseIsOnline, serviceName for each order
+- Tracking API now returns nurseName, nursePhone, nurseRating, nurseSpecialization, isOnline, location, eta
+- Beneficiary can now see nurse details and directly call/chat/track from orders list and order detail pages
+- Track button available for assigned, accepted, and in_progress statuses
