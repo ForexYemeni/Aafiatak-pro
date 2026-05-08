@@ -426,23 +426,23 @@ export default function AdminDashboardPage() {
                           onClick={() => openOrderDetails(order)}
                           className="w-full text-right p-3 rounded-xl border border-border hover:border-admin/30 hover:bg-admin/5 transition-all"
                         >
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-lg bg-admin/10 flex items-center justify-center">
+                          <div className="flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div className="w-9 h-9 rounded-lg bg-admin/10 flex items-center justify-center shrink-0">
                                 <ClipboardList className="w-4 h-4 text-admin" />
                               </div>
-                              <div>
-                                <div className="flex items-center gap-2">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 flex-wrap">
                                   <span className="font-mono text-xs font-bold text-admin">#{(order.id || order._id?.toString() || '').slice(-6).toUpperCase()}</span>
                                   <BadgeStatus status={order.status} size="sm" />
                                   {order.isEmergency && <Badge variant="destructive" className="text-[9px] px-1 py-0">طوارئ</Badge>}
                                 </div>
-                                <p className="text-xs text-muted-foreground mt-0.5">
+                                <p className="text-xs text-muted-foreground mt-0.5 truncate">
                                   {order.beneficiaryName || 'غير معروف'} • {order.serviceName || 'خدمة'}
                                 </p>
                               </div>
                             </div>
-                            <div className="text-left">
+                            <div className="text-left shrink-0">
                               <Currency amount={order.totalPrice || 0} className="text-sm font-bold" />
                               <p className="text-[10px] text-muted-foreground">
                                 {order.beneficiaryPhone && <span dir="ltr">{order.beneficiaryPhone}</span>}
@@ -787,13 +787,13 @@ export default function AdminDashboardPage() {
             <div className="space-y-4">
               {/* Beneficiary Info */}
               <div className="flex items-center gap-3 p-3 glass rounded-xl">
-                <Avatar className="w-12 h-12">
+                <Avatar className="w-12 h-12 shrink-0">
                   <AvatarFallback className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
                     <User className="w-5 h-5" />
                   </AvatarFallback>
                 </Avatar>
-                <div className="flex-1">
-                  <p className="font-semibold">{selectedOrder.beneficiaryName || 'غير معروف'}</p>
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold truncate">{selectedOrder.beneficiaryName || 'غير معروف'}</p>
                   {selectedOrder.beneficiaryPhone && (
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-sm text-muted-foreground">{selectedOrder.beneficiaryPhone}</span>
@@ -812,7 +812,7 @@ export default function AdminDashboardPage() {
                     <Stethoscope className="w-3.5 h-3.5" />
                     <p className="text-xs">الخدمة</p>
                   </div>
-                  <p className="text-sm font-medium">{selectedOrder.serviceName || 'خدمة'}</p>
+                  <p className="text-sm font-medium break-words">{selectedOrder.serviceName || 'خدمة'}</p>
                 </div>
                 <div className="glass rounded-xl p-3">
                   <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
@@ -826,7 +826,7 @@ export default function AdminDashboardPage() {
                     <User className="w-3.5 h-3.5" />
                     <p className="text-xs">الممرض/ـة</p>
                   </div>
-                  <p className="text-sm font-medium">{selectedOrder.nurseName || 'غير معيَّن'}</p>
+                  <p className="text-sm font-medium break-words">{selectedOrder.nurseName || 'غير معيَّن'}</p>
                 </div>
                 <div className="glass rounded-xl p-3">
                   <div className="flex items-center gap-1.5 text-muted-foreground mb-1">

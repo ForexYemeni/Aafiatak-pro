@@ -202,7 +202,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="end" sideOffset={8} dir="rtl">
+      <PopoverContent className="w-80 p-0" align="start" sideOffset={8} dir="rtl">
         <div className="flex items-center justify-between p-4">
           <h3 className="font-semibold text-sm">الإشعارات</h3>
           <div className="flex items-center gap-2">
