@@ -108,6 +108,7 @@ export async function POST(request: NextRequest) {
     }, { status: 201 });
   } catch (error) {
     console.error('[ADMIN SUBADMINS CREATE ERROR]', error);
-    return createErrorResponse('حدث خطأ أثناء إنشاء المشرف', 500, 'INTERNAL_ERROR');
+    const message = error instanceof Error ? error.message : 'حدث خطأ أثناء إنشاء المشرف';
+    return createErrorResponse(message, 500, 'INTERNAL_ERROR');
   }
 }
