@@ -4,6 +4,7 @@
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Beneficiary, Nurse, Service } from '@/models/mongoose';
+import PaymentMethod from '@/models/PaymentMethod';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
@@ -104,25 +105,40 @@ export async function GET(request: NextRequest) {
     const nurseIds = [...new Set(orders.map((o: any) => o.nurseId?.toString()).filter(Boolean))];
     const serviceIds = [...new Set(orders.map((o: any) => o.serviceId?.toString()).filter(Boolean))];
 
-    const [beneficiaries, nurses, services] = await Promise.all([
+    // Collect payment method IDs for batch lookup
+    const paymentMethodIds = [...new Set(orders.map((o: any) => o.paymentMethodId?.toString()).filter(Boolean))];
+
+    const [beneficiaries, nurses, services, paymentMethods] = await Promise.all([
       Beneficiary.find({ _id: { $in: beneficiaryIds } }).select('name phone').lean(),
       Nurse.find({ _id: { $in: nurseIds } }).select('name phone').lean(),
       Service.find({ _id: { $in: serviceIds } }).select('nameAr').lean(),
+      paymentMethodIds.length > 0
+        ? PaymentMethod.find({ _id: { $in: paymentMethodIds } }).select('nameAr nameEn type walletType exchangeType accountName accountNumber instructions').lean()
+        : [],
     ]);
 
     const beneficiaryMap = new Map(beneficiaries.map((b: any) => [b._id.toString(), b]));
     const nurseMap = new Map(nurses.map((n: any) => [n._id.toString(), n]));
     const serviceMap = new Map(services.map((s: any) => [s._id.toString(), s]));
+    const paymentMethodMap = new Map(paymentMethods.map((p: any) => [p._id.toString(), p]));
 
-    const populatedOrders = orders.map((o: any) => ({
-      ...o,
-      id: o._id.toString(),
-      beneficiaryName: beneficiaryMap.get(o.beneficiaryId?.toString())?.name || 'غير معروف',
-      beneficiaryPhone: beneficiaryMap.get(o.beneficiaryId?.toString())?.phone || '',
-      nurseName: o.nurseId ? (nurseMap.get(o.nurseId?.toString())?.name || 'غير معروف') : null,
-      nursePhone: o.nurseId ? (nurseMap.get(o.nurseId?.toString())?.phone || '') : '',
-      serviceName: serviceMap.get(o.serviceId?.toString())?.nameAr || 'خدمة غير معروفة',
-    }));
+    const populatedOrders = orders.map((o: any) => {
+      const pm = o.paymentMethodId ? paymentMethodMap.get(o.paymentMethodId.toString()) : null;
+      return {
+        ...o,
+        id: o._id.toString(),
+        beneficiaryName: beneficiaryMap.get(o.beneficiaryId?.toString())?.name || 'غير معروف',
+        beneficiaryPhone: beneficiaryMap.get(o.beneficiaryId?.toString())?.phone || '',
+        nurseName: o.nurseId ? (nurseMap.get(o.nurseId?.toString())?.name || 'غير معروف') : null,
+        nursePhone: o.nurseId ? (nurseMap.get(o.nurseId?.toString())?.phone || '') : '',
+        serviceName: serviceMap.get(o.serviceId?.toString())?.nameAr || 'خدمة غير معروفة',
+        // Detailed payment method info
+        paymentMethodName: pm?.nameAr || null,
+        paymentMethodAccountName: pm?.accountName || null,
+        paymentMethodAccountNumber: pm?.accountNumber || null,
+        paymentMethodInstructions: pm?.instructions || null,
+      };
+    });
 
     return Response.json({
       success: true,
