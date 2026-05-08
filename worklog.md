@@ -341,3 +341,43 @@ Stage Summary:
 - Emergency fee now loads properly for beneficiary via public API
 - Anti-spam protection added for emergency requests
 - Admin emergency management is more professional with nearby nurses API
+---
+Task ID: 1-6
+Agent: Main Agent
+Task: Fix payment methods, service request page, notifications, and order status
+
+Work Log:
+- Updated PaymentMethod model: removed non-Yemeni wallets/exchanges, added 'other' option with customProviderName field
+- Confirmed Yemeni wallets: جيب، جوالي، كاش، ون كاش، فلوسك، سبأ كاش + أخرى
+- Confirmed Yemeni exchanges: النجم، يمن اكسبرس، الامتياز، الحزمي + أخرى
+- Updated admin payments page: new wallet/exchange lists, custom name input for 'other' option
+- Updated admin payment-methods API: updated name maps to only confirmed Yemeni providers
+- Rewrote beneficiary service request page:
+  - Removed "60 دقيقة المدة المتوقعة" display
+  - Emergency fee now fetched from admin settings and shown dynamically
+  - Price updates immediately when emergency checkbox is checked
+  - Step 4 now shows admin-configured payment methods from API
+  - Payment methods grouped by type: cash, wallet deposit, bank transfer
+  - When selecting wallet/bank, shows account details with copy buttons
+  - Added payment proof upload for non-cash methods
+  - After order confirmation, non-cash opens WhatsApp with professional message
+- Fixed notification bell: replaced mock data with real API calls
+  - Connects to /api/notifications endpoint
+  - Polls every 30 seconds for updates
+  - Mark as read / mark all as read functionality
+  - Real-time unread count badge
+- Updated ServiceRequest model: added 'awaiting_payment' status and 'awaiting_confirmation' payment status
+- Updated order creation API:
+  - Non-cash orders start with status 'awaiting_payment' and paymentStatus 'awaiting_confirmation'
+  - Creates admin notifications for new orders
+  - Supports paymentMethodId and hasPaymentProof fields
+- Built and deployed to Vercel successfully
+
+Stage Summary:
+- All Yemeni wallets/exchanges now only show confirmed ones with "أخرى" option
+- Service request no longer shows "60 minutes" duration
+- Emergency pricing updates immediately using admin emergency fee setting
+- Payment methods shown to beneficiary are the ones admin configured
+- Non-cash payments: beneficiary can upload proof + WhatsApp integration
+- Notification bell now works with real API data
+- Deployed to aafiatak-v0-1.vercel.app
