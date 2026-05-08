@@ -410,6 +410,233 @@
 }
 
 /* ============================================================================
+   Ultra-Modern 2025 Login Page Animations
+   ============================================================================ */
+
+@keyframes mesh-float-1 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  25% { transform: translate(50px, -60px) scale(1.1); }
+  50% { transform: translate(-30px, 30px) scale(0.9); }
+  75% { transform: translate(40px, 50px) scale(1.05); }
+}
+
+@keyframes mesh-float-2 {
+  0%, 100% { transform: translate(0, 0) scale(1.05); }
+  25% { transform: translate(-60px, 40px) scale(0.95); }
+  50% { transform: translate(50px, -30px) scale(1.1); }
+  75% { transform: translate(-30px, -50px) scale(1); }
+}
+
+@keyframes mesh-float-3 {
+  0%, 100% { transform: translate(0, 0) scale(0.95); }
+  25% { transform: translate(30px, 50px) scale(1.1); }
+  50% { transform: translate(-50px, -20px) scale(1); }
+  75% { transform: translate(20px, -40px) scale(0.9); }
+}
+
+@keyframes mesh-float-4 {
+  0%, 100% { transform: translate(0, 0) scale(1); }
+  33% { transform: translate(-40px, 60px) scale(1.15); }
+  66% { transform: translate(60px, -40px) scale(0.85); }
+}
+
+@keyframes shimmer-slide {
+  0% { left: -100%; }
+  100% { left: 200%; }
+}
+
+@keyframes gradient-border-rotate {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+@keyframes noise-shift {
+  0%, 100% { transform: translate(0, 0); }
+  10% { transform: translate(-1%, -1%); }
+  20% { transform: translate(1%, 0%); }
+  30% { transform: translate(-1%, 1%); }
+  40% { transform: translate(1%, -1%); }
+  50% { transform: translate(-1%, 0%); }
+  60% { transform: translate(1%, 1%); }
+  70% { transform: translate(0%, -1%); }
+  80% { transform: translate(-1%, 1%); }
+  90% { transform: translate(1%, 0%); }
+}
+
+@keyframes glow-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0px); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes slide-up-over {
+  from { transform: translateY(40px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.mesh-blob-1 {
+  animation: mesh-float-1 20s ease-in-out infinite;
+}
+
+.mesh-blob-2 {
+  animation: mesh-float-2 25s ease-in-out infinite;
+}
+
+.mesh-blob-3 {
+  animation: mesh-float-3 22s ease-in-out infinite;
+}
+
+.mesh-blob-4 {
+  animation: mesh-float-4 18s ease-in-out infinite;
+}
+
+.animate-shimmer-slide {
+  animation: shimmer-slide 3s ease-in-out infinite;
+}
+
+.animate-gradient-border {
+  animation: gradient-border-rotate 4s linear infinite;
+}
+
+.animate-noise {
+  animation: noise-shift 0.5s steps(2) infinite;
+}
+
+.animate-glow-pulse {
+  animation: glow-pulse 2s ease-in-out infinite;
+}
+
+.animate-float-gentle {
+  animation: float-gentle 3s ease-in-out infinite;
+}
+
+.animate-slide-up-over {
+  animation: slide-up-over 0.6s ease-out forwards;
+}
+
+/* Ultra-modern glass card */
+.glass-ultra {
+  background: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.12),
+    0 0 0 1px rgba(255, 255, 255, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.15);
+}
+
+.dark .glass-ultra {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.3),
+    0 0 0 1px rgba(255, 255, 255, 0.03),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* Floating label input */
+.floating-input-group {
+  position: relative;
+}
+
+.floating-input-group input:focus ~ .floating-label,
+.floating-input-group input:not(:placeholder-shown) ~ .floating-label {
+  transform: translateY(-28px) scale(0.82);
+  color: rgba(139, 92, 246, 0.9);
+  background: transparent;
+  padding: 0 4px;
+}
+
+.dark .floating-input-group input:focus ~ .floating-label,
+.dark .floating-input-group input:not(:placeholder-shown) ~ .floating-label {
+  color: rgba(167, 139, 250, 0.9);
+}
+
+.floating-label {
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  font-size: 0.875rem;
+  color: rgba(0, 0, 0, 0.45);
+  z-index: 2;
+}
+
+.dark .floating-label {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+/* Input glow effect */
+.input-glow {
+  transition: all 0.3s ease;
+}
+
+.input-glow:focus {
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.12), 0 0 20px rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.5) !important;
+}
+
+.dark .input-glow:focus {
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15), 0 0 24px rgba(139, 92, 246, 0.1);
+  border-color: rgba(167, 139, 250, 0.5) !important;
+}
+
+/* Shimmer button */
+.shimmer-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.shimmer-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: shimmer-slide 3s ease-in-out infinite;
+}
+
+/* 3D tilt card */
+.tilt-card {
+  transform-style: preserve-3d;
+  transition: transform 0.3s ease;
+}
+
+.tilt-card:hover {
+  transform: perspective(600px) rotateY(-3deg) rotateX(2deg) scale(1.02);
+}
+
+[dir="rtl"] .tilt-card:hover {
+  transform: perspective(600px) rotateY(3deg) rotateX(2deg) scale(1.02);
+}
+
+/* Noise texture overlay */
+.noise-overlay::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  opacity: 0.03;
+  pointer-events: none;
+  z-index: 1;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noiseFilter'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noiseFilter)'/%3E%3C/svg%3E");
+  border-radius: inherit;
+}
+
+/* Modern pill toggle indicator */
+.toggle-indicator {
+  transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ============================================================================
    Leaflet Map Overrides
    ============================================================================ */
 

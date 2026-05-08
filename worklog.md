@@ -103,3 +103,52 @@ Stage Summary:
 - Build passes with no errors
 - No new lint errors introduced
 - Professional redesign includes gradient section grouping, password strength indicator, shake animation for name validation, expanded specializations, and address field for nurses
+---
+
+## Task ID: 1 - Agent: Code Redesign Agent
+
+### Task: Redesign Aafiatak (عافيتك) Login/Register Page - Ultra Modern 2025 Style
+
+### Summary
+Completely redesigned the login/register page from a split-screen layout to an ultra-modern full-screen immersive experience with glassmorphic UI, animated mesh gradient backgrounds, and professional micro-interactions.
+
+### Changes Made
+
+#### 1. `/home/z/my-project/src/app/page.tsx` - Complete Redesign
+- **Removed**: `HeroSection` component (split-screen hero), `MobileHeroHeader` component, `FloatingParticles` component
+- **Removed**: Old split-screen desktop layout, old tab-based form with `Tabs`/`TabsList`/`TabsTrigger` components
+- **Added**: `AnimatedBackground` component - CSS-only animated mesh gradient with organic blobs (no framer-motion for background to avoid hydration issues)
+- **Added**: `FloatingInput` component - Input with floating label animation, glow on focus effect
+- **Added**: `ShimmerButton` component - Animated submit button with shimmer light streak effect
+- **Added**: `ModernToggle` component - Pill-shaped tab switcher with smooth sliding indicator using framer-motion
+- **Added**: `RoleCard` component - 3D tilt effect role selector cards
+- **Added**: `MobileGradientHeader` component - Compact animated gradient header for mobile
+- **Redesigned**: `LoginPageContent` - Full-screen immersive layout with glassmorphic card floating on animated background
+- **Kept**: All business logic (schemas, forms, validation, PostLoginLoadingScreen, PasswordStrengthBar, nurse name shake validation, GPS button, password show/hide toggle, etc.)
+
+#### 2. `/home/z/my-project/src/app/globals.css` - New Animation Classes
+- Added 8 new `@keyframes` animations: `mesh-float-1/2/3/4`, `shimmer-slide`, `gradient-border-rotate`, `noise-shift`, `glow-pulse`, `float-gentle`, `slide-up-over`
+- Added CSS animation utility classes: `.mesh-blob-1/2/3/4`, `.animate-shimmer-slide`, `.animate-gradient-border`, `.animate-noise`, `.animate-glow-pulse`, `.animate-float-gentle`, `.animate-slide-up-over`
+- Added `.glass-ultra` - Ultra-modern glassmorphism card style with deep blur and layered shadows
+- Added `.floating-input-group` / `.floating-label` - Floating label input styles
+- Added `.input-glow` - Focus glow effect for inputs
+- Added `.shimmer-btn` - Shimmer button effect
+- Added `.tilt-card` - 3D tilt card effect
+- Added `.noise-overlay` - Subtle grain/noise texture overlay
+- Added `.toggle-indicator` - Smooth transition for pill toggle
+
+### Design Decisions
+1. **Full-screen animated background** instead of split-screen - more immersive, modern 2025 aesthetic
+2. **CSS-only blob animations** for background - avoids hydration mismatch issues with framer-motion SSR
+3. **Kept framer-motion** for form transitions (AnimatePresence, motion.div) - safe as they're client-side only
+4. **Glassmorphic card** with `backdrop-blur-40px`, conic gradient animated border, and noise texture overlay
+5. **Floating labels** on inputs that animate up when focused/filled - modern UX pattern
+6. **Shimmer buttons** with gradient light streak - professional micro-interaction
+7. **Dark mode native** - entire design is dark-mode first with white text on dark glass cards
+8. **RTL preserved** - all text direction and layout respects Arabic RTL
+
+### Verification
+- ✅ Build succeeds (`npx next build`)
+- ✅ No lint errors in page.tsx (only existing react-hook-form warning)
+- ✅ Dev server running correctly (200 responses)
+- ✅ All functional requirements preserved

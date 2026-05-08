@@ -29,7 +29,6 @@ import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   Select,
   SelectContent,
@@ -225,218 +224,7 @@ function getDashboardPath(role: UserRole): string {
 }
 
 // ============================================================================
-// Floating Particles Component
-// ============================================================================
-
-function FloatingParticles() {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {Array.from({ length: 20 }).map((_, i) => (
-        <motion.div
-          key={i}
-          className="absolute rounded-full bg-white/20 dark:bg-white/10"
-          style={{
-            width: seededRandom(i * 4) * 4 + 2,
-            height: seededRandom(i * 4 + 1) * 4 + 2,
-            left: `${seededRandom(i * 4 + 2) * 100}%`,
-            top: `${seededRandom(i * 4 + 3) * 100}%`,
-          }}
-          animate={{
-            y: [0, -30, 0],
-            x: [0, seededRandom(i * 7) * 20 - 10, 0],
-            opacity: [0.3, 0.8, 0.3],
-          }}
-          transition={{
-            duration: seededRandom(i * 7 + 1) * 4 + 3,
-            repeat: Infinity,
-            ease: 'easeInOut',
-            delay: seededRandom(i * 7 + 2) * 3,
-          }}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ============================================================================
-// Hero Section Component (Right side on desktop)
-// ============================================================================
-
-function HeroSection() {
-  const features = [
-    { icon: Stethoscope, title: 'ممرضون معتمدون', desc: 'ممرضون مرخصون ومعتمدون', color: 'from-sky-400 to-sky-600' },
-    { icon: Heart, title: 'رعاية منزلية', desc: 'خدمات صحية في منزلك', color: 'from-purple-400 to-purple-600' },
-    { icon: Shield, title: 'طوارئ ٢٤/٧', desc: 'خدمة طوارئ على مدار الساعة', color: 'from-red-400 to-red-600' },
-    { icon: MapPin, title: 'تغطية واسعة', desc: 'خدمات في جميع المحافظات', color: 'from-emerald-400 to-emerald-600' },
-  ];
-
-  const trustIndicators = [
-    { icon: Users, text: 'أكثر من ١٠٠٠ ممرض معتمد' },
-    { icon: Clock, text: 'خدمة طوارئ ٢٤/٧' },
-    { icon: Activity, text: 'رعاية صحية متكاملة' },
-  ];
-
-  return (
-    <div className="relative h-full flex flex-col justify-center items-center p-8 lg:p-12 overflow-hidden">
-      {/* Animated gradient mesh background */}
-      <div className="absolute inset-0">
-        <div className="absolute inset-0 bg-gradient-to-br from-purple-600 via-purple-700 to-sky-700 dark:from-purple-900 dark:via-purple-950 dark:to-sky-950" />
-        <motion.div
-          className="absolute top-0 right-0 w-[600px] h-[600px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(168,85,247,0.3) 0%, transparent 70%)' }}
-          animate={{ scale: [1, 1.2, 1], x: [0, -30, 0], y: [0, 20, 0] }}
-          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          className="absolute bottom-0 left-0 w-[500px] h-[500px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(14,165,233,0.3) 0%, transparent 70%)' }}
-          animate={{ scale: [1.1, 0.9, 1.1], x: [0, 30, 0], y: [0, -20, 0] }}
-          transition={{ duration: 10, repeat: Infinity, ease: 'easeInOut' }}
-        />
-        <motion.div
-          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[400px] h-[400px] rounded-full"
-          style={{ background: 'radial-gradient(circle, rgba(16,185,129,0.2) 0%, transparent 70%)' }}
-          animate={{ scale: [1, 1.3, 1] }}
-          transition={{ duration: 12, repeat: Infinity, ease: 'easeInOut' }}
-        />
-      </div>
-
-      <FloatingParticles />
-
-      {/* Content */}
-      <div className="relative z-10 text-center max-w-md">
-        {/* Logo with pulse */}
-        <motion.div
-          initial={{ scale: 0, rotate: -180 }}
-          animate={{ scale: 1, rotate: 0 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
-          className="relative mx-auto mb-6"
-        >
-          <motion.div
-            animate={{ boxShadow: ['0 0 0 0 rgba(168,85,247,0.4)', '0 0 0 20px rgba(168,85,247,0)', '0 0 0 0 rgba(168,85,247,0)'] }}
-            transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' }}
-            className="w-24 h-24 rounded-3xl mx-auto flex items-center justify-center bg-white/20 backdrop-blur-xl border border-white/30 shadow-2xl"
-          >
-            <Heart className="w-12 h-12 text-white" fill="currentColor" />
-          </motion.div>
-        </motion.div>
-
-        {/* Brand name */}
-        <motion.h1
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.4 }}
-          className="text-5xl font-bold text-white mb-3"
-        >
-          عافيتك
-        </motion.h1>
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.5 }}
-          className="text-lg text-white/80 mb-10"
-        >
-          منصة الرعاية الصحية المنزلية في اليمن
-        </motion.p>
-
-        {/* Feature cards */}
-        <div className="grid grid-cols-2 gap-3 mb-10">
-          {features.map((feature, i) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, y: 30, scale: 0.9 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              transition={{ delay: 0.6 + i * 0.12, type: 'spring', stiffness: 200, damping: 20 }}
-              whileHover={{ scale: 1.05, y: -2 }}
-              className="bg-white/10 backdrop-blur-md rounded-2xl p-4 border border-white/20 text-right cursor-default group"
-            >
-              <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center mb-2 bg-gradient-to-br', feature.color, 'shadow-lg group-hover:shadow-xl transition-shadow')}>
-                <feature.icon className="w-5 h-5 text-white" />
-              </div>
-              <p className="text-sm font-semibold text-white">{feature.title}</p>
-              <p className="text-xs text-white/60 mt-0.5">{feature.desc}</p>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Trust indicators */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.2 }}
-          className="space-y-3"
-        >
-          {trustIndicators.map((indicator, i) => (
-            <motion.div
-              key={indicator.text}
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 1.3 + i * 0.1 }}
-              className="flex items-center gap-3 text-white/70 text-sm justify-center"
-            >
-              <indicator.icon className="w-4 h-4 text-white/50" />
-              <span>{indicator.text}</span>
-            </motion.div>
-          ))}
-        </motion.div>
-      </div>
-
-      {/* Floating decorative icons */}
-      <motion.div
-        className="absolute top-[15%] left-[10%] text-white/10"
-        animate={{ y: [0, -15, 0], rotate: [0, 10, 0] }}
-        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
-      >
-        <Stethoscope className="w-12 h-12" />
-      </motion.div>
-      <motion.div
-        className="absolute bottom-[20%] right-[10%] text-white/10"
-        animate={{ y: [0, 10, 0], rotate: [0, -10, 0] }}
-        transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-      >
-        <Heart className="w-10 h-10" />
-      </motion.div>
-      <motion.div
-        className="absolute top-[60%] left-[5%] text-white/10"
-        animate={{ y: [0, -12, 0], rotate: [0, 5, 0] }}
-        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-      >
-        <Shield className="w-11 h-11" />
-      </motion.div>
-    </div>
-  );
-}
-
-// ============================================================================
-// Mobile Hero Header (compact)
-// ============================================================================
-
-function MobileHeroHeader() {
-  return (
-    <motion.div
-      initial={{ opacity: 0, y: -20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="relative overflow-hidden bg-gradient-to-br from-purple-600 via-purple-700 to-sky-700 dark:from-purple-900 dark:via-purple-950 dark:to-sky-950 px-6 pt-10 pb-8 text-center"
-    >
-      <FloatingParticles />
-      <div className="relative z-10">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-          className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center bg-white/20 backdrop-blur-xl border border-white/30 shadow-lg"
-        >
-          <Heart className="w-7 h-7 text-white" fill="currentColor" />
-        </motion.div>
-        <h1 className="text-2xl font-bold text-white">عافيتك</h1>
-        <p className="text-sm text-white/70 mt-1">منصة الرعاية الصحية المنزلية في اليمن</p>
-      </div>
-    </motion.div>
-  );
-}
-
-// ============================================================================
-// Post-Login Loading Screen with 5-Second Countdown
+// Post-Login Loading Screen with 5-Second Countdown (KEEP AS IS)
 // ============================================================================
 
 function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; role: string }; onComplete: () => void }) {
@@ -602,14 +390,7 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
           className="relative mb-6"
         >
           <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
-            {/* Background circle */}
-            <circle
-              cx="40" cy="40" r="34"
-              fill="none"
-              stroke="rgba(255,255,255,0.15)"
-              strokeWidth="5"
-            />
-            {/* Progress circle */}
+            <circle cx="40" cy="40" r="34" fill="none" stroke="rgba(255,255,255,0.15)" strokeWidth="5" />
             <motion.circle
               cx="40" cy="40" r="34"
               fill="none"
@@ -703,7 +484,7 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
 }
 
 // ============================================================================
-// Password Strength Bar Component
+// Password Strength Bar Component (KEEP AS IS)
 // ============================================================================
 
 function PasswordStrengthBar({ password }: { password: string }) {
@@ -742,7 +523,375 @@ function PasswordStrengthBar({ password }: { password: string }) {
 }
 
 // ============================================================================
-// Main Login Page Component
+// NEW: Animated Mesh Background (CSS-only, no framer-motion)
+// ============================================================================
+
+function AnimatedBackground() {
+  return (
+    <div className="absolute inset-0 overflow-hidden">
+      {/* Base gradient */}
+      <div className="absolute inset-0 bg-gradient-to-br from-violet-950 via-purple-900 to-slate-950 dark:from-gray-950 dark:via-purple-950 dark:to-slate-950" />
+
+      {/* Organic mesh blobs */}
+      <div
+        className="absolute mesh-blob-1"
+        style={{
+          width: '60vw', height: '60vw', maxWidth: '700px', maxHeight: '700px',
+          top: '-15%', right: '-10%',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(139,92,246,0.35) 0%, rgba(139,92,246,0.1) 40%, transparent 70%)',
+          filter: 'blur(60px)',
+        }}
+      />
+      <div
+        className="absolute mesh-blob-2"
+        style={{
+          width: '50vw', height: '50vw', maxWidth: '600px', maxHeight: '600px',
+          bottom: '-10%', left: '-8%',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(20,184,166,0.3) 0%, rgba(20,184,166,0.08) 40%, transparent 70%)',
+          filter: 'blur(70px)',
+        }}
+      />
+      <div
+        className="absolute mesh-blob-3"
+        style={{
+          width: '40vw', height: '40vw', maxWidth: '500px', maxHeight: '500px',
+          top: '30%', left: '50%',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(59,130,246,0.25) 0%, rgba(59,130,246,0.05) 40%, transparent 70%)',
+          filter: 'blur(50px)',
+        }}
+      />
+      <div
+        className="absolute mesh-blob-4"
+        style={{
+          width: '35vw', height: '35vw', maxWidth: '450px', maxHeight: '450px',
+          top: '60%', right: '20%',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(168,85,247,0.2) 0%, rgba(168,85,247,0.05) 40%, transparent 70%)',
+          filter: 'blur(55px)',
+        }}
+      />
+
+      {/* Subtle grid overlay */}
+      <div
+        className="absolute inset-0 opacity-[0.02]"
+        style={{
+          backgroundImage: 'linear-gradient(rgba(255,255,255,0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.1) 1px, transparent 1px)',
+          backgroundSize: '60px 60px',
+        }}
+      />
+
+      {/* Floating particles (CSS-only) */}
+      {Array.from({ length: 12 }).map((_, i) => (
+        <div
+          key={i}
+          className="absolute rounded-full bg-white/10 animate-float-gentle"
+          style={{
+            width: seededRandom(i * 3 + 50) * 3 + 2,
+            height: seededRandom(i * 3 + 51) * 3 + 2,
+            left: `${seededRandom(i * 3 + 52) * 90 + 5}%`,
+            top: `${seededRandom(i * 3 + 53) * 90 + 5}%`,
+            animationDelay: `${seededRandom(i * 5 + 60) * 3}s`,
+            animationDuration: `${seededRandom(i * 5 + 61) * 3 + 3}s`,
+          }}
+        />
+      ))}
+    </div>
+  );
+}
+
+// ============================================================================
+// NEW: Floating Input Component
+// ============================================================================
+
+function FloatingInput({
+  id,
+  label,
+  icon: Icon,
+  type = 'text',
+  dir,
+  showToggle,
+  onToggle,
+  toggleIcon,
+  registration,
+  error,
+  className,
+}: {
+  id: string;
+  label: string;
+  icon: React.ElementType;
+  type?: string;
+  dir?: string;
+  showToggle?: boolean;
+  onToggle?: () => void;
+  toggleIcon?: React.ReactNode;
+  registration: object;
+  error?: string;
+  className?: string;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="floating-input-group">
+        <div className="relative">
+          <Icon className="absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 z-10 pointer-events-none" />
+          <Input
+            id={id}
+            type={type}
+            placeholder=" "
+            dir={dir}
+            className={cn(
+              'peer pr-11 pl-11 text-right h-12 rounded-2xl input-glow',
+              'bg-white/[0.06] border-white/[0.1] text-white placeholder-transparent',
+              'hover:bg-white/[0.08] hover:border-white/[0.15]',
+              'focus:bg-white/[0.1] focus:border-purple-400/50',
+              error && 'border-red-400/50 focus:border-red-400/70',
+              className
+            )}
+            {...registration}
+          />
+          <label
+            htmlFor={id}
+            className="floating-label"
+          >
+            {label}
+          </label>
+          {showToggle && (
+            <button
+              type="button"
+              onClick={onToggle}
+              className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/40 hover:text-white/70 transition-colors z-10"
+            >
+              {toggleIcon}
+            </button>
+          )}
+        </div>
+      </div>
+      {error && (
+        <motion.p initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-red-400 mr-2">
+          {error}
+        </motion.p>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// NEW: Shimmer Button Component
+// ============================================================================
+
+function ShimmerButton({
+  children,
+  disabled,
+  loading,
+  className,
+  type = 'submit',
+  onClick,
+}: {
+  children: React.ReactNode;
+  disabled?: boolean;
+  loading?: boolean;
+  className?: string;
+  type?: 'submit' | 'button';
+  onClick?: () => void;
+}) {
+  return (
+    <motion.div whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }} className="w-full">
+      <button
+        type={type}
+        onClick={onClick}
+        disabled={disabled}
+        className={cn(
+          'shimmer-btn w-full h-12 rounded-2xl font-bold text-base text-white',
+          'bg-gradient-to-l from-violet-600 via-purple-600 to-fuchsia-600',
+          'hover:from-violet-500 hover:via-purple-500 hover:to-fuchsia-500',
+          'disabled:opacity-60 disabled:cursor-not-allowed',
+          'shadow-lg shadow-purple-500/25 hover:shadow-xl hover:shadow-purple-500/30',
+          'transition-all duration-300',
+          className
+        )}
+      >
+        {loading ? (
+          <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+        ) : (
+          children
+        )}
+      </button>
+    </motion.div>
+  );
+}
+
+// ============================================================================
+// NEW: Modern Pill Toggle Component
+// ============================================================================
+
+function ModernToggle({
+  activeTab,
+  onTabChange,
+}: {
+  activeTab: string;
+  onTabChange: (tab: string) => void;
+}) {
+  return (
+    <div className="relative flex bg-white/[0.06] rounded-2xl p-1 border border-white/[0.08]">
+      {/* Sliding indicator */}
+      <motion.div
+        className="absolute top-1 bottom-1 rounded-xl bg-gradient-to-l from-violet-500/80 to-purple-600/80 shadow-lg shadow-purple-500/20"
+        initial={false}
+        animate={{
+          x: activeTab === 'login' ? '0%' : '100%',
+          width: '50%',
+        }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        style={{ right: activeTab === 'login' ? '50%' : '0%' }}
+      />
+      <button
+        type="button"
+        onClick={() => onTabChange('login')}
+        className={cn(
+          'relative z-10 flex-1 py-2.5 text-sm font-bold rounded-xl transition-colors duration-200',
+          activeTab === 'login' ? 'text-white' : 'text-white/50 hover:text-white/70'
+        )}
+      >
+        تسجيل دخول
+      </button>
+      <button
+        type="button"
+        onClick={() => onTabChange('register')}
+        className={cn(
+          'relative z-10 flex-1 py-2.5 text-sm font-bold rounded-xl transition-colors duration-200',
+          activeTab === 'register' ? 'text-white' : 'text-white/50 hover:text-white/70'
+        )}
+      >
+        إنشاء حساب
+      </button>
+    </div>
+  );
+}
+
+// ============================================================================
+// NEW: Role Card Component (3D tilt effect)
+// ============================================================================
+
+function RoleCard({
+  role,
+  isActive,
+  onClick,
+  icon: Icon,
+  title,
+  subtitle,
+  activeColor,
+}: {
+  role: string;
+  isActive: boolean;
+  onClick: () => void;
+  icon: React.ElementType;
+  title: string;
+  subtitle: string;
+  activeColor: string;
+}) {
+  return (
+    <motion.button
+      type="button"
+      whileTap={{ scale: 0.97 }}
+      onClick={onClick}
+      className={cn(
+        'tilt-card relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border',
+        isActive
+          ? 'border-white/30 bg-white/[0.12] shadow-lg'
+          : 'border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.07] hover:border-white/15'
+      )}
+    >
+      {isActive && (
+        <motion.div
+          layoutId="role-glow"
+          className={cn('absolute inset-0 opacity-15', activeColor)}
+          transition={{ type: 'spring', stiffness: 200, damping: 25 }}
+        />
+      )}
+      <div className="relative z-10">
+        <div className={cn(
+          'w-11 h-11 rounded-xl mx-auto mb-2 flex items-center justify-center transition-all duration-300',
+          isActive
+            ? cn('bg-gradient-to-br shadow-lg', activeColor, 'text-white')
+            : 'bg-white/[0.08] text-white/40'
+        )}>
+          <Icon className="w-5 h-5" />
+        </div>
+        <span className={cn(
+          'text-sm font-bold transition-colors duration-300',
+          isActive ? 'text-white' : 'text-white/50'
+        )}>
+          {title}
+        </span>
+        <p className="text-[10px] text-white/30 mt-0.5">{subtitle}</p>
+      </div>
+    </motion.button>
+  );
+}
+
+// ============================================================================
+// NEW: Mobile Gradient Header
+// ============================================================================
+
+function MobileGradientHeader() {
+  return (
+    <div className="relative overflow-hidden">
+      {/* Animated background */}
+      <div className="absolute inset-0 bg-gradient-to-br from-violet-700 via-purple-800 to-slate-900 dark:from-gray-950 dark:via-purple-950 dark:to-slate-950" />
+      <div
+        className="absolute mesh-blob-1 -top-1/2 -right-1/4"
+        style={{
+          width: '300px', height: '300px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(139,92,246,0.3) 0%, transparent 70%)',
+          filter: 'blur(40px)',
+        }}
+      />
+      <div
+        className="absolute mesh-blob-2 -bottom-1/2 -left-1/4"
+        style={{
+          width: '250px', height: '250px',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(20,184,166,0.2) 0%, transparent 70%)',
+          filter: 'blur(40px)',
+        }}
+      />
+
+      {/* Content */}
+      <div className="relative z-10 px-6 pt-10 pb-6 text-center">
+        <motion.div
+          initial={{ scale: 0, rotate: -90 }}
+          animate={{ scale: 1, rotate: 0 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
+          className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center bg-white/15 backdrop-blur-xl border border-white/25 shadow-lg shadow-purple-500/10"
+        >
+          <Heart className="w-7 h-7 text-white" fill="currentColor" />
+        </motion.div>
+        <motion.h1
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="text-2xl font-bold text-white"
+        >
+          عافيتك
+        </motion.h1>
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.3 }}
+          className="text-sm text-white/60 mt-1"
+        >
+          منصة الرعاية الصحية المنزلية في اليمن
+        </motion.p>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// Main Login Page Component (COMPLETELY REDESIGNED)
 // ============================================================================
 
 function LoginPageContent() {
@@ -764,11 +913,9 @@ function LoginPageContent() {
   const justLoggedOut = searchParams.get('logout') === 'true';
 
   useEffect(() => {
-    // Wait for hydration before checking auth state
     if (!_hasHydrated) return;
 
     if (isAuthenticated && user && !justLoggedOut && !showLoadingScreen) {
-      // Show the loading screen first
       setShowLoadingScreen(true);
     }
     if (justLoggedOut && !isAuthenticated) {
@@ -896,250 +1043,187 @@ function LoginPageContent() {
         )}
       </AnimatePresence>
 
-      {/* ---- Desktop: Split-screen layout ---- */}
-      <div className="hidden lg:flex lg:h-screen">
-        {/* Right side: Hero branding */}
+      {/* ============ DESKTOP: Full-screen immersive layout ============ */}
+      <div className="hidden lg:flex lg:h-screen items-center justify-center relative">
+        <AnimatedBackground />
+
+        {/* Centered glassmorphic card */}
         <motion.div
-          initial={{ opacity: 0, x: 50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, ease: 'easeOut' }}
-          className="w-1/2 relative"
+          initial={{ opacity: 0, y: 40, scale: 0.95 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+          className="relative z-20 w-full max-w-[460px] mx-8"
         >
-          <HeroSection />
-        </motion.div>
+          {/* Animated gradient border */}
+          <div className="absolute -inset-[1px] rounded-3xl overflow-hidden">
+            <div
+              className="absolute inset-0 animate-gradient-border"
+              style={{
+                background: 'conic-gradient(from 0deg, rgba(139,92,246,0.3), rgba(20,184,166,0.3), rgba(59,130,246,0.3), rgba(168,85,247,0.3), rgba(139,92,246,0.3))',
+              }}
+            />
+          </div>
 
-        {/* Left side: Form */}
-        <motion.div
-          initial={{ opacity: 0, x: -50 }}
-          animate={{ opacity: 1, x: 0 }}
-          transition={{ duration: 0.8, ease: 'easeOut', delay: 0.2 }}
-          className="w-1/2 flex items-center justify-center p-8 bg-background relative"
-        >
-          {/* Subtle dot grid background */}
-          <div className="absolute inset-0 opacity-[0.03] dark:opacity-[0.05]" style={{
-            backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
-            backgroundSize: '24px 24px',
-          }} />
+          {/* Main glass card */}
+          <div className="relative glass-ultra rounded-3xl noise-overlay">
+            <div className="relative z-10 p-8">
+              {/* Logo & brand */}
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+                className="text-center mb-6"
+              >
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+                  className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-gradient-to-br from-violet-500/30 to-purple-600/30 backdrop-blur-xl border border-white/20 shadow-xl shadow-purple-500/20"
+                >
+                  <Heart className="w-8 h-8 text-white" fill="currentColor" />
+                </motion.div>
+                <h1 className="text-2xl font-bold text-white">عافيتك</h1>
+                <p className="text-sm text-white/40 mt-1">منصة الرعاية الصحية المنزلية في اليمن</p>
+              </motion.div>
 
-          <div className="w-full max-w-md relative z-10">
-            {/* Welcome text */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.4 }}
-              className="mb-8"
-            >
-              <h2 className="text-2xl font-bold text-foreground">مرحباً بك في عافيتك</h2>
-              <p className="text-muted-foreground mt-1">سجّل دخولك للوصول إلى حسابك</p>
-            </motion.div>
+              {/* Modern toggle */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="mb-6"
+              >
+                <ModernToggle
+                  activeTab={activeTab}
+                  onTabChange={(tab) => { setActiveTab(tab); clearError(); }}
+                />
+              </motion.div>
 
-            {/* Main form card with gradient border */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5, duration: 0.5 }}
-              className="relative rounded-3xl overflow-hidden"
-            >
-              {/* Animated gradient border */}
-              <div className="absolute -inset-[1px] rounded-3xl bg-gradient-to-r from-purple-500 via-sky-500 to-emerald-500 opacity-20 blur-[1px]" />
-              <div className="relative glass-strong rounded-3xl shadow-2xl border border-white/30 dark:border-white/10">
-                <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); clearError(); }}>
-                  <TabsList className="w-full rounded-none border-b border-border/50 bg-transparent h-14 p-0">
-                    <TabsTrigger
-                      value="login"
-                      className="flex-1 h-full rounded-none text-base font-semibold data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:text-purple-600 dark:data-[state=active]:text-purple-400"
+              {/* Error Display */}
+              <AnimatePresence mode="wait">
+                {error && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="mb-4 bg-red-500/10 text-red-300 text-sm rounded-xl p-3 flex items-center gap-2 border border-red-500/20"
+                  >
+                    <Shield className="w-4 h-4 shrink-0" />
+                    {error}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+
+              {/* ====== Login Form ====== */}
+              <AnimatePresence mode="wait">
+                {activeTab === 'login' && (
+                  <motion.form
+                    key="login-form"
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 20 }}
+                    transition={{ duration: 0.3 }}
+                    onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                    className="space-y-4"
+                  >
+                    {/* Smart login notice */}
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-gradient-to-l from-violet-500/10 via-purple-500/5 to-fuchsia-500/10 rounded-xl p-3 border border-purple-500/15"
                     >
-                      تسجيل دخول
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="register"
-                      className="flex-1 h-full rounded-none text-base font-semibold data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400"
-                    >
-                      إنشاء حساب
-                    </TabsTrigger>
-                  </TabsList>
-
-                  {/* Error Display */}
-                  <AnimatePresence mode="wait">
-                    {error && (
-                      <motion.div
-                        initial={{ opacity: 0, height: 0 }}
-                        animate={{ opacity: 1, height: 'auto' }}
-                        exit={{ opacity: 0, height: 0 }}
-                        className="mx-6 mt-4 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-xl p-3 flex items-center gap-2"
-                      >
-                        <Shield className="w-4 h-4 shrink-0" />
-                        {error}
-                      </motion.div>
-                    )}
-                  </AnimatePresence>
-
-                  {/* ====== Login Tab ====== */}
-                  <TabsContent value="login" className="p-6 pt-5 mt-0">
-                    <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-5">
-                      {/* Smart login notice */}
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-gradient-to-l from-purple-500/5 via-sky-500/5 to-emerald-500/5 rounded-2xl p-4 border border-purple-500/10"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-sky-500/20 flex items-center justify-center shrink-0">
-                            <Sparkles className="w-5 h-5 text-purple-500" />
-                          </div>
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">تسجيل دخول ذكي</p>
-                            <p className="text-xs text-muted-foreground mt-0.5">سيتعرف النظام تلقائياً على نوع حسابك عند تسجيل الدخول</p>
-                          </div>
+                      <div className="flex items-center gap-2.5">
+                        <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center shrink-0">
+                          <Sparkles className="w-4 h-4 text-purple-300" />
                         </div>
-                      </motion.div>
-
-                      {/* Phone */}
-                      <div className="space-y-2">
-                        <Label htmlFor="login-phone" className="text-sm font-medium">رقم الهاتف</Label>
-                        <div className="relative">
-                          <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            id="login-phone"
-                            type="tel"
-                            placeholder="7XXXXXXXX"
-                            className="pr-10 text-right h-12 rounded-xl border-border/50 bg-muted/20 focus:bg-background transition-all duration-200 focus:scale-[1.01]"
-                            dir="ltr"
-                            {...loginForm.register('phone')}
-                          />
+                        <div>
+                          <p className="text-xs font-semibold text-white/80">تسجيل دخول ذكي</p>
+                          <p className="text-[10px] text-white/40">سيتعرف النظام تلقائياً على نوع حسابك</p>
                         </div>
-                        {loginForm.formState.errors.phone && (
-                          <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-destructive">
-                            {loginForm.formState.errors.phone.message}
-                          </motion.p>
-                        )}
                       </div>
+                    </motion.div>
 
-                      {/* Password */}
-                      <div className="space-y-2">
-                        <Label htmlFor="login-password" className="text-sm font-medium">كلمة المرور</Label>
-                        <div className="relative">
-                          <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input
-                            id="login-password"
-                            type={showPassword ? 'text' : 'password'}
-                            placeholder="••••••"
-                            className="pr-10 pl-10 text-right h-12 rounded-xl border-border/50 bg-muted/20 focus:bg-background transition-all duration-200 focus:scale-[1.01]"
-                            dir="ltr"
-                            {...loginForm.register('password')}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowPassword(!showPassword)}
-                            className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                          >
-                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
-                        <PasswordStrengthBar password={loginPasswordValue} />
-                        {loginForm.formState.errors.password && (
-                          <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} className="text-xs text-destructive">
-                            {loginForm.formState.errors.password.message}
-                          </motion.p>
-                        )}
+                    <FloatingInput
+                      id="login-phone"
+                      label="رقم الهاتف"
+                      icon={Phone}
+                      type="tel"
+                      dir="ltr"
+                      registration={loginForm.register('phone')}
+                      error={loginForm.formState.errors.phone?.message}
+                    />
+
+                    <FloatingInput
+                      id="login-password"
+                      label="كلمة المرور"
+                      icon={Lock}
+                      type={showPassword ? 'text' : 'password'}
+                      dir="ltr"
+                      showToggle
+                      onToggle={() => setShowPassword(!showPassword)}
+                      toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      registration={loginForm.register('password')}
+                      error={loginForm.formState.errors.password?.message}
+                    />
+
+                    <PasswordStrengthBar password={loginPasswordValue} />
+
+                    {/* Remember + Forgot */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <input
+                          type="checkbox"
+                          id="remember"
+                          className="h-3.5 w-3.5 rounded border-white/20 bg-white/10 text-purple-500 focus:ring-purple-500/30"
+                        />
+                        <Label htmlFor="remember" className="text-xs font-normal cursor-pointer text-white/50">تذكرني</Label>
                       </div>
+                      <button type="button" className="text-xs text-purple-400/80 hover:text-purple-300 transition-colors">
+                        نسيت كلمة المرور؟
+                      </button>
+                    </div>
 
-                      {/* Remember me + Forgot password */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="checkbox"
-                            id="remember"
-                            className="h-4 w-4 rounded border-border/50 text-purple-600 focus:ring-purple-500"
-                          />
-                          <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">تذكرني</Label>
-                        </div>
-                        <button type="button" className="text-xs text-purple-600 dark:text-purple-400 hover:underline">
-                          نسيت كلمة المرور؟
-                        </button>
-                      </div>
+                    <ShimmerButton loading={isLoading} disabled={isLoading}>
+                      <span className="flex items-center gap-2 justify-center">
+                        تسجيل الدخول
+                        <ArrowLeft className="w-4 h-4" />
+                      </span>
+                    </ShimmerButton>
+                  </motion.form>
+                )}
+              </AnimatePresence>
 
-                      {/* Submit button */}
-                      <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                        <Button
-                          type="submit"
-                          className="w-full h-12 text-base font-bold rounded-xl shadow-lg transition-all duration-300 bg-gradient-to-l from-purple-600 via-purple-700 to-sky-700 hover:opacity-90 text-white"
-                          disabled={isLoading}
-                        >
-                          {isLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                          ) : (
-                            <span className="flex items-center gap-2">
-                              تسجيل الدخول
-                              <ArrowLeft className="w-4 h-4" />
-                            </span>
-                          )}
-                        </Button>
-                      </motion.div>
-                    </form>
-                  </TabsContent>
-
-                  {/* ====== Register Tab ====== */}
-                  <TabsContent value="register" className="p-6 pt-5 mt-0">
-                    {/* Register role toggle */}
-                    <div className="space-y-3 mb-5">
-                      <Label className="text-sm font-medium">نوع الحساب</Label>
-                      <div className="grid grid-cols-2 gap-3">
-                        <motion.button
-                          type="button"
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => { setRegisterRole('beneficiary'); clearError(); }}
-                          className={cn(
-                            'relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border-2',
-                            registerRole === 'beneficiary'
-                              ? 'border-purple-500/50 bg-gradient-to-br from-purple-500/10 to-purple-600/5 text-purple-700 dark:text-purple-400 shadow-lg shadow-purple-500/10'
-                              : 'border-border/50 bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:border-border/80'
-                          )}
-                        >
-                          {registerRole === 'beneficiary' && (
-                            <div className="absolute inset-0 bg-gradient-to-br from-purple-500 to-purple-700 opacity-10" />
-                          )}
-                          <div className="relative z-10">
-                            <div className={cn(
-                              'w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center transition-all duration-300',
-                              registerRole === 'beneficiary'
-                                ? 'bg-gradient-to-br from-purple-500 to-purple-700 text-white shadow-md'
-                                : 'bg-muted text-muted-foreground'
-                            )}>
-                              <User className="w-5 h-5" />
-                            </div>
-                            <span className="text-sm font-bold">مستفيد</span>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">احصل على رعاية منزلية</p>
-                          </div>
-                        </motion.button>
-                        <motion.button
-                          type="button"
-                          whileTap={{ scale: 0.97 }}
-                          onClick={() => { setRegisterRole('nurse'); clearError(); }}
-                          className={cn(
-                            'relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border-2',
-                            registerRole === 'nurse'
-                              ? 'border-sky-500/50 bg-gradient-to-br from-sky-500/10 to-sky-600/5 text-sky-700 dark:text-sky-400 shadow-lg shadow-sky-500/10'
-                              : 'border-border/50 bg-muted/30 text-muted-foreground hover:bg-muted/50 hover:border-border/80'
-                          )}
-                        >
-                          {registerRole === 'nurse' && (
-                            <div className="absolute inset-0 bg-gradient-to-br from-sky-500 to-sky-700 opacity-10" />
-                          )}
-                          <div className="relative z-10">
-                            <div className={cn(
-                              'w-10 h-10 rounded-xl mx-auto mb-2 flex items-center justify-center transition-all duration-300',
-                              registerRole === 'nurse'
-                                ? 'bg-gradient-to-br from-sky-500 to-sky-700 text-white shadow-md'
-                                : 'bg-muted text-muted-foreground'
-                            )}>
-                              <Stethoscope className="w-5 h-5" />
-                            </div>
-                            <span className="text-sm font-bold">ممرض/ـة</span>
-                            <p className="text-[10px] text-muted-foreground mt-0.5">انضم كممرض معتمد</p>
-                          </div>
-                        </motion.button>
-                      </div>
+              {/* ====== Register Forms ====== */}
+              <AnimatePresence mode="wait">
+                {activeTab === 'register' && (
+                  <motion.div
+                    key="register-container"
+                    initial={{ opacity: 0, x: 20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -20 }}
+                    transition={{ duration: 0.3 }}
+                    className="space-y-4"
+                  >
+                    {/* Role selector */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <RoleCard
+                        role="beneficiary"
+                        isActive={registerRole === 'beneficiary'}
+                        onClick={() => { setRegisterRole('beneficiary'); clearError(); }}
+                        icon={User}
+                        title="مستفيد"
+                        subtitle="رعاية منزلية"
+                        activeColor="from-purple-500 to-purple-700"
+                      />
+                      <RoleCard
+                        role="nurse"
+                        isActive={registerRole === 'nurse'}
+                        onClick={() => { setRegisterRole('nurse'); clearError(); }}
+                        icon={Stethoscope}
+                        title="ممرض/ـة"
+                        subtitle="ممرض معتمد"
+                        activeColor="from-sky-500 to-sky-700"
+                      />
                     </div>
 
                     <AnimatePresence mode="wait">
@@ -1147,42 +1231,42 @@ function LoginPageContent() {
                       {registerRole === 'beneficiary' && (
                         <motion.form
                           key="beneficiary-form"
-                          initial={{ opacity: 0, x: -20 }}
+                          initial={{ opacity: 0, x: -15 }}
                           animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 20 }}
+                          exit={{ opacity: 0, x: 15 }}
                           transition={{ duration: 0.25 }}
                           onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)}
-                          className="space-y-4"
+                          className="space-y-3"
                         >
-                          {/* Personal info section */}
-                          <div className="bg-gradient-to-l from-purple-500/5 via-transparent to-purple-500/5 rounded-2xl p-4 border border-purple-500/10 space-y-4">
-                            <div className="flex items-center gap-2 mb-1">
-                              <User className="w-4 h-4 text-purple-500" />
-                              <span className="text-xs font-semibold text-purple-600 dark:text-purple-400">المعلومات الشخصية</span>
+                          {/* Personal info */}
+                          <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-3">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <User className="w-3.5 h-3.5 text-purple-400" />
+                              <span className="text-[10px] font-semibold text-purple-400">المعلومات الشخصية</span>
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="ben-name">الاسم الكامل</Label>
-                              <div className="relative">
-                                <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input id="ben-name" placeholder="الاسم الكامل" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...beneficiaryForm.register('name')} />
-                              </div>
-                              {beneficiaryForm.formState.errors.name && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.name.message}</p>}
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="ben-phone">رقم الهاتف</Label>
-                              <div className="relative">
-                                <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input id="ben-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('phone')} />
-                              </div>
-                              {beneficiaryForm.formState.errors.phone && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.phone.message}</p>}
-                            </div>
+                            <FloatingInput
+                              id="ben-name"
+                              label="الاسم الكامل"
+                              icon={User}
+                              registration={beneficiaryForm.register('name')}
+                              error={beneficiaryForm.formState.errors.name?.message}
+                            />
+                            <FloatingInput
+                              id="ben-phone"
+                              label="رقم الهاتف"
+                              icon={Phone}
+                              type="tel"
+                              dir="ltr"
+                              registration={beneficiaryForm.register('phone')}
+                              error={beneficiaryForm.formState.errors.phone?.message}
+                            />
                           </div>
 
-                          {/* Location section */}
-                          <div className="bg-gradient-to-l from-emerald-500/5 via-transparent to-emerald-500/5 rounded-2xl p-4 border border-emerald-500/10 space-y-4">
-                            <div className="flex items-center gap-2 mb-1">
-                              <MapPin className="w-4 h-4 text-emerald-500" />
-                              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">معلومات الموقع</span>
+                          {/* Location info */}
+                          <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-3">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <MapPin className="w-3.5 h-3.5 text-teal-400" />
+                              <span className="text-[10px] font-semibold text-teal-400">معلومات الموقع</span>
                             </div>
                             <GpsLocationButton
                               onLocationDetected={(loc) => {
@@ -1196,45 +1280,49 @@ function LoginPageContent() {
                               size="sm"
                               className="w-full"
                             />
-                            <div className="space-y-2">
-                              <Label htmlFor="ben-address">العنوان</Label>
-                              <div className="relative">
-                                <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input id="ben-address" placeholder="عنوانك التفصيلي" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...beneficiaryForm.register('address')} />
-                              </div>
-                              {beneficiaryForm.formState.errors.address && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.address.message}</p>}
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="ben-referral">كود الإحالة (اختياري)</Label>
-                              <Input id="ben-referral" placeholder="AF-XXXXXX" className="text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('referralCode')} />
-                            </div>
+                            <FloatingInput
+                              id="ben-address"
+                              label="العنوان"
+                              icon={MapPin}
+                              registration={beneficiaryForm.register('address')}
+                              error={beneficiaryForm.formState.errors.address?.message}
+                            />
+                            <FloatingInput
+                              id="ben-referral"
+                              label="كود الإحالة (اختياري)"
+                              icon={Sparkles}
+                              dir="ltr"
+                              registration={beneficiaryForm.register('referralCode')}
+                            />
                           </div>
 
-                          {/* Security section */}
-                          <div className="bg-gradient-to-l from-amber-500/5 via-transparent to-amber-500/5 rounded-2xl p-4 border border-amber-500/10 space-y-4">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Lock className="w-4 h-4 text-amber-500" />
-                              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">الأمان</span>
+                          {/* Security */}
+                          <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-3">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Lock className="w-3.5 h-3.5 text-amber-400" />
+                              <span className="text-[10px] font-semibold text-amber-400">الأمان</span>
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="ben-password">كلمة المرور</Label>
-                              <div className="relative">
-                                <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input id="ben-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('password')} />
-                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
-                              </div>
-                              <PasswordStrengthBar password={beneficiaryPasswordValue} />
-                              {beneficiaryForm.formState.errors.password && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.password.message}</p>}
-                            </div>
+                            <FloatingInput
+                              id="ben-password"
+                              label="كلمة المرور"
+                              icon={Lock}
+                              type={showPassword ? 'text' : 'password'}
+                              dir="ltr"
+                              showToggle
+                              onToggle={() => setShowPassword(!showPassword)}
+                              toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              registration={beneficiaryForm.register('password')}
+                              error={beneficiaryForm.formState.errors.password?.message}
+                            />
+                            <PasswordStrengthBar password={beneficiaryPasswordValue} />
                           </div>
 
-                          <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                            <Button type="submit" className="w-full h-12 text-base font-bold rounded-xl bg-gradient-to-l from-purple-500 to-purple-700 hover:opacity-90 text-white shadow-lg transition-all duration-300" disabled={isLoading}>
-                              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5" />إنشاء حساب مستفيد</span>}
-                            </Button>
-                          </motion.div>
+                          <ShimmerButton loading={isLoading} disabled={isLoading}>
+                            <span className="flex items-center gap-2 justify-center">
+                              <CheckCircle2 className="w-4 h-4" />
+                              إنشاء حساب مستفيد
+                            </span>
+                          </ShimmerButton>
                         </motion.form>
                       )}
 
@@ -1242,85 +1330,93 @@ function LoginPageContent() {
                       {registerRole === 'nurse' && (
                         <motion.form
                           key="nurse-form"
-                          initial={{ opacity: 0, x: 20 }}
+                          initial={{ opacity: 0, x: 15 }}
                           animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -20 }}
+                          exit={{ opacity: 0, x: -15 }}
                           transition={{ duration: 0.25 }}
                           onSubmit={nurseForm.handleSubmit(onNurseRegister)}
-                          className="space-y-4"
+                          className="space-y-3 max-h-[55vh] overflow-y-auto custom-scrollbar pl-1"
                         >
-                          {/* Personal info section */}
-                          <div className="bg-gradient-to-l from-sky-500/5 via-transparent to-sky-500/5 rounded-2xl p-4 border border-sky-500/10 space-y-4">
-                            <div className="flex items-center gap-2 mb-1">
-                              <User className="w-4 h-4 text-sky-500" />
-                              <span className="text-xs font-semibold text-sky-600 dark:text-sky-400">المعلومات الشخصية</span>
+                          {/* Personal info */}
+                          <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-3">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <User className="w-3.5 h-3.5 text-sky-400" />
+                              <span className="text-[10px] font-semibold text-sky-400">المعلومات الشخصية</span>
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="nurse-name">الاسم الرباعي</Label>
+                            <motion.div
+                              className="relative"
+                              animate={nurseNameShake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
+                              transition={{ duration: 0.5, ease: 'easeInOut' }}
+                            >
+                              <FloatingInput
+                                id="nurse-name"
+                                label="الاسم الرباعي"
+                                icon={User}
+                                registration={nurseForm.register('name')}
+                                error={nurseNameShake ? undefined : nurseForm.formState.errors.name?.message}
+                                className={nurseNameShake ? 'border-red-400/60!' : ''}
+                              />
+                            </motion.div>
+                            {nurseNameWarning && (
                               <motion.div
-                                className="relative"
-                                animate={nurseNameShake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
-                                transition={{ duration: 0.5, ease: 'easeInOut' }}
+                                initial={{ opacity: 0, y: -5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                className="flex items-center gap-1.5"
                               >
-                                <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input
-                                  id="nurse-name"
-                                  placeholder="الاسم الرباعي (أربعة أجزاء)"
-                                  className={cn(
-                                    'pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]',
-                                    nurseNameShake && 'border-red-500 focus:border-red-500'
-                                  )}
-                                  {...nurseForm.register('name')}
-                                />
+                                <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                <p className="text-xs text-red-400 font-medium">يجب أن تكتب اسمك الرباعي (أربعة أجزاء)</p>
                               </motion.div>
-                              {nurseNameWarning && (
-                                <motion.div
-                                  initial={{ opacity: 0, y: -5 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  className="flex items-center gap-1.5"
-                                >
-                                  <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                                  <p className="text-xs text-red-500 font-medium">يجب أن تكتب اسمك الرباعي (أربعة أجزاء)</p>
-                                </motion.div>
-                              )}
-                              {nurseForm.formState.errors.name && !nurseNameWarning && <p className="text-xs text-destructive">{nurseForm.formState.errors.name.message}</p>}
-                            </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="nurse-phone">رقم الهاتف</Label>
-                              <div className="relative">
-                                <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input id="nurse-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...nurseForm.register('phone')} />
-                              </div>
-                              {nurseForm.formState.errors.phone && <p className="text-xs text-destructive">{nurseForm.formState.errors.phone.message}</p>}
-                            </div>
+                            )}
+                            {nurseForm.formState.errors.name && !nurseNameWarning && (
+                              <p className="text-xs text-red-400">{nurseForm.formState.errors.name.message}</p>
+                            )}
+                            <FloatingInput
+                              id="nurse-phone"
+                              label="رقم الهاتف"
+                              icon={Phone}
+                              type="tel"
+                              dir="ltr"
+                              registration={nurseForm.register('phone')}
+                              error={nurseForm.formState.errors.phone?.message}
+                            />
                           </div>
 
-                          {/* Professional info section */}
-                          <div className="bg-gradient-to-l from-violet-500/5 via-transparent to-violet-500/5 rounded-2xl p-4 border border-violet-500/10 space-y-4">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Stethoscope className="w-4 h-4 text-violet-500" />
-                              <span className="text-xs font-semibold text-violet-600 dark:text-violet-400">المعلومات المهنية</span>
+                          {/* Professional info */}
+                          <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-3">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Stethoscope className="w-3.5 h-3.5 text-violet-400" />
+                              <span className="text-[10px] font-semibold text-violet-400">المعلومات المهنية</span>
                             </div>
-                            <div className="space-y-2">
-                              <Label>التخصص</Label>
+                            <div className="space-y-1.5">
+                              <Label className="text-xs text-white/50">التخصص</Label>
                               <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}>
-                                <SelectTrigger className="h-11 rounded-xl border-border/50 bg-background/50"><SelectValue placeholder="اختر التخصص" /></SelectTrigger>
-                                <SelectContent>{specializations.map((spec) => (<SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>))}</SelectContent>
+                                <SelectTrigger className="h-11 rounded-xl bg-white/[0.06] border-white/[0.1] text-white/80 hover:bg-white/[0.08] focus:border-purple-400/50">
+                                  <SelectValue placeholder="اختر التخصص" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  {specializations.map((spec) => (
+                                    <SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>
+                                  ))}
+                                </SelectContent>
                               </Select>
-                              {nurseForm.formState.errors.specialization && <p className="text-xs text-destructive">{nurseForm.formState.errors.specialization.message}</p>}
+                              {nurseForm.formState.errors.specialization && (
+                                <p className="text-xs text-red-400">{nurseForm.formState.errors.specialization.message}</p>
+                              )}
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="nurse-license">رقم الترخيص</Label>
-                              <Input id="nurse-license" placeholder="رقم ترخيص المهنة" className="text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...nurseForm.register('licenseNumber')} />
-                              {nurseForm.formState.errors.licenseNumber && <p className="text-xs text-destructive">{nurseForm.formState.errors.licenseNumber.message}</p>}
-                            </div>
+                            <FloatingInput
+                              id="nurse-license"
+                              label="رقم الترخيص"
+                              icon={Shield}
+                              registration={nurseForm.register('licenseNumber')}
+                              error={nurseForm.formState.errors.licenseNumber?.message}
+                            />
                           </div>
 
-                          {/* Location section */}
-                          <div className="bg-gradient-to-l from-emerald-500/5 via-transparent to-emerald-500/5 rounded-2xl p-4 border border-emerald-500/10 space-y-4">
-                            <div className="flex items-center gap-2 mb-1">
-                              <MapPin className="w-4 h-4 text-emerald-500" />
-                              <span className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">معلومات الموقع</span>
+                          {/* Location info */}
+                          <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-3">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <MapPin className="w-3.5 h-3.5 text-teal-400" />
+                              <span className="text-[10px] font-semibold text-teal-400">معلومات الموقع</span>
                             </div>
                             <GpsLocationButton
                               onLocationDetected={(loc) => {
@@ -1334,88 +1430,111 @@ function LoginPageContent() {
                               size="sm"
                               className="w-full"
                             />
-                            <div className="space-y-2">
-                              <Label htmlFor="nurse-address">العنوان التفصيلي</Label>
-                              <div className="relative">
-                                <MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input id="nurse-address" placeholder="العنوان التفصيلي" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...nurseForm.register('address')} />
-                              </div>
-                              {nurseForm.formState.errors.address && <p className="text-xs text-destructive">{nurseForm.formState.errors.address.message}</p>}
-                            </div>
+                            <FloatingInput
+                              id="nurse-address"
+                              label="العنوان التفصيلي"
+                              icon={MapPin}
+                              registration={nurseForm.register('address')}
+                              error={nurseForm.formState.errors.address?.message}
+                            />
                           </div>
 
-                          {/* Security section */}
-                          <div className="bg-gradient-to-l from-amber-500/5 via-transparent to-amber-500/5 rounded-2xl p-4 border border-amber-500/10 space-y-4">
-                            <div className="flex items-center gap-2 mb-1">
-                              <Lock className="w-4 h-4 text-amber-500" />
-                              <span className="text-xs font-semibold text-amber-600 dark:text-amber-400">الأمان</span>
+                          {/* Security */}
+                          <div className="bg-white/[0.04] rounded-xl p-3 border border-white/[0.06] space-y-3">
+                            <div className="flex items-center gap-1.5 mb-1">
+                              <Lock className="w-3.5 h-3.5 text-amber-400" />
+                              <span className="text-[10px] font-semibold text-amber-400">الأمان</span>
                             </div>
-                            <div className="space-y-2">
-                              <Label htmlFor="nurse-password">كلمة المرور</Label>
-                              <div className="relative">
-                                <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input id="nurse-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...nurseForm.register('password')} />
-                                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                </button>
-                              </div>
-                              <PasswordStrengthBar password={nursePasswordValue} />
-                              {nurseForm.formState.errors.password && <p className="text-xs text-destructive">{nurseForm.formState.errors.password.message}</p>}
-                            </div>
+                            <FloatingInput
+                              id="nurse-password"
+                              label="كلمة المرور"
+                              icon={Lock}
+                              type={showPassword ? 'text' : 'password'}
+                              dir="ltr"
+                              showToggle
+                              onToggle={() => setShowPassword(!showPassword)}
+                              toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                              registration={nurseForm.register('password')}
+                              error={nurseForm.formState.errors.password?.message}
+                            />
+                            <PasswordStrengthBar password={nursePasswordValue} />
                           </div>
 
-                          <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
-                            <Button type="submit" className="w-full h-12 text-base font-bold rounded-xl bg-gradient-to-l from-sky-500 to-sky-700 hover:opacity-90 text-white shadow-lg transition-all duration-300" disabled={isLoading}>
-                              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2"><CheckCircle2 className="w-5 h-5" />إنشاء حساب ممرض/ـة</span>}
-                            </Button>
-                          </motion.div>
+                          <ShimmerButton loading={isLoading} disabled={isLoading} className="from-sky-600 via-cyan-600 to-teal-600 hover:from-sky-500 hover:via-cyan-500 hover:to-teal-500 shadow-sky-500/25">
+                            <span className="flex items-center gap-2 justify-center">
+                              <CheckCircle2 className="w-4 h-4" />
+                              إنشاء حساب ممرض/ـة
+                            </span>
+                          </ShimmerButton>
                         </motion.form>
                       )}
                     </AnimatePresence>
-                  </TabsContent>
-                </Tabs>
-              </div>
-            </motion.div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
+        </motion.div>
+
+        {/* Floating decorative elements */}
+        <motion.div
+          className="absolute top-[8%] left-[8%] text-white/[0.04] z-10 hidden xl:block"
+          animate={{ y: [0, -15, 0], rotate: [0, 8, 0] }}
+          transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+        >
+          <Stethoscope className="w-16 h-16" />
+        </motion.div>
+        <motion.div
+          className="absolute bottom-[12%] right-[8%] text-white/[0.04] z-10 hidden xl:block"
+          animate={{ y: [0, 12, 0], rotate: [0, -8, 0] }}
+          transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
+        >
+          <Heart className="w-14 h-14" />
+        </motion.div>
+        <motion.div
+          className="absolute top-[70%] left-[5%] text-white/[0.04] z-10 hidden xl:block"
+          animate={{ y: [0, -10, 0], rotate: [0, 5, 0] }}
+          transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
+        >
+          <Shield className="w-12 h-12" />
         </motion.div>
       </div>
 
-      {/* ---- Mobile & Tablet: Single column layout ---- */}
+      {/* ============ MOBILE: Compact layout ============ */}
       <div className="lg:hidden flex flex-col min-h-screen">
-        <MobileHeroHeader />
+        <MobileGradientHeader />
 
-        <div className="flex-1 flex flex-col items-center justify-start px-4 py-6 bg-background relative">
-          {/* Dot grid background */}
-          <div className="absolute inset-0 opacity-[0.02] dark:opacity-[0.04]" style={{
-            backgroundImage: 'radial-gradient(circle, currentColor 1px, transparent 1px)',
-            backgroundSize: '20px 20px',
-          }} />
+        {/* Form card sliding over the gradient */}
+        <div className="flex-1 bg-gradient-to-b from-slate-900 to-gray-950 dark:from-gray-950 dark:to-gray-950 -mt-3 relative">
+          <AnimatedBackground />
 
-          <div className="w-full max-w-md relative z-10">
-            {/* Main form card with gradient border */}
+          <div className="relative z-10 px-4 pt-6 pb-8 max-w-md mx-auto w-full">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.3, duration: 0.5 }}
-              className="relative rounded-3xl overflow-hidden"
+              className="relative"
             >
-              <div className="absolute -inset-[1px] rounded-3xl bg-gradient-to-r from-purple-500 via-sky-500 to-emerald-500 opacity-15 blur-[1px]" />
-              <div className="relative glass-strong rounded-3xl shadow-2xl border border-white/30 dark:border-white/10">
-                <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); clearError(); }}>
-                  <TabsList className="w-full rounded-none border-b border-border/50 bg-transparent h-12 p-0">
-                    <TabsTrigger
-                      value="login"
-                      className="flex-1 h-full rounded-none text-sm font-semibold data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-purple-500 data-[state=active]:text-purple-600 dark:data-[state=active]:text-purple-400"
-                    >
-                      تسجيل دخول
-                    </TabsTrigger>
-                    <TabsTrigger
-                      value="register"
-                      className="flex-1 h-full rounded-none text-sm font-semibold data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-emerald-500 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400"
-                    >
-                      إنشاء حساب
-                    </TabsTrigger>
-                  </TabsList>
+              {/* Animated gradient border */}
+              <div className="absolute -inset-[1px] rounded-2xl overflow-hidden">
+                <div
+                  className="absolute inset-0 animate-gradient-border"
+                  style={{
+                    background: 'conic-gradient(from 0deg, rgba(139,92,246,0.2), rgba(20,184,166,0.2), rgba(59,130,246,0.2), rgba(168,85,247,0.2), rgba(139,92,246,0.2))',
+                  }}
+                />
+              </div>
+
+              {/* Main glass card */}
+              <div className="relative glass-ultra rounded-2xl noise-overlay">
+                <div className="relative z-10 p-5">
+                  {/* Toggle */}
+                  <div className="mb-5">
+                    <ModernToggle
+                      activeTab={activeTab}
+                      onTabChange={(tab) => { setActiveTab(tab); clearError(); }}
+                    />
+                  </div>
 
                   {/* Error Display */}
                   <AnimatePresence mode="wait">
@@ -1424,312 +1543,372 @@ function LoginPageContent() {
                         initial={{ opacity: 0, height: 0 }}
                         animate={{ opacity: 1, height: 'auto' }}
                         exit={{ opacity: 0, height: 0 }}
-                        className="mx-5 mt-4 bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 text-sm rounded-xl p-3 flex items-center gap-2"
+                        className="mb-3 bg-red-500/10 text-red-300 text-xs rounded-xl p-2.5 flex items-center gap-2 border border-red-500/20"
                       >
-                        <Shield className="w-4 h-4 shrink-0" />
+                        <Shield className="w-3.5 h-3.5 shrink-0" />
                         {error}
                       </motion.div>
                     )}
                   </AnimatePresence>
 
-                  {/* ====== Mobile Login Tab ====== */}
-                  <TabsContent value="login" className="p-5 pt-4 mt-0">
-                    <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
-                      {/* Smart login notice */}
-                      <motion.div
-                        initial={{ opacity: 0, y: -10 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="bg-gradient-to-l from-purple-500/5 via-sky-500/5 to-emerald-500/5 rounded-xl p-3 border border-purple-500/10"
+                  {/* Mobile Login Form */}
+                  <AnimatePresence mode="wait">
+                    {activeTab === 'login' && (
+                      <motion.form
+                        key="m-login-form"
+                        initial={{ opacity: 0, x: -15 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 15 }}
+                        transition={{ duration: 0.25 }}
+                        onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                        className="space-y-3"
                       >
-                        <div className="flex items-center gap-2">
-                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-sky-500/20 flex items-center justify-center shrink-0">
-                            <Sparkles className="w-4 h-4 text-purple-500" />
+                        {/* Smart login notice */}
+                        <div className="bg-gradient-to-l from-violet-500/10 via-purple-500/5 to-fuchsia-500/10 rounded-xl p-2.5 border border-purple-500/15">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-500/20 to-purple-500/20 flex items-center justify-center shrink-0">
+                              <Sparkles className="w-3.5 h-3.5 text-purple-300" />
+                            </div>
+                            <div>
+                              <p className="text-[11px] font-semibold text-white/80">تسجيل دخول ذكي</p>
+                              <p className="text-[9px] text-white/40">النظام يتعرف على نوع حسابك تلقائياً</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-xs font-semibold text-foreground">تسجيل دخول ذكي</p>
-                            <p className="text-[10px] text-muted-foreground">النظام يتعرف على نوع حسابك تلقائياً</p>
-                          </div>
                         </div>
-                      </motion.div>
 
-                      {/* Phone */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="m-login-phone" className="text-xs font-medium">رقم الهاتف</Label>
-                        <div className="relative">
-                          <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input id="m-login-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-11 rounded-xl border-border/50 bg-muted/20 transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...loginForm.register('phone')} />
-                        </div>
-                        {loginForm.formState.errors.phone && <p className="text-xs text-destructive">{loginForm.formState.errors.phone.message}</p>}
-                      </div>
+                        <FloatingInput
+                          id="m-login-phone"
+                          label="رقم الهاتف"
+                          icon={Phone}
+                          type="tel"
+                          dir="ltr"
+                          registration={loginForm.register('phone')}
+                          error={loginForm.formState.errors.phone?.message}
+                          className="h-11"
+                        />
 
-                      {/* Password */}
-                      <div className="space-y-1.5">
-                        <Label htmlFor="m-login-password" className="text-xs font-medium">كلمة المرور</Label>
-                        <div className="relative">
-                          <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                          <Input id="m-login-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-11 rounded-xl border-border/50 bg-muted/20 transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...loginForm.register('password')} />
-                          <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors">
-                            {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                          </button>
-                        </div>
+                        <FloatingInput
+                          id="m-login-password"
+                          label="كلمة المرور"
+                          icon={Lock}
+                          type={showPassword ? 'text' : 'password'}
+                          dir="ltr"
+                          showToggle
+                          onToggle={() => setShowPassword(!showPassword)}
+                          toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                          registration={loginForm.register('password')}
+                          error={loginForm.formState.errors.password?.message}
+                          className="h-11"
+                        />
+
                         <PasswordStrengthBar password={loginPasswordValue} />
-                        {loginForm.formState.errors.password && <p className="text-xs text-destructive">{loginForm.formState.errors.password.message}</p>}
-                      </div>
 
-                      {/* Remember + Forgot */}
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" id="m-remember" className="h-3.5 w-3.5 rounded border-border/50 text-purple-600 focus:ring-purple-500" />
-                          <Label htmlFor="m-remember" className="text-xs font-normal cursor-pointer">تذكرني</Label>
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-1.5">
+                            <input type="checkbox" id="m-remember" className="h-3.5 w-3.5 rounded border-white/20 bg-white/10 text-purple-500 focus:ring-purple-500/30" />
+                            <Label htmlFor="m-remember" className="text-[11px] font-normal cursor-pointer text-white/40">تذكرني</Label>
+                          </div>
+                          <button type="button" className="text-[11px] text-purple-400/70 hover:text-purple-300 transition-colors">نسيت كلمة المرور؟</button>
                         </div>
-                        <button type="button" className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline">نسيت كلمة المرور؟</button>
-                      </div>
 
-                      {/* Submit */}
-                      <motion.div whileTap={{ scale: 0.98 }}>
-                        <Button type="submit" className="w-full h-11 text-sm font-bold rounded-xl shadow-lg bg-gradient-to-l from-purple-600 via-purple-700 to-sky-700 hover:opacity-90 text-white transition-all duration-300" disabled={isLoading}>
-                          {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2">تسجيل الدخول <ArrowLeft className="w-4 h-4" /></span>}
-                        </Button>
-                      </motion.div>
-                    </form>
-                  </TabsContent>
+                        <ShimmerButton loading={isLoading} disabled={isLoading}>
+                          <span className="flex items-center gap-2 justify-center text-sm">
+                            تسجيل الدخول
+                            <ArrowLeft className="w-4 h-4" />
+                          </span>
+                        </ShimmerButton>
+                      </motion.form>
+                    )}
+                  </AnimatePresence>
 
-                  {/* ====== Mobile Register Tab ====== */}
-                  <TabsContent value="register" className="p-5 pt-4 mt-0">
-                    <div className="space-y-3 mb-4">
-                      <Label className="text-xs font-medium">نوع الحساب</Label>
-                      <div className="grid grid-cols-2 gap-2">
-                        <motion.button
-                          type="button"
-                          whileTap={{ scale: 0.96 }}
-                          onClick={() => { setRegisterRole('beneficiary'); clearError(); }}
-                          className={cn(
-                            'rounded-xl p-3 text-center transition-all duration-300 border-2',
-                            registerRole === 'beneficiary'
-                              ? 'border-purple-500/50 bg-gradient-to-br from-purple-500/10 to-purple-600/5 text-purple-700 dark:text-purple-400 shadow-md shadow-purple-500/10'
-                              : 'border-border/50 bg-muted/30 text-muted-foreground'
-                          )}
-                        >
-                          <div className={cn(
-                            'w-8 h-8 rounded-lg mx-auto mb-1 flex items-center justify-center transition-all duration-300',
-                            registerRole === 'beneficiary'
-                              ? 'bg-gradient-to-br from-purple-500 to-purple-700 text-white'
-                              : 'bg-muted text-muted-foreground'
-                          )}>
-                            <User className="w-4 h-4" />
-                          </div>
-                          <span className="text-xs font-bold">مستفيد</span>
-                          <p className="text-[9px] text-muted-foreground mt-0.5">رعاية منزلية</p>
-                        </motion.button>
-                        <motion.button
-                          type="button"
-                          whileTap={{ scale: 0.96 }}
-                          onClick={() => { setRegisterRole('nurse'); clearError(); }}
-                          className={cn(
-                            'rounded-xl p-3 text-center transition-all duration-300 border-2',
-                            registerRole === 'nurse'
-                              ? 'border-sky-500/50 bg-gradient-to-br from-sky-500/10 to-sky-600/5 text-sky-700 dark:text-sky-400 shadow-md shadow-sky-500/10'
-                              : 'border-border/50 bg-muted/30 text-muted-foreground'
-                          )}
-                        >
-                          <div className={cn(
-                            'w-8 h-8 rounded-lg mx-auto mb-1 flex items-center justify-center transition-all duration-300',
-                            registerRole === 'nurse'
-                              ? 'bg-gradient-to-br from-sky-500 to-sky-700 text-white'
-                              : 'bg-muted text-muted-foreground'
-                          )}>
-                            <Stethoscope className="w-4 h-4" />
-                          </div>
-                          <span className="text-xs font-bold">ممرض/ـة</span>
-                          <p className="text-[9px] text-muted-foreground mt-0.5">ممرض معتمد</p>
-                        </motion.button>
-                      </div>
-                    </div>
+                  {/* Mobile Register Forms */}
+                  <AnimatePresence mode="wait">
+                    {activeTab === 'register' && (
+                      <motion.div
+                        key="m-register-container"
+                        initial={{ opacity: 0, x: 15 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: -15 }}
+                        transition={{ duration: 0.25 }}
+                        className="space-y-3"
+                      >
+                        {/* Role selector */}
+                        <div className="grid grid-cols-2 gap-2">
+                          <RoleCard
+                            role="beneficiary"
+                            isActive={registerRole === 'beneficiary'}
+                            onClick={() => { setRegisterRole('beneficiary'); clearError(); }}
+                            icon={User}
+                            title="مستفيد"
+                            subtitle="رعاية منزلية"
+                            activeColor="from-purple-500 to-purple-700"
+                          />
+                          <RoleCard
+                            role="nurse"
+                            isActive={registerRole === 'nurse'}
+                            onClick={() => { setRegisterRole('nurse'); clearError(); }}
+                            icon={Stethoscope}
+                            title="ممرض/ـة"
+                            subtitle="ممرض معتمد"
+                            activeColor="from-sky-500 to-sky-700"
+                          />
+                        </div>
 
-                    <AnimatePresence mode="wait">
-                      {registerRole === 'beneficiary' && (
-                        <motion.form key="m-beneficiary-form" initial={{ opacity: 0, x: -15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 15 }} transition={{ duration: 0.2 }} onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)} className="space-y-3">
-                          {/* Personal info */}
-                          <div className="bg-gradient-to-l from-purple-500/5 via-transparent to-purple-500/5 rounded-xl p-3 border border-purple-500/10 space-y-3">
-                            <div className="flex items-center gap-1.5">
-                              <User className="w-3.5 h-3.5 text-purple-500" />
-                              <span className="text-[10px] font-semibold text-purple-600 dark:text-purple-400">المعلومات الشخصية</span>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="m-ben-name" className="text-xs">الاسم الكامل</Label>
-                              <div className="relative"><User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-name" placeholder="الاسم الكامل" className="pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...beneficiaryForm.register('name')} /></div>
-                              {beneficiaryForm.formState.errors.name && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.name.message}</p>}
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="m-ben-phone" className="text-xs">رقم الهاتف</Label>
-                              <div className="relative"><Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('phone')} /></div>
-                              {beneficiaryForm.formState.errors.phone && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.phone.message}</p>}
-                            </div>
-                          </div>
-
-                          {/* Location info */}
-                          <div className="bg-gradient-to-l from-emerald-500/5 via-transparent to-emerald-500/5 rounded-xl p-3 border border-emerald-500/10 space-y-3">
-                            <div className="flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-emerald-500" />
-                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">معلومات الموقع</span>
-                            </div>
-                            <GpsLocationButton
-                              onLocationDetected={(loc) => {
-                                if (loc.governorate && loc.governorateValue) {
-                                  beneficiaryForm.setValue('governorate', loc.governorateValue);
-                                }
-                                if (loc.address || loc.district) {
-                                  beneficiaryForm.setValue('address', loc.district || loc.address);
-                                }
-                              }}
-                              size="sm"
-                              className="w-full"
-                            />
-                            <div className="space-y-1.5">
-                              <Label htmlFor="m-ben-address" className="text-xs">العنوان</Label>
-                              <div className="relative"><MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-address" placeholder="عنوانك التفصيلي" className="pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...beneficiaryForm.register('address')} /></div>
-                              {beneficiaryForm.formState.errors.address && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.address.message}</p>}
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="m-ben-referral" className="text-xs">كود الإحالة (اختياري)</Label>
-                              <Input id="m-ben-referral" placeholder="AF-XXXXXX" className="text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('referralCode')} />
-                            </div>
-                          </div>
-
-                          {/* Security */}
-                          <div className="bg-gradient-to-l from-amber-500/5 via-transparent to-amber-500/5 rounded-xl p-3 border border-amber-500/10 space-y-3">
-                            <div className="flex items-center gap-1.5">
-                              <Lock className="w-3.5 h-3.5 text-amber-500" />
-                              <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">الأمان</span>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="m-ben-password" className="text-xs">كلمة المرور</Label>
-                              <div className="relative"><Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...beneficiaryForm.register('password')} /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
-                              <PasswordStrengthBar password={beneficiaryPasswordValue} />
-                              {beneficiaryForm.formState.errors.password && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.password.message}</p>}
-                            </div>
-                          </div>
-
-                          <motion.div whileTap={{ scale: 0.98 }}>
-                            <Button type="submit" className="w-full h-11 text-sm font-bold rounded-xl bg-gradient-to-l from-purple-500 to-purple-700 hover:opacity-90 text-white shadow-lg transition-all duration-300" disabled={isLoading}>
-                              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />إنشاء حساب مستفيد</span>}
-                            </Button>
-                          </motion.div>
-                        </motion.form>
-                      )}
-
-                      {registerRole === 'nurse' && (
-                        <motion.form key="m-nurse-form" initial={{ opacity: 0, x: 15 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: -15 }} transition={{ duration: 0.2 }} onSubmit={nurseForm.handleSubmit(onNurseRegister)} className="space-y-3">
-                          {/* Personal info */}
-                          <div className="bg-gradient-to-l from-sky-500/5 via-transparent to-sky-500/5 rounded-xl p-3 border border-sky-500/10 space-y-3">
-                            <div className="flex items-center gap-1.5">
-                              <User className="w-3.5 h-3.5 text-sky-500" />
-                              <span className="text-[10px] font-semibold text-sky-600 dark:text-sky-400">المعلومات الشخصية</span>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="m-nurse-name" className="text-xs">الاسم الرباعي</Label>
-                              <motion.div
-                                className="relative"
-                                animate={nurseNameShake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
-                                transition={{ duration: 0.5, ease: 'easeInOut' }}
-                              >
-                                <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-                                <Input
-                                  id="m-nurse-name"
-                                  placeholder="الاسم الرباعي (أربعة أجزاء)"
-                                  className={cn(
-                                    'pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]',
-                                    nurseNameShake && 'border-red-500 focus:border-red-500'
-                                  )}
-                                  {...nurseForm.register('name')}
+                        <AnimatePresence mode="wait">
+                          {/* Mobile Beneficiary Form */}
+                          {registerRole === 'beneficiary' && (
+                            <motion.form
+                              key="m-beneficiary-form"
+                              initial={{ opacity: 0, x: -12 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: 12 }}
+                              transition={{ duration: 0.2 }}
+                              onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)}
+                              className="space-y-2.5"
+                            >
+                              {/* Personal info */}
+                              <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <User className="w-3 h-3 text-purple-400" />
+                                  <span className="text-[9px] font-semibold text-purple-400">المعلومات الشخصية</span>
+                                </div>
+                                <FloatingInput
+                                  id="m-ben-name"
+                                  label="الاسم الكامل"
+                                  icon={User}
+                                  registration={beneficiaryForm.register('name')}
+                                  error={beneficiaryForm.formState.errors.name?.message}
+                                  className="h-10"
                                 />
-                              </motion.div>
-                              {nurseNameWarning && (
+                                <FloatingInput
+                                  id="m-ben-phone"
+                                  label="رقم الهاتف"
+                                  icon={Phone}
+                                  type="tel"
+                                  dir="ltr"
+                                  registration={beneficiaryForm.register('phone')}
+                                  error={beneficiaryForm.formState.errors.phone?.message}
+                                  className="h-10"
+                                />
+                              </div>
+
+                              {/* Location */}
+                              <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <MapPin className="w-3 h-3 text-teal-400" />
+                                  <span className="text-[9px] font-semibold text-teal-400">معلومات الموقع</span>
+                                </div>
+                                <GpsLocationButton
+                                  onLocationDetected={(loc) => {
+                                    if (loc.governorate && loc.governorateValue) {
+                                      beneficiaryForm.setValue('governorate', loc.governorateValue);
+                                    }
+                                    if (loc.address || loc.district) {
+                                      beneficiaryForm.setValue('address', loc.district || loc.address);
+                                    }
+                                  }}
+                                  size="sm"
+                                  className="w-full"
+                                />
+                                <FloatingInput
+                                  id="m-ben-address"
+                                  label="العنوان"
+                                  icon={MapPin}
+                                  registration={beneficiaryForm.register('address')}
+                                  error={beneficiaryForm.formState.errors.address?.message}
+                                  className="h-10"
+                                />
+                                <FloatingInput
+                                  id="m-ben-referral"
+                                  label="كود الإحالة (اختياري)"
+                                  icon={Sparkles}
+                                  dir="ltr"
+                                  registration={beneficiaryForm.register('referralCode')}
+                                  className="h-10"
+                                />
+                              </div>
+
+                              {/* Security */}
+                              <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <Lock className="w-3 h-3 text-amber-400" />
+                                  <span className="text-[9px] font-semibold text-amber-400">الأمان</span>
+                                </div>
+                                <FloatingInput
+                                  id="m-ben-password"
+                                  label="كلمة المرور"
+                                  icon={Lock}
+                                  type={showPassword ? 'text' : 'password'}
+                                  dir="ltr"
+                                  showToggle
+                                  onToggle={() => setShowPassword(!showPassword)}
+                                  toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  registration={beneficiaryForm.register('password')}
+                                  error={beneficiaryForm.formState.errors.password?.message}
+                                  className="h-10"
+                                />
+                                <PasswordStrengthBar password={beneficiaryPasswordValue} />
+                              </div>
+
+                              <ShimmerButton loading={isLoading} disabled={isLoading}>
+                                <span className="flex items-center gap-2 justify-center text-sm">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  إنشاء حساب مستفيد
+                                </span>
+                              </ShimmerButton>
+                            </motion.form>
+                          )}
+
+                          {/* Mobile Nurse Form */}
+                          {registerRole === 'nurse' && (
+                            <motion.form
+                              key="m-nurse-form"
+                              initial={{ opacity: 0, x: 12 }}
+                              animate={{ opacity: 1, x: 0 }}
+                              exit={{ opacity: 0, x: -12 }}
+                              transition={{ duration: 0.2 }}
+                              onSubmit={nurseForm.handleSubmit(onNurseRegister)}
+                              className="space-y-2.5 max-h-[60vh] overflow-y-auto custom-scrollbar pl-1"
+                            >
+                              {/* Personal info */}
+                              <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <User className="w-3 h-3 text-sky-400" />
+                                  <span className="text-[9px] font-semibold text-sky-400">المعلومات الشخصية</span>
+                                </div>
                                 <motion.div
-                                  initial={{ opacity: 0, y: -5 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  className="flex items-center gap-1.5"
+                                  animate={nurseNameShake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
+                                  transition={{ duration: 0.5, ease: 'easeInOut' }}
                                 >
-                                  <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                                  <p className="text-xs text-red-500 font-medium">يجب أن تكتب اسمك الرباعي (أربعة أجزاء)</p>
+                                  <FloatingInput
+                                    id="m-nurse-name"
+                                    label="الاسم الرباعي"
+                                    icon={User}
+                                    registration={nurseForm.register('name')}
+                                    error={nurseNameShake ? undefined : nurseForm.formState.errors.name?.message}
+                                    className={cn('h-10', nurseNameShake && 'border-red-400/60!')}
+                                  />
                                 </motion.div>
-                              )}
-                              {nurseForm.formState.errors.name && !nurseNameWarning && <p className="text-xs text-destructive">{nurseForm.formState.errors.name.message}</p>}
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="m-nurse-phone" className="text-xs">رقم الهاتف</Label>
-                              <div className="relative"><Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...nurseForm.register('phone')} /></div>
-                              {nurseForm.formState.errors.phone && <p className="text-xs text-destructive">{nurseForm.formState.errors.phone.message}</p>}
-                            </div>
-                          </div>
+                                {nurseNameWarning && (
+                                  <motion.div
+                                    initial={{ opacity: 0, y: -5 }}
+                                    animate={{ opacity: 1, y: 0 }}
+                                    className="flex items-center gap-1.5"
+                                  >
+                                    <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
+                                    <p className="text-[10px] text-red-400 font-medium">يجب أن تكتب اسمك الرباعي (أربعة أجزاء)</p>
+                                  </motion.div>
+                                )}
+                                {nurseForm.formState.errors.name && !nurseNameWarning && (
+                                  <p className="text-xs text-red-400">{nurseForm.formState.errors.name.message}</p>
+                                )}
+                                <FloatingInput
+                                  id="m-nurse-phone"
+                                  label="رقم الهاتف"
+                                  icon={Phone}
+                                  type="tel"
+                                  dir="ltr"
+                                  registration={nurseForm.register('phone')}
+                                  error={nurseForm.formState.errors.phone?.message}
+                                  className="h-10"
+                                />
+                              </div>
 
-                          {/* Professional info */}
-                          <div className="bg-gradient-to-l from-violet-500/5 via-transparent to-violet-500/5 rounded-xl p-3 border border-violet-500/10 space-y-3">
-                            <div className="flex items-center gap-1.5">
-                              <Stethoscope className="w-3.5 h-3.5 text-violet-500" />
-                              <span className="text-[10px] font-semibold text-violet-600 dark:text-violet-400">المعلومات المهنية</span>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label className="text-xs">التخصص</Label>
-                              <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}><SelectTrigger className="h-10 rounded-xl border-border/50 bg-background/50"><SelectValue placeholder="اختر التخصص" /></SelectTrigger><SelectContent>{specializations.map((spec) => (<SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>))}</SelectContent></Select>
-                              {nurseForm.formState.errors.specialization && <p className="text-xs text-destructive">{nurseForm.formState.errors.specialization.message}</p>}
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="m-nurse-license" className="text-xs">رقم الترخيص</Label>
-                              <Input id="m-nurse-license" placeholder="رقم ترخيص المهنة" className="text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...nurseForm.register('licenseNumber')} />
-                              {nurseForm.formState.errors.licenseNumber && <p className="text-xs text-destructive">{nurseForm.formState.errors.licenseNumber.message}</p>}
-                            </div>
-                          </div>
+                              {/* Professional info */}
+                              <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <Stethoscope className="w-3 h-3 text-violet-400" />
+                                  <span className="text-[9px] font-semibold text-violet-400">المعلومات المهنية</span>
+                                </div>
+                                <div className="space-y-1.5">
+                                  <Label className="text-[10px] text-white/40">التخصص</Label>
+                                  <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}>
+                                    <SelectTrigger className="h-10 rounded-xl bg-white/[0.06] border-white/[0.1] text-white/80 text-xs hover:bg-white/[0.08] focus:border-purple-400/50">
+                                      <SelectValue placeholder="اختر التخصص" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {specializations.map((spec) => (
+                                        <SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                  {nurseForm.formState.errors.specialization && (
+                                    <p className="text-[10px] text-red-400">{nurseForm.formState.errors.specialization.message}</p>
+                                  )}
+                                </div>
+                                <FloatingInput
+                                  id="m-nurse-license"
+                                  label="رقم الترخيص"
+                                  icon={Shield}
+                                  registration={nurseForm.register('licenseNumber')}
+                                  error={nurseForm.formState.errors.licenseNumber?.message}
+                                  className="h-10"
+                                />
+                              </div>
 
-                          {/* Location info */}
-                          <div className="bg-gradient-to-l from-emerald-500/5 via-transparent to-emerald-500/5 rounded-xl p-3 border border-emerald-500/10 space-y-3">
-                            <div className="flex items-center gap-1.5">
-                              <MapPin className="w-3.5 h-3.5 text-emerald-500" />
-                              <span className="text-[10px] font-semibold text-emerald-600 dark:text-emerald-400">معلومات الموقع</span>
-                            </div>
-                            <GpsLocationButton
-                              onLocationDetected={(loc) => {
-                                if (loc.governorate && loc.governorateValue) {
-                                  nurseForm.setValue('governorate', loc.governorateValue);
-                                }
-                                if (loc.address || loc.district) {
-                                  nurseForm.setValue('address', loc.district || loc.address);
-                                }
-                              }}
-                              size="sm"
-                              className="w-full"
-                            />
-                            <div className="space-y-1.5">
-                              <Label htmlFor="m-nurse-address" className="text-xs">العنوان التفصيلي</Label>
-                              <div className="relative"><MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-address" placeholder="العنوان التفصيلي" className="pr-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" {...nurseForm.register('address')} /></div>
-                              {nurseForm.formState.errors.address && <p className="text-xs text-destructive">{nurseForm.formState.errors.address.message}</p>}
-                            </div>
-                          </div>
+                              {/* Location info */}
+                              <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <MapPin className="w-3 h-3 text-teal-400" />
+                                  <span className="text-[9px] font-semibold text-teal-400">معلومات الموقع</span>
+                                </div>
+                                <GpsLocationButton
+                                  onLocationDetected={(loc) => {
+                                    if (loc.governorate && loc.governorateValue) {
+                                      nurseForm.setValue('governorate', loc.governorateValue);
+                                    }
+                                    if (loc.address || loc.district) {
+                                      nurseForm.setValue('address', loc.district || loc.address);
+                                    }
+                                  }}
+                                  size="sm"
+                                  className="w-full"
+                                />
+                                <FloatingInput
+                                  id="m-nurse-address"
+                                  label="العنوان التفصيلي"
+                                  icon={MapPin}
+                                  registration={nurseForm.register('address')}
+                                  error={nurseForm.formState.errors.address?.message}
+                                  className="h-10"
+                                />
+                              </div>
 
-                          {/* Security */}
-                          <div className="bg-gradient-to-l from-amber-500/5 via-transparent to-amber-500/5 rounded-xl p-3 border border-amber-500/10 space-y-3">
-                            <div className="flex items-center gap-1.5">
-                              <Lock className="w-3.5 h-3.5 text-amber-500" />
-                              <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">الأمان</span>
-                            </div>
-                            <div className="space-y-1.5">
-                              <Label htmlFor="m-nurse-password" className="text-xs">كلمة المرور</Label>
-                              <div className="relative"><Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-nurse-password" type={showPassword ? 'text' : 'password'} placeholder="••••••" className="pr-10 pl-10 text-right h-10 rounded-xl border-border/50 bg-background/50 focus:bg-background transition-all duration-200 focus:scale-[1.01]" dir="ltr" {...nurseForm.register('password')} /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">{showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}</button></div>
-                              <PasswordStrengthBar password={nursePasswordValue} />
-                              {nurseForm.formState.errors.password && <p className="text-xs text-destructive">{nurseForm.formState.errors.password.message}</p>}
-                            </div>
-                          </div>
+                              {/* Security */}
+                              <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                                <div className="flex items-center gap-1.5">
+                                  <Lock className="w-3 h-3 text-amber-400" />
+                                  <span className="text-[9px] font-semibold text-amber-400">الأمان</span>
+                                </div>
+                                <FloatingInput
+                                  id="m-nurse-password"
+                                  label="كلمة المرور"
+                                  icon={Lock}
+                                  type={showPassword ? 'text' : 'password'}
+                                  dir="ltr"
+                                  showToggle
+                                  onToggle={() => setShowPassword(!showPassword)}
+                                  toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                                  registration={nurseForm.register('password')}
+                                  error={nurseForm.formState.errors.password?.message}
+                                  className="h-10"
+                                />
+                                <PasswordStrengthBar password={nursePasswordValue} />
+                              </div>
 
-                          <motion.div whileTap={{ scale: 0.98 }}>
-                            <Button type="submit" className="w-full h-11 text-sm font-bold rounded-xl bg-gradient-to-l from-sky-500 to-sky-700 hover:opacity-90 text-white shadow-lg transition-all duration-300" disabled={isLoading}>
-                              {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4" />إنشاء حساب ممرض/ـة</span>}
-                            </Button>
-                          </motion.div>
-                        </motion.form>
-                      )}
-                    </AnimatePresence>
-                  </TabsContent>
-                </Tabs>
+                              <ShimmerButton loading={isLoading} disabled={isLoading} className="from-sky-600 via-cyan-600 to-teal-600 hover:from-sky-500 hover:via-cyan-500 hover:to-teal-500 shadow-sky-500/25">
+                                <span className="flex items-center gap-2 justify-center text-sm">
+                                  <CheckCircle2 className="w-4 h-4" />
+                                  إنشاء حساب ممرض/ـة
+                                </span>
+                              </ShimmerButton>
+                            </motion.form>
+                          )}
+                        </AnimatePresence>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -1745,16 +1924,21 @@ function LoginPageContent() {
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-600 via-purple-700 to-sky-700" dir="rtl">
-        <div className="text-center">
-          <div className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-white/20 backdrop-blur-xl border border-white/30">
-            <Heart className="w-8 h-8 text-white animate-pulse" fill="currentColor" />
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-violet-950 via-purple-900 to-slate-950" dir="rtl">
+          <div className="flex flex-col items-center gap-4">
+            <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center animate-pulse">
+              <Heart className="w-8 h-8 text-white/60" fill="currentColor" />
+            </div>
+            <div className="flex items-center gap-2 text-white/40 text-sm">
+              <Loader2 className="w-4 h-4 animate-spin" />
+              <span>جارٍ التحميل...</span>
+            </div>
           </div>
-          <p className="text-white/70 text-sm">جارٍ تحميل صفحة تسجيل الدخول...</p>
         </div>
-      </div>
-    }>
+      }
+    >
       <LoginPageContent />
     </Suspense>
   );
