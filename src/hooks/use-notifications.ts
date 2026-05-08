@@ -12,7 +12,7 @@ import { useNotificationStore, type NotificationItem } from '@/lib/stores/notifi
 import { notificationManager, type AppNotification } from '@/lib/notifications/notification-manager';
 import { voiceManager } from '@/lib/notifications/voice-manager';
 import { soundManager } from '@/lib/notifications/sound-manager';
-import { firebaseClient } from '@/lib/notifications/firebase-client';
+import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { socketService } from '@/lib/socket';
 import type { NotificationEvent, NotificationType, NotificationPriority } from '@/types';
 import { useAuthStore } from '@/lib/stores/auth-store';
@@ -415,59 +415,44 @@ export function useNotificationTTS(): UseNotificationTTSReturn {
 }
 
 // ============================================================================
-// useFCMToken - Manage FCM token registration
+// useFCMToken - Manage Web Push subscription (VAPID-based, NO Firebase)
 // ============================================================================
 
 interface UseFCMTokenReturn {
-  /** Current FCM token */
-  token: string | null;
-  /** Whether Firebase is configured */
-  isConfigured: boolean;
-  /** Whether Firebase is initialized */
-  isInitialized: boolean;
-  /** Request FCM token */
-  requestToken: () => Promise<string | null>;
+  /** Whether push notifications are supported */
+  isSupported: boolean;
+  /** Whether the user is currently subscribed */
+  isSubscribed: boolean;
+  /** Current notification permission status */
+  permission: NotificationPermission | 'default';
+  /** Subscribe to push notifications */
+  subscribe: () => Promise<boolean>;
+  /** Unsubscribe from push notifications */
+  unsubscribe: () => Promise<boolean>;
+  /** Whether a subscribe/unsubscribe operation is in progress */
+  isLoading: boolean;
+  /** Last error message, if any */
+  error: string | null;
 }
 
 export function useFCMToken(): UseFCMTokenReturn {
-  const [token, setToken] = useState<string | null>(null);
-  const [isInitialized, setIsInitialized] = useState(false);
-  const { user } = useAuthStore();
+  const { isSupported, isSubscribed, permission, subscribe, unsubscribe, isLoading, error } =
+    usePushNotifications();
 
-  // Initialize Firebase when user is authenticated
+  // Auto-subscribe when user logs in and has granted permission
   useEffect(() => {
-    if (!user) return;
-
-    firebaseClient.init().then(() => {
-      setIsInitialized(firebaseClient.isInitialized());
-    });
-  }, [user]);
-
-  const requestToken = useCallback(async (): Promise<string | null> => {
-    const fcmToken = await firebaseClient.getToken();
-    if (fcmToken) {
-      setToken(fcmToken);
-
-      // Register token with backend
-      const platform = typeof navigator !== 'undefined'
-        ? /Android/i.test(navigator.userAgent)
-          ? 'android'
-          : /iPhone|iPad|iPod/i.test(navigator.userAgent)
-            ? 'ios'
-            : 'web'
-        : 'web';
-
-      const deviceId = typeof crypto !== 'undefined' ? crypto.randomUUID() : 'default';
-
-      await notificationManager.registerFCMToken(fcmToken, platform, deviceId);
+    if (isSupported && !isSubscribed && permission === 'granted' && !isLoading) {
+      subscribe();
     }
-    return fcmToken;
-  }, []);
+  }, [isSupported, isSubscribed, permission, subscribe, isLoading]);
 
   return {
-    token,
-    isConfigured: firebaseClient.isConfigured(),
-    isInitialized,
-    requestToken,
+    isSupported,
+    isSubscribed,
+    permission,
+    subscribe,
+    unsubscribe,
+    isLoading,
+    error,
   };
 }

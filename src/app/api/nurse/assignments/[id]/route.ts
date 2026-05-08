@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 async function handleAssignmentAction(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -61,6 +62,17 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
           actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,
         });
+
+        // Send push notification to beneficiary
+        sendPushToUser(order.beneficiaryId.toString(), {
+          title: 'تم قبول طلبك',
+          body: `تم قبول طلبك من ${nurse?.name || 'الممرض/ـة'} وسيقوم بالوصول قريباً`,
+          type: 'service_accepted',
+          priority: 'high',
+          url: `/beneficiary/orders/${id}`,
+          userRole: 'beneficiary',
+          data: { requestId: id, status: 'accepted' },
+        }).catch(() => {}); // Non-blocking
       } catch {
         // Non-critical
       }
@@ -87,6 +99,21 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
           data: { requestId: id, status: 'rejected', nurseId: user.userId },
           voiceEnabled: false,
         });
+
+        // Send push notification to admins
+        const { User } = await import('@/models/mongoose');
+        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        for (const admin of admins) {
+          sendPushToUser(admin._id.toString(), {
+            title: 'رفض ممرض طلباً',
+            body: `رفض الممرض ${nurse?.name || 'غير معروف'} الطلب الموكل إليه`,
+            type: 'service_cancelled',
+            priority: 'high',
+            url: '/admin/orders',
+            userRole: 'admin',
+            data: { requestId: id, status: 'rejected' },
+          }).catch(() => {});
+        }
       } catch {
         // Non-critical
       }

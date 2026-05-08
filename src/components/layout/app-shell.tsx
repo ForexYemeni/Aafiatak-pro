@@ -9,6 +9,7 @@ import { BottomNav } from './bottom-nav';
 import { TopHeader } from './top-header';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { PushNotificationSetup } from '@/components/common/push-notification-setup';
 import type { UserRole } from '@/types';
 
 interface AppShellProps {
@@ -24,6 +25,9 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="min-h-screen flex flex-col" dir="rtl" lang="ar">
+      {/* Push Notification Auto-Setup */}
+      <PushNotificationSetup />
+
       {/* Top Header */}
       <TopHeader
         onMenuToggle={() => setSidebarOpen(!sidebarOpen)}

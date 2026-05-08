@@ -5,7 +5,9 @@ export type Platform = 'web' | 'android' | 'ios';
 
 export interface IFCMToken extends Document {
   userId: Types.ObjectId;
-  token: string;
+  endpoint: string;
+  p256dh: string;
+  auth: string;
   platform: Platform;
   deviceId: string;
   isActive: boolean;
@@ -20,17 +22,27 @@ const fcmTokenSchema = new Schema<IFCMToken>(
     userId: {
       type: Schema.Types.ObjectId,
       required: [true, 'معرف المستخدم مطلوب'],
+      index: true,
     },
-    token: {
+    endpoint: {
       type: String,
-      required: [true, 'رمز FCM مطلوب'],
-      unique: true,
+      required: [true, 'رابط الاشتراك مطلوب'],
+      trim: true,
+    },
+    p256dh: {
+      type: String,
+      required: [true, 'مفتاح التشفير مطلوب'],
+      trim: true,
+    },
+    auth: {
+      type: String,
+      required: [true, 'مفتاح المصادقة مطلوب'],
       trim: true,
     },
     platform: {
       type: String,
       enum: ['web', 'android', 'ios'] as const,
-      required: [true, 'المنصة مطلوبة'],
+      default: 'web',
     },
     deviceId: {
       type: String,
@@ -40,10 +52,11 @@ const fcmTokenSchema = new Schema<IFCMToken>(
     isActive: {
       type: Boolean,
       default: true,
+      index: true,
     },
     lastUsedAt: {
       type: Date,
-      default: null,
+      default: Date.now,
     },
   },
   {
@@ -58,9 +71,10 @@ const fcmTokenSchema = new Schema<IFCMToken>(
 );
 
 // ── Indexes ─────────────────────────────────────────────────────────
-fcmTokenSchema.index({ userId: 1 });
-fcmTokenSchema.index({ token: 1 }, { unique: true });
-fcmTokenSchema.index({ isActive: 1 });
+// Compound index: one active subscription per device per user
+fcmTokenSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
+// Index for cleanup of expired subscriptions
+fcmTokenSchema.index({ endpoint: 1 });
 fcmTokenSchema.index({ userId: 1, isActive: 1 });
 
 // ── Model ───────────────────────────────────────────────────────────

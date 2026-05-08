@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { creditNurseEarnings } from '@/lib/api/helpers';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -48,6 +49,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           data: { requestId: id, status: 'in_progress' },
           voiceEnabled: true,
         });
+
+        // Send push notification to beneficiary
+        sendPushToUser(order.beneficiaryId.toString(), {
+          title: 'بدأ تنفيذ طلبك',
+          body: 'بدأ الممرض بتنفيذ طلب الخدمة الخاص بك',
+          type: 'service_started',
+          priority: 'medium',
+          url: `/beneficiary/orders/${id}`,
+          userRole: 'beneficiary',
+          data: { requestId: id, status: 'in_progress' },
+        }).catch(() => {}); // Non-blocking
       } catch {
         // Non-critical
       }
@@ -93,6 +105,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           data: { requestId: id, status: 'completed' },
           voiceEnabled: true,
         });
+
+        // Send push notification to beneficiary
+        sendPushToUser(order.beneficiaryId.toString(), {
+          title: 'تم إكمال طلبك',
+          body: 'تم إكمال طلب الخدمة بنجاح. يرجى تقييم الخدمة',
+          type: 'service_completed',
+          priority: 'high',
+          url: `/beneficiary/orders/${id}`,
+          userRole: 'beneficiary',
+          data: { requestId: id, status: 'completed' },
+        }).catch(() => {}); // Non-blocking
       } catch {
         // Non-critical
       }

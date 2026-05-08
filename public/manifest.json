@@ -54,5 +54,6 @@
     }
   ],
   "screenshots": [],
-  "prefer_related_applications": false
+  "prefer_related_applications": false,
+  "gcm_sender_id": "103953800507"
 }

@@ -7,6 +7,7 @@ import { ServiceRequest, Service, Beneficiary, Nurse, AdminSettings, Transaction
 import { createErrorResponse } from '@/lib/auth';
 import { requireAuth } from '@/lib/auth/middleware';
 import { calculatePricing } from '@/lib/api/helpers';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -228,6 +229,17 @@ export async function POST(request: NextRequest) {
           data: { orderId: order._id.toString(), serviceId },
           read: false,
         });
+
+        // Send push notification to admin
+        sendPushToUser(admin._id.toString(), {
+          title: isCashPayment ? 'طلب خدمة جديد' : 'طلب جديد بانتظار تأكيد الدفع',
+          body: adminMsg,
+          type: isEmergency ? 'emergency' : 'service_request',
+          priority: isEmergency ? 'urgent' : 'high',
+          url: '/admin/orders',
+          userRole: 'admin',
+          data: { orderId: order._id.toString(), serviceId },
+        }).catch(() => {}); // Non-blocking
       }
     } catch {
       // Notification creation should not block order creation

@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -48,6 +49,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         actionUrl: '/nurse',
         voiceEnabled: true,
       });
+
+      // Send push notification to the assigned nurse
+      sendPushToUser(nurseId, {
+        title: 'طلب خدمة جديد',
+        body: 'تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول',
+        type: 'service_assigned',
+        priority: 'high',
+        url: '/nurse',
+        userRole: 'nurse',
+        data: { requestId: id, assignmentType: 'service' },
+      }).catch(() => {}); // Non-blocking
     } catch {
       // Non-critical
     }

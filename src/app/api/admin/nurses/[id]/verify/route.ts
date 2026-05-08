@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Nurse, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -52,6 +53,19 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data: { verificationStatus: status },
         voiceEnabled: true,
       });
+
+      // Send push notification to nurse
+      sendPushToUser(id, {
+        title: status === 'verified' ? 'تم توثيق حسابك' : 'تم رفض التوثيق',
+        body: status === 'verified'
+          ? 'تهانينا! تم توثيق حسابك بنجاح. يمكنك الآن استقبال الطلبات'
+          : `تم رفض توثيق حسابك. السبب: ${rejectedReason || 'لم يتم تحديد سبب'}`,
+        type: 'verification',
+        priority: status === 'verified' ? 'medium' : 'high',
+        url: '/nurse/profile',
+        userRole: 'nurse',
+        data: { verificationStatus: status },
+      }).catch(() => {}); // Non-blocking
     } catch {
       // Notification creation should not block the main operation
     }

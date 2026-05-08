@@ -34,6 +34,10 @@ export type { IChatMessage } from './ChatMessage';
 export { Notification } from './Notification';
 export type { INotification } from './Notification';
 
+// FCM/Push Token model (Web Push subscriptions)
+export { default as FCMToken } from '@/models/FCMToken';
+export type { IFCMToken, Platform as FCMPlatform } from '@/models/FCMToken';
+
 // Rating model
 export { Rating } from './Rating';
 export type { IRating } from './Rating';
