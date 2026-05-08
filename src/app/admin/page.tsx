@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Stethoscope,
   Users,
@@ -14,6 +14,16 @@ import {
   RefreshCw,
   Search,
   Loader2,
+  Phone,
+  MessageCircle,
+  MapPin,
+  Clock,
+  Calendar,
+  User,
+  Navigation,
+  Zap,
+  XCircle,
+  CheckCircle2,
 } from 'lucide-react';
 import {
   LineChart,
@@ -37,6 +47,13 @@ import { useAuthFetch } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useSearchParams } from 'next/navigation';
@@ -133,6 +150,9 @@ export default function AdminDashboardPage() {
   const [searchResults, setSearchResults] = useState<any[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [showSearchResults, setShowSearchResults] = useState(false);
+
+  // Order detail dialog
+  const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
   const fetchDashboard = async () => {
     setIsLoading(true);
@@ -257,11 +277,17 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Open order details
+  // Open order details in dialog
   const openOrderDetails = (order: any) => {
-    // Navigate to orders page with the order ID, which will show it in a dialog
-    router.push(`/admin/orders?search=${encodeURIComponent(order.id.slice(-6))}`);
+    setSelectedOrder(order);
   };
+
+  // Get WhatsApp URL
+  function getWhatsAppUrl(phone: string) {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const withCode = cleanPhone.startsWith('0') ? '967' + cleanPhone.substring(1) : cleanPhone.startsWith('967') ? cleanPhone : '967' + cleanPhone;
+    return `https://wa.me/${withCode}`;
+  }
 
   if (isLoading) {
     return (
@@ -638,7 +664,7 @@ export default function AdminDashboardPage() {
                   </tr>
                 ) : (
                   recentOrders.map((order) => (
-                    <tr key={order.id} className="border-b border-border/50 hover:bg-accent/20 transition-colors">
+                    <tr key={order.id} className="border-b border-border/50 hover:bg-accent/20 transition-colors cursor-pointer" onClick={() => setSelectedOrder(order)}>
                       <td className="px-6 py-3 text-sm">{order.beneficiaryName}</td>
                       <td className="px-6 py-3 text-sm">{order.serviceName}</td>
                       <td className="px-6 py-3">
@@ -747,6 +773,113 @@ export default function AdminDashboardPage() {
           </div>
         </GlassCard>
       </motion.div>
+
+      {/* Order Detail Dialog */}
+      <Dialog open={!!selectedOrder} onOpenChange={(open) => { if (!open) setSelectedOrder(null); }}>
+        <DialogContent dir="rtl" className="max-w-lg max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-admin" />
+              تفاصيل الطلب #{selectedOrder?.id?.slice?.(-6)?.toUpperCase?.()}
+            </DialogTitle>
+          </DialogHeader>
+          {selectedOrder && (
+            <div className="space-y-4">
+              {/* Beneficiary Info */}
+              <div className="flex items-center gap-3 p-3 glass rounded-xl">
+                <Avatar className="w-12 h-12">
+                  <AvatarFallback className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                    <User className="w-5 h-5" />
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="font-semibold">{selectedOrder.beneficiaryName || 'غير معروف'}</p>
+                  {selectedOrder.beneficiaryPhone && (
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-sm text-muted-foreground">{selectedOrder.beneficiaryPhone}</span>
+                      <a href={`tel:${selectedOrder.beneficiaryPhone}`}><Phone className="w-3.5 h-3.5 text-blue-500" /></a>
+                      <a href={getWhatsAppUrl(selectedOrder.beneficiaryPhone)} target="_blank" rel="noopener noreferrer"><MessageCircle className="w-3.5 h-3.5 text-green-500" /></a>
+                    </div>
+                  )}
+                </div>
+                <BadgeStatus status={selectedOrder.status} size="md" />
+              </div>
+
+              {/* Order Details Grid */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="glass rounded-xl p-3">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                    <Stethoscope className="w-3.5 h-3.5" />
+                    <p className="text-xs">الخدمة</p>
+                  </div>
+                  <p className="text-sm font-medium">{selectedOrder.serviceName || 'خدمة'}</p>
+                </div>
+                <div className="glass rounded-xl p-3">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                    <Banknote className="w-3.5 h-3.5" />
+                    <p className="text-xs">المبلغ الإجمالي</p>
+                  </div>
+                  <p className="text-sm font-bold"><Currency amount={selectedOrder.totalPrice || 0} /></p>
+                </div>
+                <div className="glass rounded-xl p-3">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                    <User className="w-3.5 h-3.5" />
+                    <p className="text-xs">الممرض/ـة</p>
+                  </div>
+                  <p className="text-sm font-medium">{selectedOrder.nurseName || 'غير معيَّن'}</p>
+                </div>
+                <div className="glass rounded-xl p-3">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                    <Calendar className="w-3.5 h-3.5" />
+                    <p className="text-xs">التاريخ</p>
+                  </div>
+                  <p className="text-sm font-medium"><DateFormatter date={selectedOrder.createdAt} format="short" /></p>
+                </div>
+              </div>
+
+              {/* Location */}
+              {selectedOrder.beneficiaryAddress && (
+                <div className="glass rounded-xl p-3">
+                  <div className="flex items-center gap-1.5 text-muted-foreground mb-1">
+                    <MapPin className="w-3.5 h-3.5 text-red-500" />
+                    <p className="text-xs">الموقع</p>
+                  </div>
+                  <p className="text-sm font-medium">{selectedOrder.beneficiaryAddress}</p>
+                  {selectedOrder.beneficiaryLat && selectedOrder.beneficiaryLng && (
+                    <a href={`https://www.google.com/maps?q=${selectedOrder.beneficiaryLat},${selectedOrder.beneficiaryLng}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 mt-1">
+                      <Navigation className="w-3 h-3" /> عرض على الخريطة
+                    </a>
+                  )}
+                </div>
+              )}
+
+              {/* Emergency / Night / Friday badges */}
+              <div className="flex flex-wrap gap-2">
+                {selectedOrder.isEmergency && <Badge variant="destructive">طلب طوارئ</Badge>}
+                {selectedOrder.isNightService && <Badge className="bg-indigo-100 text-indigo-700">خدمة ليلية</Badge>}
+                {selectedOrder.isFridayService && <Badge className="bg-amber-100 text-amber-700">خدمة جمعة</Badge>}
+              </div>
+
+              {/* Notes */}
+              {selectedOrder.notes && (
+                <div className="glass rounded-xl p-3">
+                  <p className="text-xs text-muted-foreground">ملاحظات</p>
+                  <p className="text-sm">{selectedOrder.notes}</p>
+                </div>
+              )}
+
+              {/* Action Button - Go to full order management */}
+              <Button
+                onClick={() => router.push(`/admin/orders?search=${encodeURIComponent(selectedOrder.id.slice(-6))}`)}
+                className="w-full bg-admin hover:bg-admin/90 gap-2"
+              >
+                <ClipboardList className="w-4 h-4" />
+                إدارة الطلب بالكامل
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }
