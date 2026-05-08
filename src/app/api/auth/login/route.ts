@@ -66,6 +66,7 @@ export async function POST(request: NextRequest) {
         phone: user.phone,
         role: user.role,
         isActive: user.isActive,
+        permissions: user.permissions || [],
       },
       token,
       refreshToken,

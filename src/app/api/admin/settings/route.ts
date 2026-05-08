@@ -4,13 +4,13 @@
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { AdminSettings } from '@/models/mongoose';
-import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    const { user, error } = await requireSubadminPermission(request, 'manage_settings');
     if (error) return error;
 
     let settings = await AdminSettings.findOne().lean();

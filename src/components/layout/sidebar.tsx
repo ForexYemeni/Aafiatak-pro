@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { motion } from 'framer-motion';
@@ -27,29 +27,33 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
 import { Separator } from '@/components/ui/separator';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import type { UserRole } from '@/types';
+import type { UserRole, SubAdminPermission } from '@/types';
 
 interface NavItem {
   label: string;
   href: string;
   icon: React.ElementType;
   badge?: number;
+  /** Permission required for subadmins. If not set, only admin can see this item. */
+  permission?: SubAdminPermission;
+  /** Whether this item is always visible to subadmins (like dashboard) */
+  alwaysVisibleToSubadmin?: boolean;
 }
 
 const adminNavItems: NavItem[] = [
-  { label: 'لوحة التحكم', href: '/admin', icon: LayoutDashboard },
-  { label: 'الخدمات', href: '/admin/services', icon: Heart },
-  { label: 'الممرضون', href: '/admin/nurses', icon: Stethoscope },
-  { label: 'المستفيدون', href: '/admin/beneficiaries', icon: Users },
-  { label: 'الطلبات', href: '/admin/orders', icon: ClipboardList },
-  { label: 'الطوارئ', href: '/admin/emergencies', icon: AlertTriangle, badge: 0 },
-  { label: 'المدفوعات', href: '/admin/payments', icon: CreditCard },
-  { label: 'الكوبونات', href: '/admin/coupons', icon: Tags },
-  { label: 'التقييمات', href: '/admin/ratings', icon: Star },
-  { label: 'الشكاوى', href: '/admin/complaints', icon: MessageSquare },
-  { label: 'المديرون الفرعيون', href: '/admin/subadmins', icon: Shield },
-  { label: 'سجل النشاط', href: '/admin/activity/page', icon: ScrollText },
-  { label: 'الإعدادات', href: '/admin/settings', icon: Settings },
+  { label: 'لوحة التحكم', href: '/admin', icon: LayoutDashboard, alwaysVisibleToSubadmin: true },
+  { label: 'الخدمات', href: '/admin/services', icon: Heart, permission: 'manage_services' },
+  { label: 'الممرضون', href: '/admin/nurses', icon: Stethoscope, permission: 'manage_nurses' },
+  { label: 'المستفيدون', href: '/admin/beneficiaries', icon: Users, permission: 'manage_beneficiaries' },
+  { label: 'الطلبات', href: '/admin/orders', icon: ClipboardList, permission: 'manage_orders' },
+  { label: 'الطوارئ', href: '/admin/emergencies', icon: AlertTriangle, permission: 'manage_emergencies', badge: 0 },
+  { label: 'المدفوعات', href: '/admin/payments', icon: CreditCard, permission: 'manage_payments' },
+  { label: 'الكوبونات', href: '/admin/coupons', icon: Tags, permission: 'manage_payments' },
+  { label: 'التقييمات', href: '/admin/ratings', icon: Star, permission: 'view_reports' },
+  { label: 'الشكاوى', href: '/admin/complaints', icon: MessageSquare, permission: 'manage_chat' },
+  { label: 'المديرون الفرعيون', href: '/admin/subadmins', icon: Shield }, // Admin only - no permission key
+  { label: 'سجل النشاط', href: '/admin/activity/page', icon: ScrollText, permission: 'view_reports' },
+  { label: 'الإعدادات', href: '/admin/settings', icon: Settings, permission: 'manage_settings' },
 ];
 
 const nurseNavItems: NavItem[] = [
@@ -69,11 +73,20 @@ const beneficiaryNavItems: NavItem[] = [
   { label: 'الملف الشخصي', href: '/beneficiary/profile', icon: Users },
 ];
 
-function getNavItems(role: UserRole): NavItem[] {
+function getNavItems(role: UserRole, permissions?: SubAdminPermission[]): NavItem[] {
   switch (role) {
     case 'admin':
-    case 'subadmin':
       return adminNavItems;
+    case 'subadmin': {
+      // Filter items based on subadmin permissions
+      if (!permissions || permissions.length === 0) {
+        // Subadmin with no permissions only sees dashboard
+        return adminNavItems.filter(item => item.alwaysVisibleToSubadmin);
+      }
+      return adminNavItems.filter(item =>
+        item.alwaysVisibleToSubadmin || (item.permission && permissions.includes(item.permission))
+      );
+    }
     case 'nurse':
       return nurseNavItems;
     case 'beneficiary':
@@ -119,10 +132,13 @@ interface SidebarProps {
 
 export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
   const pathname = usePathname();
-  const navItems = getNavItems(role);
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
   const [collapsed, setCollapsed] = useState(false);
+
+  // Get subadmin permissions from user object
+  const subadminPermissions = (user as any)?.permissions as SubAdminPermission[] | undefined;
+  const navItems = useMemo(() => getNavItems(role, subadminPermissions), [role, subadminPermissions]);
 
   const roleLabelMap: Record<UserRole, string> = {
     admin: 'مدير النظام',

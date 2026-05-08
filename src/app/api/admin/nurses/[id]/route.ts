@@ -4,13 +4,13 @@
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Nurse, Notification } from '@/models/mongoose';
-import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
-    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    const { user, error } = await requireSubadminPermission(request, 'manage_nurses');
     if (error) return error;
 
     const { id } = await params;
@@ -28,7 +28,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
-    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    const { user, error } = await requireSubadminPermission(request, 'manage_nurses');
     if (error) return error;
 
     const { id } = await params;

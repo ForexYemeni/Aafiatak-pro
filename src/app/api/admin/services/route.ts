@@ -4,13 +4,13 @@
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Service } from '@/models/mongoose';
-import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    const { user, error } = requireRole(request, ['admin', 'subadmin']);
+    const { user, error } = await requireSubadminPermission(request, 'manage_services');
     if (error) return error;
 
     const { searchParams } = new URL(request.url);
