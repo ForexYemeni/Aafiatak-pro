@@ -135,28 +135,55 @@ export function NotificationBell({ className }: NotificationBellProps) {
   }, [isOpen, fetchNotifications]);
 
   const markAsRead = async (id: string) => {
+    // Optimistic update
     setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     setUnreadCount((prev) => Math.max(0, prev - 1));
     try {
-      await fetch(`/api/notifications/${id}/read`, {
+      const res = await fetch(`/api/notifications/${id}/read`, {
         method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ read: true }),
       });
+      if (!res.ok) {
+        // Revert on failure
+        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: false } : n)));
+        setUnreadCount((prev) => prev + 1);
+      }
     } catch {
-      // silent
+      // Revert on failure
+      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: false } : n)));
+      setUnreadCount((prev) => prev + 1);
     }
   };
 
   const markAllAsRead = async () => {
+    // Store previous state for rollback
+    const prevNotifications = [...notifications];
+    const prevUnreadCount = unreadCount;
+    // Optimistic update
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnreadCount(0);
     try {
-      await fetch('/api/notifications/read-all', {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch('/api/notifications/read-all', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({}),
       });
+      if (!res.ok) {
+        // Revert on failure
+        setNotifications(prevNotifications.map((n) => ({ ...n })));
+        setUnreadCount(prevUnreadCount);
+      }
     } catch {
-      // silent
+      // Revert on failure
+      setNotifications(prevNotifications.map((n) => ({ ...n })));
+      setUnreadCount(prevUnreadCount);
     }
   };
 
@@ -175,7 +202,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-80 p-0" align="start" dir="rtl">
+      <PopoverContent className="w-80 p-0" align="end" sideOffset={8} dir="rtl">
         <div className="flex items-center justify-between p-4">
           <h3 className="font-semibold text-sm">الإشعارات</h3>
           <div className="flex items-center gap-2">
