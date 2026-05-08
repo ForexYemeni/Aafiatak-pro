@@ -8,29 +8,39 @@ import {
   Send,
   Image as ImageIcon,
   Phone,
-  MapPin,
   Loader2,
   CheckCheck,
   Check,
-  Clock,
   User,
+  MessageCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { GlassCard } from '@/components/common/glass-card';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useAuthFetch } from '@/hooks/use-auth';
 import { useSocket } from '@/hooks/use-socket';
-import { useToast } from '@/hooks/use-toast';
-import type { ApiResponse, Message } from '@/types';
+import { toast } from 'sonner';
 
 interface ChatInfo {
   id: string;
   participantName: string;
   participantRole: string;
-  participantAvatar: string | null;
   participantPhone: string | null;
+  participantAvatar: string | null;
+}
+
+interface ChatMessage {
+  id: string;
+  chatId: string;
+  senderId: string;
+  senderRole: string;
+  content: string;
+  type: string;
+  imageUrl?: string;
+  readBy: string[];
+  createdAt: string;
 }
 
 const quickReplies = [
@@ -43,13 +53,13 @@ const quickReplies = [
 export default function ChatDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const chatId = params.id as string;
-  const token = useAuthStore((s) => s.token);
+  const chatParam = params.id as string;
+  const authFetch = useAuthFetch();
   const user = useAuthStore((s) => s.user);
-  const { toast } = useToast();
 
+  const [chatId, setChatId] = useState<string | null>(null);
   const [chatInfo, setChatInfo] = useState<ChatInfo | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [newMessage, setNewMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -59,44 +69,79 @@ export default function ChatDetailPage() {
   const { isConnected, service } = useSocket();
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const fetchChatInfo = useCallback(async () => {
-    if (!token || !chatId) return;
-    try {
-      const res = await fetch(`/api/chat`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data: ApiResponse<ChatInfo[]> = await res.json();
-      if (data.success && data.data) {
-        const found = data.data.find((c: ChatInfo) => c.id === chatId);
-        if (found) setChatInfo(found);
-      }
-    } catch {
-      // Error handled silently
-    }
-  }, [token, chatId]);
+  // The param could be a chatId or a nurseId - we need to resolve it
+  useEffect(() => {
+    const resolveChat = async () => {
+      setIsLoading(true);
+      try {
+        // First try: check if param is an existing chatId
+        const chatListRes = await authFetch('/api/chat');
+        const chatListData = await chatListRes.json();
 
+        if (chatListData.success && chatListData.data) {
+          const chats = chatListData.data;
+
+          // Check if chatParam is a chatId
+          const existingChat = chats.find((c: ChatInfo) => c.id === chatParam);
+          if (existingChat) {
+            setChatId(chatParam);
+            setChatInfo(existingChat);
+            return;
+          }
+
+          // Check if chatParam is a nurseId - find chat with this nurse
+          const nurseChat = chats.find((c: ChatInfo & { participantId?: string }) => {
+            // The chat list might have participant info we can match
+            return false; // We'll use the create endpoint instead
+          });
+
+          // If not found, create a new chat with this nurse
+          const createRes = await authFetch('/api/chat', {
+            method: 'POST',
+            body: JSON.stringify({
+              participantId: chatParam,
+              participantRole: 'nurse',
+            }),
+          });
+          const createData = await createRes.json();
+
+          if (createData.success && createData.data) {
+            setChatId(createData.data.id);
+            setChatInfo(createData.data);
+          }
+        }
+      } catch (err) {
+        console.error('Error resolving chat:', err);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    resolveChat();
+  }, [chatParam, authFetch]);
+
+  // Fetch messages once we have chatId
   const fetchMessages = useCallback(async () => {
-    if (!token || !chatId) return;
+    if (!chatId) return;
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/chat/${chatId}/messages?limit=50`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data: ApiResponse<Message[]> = await res.json();
+      const res = await authFetch(`/api/chat/${chatId}/messages?limit=50`);
+      const data = await res.json();
       if (data.success && data.data) {
-        setMessages(data.data);
+        // API returns { messages: [...], total, page, pages }
+        const msgs = data.data.messages || data.data;
+        setMessages(Array.isArray(msgs) ? msgs : []);
       }
     } catch {
       setMessages([]);
     } finally {
       setIsLoading(false);
     }
-  }, [token, chatId]);
+  }, [authFetch, chatId]);
 
   useEffect(() => {
-    fetchChatInfo();
-    fetchMessages();
-  }, [fetchChatInfo, fetchMessages]);
+    if (chatId) fetchMessages();
+  }, [chatId, fetchMessages]);
 
   // Socket listeners for real-time messages
   useEffect(() => {
@@ -104,17 +149,17 @@ export default function ChatDetailPage() {
 
     service.joinChat(chatId);
 
-    const unsubMessage = service.onMessage((event) => {
+    const unsubMessage = service.onMessage((event: any) => {
       if (event.chatId === chatId) {
         setMessages((prev) => {
-          const exists = prev.some((m) => m.id === event.message.id);
+          const exists = prev.some((m) => m.id === event.message?.id);
           if (exists) return prev;
           return [...prev, event.message];
         });
       }
     });
 
-    const unsubTyping = service.onTyping((event) => {
+    const unsubTyping = service.onTyping((event: any) => {
       if (event.chatId === chatId && event.userId !== user?.id) {
         setIsTyping(event.isTyping);
         if (event.isTyping) {
@@ -138,24 +183,20 @@ export default function ChatDetailPage() {
   }, [messages]);
 
   const sendMessage = async () => {
-    if (!newMessage.trim() || !token || !chatId) return;
+    if (!newMessage.trim() || !chatId) return;
     const messageContent = newMessage.trim();
     setNewMessage('');
     setIsSending(true);
 
     try {
-      const res = await fetch(`/api/chat/${chatId}/messages`, {
+      const res = await authFetch(`/api/chat/${chatId}/messages`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({
           content: messageContent,
           type: 'text',
         }),
       });
-      const data: ApiResponse<Message> = await res.json();
+      const data = await res.json();
       if (data.success && data.data) {
         setMessages((prev) => {
           const exists = prev.some((m) => m.id === data.data.id);
@@ -164,7 +205,7 @@ export default function ChatDetailPage() {
         });
       }
     } catch {
-      toast({ title: 'فشل إرسال الرسالة', variant: 'destructive' });
+      toast.error('فشل إرسال الرسالة');
     } finally {
       setIsSending(false);
     }
@@ -182,7 +223,17 @@ export default function ChatDetailPage() {
     return d.toLocaleTimeString('ar-YE', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const isMyMessage = (msg: Message) => msg.senderId === user?.id;
+  const isMyMessage = (msg: ChatMessage) => msg.senderId === user?.id || msg.senderId === user?._id;
+
+  if (!chatId && !isLoading) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+        <MessageCircle className="w-12 h-12 text-muted-foreground" />
+        <p className="text-muted-foreground">لم يتم العثور على المحادثة</p>
+        <Button onClick={() => router.back()}>العودة</Button>
+      </div>
+    );
+  }
 
   return (
     <div className="flex flex-col h-[calc(100vh-8rem)] -m-4 md:-m-6">
@@ -201,7 +252,7 @@ export default function ChatDetailPage() {
             {chatInfo?.participantName ?? 'الممرض/ـة'}
           </h3>
           <p className="text-xs text-muted-foreground">
-            {isTyping ? 'يكتب...' : 'متصل'}
+            {isTyping ? 'يكتب...' : isConnected ? 'متصل' : 'غير متصل'}
           </p>
         </div>
         {chatInfo?.participantPhone && (
@@ -317,8 +368,7 @@ export default function ChatDetailPage() {
           size="icon"
           className="shrink-0 h-10 w-10"
           onClick={() => {
-            // Image upload placeholder
-            toast({ title: 'قريباً - إرسال الصور' });
+            toast.info('قريباً - إرسال الصور');
           }}
         >
           <ImageIcon className="w-5 h-5 text-muted-foreground" />

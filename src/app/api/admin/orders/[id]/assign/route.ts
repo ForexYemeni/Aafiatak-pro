@@ -35,7 +35,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     ).lean();
     if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
-    // Create notification for the nurse
+    // Create notification for the nurse with action URL
     try {
       await Notification.create({
         userId: nurseId,
@@ -45,6 +45,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         type: 'assignment',
         priority: 'high',
         data: { requestId: id, assignmentType: 'service' },
+        actionUrl: '/nurse',
         voiceEnabled: true,
       });
     } catch {

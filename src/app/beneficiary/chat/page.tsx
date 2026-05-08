@@ -7,53 +7,46 @@ import {
   MessageCircle,
   Search,
   Clock,
-  User,
-  Stethoscope,
   Loader2,
 } from 'lucide-react';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Badge } from '@/components/ui/badge';
 import { GlassCard } from '@/components/common/glass-card';
 import { EmptyState } from '@/components/common/empty-state';
 import { ListSkeleton } from '@/components/common/loading-skeleton';
 import { SearchInput } from '@/components/common/search-input';
-import { useAuthStore } from '@/lib/stores/auth-store';
-import type { ApiResponse } from '@/types';
+import { useAuthFetch } from '@/hooks/use-auth';
 
 interface ChatConversation {
   id: string;
   participantName: string;
   participantRole: string;
+  participantPhone: string | null;
   lastMessage: string;
   lastMessageTime: string;
   unreadCount: number;
-  participantAvatar: string | null;
 }
 
 export default function ChatPage() {
   const router = useRouter();
-  const token = useAuthStore((s) => s.token);
+  const authFetch = useAuthFetch();
   const [chats, setChats] = useState<ChatConversation[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
   const fetchChats = useCallback(async () => {
-    if (!token) return;
     setIsLoading(true);
     try {
-      const res = await fetch('/api/chat', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data: ApiResponse<ChatConversation[]> = await res.json();
+      const res = await authFetch('/api/chat');
+      const data = await res.json();
       if (data.success && data.data) {
-        setChats(data.data);
+        setChats(Array.isArray(data.data) ? data.data : []);
       }
     } catch {
       setChats([]);
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [authFetch]);
 
   useEffect(() => {
     fetchChats();
@@ -98,7 +91,7 @@ export default function ChatPage() {
         <EmptyState
           icon={<MessageCircle className="w-10 h-10 text-muted-foreground" />}
           title="لا توجد محادثات"
-          description="ستظهر هنا محادثاتك مع الممرضين/ـات بعد إنشاء طلب"
+          description="ستظهر هنا محادثاتك مع الممرضين/ـات بعد تعيين ممرض لطلبك"
         />
       ) : (
         <div className="space-y-2 max-h-[calc(100vh-260px)] overflow-y-auto custom-scrollbar">
@@ -136,7 +129,7 @@ export default function ChatPage() {
                       </span>
                     </div>
                     <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">
-                      {chat.lastMessage}
+                      {chat.lastMessage || 'لا توجد رسائل بعد'}
                     </p>
                   </div>
                 </div>

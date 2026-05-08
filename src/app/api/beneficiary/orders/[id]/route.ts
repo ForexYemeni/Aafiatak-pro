@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { ServiceRequest, Beneficiary, Notification } from '@/models/mongoose';
+import { ServiceRequest, Beneficiary, Nurse, Service, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -20,7 +20,57 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const order = await ServiceRequest.findOne({ _id: id, beneficiaryId: user.userId }).lean();
     if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
-    return Response.json({ success: true, data: { ...order, id: order._id.toString() } });
+    // Populate nurse details
+    let nurseData: any = null;
+    if (order.nurseId) {
+      nurseData = await Nurse.findById(order.nurseId)
+        .select('name phone rating specialization isOnline')
+        .lean();
+    }
+
+    // Populate service details
+    const serviceData = await Service.findById(order.serviceId)
+      .select('nameAr category basePrice duration')
+      .lean();
+
+    const result: any = {
+      ...order,
+      id: order._id.toString(),
+      // Nurse details for beneficiary view
+      nurseName: nurseData?.name || null,
+      nursePhone: nurseData?.phone || null,
+      nurseRating: nurseData?.rating || 0,
+      nurseSpecialization: nurseData?.specialization?.map((s: string) => {
+        const labels: Record<string, string> = {
+          general_nursing: 'تمريض عام',
+          critical_care: 'رعاية حرجة',
+          pediatric: 'أطفال',
+          elderly_care: 'مسنين',
+          physiotherapy: 'علاج طبيعي',
+          wound_care: 'جروح',
+          iv_therapy: 'علاج وريدي',
+          mental_health: 'صحة نفسية',
+          post_surgery: 'بعد الجراحة',
+          emergency: 'طوارئ',
+        };
+        return labels[s] || s;
+      }).join(' • ') || null,
+      nurseIsOnline: nurseData?.isOnline || false,
+      // Service details
+      serviceName: serviceData?.nameAr || 'خدمة طبية',
+      // Pricing for compatibility
+      pricing: {
+        basePrice: order.basePrice,
+        nightFee: order.nightFee,
+        fridayFee: order.fridayFee,
+        emergencyFee: order.emergencyFee,
+        discount: order.discount,
+        totalPrice: order.totalPrice,
+        couponDiscount: order.discount,
+      },
+    };
+
+    return Response.json({ success: true, data: result });
   } catch (error) {
     console.error('[BENEFICIARY ORDER DETAIL ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
@@ -48,7 +98,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const order = await ServiceRequest.findOne({ _id: id, beneficiaryId: user.userId });
     if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
-    if (!['pending', 'assigned'].includes(order.status)) {
+    // Allow cancellation for pending, assigned, and accepted statuses
+    if (!['pending', 'assigned', 'accepted'].includes(order.status)) {
       return createErrorResponse('لا يمكن إلغاء الطلب في حالته الحالية', 400, 'INVALID_STATUS');
     }
 

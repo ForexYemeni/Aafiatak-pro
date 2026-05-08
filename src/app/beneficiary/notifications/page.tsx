@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Bell,
   CheckCheck,
-  ClipboardCheck,
+  ClipboardList,
   CreditCard,
   AlertTriangle,
   MessageCircle,
@@ -19,10 +19,21 @@ import { Separator } from '@/components/ui/separator';
 import { GlassCard } from '@/components/common/glass-card';
 import { EmptyState } from '@/components/common/empty-state';
 import { ListSkeleton } from '@/components/common/loading-skeleton';
-import { useAuthStore } from '@/lib/stores/auth-store';
-import type { ApiResponse, Notification, NotificationType } from '@/types';
+import { useAuthFetch } from '@/hooks/use-auth';
 
-const notificationTypeIcons: Record<NotificationType, React.ElementType> = {
+interface NotificationItem {
+  id: string;
+  titleAr: string;
+  bodyAr: string;
+  type: string;
+  priority: string;
+  read: boolean;
+  actionUrl?: string;
+  createdAt: string;
+  data?: Record<string, unknown>;
+}
+
+const notificationTypeIcons: Record<string, React.ElementType> = {
   assignment: ClipboardList,
   payment: CreditCard,
   emergency: AlertTriangle,
@@ -34,7 +45,7 @@ const notificationTypeIcons: Record<NotificationType, React.ElementType> = {
   system: Bell,
 };
 
-const notificationTypeColors: Record<NotificationType, string> = {
+const notificationTypeColors: Record<string, string> = {
   assignment: 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400',
   payment: 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400',
   emergency: 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400',
@@ -47,40 +58,35 @@ const notificationTypeColors: Record<NotificationType, string> = {
 };
 
 export default function NotificationsPage() {
-  const token = useAuthStore((s) => s.token);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const authFetch = useAuthFetch();
+  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [markingAll, setMarkingAll] = useState(false);
 
   const fetchNotifications = useCallback(async () => {
-    if (!token) return;
     setIsLoading(true);
     try {
-      const res = await fetch('/api/notifications?limit=50', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data: ApiResponse<Notification[]> = await res.json();
+      const res = await authFetch('/api/notifications?limit=50');
+      const data = await res.json();
       if (data.success && data.data) {
-        setNotifications(data.data);
+        // API returns { notifications: [...], total, unreadCount, ... }
+        const notifs = Array.isArray(data.data) ? data.data : (data.data.notifications || []);
+        setNotifications(notifs);
       }
     } catch {
       setNotifications([]);
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [authFetch]);
 
   useEffect(() => {
     fetchNotifications();
   }, [fetchNotifications]);
 
   const markAsRead = async (notifId: string) => {
-    if (!token) return;
     try {
-      await fetch(`/api/notifications/${notifId}/read`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await authFetch(`/api/notifications/${notifId}/read`, { method: 'PATCH' });
       setNotifications((prev) =>
         prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
       );
@@ -90,15 +96,10 @@ export default function NotificationsPage() {
   };
 
   const markAllAsRead = async () => {
-    if (!token) return;
     setMarkingAll(true);
     try {
-      await fetch('/api/notifications', {
+      await authFetch('/api/notifications', {
         method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
         body: JSON.stringify({ markAllRead: true }),
       });
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
@@ -125,7 +126,7 @@ export default function NotificationsPage() {
   };
 
   // Group notifications by date
-  const groupedNotifications = notifications.reduce<Record<string, Notification[]>>((acc, notif) => {
+  const groupedNotifications = notifications.reduce<Record<string, NotificationItem[]>>((acc, notif) => {
     const dateKey = new Date(notif.createdAt).toLocaleDateString('ar-YE', {
       year: 'numeric',
       month: 'long',

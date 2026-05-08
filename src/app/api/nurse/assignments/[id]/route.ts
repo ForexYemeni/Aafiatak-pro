@@ -47,16 +47,18 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
       order.status = 'accepted';
       await order.save();
 
-      // Notify beneficiary
+      // Notify beneficiary with action URL to view order details
       try {
+        const nurse = await Nurse.findById(user.userId).select('name').lean();
         await Notification.create({
           userId: order.beneficiaryId,
           userRole: 'beneficiary',
           titleAr: 'تم قبول طلبك',
-          bodyAr: 'تم قبول طلبك وسيقوم الممرض بالوصول قريباً',
+          bodyAr: `تم قبول طلبك من ${nurse?.name || 'الممرض/ـة'} وسيقوم بالوصول قريباً`,
           type: 'status_change',
-          priority: 'medium',
-          data: { requestId: id, status: 'accepted' },
+          priority: 'high',
+          data: { requestId: id, status: 'accepted', nurseId: user.userId },
+          actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,
         });
       } catch {
