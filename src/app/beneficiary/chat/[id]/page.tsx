@@ -143,6 +143,22 @@ export default function ChatDetailPage() {
     if (chatId) fetchMessages();
   }, [chatId, fetchMessages]);
 
+  // Mark chat-related notifications as read when opening a chat
+  useEffect(() => {
+    if (!chatId) return;
+    const markNotificationsRead = async () => {
+      try {
+        await authFetch('/api/notifications/read-all', {
+          method: 'POST',
+          body: JSON.stringify({ type: 'chat', chatId }),
+        });
+      } catch {
+        // silently handle
+      }
+    };
+    markNotificationsRead();
+  }, [chatId, authFetch]);
+
   // Polling for new messages every 3 seconds (fallback for when socket is not available)
   useEffect(() => {
     if (!chatId) return;

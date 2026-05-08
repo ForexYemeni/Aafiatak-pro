@@ -14,17 +14,17 @@ export async function GET(request: NextRequest) {
     const { user, error } = requireAuth(request);
     if (error) return error;
 
-    // Only subadmins can use this endpoint
-    if (user.role !== 'subadmin') {
-      return createErrorResponse('هذا المسار مخصص للمديرين الفرعيين فقط', 403, 'FORBIDDEN');
+    // Only subadmins and admins can use this endpoint
+    if (user.role !== 'subadmin' && user.role !== 'admin') {
+      return createErrorResponse('هذا المسار مخصص للمديرين فقط', 403, 'FORBIDDEN');
     }
 
-    const subadmin = await User.findById(user.userId).select('-password').lean();
-    if (!subadmin) return createErrorResponse('المستخدم غير موجود', 404, 'NOT_FOUND');
+    const dbUser = await User.findById(user.userId).select('-password').lean();
+    if (!dbUser) return createErrorResponse('المستخدم غير موجود', 404, 'NOT_FOUND');
 
     return Response.json({
       success: true,
-      data: { ...subadmin, id: subadmin._id.toString() },
+      data: { ...dbUser, id: dbUser._id.toString() },
     });
   } catch (error) {
     console.error('[SUBADMIN PROFILE GET ERROR]', error);
@@ -38,9 +38,9 @@ export async function PATCH(request: NextRequest) {
     const { user, error } = requireAuth(request);
     if (error) return error;
 
-    // Only subadmins can use this endpoint
-    if (user.role !== 'subadmin') {
-      return createErrorResponse('هذا المسار مخصص للمديرين الفرعيين فقط', 403, 'FORBIDDEN');
+    // Only subadmins and admins can use this endpoint
+    if (user.role !== 'subadmin' && user.role !== 'admin') {
+      return createErrorResponse('هذا المسار مخصص للمديرين فقط', 403, 'FORBIDDEN');
     }
 
     const body = await request.json();
@@ -71,10 +71,10 @@ export async function PATCH(request: NextRequest) {
     // Update password
     if (currentPassword && newPassword) {
       // Verify current password
-      const subadmin = await User.findById(user.userId).select('password').lean();
-      if (!subadmin) return createErrorResponse('المستخدم غير موجود', 404, 'NOT_FOUND');
+      const dbUser = await User.findById(user.userId).select('password').lean();
+      if (!dbUser) return createErrorResponse('المستخدم غير موجود', 404, 'NOT_FOUND');
 
-      const isPasswordValid = await verifyPassword(currentPassword, subadmin.password);
+      const isPasswordValid = await verifyPassword(currentPassword, dbUser.password);
       if (!isPasswordValid) {
         return createErrorResponse('كلمة المرور الحالية غير صحيحة', 400, 'INVALID_PASSWORD');
       }

@@ -5,6 +5,7 @@ import { motion } from 'framer-motion';
 import { MessageSquare, Search, ChevronLeft } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
+
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { GlassCard } from '@/components/common/glass-card';
 import { EmptyState } from '@/components/common/empty-state';
@@ -75,7 +76,7 @@ export default function NurseChatPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader title="المحادثات" description="تواصل مع المستفيدين" />
+      <PageHeader title="المحادثات" description="تواصل مع المستفيدين والدعم الفني" />
 
       {/* Search */}
       <div className="relative">
@@ -114,9 +115,14 @@ export default function NurseChatPage() {
                       </Avatar>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between">
-                          <p className="font-semibold text-sm truncate">
-                            {chat.participantName || 'مستفيد'}
-                          </p>
+                          <div className="flex items-center gap-2">
+                            <p className="font-semibold text-sm truncate">
+                              {chat.participantName || 'مستفيد'}
+                            </p>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                              {chat.participantRole === 'nurse' ? 'ممرض' : chat.participantRole === 'beneficiary' ? 'مستفيد' : chat.participantRole === 'admin' ? 'دعم فني' : chat.participantRole === 'subadmin' ? 'مدير فرعي' : chat.participantRole}
+                            </Badge>
+                          </div>
                           {chat.lastMessageTime && (
                             <span className="text-[10px] text-muted-foreground shrink-0">
                               {getRelativeTime(new Date(chat.lastMessageTime))}

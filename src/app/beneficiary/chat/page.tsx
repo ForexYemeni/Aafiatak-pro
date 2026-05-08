@@ -89,7 +89,7 @@ export default function ChatPage() {
         animate={{ opacity: 1, y: 0 }}
       >
         <h1 className="text-2xl font-bold">المحادثات</h1>
-        <p className="text-sm text-muted-foreground">محادثاتك مع الممرضين/ـات</p>
+        <p className="text-sm text-muted-foreground">محادثاتك مع الممرضين/ـات والدعم الفني</p>
       </motion.div>
 
       <SearchInput
@@ -104,7 +104,7 @@ export default function ChatPage() {
         <EmptyState
           icon={<MessageCircle className="w-10 h-10 text-muted-foreground" />}
           title="لا توجد محادثات"
-          description="ستظهر هنا محادثاتك مع الممرضين/ـات بعد تعيين ممرض لطلبك"
+          description="ستظهر هنا محادثاتك مع الممرضين/ـات والدعم الفني بعد تعيين ممرض لطلبك"
         />
       ) : (
         <div className="space-y-2 max-h-[calc(100vh-260px)] overflow-y-auto custom-scrollbar">

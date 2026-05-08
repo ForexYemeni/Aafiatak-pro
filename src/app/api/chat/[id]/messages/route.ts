@@ -41,6 +41,12 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       { $addToSet: { readBy: user.userId } }
     );
 
+    // Reset unread count for this user in the chat
+    await Chat.updateOne(
+      { _id: id },
+      { $set: { [`unreadCount.${user.userId}`]: 0 } }
+    );
+
     return Response.json({
       success: true,
       data: {

@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { Chat, ChatMessage, Nurse, Beneficiary } from '@/models/mongoose';
+import { Chat, ChatMessage, Nurse, Beneficiary, User } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
@@ -46,8 +46,15 @@ export async function GET(request: NextRequest) {
             participantName = beneficiary.name;
             participantPhone = beneficiary.phone || null;
           }
+        } else if (otherRole === 'admin' || otherRole === 'subadmin') {
+          const adminUser = await User.findById(otherUserId).select('name phone role').lean();
+          if (adminUser) {
+            participantName = adminUser.name;
+            participantPhone = adminUser.phone || null;
+          } else {
+            participantName = 'الإدارة';
+          }
         } else {
-          // Admin or other roles
           participantName = 'الإدارة';
         }
       }
@@ -69,6 +76,61 @@ export async function GET(request: NextRequest) {
         requestId: chat.requestId?.toString() || null,
       };
     }));
+
+    // Auto-ensure admin/support chat exists for nurses and beneficiaries
+    if (user.role === 'nurse' || user.role === 'beneficiary') {
+      const hasAdminChat = chats.some((chat: any) => {
+        return chat.participants.some((p: any) =>
+          (p.role === 'admin' || p.role === 'subadmin') &&
+          p.userId.toString() !== user.userId
+        );
+      });
+
+      if (!hasAdminChat) {
+        // Find an admin or subadmin to create a support chat with
+        const adminUser = await User.findOne({
+          role: { $in: ['admin', 'subadmin'] },
+          isActive: { $ne: false },
+        }).select('name phone role').sort({ role: 1 }).lean(); // Prefer admin over subadmin
+
+        if (adminUser) {
+          const supportChat = await Chat.create({
+            participants: [
+              { userId: user.userId, role: user.role, joinedAt: new Date() },
+              { userId: adminUser._id, role: adminUser.role, joinedAt: new Date() },
+            ],
+            unreadCount: {},
+            isActive: true,
+            lastMessageContent: 'مرحباً بك في الدعم الفني - كيف يمكننا مساعدتك؟',
+            lastMessageSender: adminUser._id.toString(),
+            lastMessageAt: new Date(),
+          });
+
+          // Create welcome message
+          await ChatMessage.create({
+            chatId: supportChat._id,
+            senderId: adminUser._id,
+            senderRole: adminUser.role,
+            content: 'مرحباً بك في الدعم الفني - كيف يمكننا مساعدتك؟',
+            type: 'system',
+            readBy: [adminUser._id],
+            isDeleted: false,
+          });
+
+          populatedChats.unshift({
+            id: supportChat._id.toString(),
+            participantName: 'الدعم الفني',
+            participantRole: adminUser.role,
+            participantPhone: adminUser.phone || null,
+            participantAvatar: null,
+            lastMessage: 'مرحباً بك في الدعم الفني - كيف يمكننا مساعدتك؟',
+            lastMessageTime: new Date().toISOString(),
+            unreadCount: 1,
+            requestId: null,
+          });
+        }
+      }
+    }
 
     return Response.json({
       success: true,
@@ -116,7 +178,7 @@ export async function POST(request: NextRequest) {
     let participantName = 'غير معروف';
     let participantPhone: string | null = null;
 
-    if (participantRole === 'nurse' || !participantRole) {
+    if (participantRole === 'nurse' || (!participantRole && await Nurse.findById(participantId))) {
       const nurse = await Nurse.findById(participantId).select('name phone').lean();
       if (nurse) {
         participantName = nurse.name;
@@ -127,6 +189,12 @@ export async function POST(request: NextRequest) {
       if (beneficiary) {
         participantName = beneficiary.name;
         participantPhone = beneficiary.phone || null;
+      }
+    } else if (participantRole === 'admin' || participantRole === 'subadmin') {
+      const adminUser = await User.findById(participantId).select('name phone role').lean();
+      if (adminUser) {
+        participantName = adminUser.role === 'admin' ? 'مدير النظام' : adminUser.name;
+        participantPhone = adminUser.phone || null;
       }
     }
 

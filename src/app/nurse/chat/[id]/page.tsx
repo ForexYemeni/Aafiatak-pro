@@ -42,6 +42,7 @@ interface ChatInfo {
   id: string;
   participantName: string;
   participantPhone: string | null;
+  participantRole?: string;
 }
 
 // ---- Quick Reply Suggestions ----
@@ -86,6 +87,7 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
               id: found.id,
               participantName: found.participantName || 'مستفيد',
               participantPhone: found.participantPhone || null,
+              participantRole: found.participantRole || 'unknown',
             });
           }
         }
@@ -116,6 +118,22 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
   useEffect(() => {
     if (chatId) fetchMessages();
   }, [chatId, fetchMessages]);
+
+  // Mark chat-related notifications as read when opening a chat
+  useEffect(() => {
+    if (!chatId) return;
+    const markNotificationsRead = async () => {
+      try {
+        await authFetch('/api/notifications/read-all', {
+          method: 'POST',
+          body: JSON.stringify({ type: 'chat', chatId }),
+        });
+      } catch {
+        // silently handle
+      }
+    };
+    markNotificationsRead();
+  }, [chatId, authFetch]);
 
   // Polling for new messages every 3 seconds
   useEffect(() => {
@@ -231,7 +249,9 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
           </div>
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate">{chatInfo?.participantName || 'مستفيد'}</p>
-            <p className="text-[10px] text-muted-foreground">محادثة نشطة</p>
+            <p className="text-[10px] text-muted-foreground">
+              {chatInfo?.participantRole === 'nurse' ? 'ممرض/ـة' : chatInfo?.participantRole === 'beneficiary' ? 'مستفيد/ـة' : chatInfo?.participantRole === 'admin' ? 'دعم فني' : chatInfo?.participantRole === 'subadmin' ? 'مدير فرعي' : 'محادثة نشطة'}
+            </p>
           </div>
           {chatInfo?.participantPhone && (
             <Button

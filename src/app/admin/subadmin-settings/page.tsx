@@ -181,7 +181,7 @@ export default function SubadminSettingsPage() {
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       <motion.div variants={itemAnim}>
-        <PageHeader title="إعداداتي" description="إدارة حسابك الشخصي وإعداداتك" />
+        <PageHeader title="الملف الشخصي" description="إدارة حسابك الشخصي وإعداداتك" />
       </motion.div>
 
       {/* Profile Info Card */}

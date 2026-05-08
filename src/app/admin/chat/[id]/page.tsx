@@ -101,6 +101,22 @@ export default function AdminChatDetailPage({ params }: { params: Promise<{ id: 
     if (chatId) fetchMessages();
   }, [chatId, fetchMessages]);
 
+  // Mark chat-related notifications as read when opening a chat
+  useEffect(() => {
+    if (!chatId) return;
+    const markNotificationsRead = async () => {
+      try {
+        await authFetch('/api/notifications/read-all', {
+          method: 'POST',
+          body: JSON.stringify({ type: 'chat', chatId }),
+        });
+      } catch {
+        // silently handle
+      }
+    };
+    markNotificationsRead();
+  }, [chatId, authFetch]);
+
   // Polling for new messages
   useEffect(() => {
     if (!chatId) return;
@@ -189,7 +205,7 @@ export default function AdminChatDetailPage({ params }: { params: Promise<{ id: 
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate">{chatInfo?.participantName || 'مستخدم'}</p>
             <p className="text-[10px] text-muted-foreground">
-              {chatInfo?.participantRole === 'nurse' ? 'ممرض/ـة' : chatInfo?.participantRole === 'beneficiary' ? 'مستفيد/ـة' : 'محادثة نشطة'}
+              {chatInfo?.participantRole === 'nurse' ? 'ممرض/ـة' : chatInfo?.participantRole === 'beneficiary' ? 'مستفيد/ـة' : chatInfo?.participantRole === 'subadmin' ? 'مدير فرعي' : chatInfo?.participantRole === 'admin' ? 'مدير النظام' : 'محادثة نشطة'}
             </p>
           </div>
           {chatInfo?.participantPhone && (

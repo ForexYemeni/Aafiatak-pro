@@ -22,6 +22,7 @@ import {
   ScrollText,
   Shield,
   UserCog,
+  UserCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -57,7 +58,7 @@ const adminNavItems: NavItem[] = [
   { label: 'المحادثات', href: '/admin/chat', icon: MessageSquare, permission: 'manage_chat' },
   { label: 'المديرون الفرعيون', href: '/admin/subadmins', icon: Shield, adminOnly: true },
   { label: 'سجل النشاط', href: '/admin/activity/page', icon: ScrollText, permission: 'view_reports' },
-  { label: 'إعداداتي', href: '/admin/subadmin-settings', icon: UserCog, alwaysVisibleToSubadmin: true },
+  { label: 'الملف الشخصي', href: '/admin/subadmin-settings', icon: UserCircle, alwaysVisibleToSubadmin: true },
   { label: 'الإعدادات', href: '/admin/settings', icon: Settings, adminOnly: true },
 ];
 

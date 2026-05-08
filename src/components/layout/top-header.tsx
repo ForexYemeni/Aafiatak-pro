@@ -140,6 +140,24 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
     return () => clearInterval(interval);
   }, [authFetch]);
 
+  // Refresh notification count when window gets focus (e.g. returning from chat)
+  useEffect(() => {
+    const handleFocus = async () => {
+      try {
+        const res = await authFetch('/api/notifications?limit=1&unreadOnly=true');
+        const json = await res.json();
+        if (json.success && json.data) {
+          const count = json.data.unreadCount ?? json.data.total ?? 0;
+          setUnreadCount(count);
+        }
+      } catch {
+        // Ignore
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [authFetch]);
+
   // Focus search input when shown
   useEffect(() => {
     if (showSearch && searchInputRef.current) {
