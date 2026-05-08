@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
-import { Moon, Sun, Bell, Search, Menu, X, User, Settings } from 'lucide-react';
+import { Moon, Sun, Search, Menu, X, User, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -15,9 +15,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { useAuthFetch } from '@/hooks/use-auth';
+import { NotificationBell } from '@/components/common/notification-bell';
 import type { UserRole } from '@/types';
 import { cn } from '@/lib/utils';
 
@@ -91,70 +90,17 @@ function getSettingsPath(role: UserRole): string {
   }
 }
 
-function getNotificationsPath(role: UserRole): string {
-  switch (role) {
-    case 'admin':
-    case 'subadmin':
-      return '/admin/settings'; // Admin doesn't have separate notifications page yet
-    case 'nurse':
-      return '/nurse/notifications';
-    case 'beneficiary':
-      return '/beneficiary/notifications';
-    default:
-      return '/';
-  }
-}
+
 
 export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
   const { theme, setTheme } = useTheme();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const logout = useAuthStore((s) => s.logout);
-  const authFetch = useAuthFetch();
-
   // Search state
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const searchInputRef = useRef<HTMLInputElement>(null);
-
-  // Notification count
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  // Fetch unread notification count
-  const fetchUnreadCount = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/notifications?limit=1&unreadOnly=true');
-      const json = await res.json();
-      if (json.success && json.data) {
-        const count = json.data.unreadCount ?? json.data.total ?? 0;
-        setUnreadCount(count);
-      }
-    } catch {
-      // Ignore errors
-    }
-  }, [authFetch]);
-
-  useEffect(() => {
-    fetchUnreadCount();
-    // Poll every 30 seconds
-    const interval = setInterval(fetchUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, [fetchUnreadCount]);
-
-  // Refresh notification count when window gets focus (e.g. returning from chat)
-  useEffect(() => {
-    window.addEventListener('focus', fetchUnreadCount);
-    return () => window.removeEventListener('focus', fetchUnreadCount);
-  }, [fetchUnreadCount]);
-
-  // Listen for custom event to refresh notification count (e.g. after mark all as read)
-  useEffect(() => {
-    const handleRefresh = () => {
-      fetchUnreadCount();
-    };
-    window.addEventListener('notifications-changed', handleRefresh);
-    return () => window.removeEventListener('notifications-changed', handleRefresh);
-  }, [fetchUnreadCount]);
 
   // Focus search input when shown
   useEffect(() => {
@@ -260,22 +206,7 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
           </Button>
 
           {/* Notifications Bell */}
-          <Button
-            variant="ghost"
-            size="icon"
-            className="w-9 h-9 relative"
-            onClick={() => router.push(getNotificationsPath(role))}
-          >
-            <Bell className="w-4 h-4" />
-            {unreadCount > 0 && (
-              <Badge
-                variant="destructive"
-                className="absolute -top-1 -right-1 min-w-[16px] h-4 p-0 flex items-center justify-center text-[10px]"
-              >
-                {unreadCount > 9 ? '٩+' : unreadCount}
-              </Badge>
-            )}
-          </Button>
+          <NotificationBell />
 
           {/* User Avatar Dropdown */}
           <DropdownMenu dir="rtl">

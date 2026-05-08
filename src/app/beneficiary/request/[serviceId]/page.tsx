@@ -291,7 +291,8 @@ export default function ServiceRequestPage() {
     const lines = [
       '🏥 *عافيتك - طلب خدمة جديدة*',
       '━━━━━━━━━━━━━━━━━━',
-      `📋 *رقم الطلب:* #${orderId.slice(-6).toUpperCase()}`,
+      `📋 *رقم الطلب:* \`#${orderId.slice(-6).toUpperCase()}\``,
+      `🆔 *معرف الطلب:* \`${orderId}\``,
       `🩺 *الخدمة:* ${svc.nameAr}`,
       `💰 *المبلغ:* ${formatYemeniRial(prc.totalPrice)}`,
     ];

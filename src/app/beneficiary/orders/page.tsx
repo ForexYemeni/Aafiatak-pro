@@ -46,6 +46,7 @@ const statusMap: Record<string, { label: string; variant: string }> = {
   completed: { label: 'مكتمل', variant: 'completed' },
   cancelled: { label: 'ملغي', variant: 'cancelled' },
   rejected: { label: 'مرفوض', variant: 'rejected' },
+  awaiting_payment: { label: 'بانتظار تأكيد الدفع', variant: 'pending' },
 };
 
 type TabKey = 'active' | 'completed' | 'cancelled';
@@ -80,7 +81,7 @@ export default function OrdersPage() {
     setIsLoading(true);
     try {
       const statusMapByTab: Record<TabKey, string> = {
-        active: 'pending,assigned,accepted,in_progress',
+        active: 'pending,assigned,accepted,in_progress,awaiting_payment',
         completed: 'completed',
         cancelled: 'cancelled,rejected',
       };

@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 
-type BadgeStatusVariant = 'active' | 'inactive' | 'pending' | 'assigned' | 'accepted' | 'suspended' | 'verified' | 'rejected' | 'completed' | 'cancelled' | 'in_progress' | 'dispatched' | 'unverified' | 'resolved';
+type BadgeStatusVariant = 'active' | 'inactive' | 'pending' | 'assigned' | 'accepted' | 'suspended' | 'verified' | 'rejected' | 'completed' | 'cancelled' | 'in_progress' | 'dispatched' | 'unverified' | 'resolved' | 'awaiting_payment';
 
 interface BadgeStatusProps {
   status: BadgeStatusVariant | string;
@@ -67,6 +67,10 @@ const statusConfig: Record<BadgeStatusVariant, { label: string; className: strin
   resolved: {
     label: 'تم الحل',
     className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  },
+  awaiting_payment: {
+    label: 'بانتظار تأكيد الدفع',
+    className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
   },
 };
 

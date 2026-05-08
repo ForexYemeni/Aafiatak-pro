@@ -48,6 +48,7 @@ interface OrderItem {
   isFridayService?: boolean;
   paymentStatus?: string;
   paymentMethod?: string;
+  hasPaymentProof?: boolean;
   beneficiaryAddress?: string;
   beneficiaryLat?: number;
   beneficiaryLng?: number;
@@ -78,6 +79,7 @@ const statusLabels: Record<string, string> = {
   completed: 'مكتمل',
   cancelled: 'ملغي',
   rejected: 'مرفوض',
+  awaiting_payment: 'بانتظار تأكيد الدفع',
 };
 
 const paymentStatusLabels: Record<string, string> = {
@@ -85,6 +87,7 @@ const paymentStatusLabels: Record<string, string> = {
   completed: 'مكتمل',
   failed: 'فاشل',
   refunded: 'مسترد',
+  awaiting_confirmation: 'بانتظار التأكيد',
 };
 
 const specializationLabels: Record<string, string> = {
@@ -429,6 +432,7 @@ export default function AdminOrdersPage() {
   const tabs = [
     { value: 'all', label: 'الكل' },
     { value: 'pending', label: 'معلق' },
+    { value: 'awaiting_payment', label: 'بانتظار الدفع' },
     { value: 'assigned', label: 'تم التعيين' },
     { value: 'accepted', label: 'مقبول' },
     { value: 'in_progress', label: 'قيد التنفيذ' },
@@ -564,6 +568,18 @@ export default function AdminOrdersPage() {
               {paymentStatusLabels[order.paymentStatus] ?? order.paymentStatus}
             </Badge>
           </div>
+          {order.paymentMethod && (
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-xs text-muted-foreground">طريقة الدفع</span>
+              <span className="text-sm font-medium">{order.paymentMethod}</span>
+            </div>
+          )}
+          {order.hasPaymentProof && (
+            <div className="flex items-center justify-between mt-2">
+              <span className="text-xs text-muted-foreground">إثبات الدفع</span>
+              <Badge className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">مرفق</Badge>
+            </div>
+          )}
           {order.commission !== undefined && order.commission > 0 && (
             <div className="flex items-center justify-between mt-2">
               <span className="text-xs text-muted-foreground">عمولة المنصة</span>
@@ -651,7 +667,7 @@ export default function AdminOrdersPage() {
         <GlassCard variant="admin">
           <div className="flex flex-col gap-4 mb-6">
             <div className="flex flex-col sm:flex-row gap-4">
-              <SearchInput placeholder="بحث بالاسم أو الهاتف..." onChange={setSearch} className="flex-1" />
+              <SearchInput placeholder="بحث بالاسم أو الهاتف أو رقم الطلب..." onChange={setSearch} className="flex-1" />
               <Button variant="outline" size="icon" onClick={() => { setIsLoading(true); void fetchOrders(); }}>
                 <RefreshCw className="w-4 h-4" />
               </Button>

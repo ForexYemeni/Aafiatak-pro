@@ -34,6 +34,19 @@ export async function GET(request: NextRequest) {
 
     // If search term provided, find matching beneficiaries/nurses
     if (search) {
+      // Try matching by order ID (full or partial)
+      const idFilter: any[] = [];
+
+      // If search looks like an order ID (hex string), try exact or partial match
+      if (/^[0-9a-fA-F]+$/.test(search)) {
+        try {
+          const { Types } = await import('mongoose');
+          if (Types.ObjectId.isValid(search)) {
+            idFilter.push({ _id: new Types.ObjectId(search) });
+          }
+        } catch {}
+      }
+
       const matchedBeneficiaries = await Beneficiary.find({
         $or: [
           { name: { $regex: search, $options: 'i' } },
@@ -50,10 +63,16 @@ export async function GET(request: NextRequest) {
       const beneficiaryIds = matchedBeneficiaries.map((b: any) => b._id);
       const nurseIds = matchedNurses.map((n: any) => n._id);
 
-      filter.$or = [
+      const orConditions: any[] = [
         { beneficiaryId: { $in: beneficiaryIds } },
         { nurseId: { $in: nurseIds } },
+        ...idFilter,
       ];
+
+      // Also search by beneficiaryAddress
+      orConditions.push({ beneficiaryAddress: { $regex: search, $options: 'i' } });
+
+      filter.$or = orConditions;
     }
 
     const [orders, total] = await Promise.all([
