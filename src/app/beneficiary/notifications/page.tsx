@@ -90,6 +90,8 @@ export default function NotificationsPage() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === notifId ? { ...n, read: true } : n))
       );
+      // Notify top-header to refresh bell count
+      window.dispatchEvent(new Event('notifications-changed'));
     } catch {
       // Error handled silently
     }
@@ -98,11 +100,12 @@ export default function NotificationsPage() {
   const markAllAsRead = async () => {
     setMarkingAll(true);
     try {
-      await authFetch('/api/notifications', {
-        method: 'PATCH',
-        body: JSON.stringify({ markAllRead: true }),
+      await authFetch('/api/notifications/read-all', {
+        method: 'POST',
       });
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      // Notify top-header to refresh bell count
+      window.dispatchEvent(new Event('notifications-changed'));
     } catch {
       // Error handled silently
     } finally {

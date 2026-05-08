@@ -146,6 +146,8 @@ export default function NurseNotificationsPage() {
       setNotifications((prev) =>
         prev.map((n) => (n.id === id ? { ...n, read: true } : n))
       );
+      // Notify top-header to refresh bell count
+      window.dispatchEvent(new Event('notifications-changed'));
     } catch {
       // silently handle
     }
@@ -153,8 +155,10 @@ export default function NurseNotificationsPage() {
 
   const handleMarkAllAsRead = async () => {
     try {
-      await authFetch('/api/notifications', { method: 'PATCH' });
+      await authFetch('/api/notifications/read-all', { method: 'POST' });
       setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      // Notify top-header to refresh bell count
+      window.dispatchEvent(new Event('notifications-changed'));
     } catch {
       // silently handle
     }

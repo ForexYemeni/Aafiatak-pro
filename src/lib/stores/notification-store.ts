@@ -169,7 +169,7 @@ export const useNotificationStore = create<NotificationState>()(
         }));
 
         // Mark all as read on server
-        fetch('/api/notifications', { method: 'PATCH' }).catch(() => {
+        fetch('/api/notifications/read-all', { method: 'POST' }).catch(() => {
           // Silently fail
         });
       },

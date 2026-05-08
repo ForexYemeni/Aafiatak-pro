@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { useTheme } from 'next-themes';
 import { Moon, Sun, Bell, Search, Menu, X, User, Settings } from 'lucide-react';
@@ -121,42 +121,40 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
   const [unreadCount, setUnreadCount] = useState(0);
 
   // Fetch unread notification count
-  useEffect(() => {
-    const fetchCount = async () => {
-      try {
-        const res = await authFetch('/api/notifications?limit=1&unreadOnly=true');
-        const json = await res.json();
-        if (json.success && json.data) {
-          const count = json.data.unreadCount ?? json.data.total ?? 0;
-          setUnreadCount(count);
-        }
-      } catch {
-        // Ignore errors
+  const fetchUnreadCount = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/notifications?limit=1&unreadOnly=true');
+      const json = await res.json();
+      if (json.success && json.data) {
+        const count = json.data.unreadCount ?? json.data.total ?? 0;
+        setUnreadCount(count);
       }
-    };
-    fetchCount();
-    // Poll every 30 seconds
-    const interval = setInterval(fetchCount, 30000);
-    return () => clearInterval(interval);
+    } catch {
+      // Ignore errors
+    }
   }, [authFetch]);
+
+  useEffect(() => {
+    fetchUnreadCount();
+    // Poll every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, [fetchUnreadCount]);
 
   // Refresh notification count when window gets focus (e.g. returning from chat)
   useEffect(() => {
-    const handleFocus = async () => {
-      try {
-        const res = await authFetch('/api/notifications?limit=1&unreadOnly=true');
-        const json = await res.json();
-        if (json.success && json.data) {
-          const count = json.data.unreadCount ?? json.data.total ?? 0;
-          setUnreadCount(count);
-        }
-      } catch {
-        // Ignore
-      }
+    window.addEventListener('focus', fetchUnreadCount);
+    return () => window.removeEventListener('focus', fetchUnreadCount);
+  }, [fetchUnreadCount]);
+
+  // Listen for custom event to refresh notification count (e.g. after mark all as read)
+  useEffect(() => {
+    const handleRefresh = () => {
+      fetchUnreadCount();
     };
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, [authFetch]);
+    window.addEventListener('notifications-changed', handleRefresh);
+    return () => window.removeEventListener('notifications-changed', handleRefresh);
+  }, [fetchUnreadCount]);
 
   // Focus search input when shown
   useEffect(() => {
