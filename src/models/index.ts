@@ -2,13 +2,10 @@
 // This file imports and re-exports all Mongoose models.
 // Import models from this file to ensure they are registered with Mongoose.
 
+// NOTE: Admin, SubAdmin, Coupon are now in src/models/mongoose/ only.
+// The standalone versions were removed to avoid model name conflicts.
+
 // ── User Models ─────────────────────────────────────────────────────
-export { default as Admin } from './Admin';
-export type { IAdmin } from './Admin';
-
-export { default as SubAdmin } from './SubAdmin';
-export type { ISubAdmin } from './SubAdmin';
-
 export { default as Nurse } from './Nurse';
 export type { INurse, IVerificationDocument, IBankAccount, IGeoJSONPoint as NurseGeoPoint } from './Nurse';
 
@@ -44,8 +41,7 @@ export { default as Chat } from './Chat';
 export type { IChat, IParticipant, ILastMessage, ChatType } from './Chat';
 
 // ── Marketing & Loyalty Models ──────────────────────────────────────
-export { default as Coupon } from './Coupon';
-export type { ICoupon } from './Coupon';
+// Coupon is exported from mongoose models only (see src/models/mongoose/Coupon.ts)
 
 export { default as LoyaltyPoints } from './LoyaltyPoints';
 export type { ILoyaltyPoints, LoyaltyPointsType } from './LoyaltyPoints';

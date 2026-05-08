@@ -113,7 +113,15 @@ export default function AdminSubAdminsPage() {
 
   const handleSave = async () => {
     if (!form.name || !form.phone) {
-      toast.error('يرجى ملء الحقول المطلوبة');
+      toast.error('يرجى ملء الاسم ورقم الهاتف');
+      return;
+    }
+    if (!editingTarget && !form.password) {
+      toast.error('يرجى إدخال كلمة المرور للمدير الفرعي الجديد');
+      return;
+    }
+    if (!editingTarget && form.password.length < 6) {
+      toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل');
       return;
     }
     setIsSaving(true);
@@ -132,7 +140,7 @@ export default function AdminSubAdminsPage() {
         if (json.success) {
           toast.success('تم تحديث المدير الفرعي');
         } else {
-          toast.error(json.message ?? 'فشل التحديث');
+          toast.error(json.error?.message ?? json.message ?? 'فشل التحديث');
         }
       } else {
         const res = await authFetch('/api/admin/subadmins', {
@@ -143,7 +151,7 @@ export default function AdminSubAdminsPage() {
         if (json.success) {
           toast.success('تم إضافة المدير الفرعي');
         } else {
-          toast.error(json.message ?? 'فشل الإضافة');
+          toast.error(json.error?.message ?? json.message ?? 'فشل الإضافة');
         }
       }
       setDialogOpen(false);

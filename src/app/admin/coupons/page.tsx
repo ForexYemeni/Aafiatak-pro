@@ -105,8 +105,8 @@ export default function AdminCouponsPage() {
   }, [fetchCoupons]);
 
   const handleSave = async () => {
-    if (!form.code || !form.discountPercent) {
-      toast.error('يرجى ملء الحقول المطلوبة');
+    if (!form.code || !form.discountPercent || !form.expiresAt) {
+      toast.error('يرجى ملء جميع الحقول المطلوبة (الكود، نسبة الخصم، تاريخ الانتهاء)');
       return;
     }
     setIsSaving(true);
@@ -120,7 +120,7 @@ export default function AdminCouponsPage() {
         if (json.success) {
           toast.success('تم تحديث الكوبون');
         } else {
-          toast.error(json.message ?? 'فشل التحديث');
+          toast.error(json.error?.message ?? json.message ?? 'فشل التحديث');
         }
       } else {
         const res = await authFetch('/api/admin/coupons', {
@@ -131,7 +131,7 @@ export default function AdminCouponsPage() {
         if (json.success) {
           toast.success('تم إضافة الكوبون');
         } else {
-          toast.error(json.message ?? 'فشل الإضافة');
+          toast.error(json.error?.message ?? json.message ?? 'فشل الإضافة');
         }
       }
       setDialogOpen(false);
