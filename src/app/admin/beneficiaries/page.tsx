@@ -11,6 +11,7 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { DateFormatter } from '@/components/common/date-formatter';
 import { Currency } from '@/components/common/currency';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -253,6 +254,9 @@ export default function AdminBeneficiariesPage() {
     },
   ];
 
+  const user = useAuthStore((s) => s.user);
+  const isSubadmin = user?.role === 'subadmin';
+
   const rowActions = [
     {
       label: 'عرض التفاصيل',
@@ -267,11 +271,11 @@ export default function AdminBeneficiariesPage() {
       onClick: (row: Record<string, unknown>) => setBlockTarget(row as unknown as BeneficiaryItem),
       variant: 'destructive' as const,
     },
-    {
+    ...(!isSubadmin ? [{
       label: 'حذف نهائي',
       onClick: (row: Record<string, unknown>) => setDeleteTarget(row as unknown as BeneficiaryItem),
       variant: 'destructive' as const,
-    },
+    }] : []),
   ];
 
   const ViewContent = ({ ben }: { ben: BeneficiaryItem }) => (

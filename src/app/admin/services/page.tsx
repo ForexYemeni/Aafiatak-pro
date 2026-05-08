@@ -10,6 +10,7 @@ import { SearchInput } from '@/components/common/search-input';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { Currency } from '@/components/common/currency';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -269,20 +270,23 @@ export default function AdminServicesPage() {
     },
   ];
 
+  const user = useAuthStore((s) => s.user);
+  const isSubadmin = user?.role === 'subadmin';
+
   const rowActions = [
-    {
+    ...(!isSubadmin ? [{
       label: 'تعديل',
       onClick: (row: Record<string, unknown>) => openEdit(row as unknown as ServiceItem),
-    },
+    }] : []),
     {
       label: (row: Record<string, unknown>) => ((row as unknown as ServiceItem).isActive ? 'إيقاف' : 'تفعيل'),
       onClick: (row: Record<string, unknown>) => setToggleTarget(row as unknown as ServiceItem),
     },
-    {
+    ...(!isSubadmin ? [{
       label: 'حذف نهائياً',
       onClick: (row: Record<string, unknown>) => setDeleteTarget(row as unknown as ServiceItem),
       variant: 'destructive' as const,
-    },
+    }] : []),
   ];
 
   return (
@@ -291,7 +295,7 @@ export default function AdminServicesPage() {
         <PageHeader
           title="إدارة الخدمات"
           description="إضافة وتعديل وإدارة خدمات المنصة"
-          action={{ label: 'إضافة خدمة', onClick: openAdd, icon: <Plus className="w-4 h-4" /> }}
+          {...(!isSubadmin ? { action: { label: 'إضافة خدمة', onClick: openAdd, icon: <Plus className="w-4 h-4" /> } } : {})}
         />
       </motion.div>
 

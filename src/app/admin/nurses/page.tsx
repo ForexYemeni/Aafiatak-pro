@@ -28,6 +28,7 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { EmptyState } from '@/components/common/empty-state';
 import { DateFormatter } from '@/components/common/date-formatter';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -77,6 +78,10 @@ interface NurseItem {
   licenseDocumentData?: string | null;
   createdAt: string;
   licenseNumber?: string;
+  lat?: number | null;
+  lng?: number | null;
+  district?: string | null;
+  address?: string | null;
 }
 
 const specializationLabels: Record<string, string> = {
@@ -366,6 +371,9 @@ export default function AdminNursesPage() {
     },
   ];
 
+  const user = useAuthStore((s) => s.user);
+  const isSubadmin = user?.role === 'subadmin';
+
   const rowActions = [
     {
       label: 'عرض التفاصيل',
@@ -398,12 +406,12 @@ export default function AdminNursesPage() {
       icon: <Ban className="w-4 h-4" />,
       onClick: (row: Record<string, unknown>) => setBlockTarget(row as unknown as NurseItem),
     },
-    {
+    ...(!isSubadmin ? [{
       label: 'حذف نهائي',
       icon: <Trash2 className="w-4 h-4" />,
       onClick: (row: Record<string, unknown>) => setDeleteTarget(row as unknown as NurseItem),
       variant: 'destructive' as const,
-    },
+    }] : []),
   ];
 
   const ViewContent = ({ nurse }: { nurse: NurseItem }) => (
@@ -451,10 +459,27 @@ export default function AdminNursesPage() {
         </div>
       </div>
 
-      {nurse.governorate && (
-        <div className="flex items-center gap-2 text-sm">
-          <MapPin className="w-4 h-4 text-muted-foreground" />
-          <span>{nurse.governorate}</span>
+      {(nurse.governorate || nurse.lat) && (
+        <div className="glass rounded-xl p-3 space-y-2">
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin className="w-4 h-4 text-red-500" />
+            <span className="font-medium">
+              {nurse.governorate || 'غير محدد'}
+              {nurse.district && <span className="text-muted-foreground"> - {nurse.district}</span>}
+              {nurse.address && <span className="text-muted-foreground"> - {nurse.address}</span>}
+            </span>
+          </div>
+          {nurse.lat && nurse.lng && (
+            <a
+              href={`https://www.google.com/maps?q=${nurse.lat},${nurse.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800"
+            >
+              <MapPin className="w-3 h-3" />
+              عرض على الخريطة ({Number(nurse.lat).toFixed(4)}, {Number(nurse.lng).toFixed(4)})
+            </a>
+          )}
         </div>
       )}
       {nurse.bio && (

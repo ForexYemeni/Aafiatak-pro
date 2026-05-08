@@ -21,6 +21,7 @@ import {
   MessageSquare,
   ScrollText,
   Shield,
+  UserCog,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -53,6 +54,7 @@ const adminNavItems: NavItem[] = [
   { label: 'الشكاوى', href: '/admin/complaints', icon: MessageSquare, permission: 'manage_chat' },
   { label: 'المديرون الفرعيون', href: '/admin/subadmins', icon: Shield }, // Admin only - no permission key
   { label: 'سجل النشاط', href: '/admin/activity/page', icon: ScrollText, permission: 'view_reports' },
+  { label: 'إعداداتي', href: '/admin/subadmin-settings', icon: UserCog, alwaysVisibleToSubadmin: true },
   { label: 'الإعدادات', href: '/admin/settings', icon: Settings, permission: 'manage_settings' },
 ];
 

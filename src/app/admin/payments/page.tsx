@@ -13,9 +13,11 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { DateFormatter } from '@/components/common/date-formatter';
 import { Currency, formatYemeniRial } from '@/components/common/currency';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
@@ -102,6 +104,9 @@ const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
 
 export default function AdminPaymentsPage() {
   const authFetch = useAuthFetch();
+  const user = useAuthStore((s) => s.user);
+  const isSubadmin = user?.role === 'subadmin';
+  const canManagePayments = user?.permissions?.includes('manage_payments') ?? false;
   const [transactions, setTransactions] = useState<TransactionItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -359,13 +364,13 @@ export default function AdminPaymentsPage() {
   ];
 
   const rowActions = [
-    {
+    ...((!isSubadmin || canManagePayments) ? [{
       label: 'تأكيد الدفع',
       onClick: (row: Record<string, unknown>) => {
         const t = row as unknown as TransactionItem;
         if (t.status === 'pending') setConfirmTarget(t);
       },
-    },
+    }] : []),
   ];
 
   const getTypeIcon = (type: string) => {
@@ -473,10 +478,12 @@ export default function AdminPaymentsPage() {
           <TabsContent value="payment-methods" className="space-y-6 mt-4">
             <div className="flex items-center justify-between">
               <h3 className="font-semibold">طرق الدفع المتاحة</h3>
-              <Button onClick={openAddPm} className="bg-admin hover:bg-admin/90 gap-2">
-                <Plus className="w-4 h-4" />
-                إضافة طريقة دفع
-              </Button>
+              {!isSubadmin && (
+                <Button onClick={openAddPm} className="bg-admin hover:bg-admin/90 gap-2">
+                  <Plus className="w-4 h-4" />
+                  إضافة طريقة دفع
+                </Button>
+              )}
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -530,12 +537,19 @@ export default function AdminPaymentsPage() {
                       )}
 
                       <div className="flex items-center gap-2 pt-2 border-t border-border">
-                        <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => openEditPm(pm)}>
-                          تعديل
-                        </Button>
-                        <Button variant="outline" size="sm" className="text-xs text-destructive hover:bg-destructive/10" onClick={() => setDeletePmTarget(pm)}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        {!isSubadmin && (
+                          <Button variant="outline" size="sm" className="flex-1 text-xs" onClick={() => openEditPm(pm)}>
+                            تعديل
+                          </Button>
+                        )}
+                        {!isSubadmin && (
+                          <Button variant="outline" size="sm" className="text-xs text-destructive hover:bg-destructive/10" onClick={() => setDeletePmTarget(pm)}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        )}
+                        {isSubadmin && (
+                          <span className="text-xs text-muted-foreground">عرض فقط</span>
+                        )}
                       </div>
                     </div>
                   </GlassCard>
