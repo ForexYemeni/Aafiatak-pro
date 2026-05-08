@@ -45,3 +45,22 @@ const UserSchema = new Schema<IUser>({
 }, { timestamps: true, discriminatorKey: 'role' });
 
 export const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
+
+// Register discriminators for all roles that don't have extra fields
+// This is required because Mongoose with discriminatorKey expects a discriminator
+// for every possible value of the discriminator key when discriminators are used
+function ensureDiscriminator(name: string, schema: Schema = new Schema({})) {
+  if (User.discriminators && User.discriminators[name]) {
+    return User.discriminators[name];
+  }
+  if (mongoose.models[name]) {
+    return mongoose.models[name];
+  }
+  return User.discriminator(name, schema);
+}
+
+// Admin discriminator (no extra fields)
+ensureDiscriminator('admin');
+
+// SubAdmin discriminator (no extra fields - uses base User fields only)
+ensureDiscriminator('subadmin');
