@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { serviceId, scheduledAt, notes, address, lat, lng, isEmergency, paymentMethod, paymentMethodId, couponCode, loyaltyPointsToRedeem, hasPaymentProof } = body;
+    const { serviceId, scheduledAt, notes, address, lat, lng, isEmergency, paymentMethod, paymentMethodId, couponCode, loyaltyPointsToRedeem, hasPaymentProof, paymentProofData } = body;
 
     if (!serviceId) {
       return createErrorResponse('معرف الخدمة مطلوب', 400, 'VALIDATION_ERROR');
@@ -195,6 +195,7 @@ export async function POST(request: NextRequest) {
       paymentMethod: paymentMethod || 'cash',
       paymentMethodId: paymentMethodId || null,
       hasPaymentProof: hasPaymentProof || false,
+      paymentProofData: paymentProofData || null,
       couponId,
     });
 

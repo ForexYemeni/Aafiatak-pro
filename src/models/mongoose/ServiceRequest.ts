@@ -29,6 +29,7 @@ export interface IServiceRequest extends Document {
   paymentMethod?: string;
   paymentMethodId?: string;
   hasPaymentProof?: boolean;
+  paymentProofData?: string;
   couponId?: Types.ObjectId;
 }
 
@@ -61,6 +62,7 @@ const ServiceRequestSchema = new Schema<IServiceRequest>({
   paymentMethod: { type: String },
   paymentMethodId: { type: String },
   hasPaymentProof: { type: Boolean, default: false },
+  paymentProofData: { type: String },
   couponId: { type: Schema.Types.ObjectId, ref: 'Coupon' },
 }, { timestamps: true });
 

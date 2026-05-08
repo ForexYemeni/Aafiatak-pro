@@ -262,6 +262,7 @@ export default function ServiceRequestPage() {
           paymentMethodId: selectedPaymentMethodId,
           couponCode: couponCode || undefined,
           hasPaymentProof: !isCashPayment && !!paymentProofFile,
+          paymentProofData: !isCashPayment && paymentProofPreview ? paymentProofPreview : undefined,
         }),
       });
       const data = await res.json();
