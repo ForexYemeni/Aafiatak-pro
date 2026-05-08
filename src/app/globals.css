@@ -756,3 +756,116 @@
 .leaflet-popup-pane {
   z-index: 5;
 }
+
+/* ============================================================================
+   Premium Login Page Components
+   ============================================================================ */
+
+/* Premium floating label input - Light variant */
+.premium-input-group {
+  position: relative;
+}
+
+.premium-floating-label {
+  position: absolute;
+  right: 40px;
+  top: 50%;
+  transform: translateY(-50%);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  pointer-events: none;
+  font-size: 0.875rem;
+  z-index: 2;
+}
+
+.premium-floating-label-light {
+  color: rgba(100, 116, 139, 0.8);
+}
+
+.premium-floating-label-dark {
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.premium-input-group input:focus ~ .premium-floating-label,
+.premium-input-group input:not(:placeholder-shown) ~ .premium-floating-label {
+  transform: translateY(-28px) scale(0.82);
+  background: transparent;
+  padding: 0 4px;
+}
+
+.premium-input-group input:focus ~ .premium-floating-label-light,
+.premium-input-group input:not(:placeholder-shown) ~ .premium-floating-label-light {
+  color: rgba(13, 148, 136, 0.9);
+}
+
+.premium-input-group input:focus ~ .premium-floating-label-dark,
+.premium-input-group input:not(:placeholder-shown) ~ .premium-floating-label-dark {
+  color: rgba(20, 184, 166, 0.9);
+}
+
+/* Premium input glow */
+.premium-input-glow {
+  transition: all 0.2s ease;
+}
+
+/* Premium shimmer button */
+.premium-shimmer-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.premium-shimmer-btn::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  animation: shimmer-slide 3s ease-in-out infinite;
+}
+
+/* EKG line drawing animation */
+@keyframes ekg-draw {
+  0% {
+    stroke-dashoffset: 2400;
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    stroke-dashoffset: 0;
+    opacity: 1;
+  }
+}
+
+.ekg-line-draw path {
+  stroke-dasharray: 2400;
+  stroke-dashoffset: 2400;
+  animation: ekg-draw 3s ease-out forwards, ekg-loop 4s ease-in-out 3s infinite;
+}
+
+@keyframes ekg-loop {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Mobile glass card for login */
+.login-glass-card {
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(30px);
+  -webkit-backdrop-filter: blur(30px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+}
+
+/* Custom focus ring for Select on light background */
+.select-light-trigger:focus {
+  box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
+}
