@@ -2,11 +2,14 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { AlertTriangle, Eye, UserPlus, RefreshCw, Clock, Phone, MessageCircle, MapPin, Navigation, Siren, Activity } from 'lucide-react';
+import {
+  AlertTriangle, Eye, UserPlus, RefreshCw, Clock, Phone, MessageCircle,
+  MapPin, Navigation, Siren, Activity, Play, CheckCircle2, X,
+  Loader2, Zap, Timer, User, Star
+} from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
-import { BadgeStatus } from '@/components/common/badge-status';
 import { DateFormatter } from '@/components/common/date-formatter';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
@@ -14,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
+import { Separator } from '@/components/ui/separator';
 import {
   Dialog,
   DialogContent,
@@ -38,7 +42,18 @@ interface EmergencyItem {
   lat?: number;
   lng?: number;
   responseTime: number | null;
+  emergencyFee?: number;
   createdAt: string;
+}
+
+interface NearbyNurse {
+  id: string;
+  name: string;
+  phone: string;
+  specialty: string;
+  rating: number;
+  distance: number;
+  isAvailable: boolean;
 }
 
 const typeLabels: Record<string, string> = {
@@ -65,6 +80,14 @@ const statusLabelsAr: Record<string, string> = {
   in_progress: 'قيد التنفيذ',
   resolved: 'تم الحل',
   cancelled: 'ملغي',
+};
+
+const statusColors: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  dispatched: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  in_progress: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  resolved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
 };
 
 const priorityColors: Record<string, string> = {
@@ -100,13 +123,13 @@ export default function AdminEmergenciesPage() {
 
   const [viewTarget, setViewTarget] = useState<EmergencyItem | null>(null);
   const [assignTarget, setAssignTarget] = useState<EmergencyItem | null>(null);
+  const [nearbyNurses, setNearbyNurses] = useState<NearbyNurse[]>([]);
   const [selectedNurse, setSelectedNurse] = useState('');
-  const [nurseOptions, setNurseOptions] = useState<{ id: string; name: string }[]>([]);
   const [isAssigning, setIsAssigning] = useState(false);
+  const [isLoadingNurses, setIsLoadingNurses] = useState(false);
 
-  const [statusTarget, setStatusTarget] = useState<EmergencyItem | null>(null);
-  const [newStatus, setNewStatus] = useState('');
-  const [isUpdating, setIsUpdating] = useState(false);
+  const [executeTarget, setExecuteTarget] = useState<EmergencyItem | null>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -144,19 +167,47 @@ export default function AdminEmergenciesPage() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [fetchEmergencies]);
 
-  const fetchNurses = async () => {
+  // Fetch nearby nurses based on emergency location
+  const fetchNearbyNurses = async (em: EmergencyItem) => {
+    setIsLoadingNurses(true);
     try {
-      const res = await authFetch('/api/admin/nurses?limit=50&status=active');
+      // Fetch all verified nurses
+      const res = await authFetch('/api/admin/nurses?limit=100&status=active');
       const json = await res.json();
       if (json.success && json.data) {
         const nursesArray = json.data.nurses ?? json.data;
-        setNurseOptions((Array.isArray(nursesArray) ? nursesArray : []).map((n: Record<string, unknown>) => ({
-          id: String(n.id ?? n._id ?? ''),
-          name: String(n.name ?? ''),
-        })));
+        const allNurses = Array.isArray(nursesArray) ? nursesArray : [];
+
+        // Calculate distance for each nurse
+        const nursesWithDistance: NearbyNurse[] = allNurses
+          .filter((n: any) => n.lat && n.lng && em.lat && em.lng)
+          .map((n: any) => {
+            const R = 6371;
+            const dLat = (n.lat - em.lat!) * Math.PI / 180;
+            const dLon = (n.lng - em.lng!) * Math.PI / 180;
+            const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                      Math.cos(em.lat! * Math.PI / 180) * Math.cos(n.lat * Math.PI / 180) *
+                      Math.sin(dLon/2) * Math.sin(dLon/2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            const distance = Math.round(R * c * 10) / 10;
+            return {
+              id: String(n.id ?? n._id ?? ''),
+              name: String(n.name ?? ''),
+              phone: String(n.phone ?? ''),
+              specialty: String(n.specialty ?? 'تمريض عام'),
+              rating: n.rating || 0,
+              distance,
+              isAvailable: n.isAvailable !== false,
+            };
+          })
+          .sort((a: NearbyNurse, b: NearbyNurse) => a.distance - b.distance);
+
+        setNearbyNurses(nursesWithDistance);
       }
     } catch {
       toast.error('فشل تحميل قائمة الممرضين');
+    } finally {
+      setIsLoadingNurses(false);
     }
   };
 
@@ -184,27 +235,46 @@ export default function AdminEmergenciesPage() {
     }
   };
 
-  const handleStatusUpdate = async () => {
-    if (!statusTarget || !newStatus) return;
-    setIsUpdating(true);
+  // Direct execution - start the emergency immediately
+  const handleDirectExecute = async () => {
+    if (!executeTarget) return;
+    setIsExecuting(true);
     try {
-      const res = await authFetch(`/api/admin/emergencies/${statusTarget.id}`, {
+      const res = await authFetch(`/api/admin/emergencies/${executeTarget.id}`, {
         method: 'PATCH',
-        body: JSON.stringify({ status: newStatus }),
+        body: JSON.stringify({ status: 'in_progress' }),
       });
       const json = await res.json();
       if (json.success) {
-        toast.success('تم تحديث حالة الطوارئ');
+        toast.success('تم بدء التنفيذ المباشر');
+        void fetchEmergencies();
+      } else {
+        toast.error(json.message ?? 'فشل التنفيذ');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    } finally {
+      setIsExecuting(false);
+      setExecuteTarget(null);
+    }
+  };
+
+  // Resolve emergency
+  const handleResolve = async (em: EmergencyItem) => {
+    try {
+      const res = await authFetch(`/api/admin/emergencies/${em.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'resolved' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم حل حالة الطوارئ');
         void fetchEmergencies();
       } else {
         toast.error(json.message ?? 'فشل التحديث');
       }
     } catch {
       toast.error('حدث خطأ');
-    } finally {
-      setIsUpdating(false);
-      setStatusTarget(null);
-      setNewStatus('');
     }
   };
 
@@ -253,13 +323,7 @@ export default function AdminEmergenciesPage() {
       accessorKey: 'status',
       header: 'الحالة',
       cell: ({ row }) => (
-        <span className={`text-xs px-2 py-1 rounded-full ${
-          row.original.status === 'resolved' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-          row.original.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-          row.original.status === 'dispatched' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400' :
-          row.original.status === 'in_progress' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
-          'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400'
-        }`}>
+        <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${statusColors[row.original.status] ?? ''}`}>
           {statusLabelsAr[row.original.status] ?? row.original.status}
         </span>
       ),
@@ -267,7 +331,7 @@ export default function AdminEmergenciesPage() {
     {
       accessorKey: 'nurseName',
       header: 'الممرض/ـة',
-      cell: ({ row }) => <span className="text-sm">{row.original.nurseName ?? 'غير معيَّن'}</span>,
+      cell: ({ row }) => <span className="text-sm">{row.original.nurseName ?? '—'}</span>,
     },
     {
       accessorKey: 'createdAt',
@@ -279,29 +343,42 @@ export default function AdminEmergenciesPage() {
   const rowActions = [
     {
       label: 'عرض التفاصيل',
+      icon: Eye,
       onClick: (row: Record<string, unknown>) => setViewTarget(row as unknown as EmergencyItem),
     },
     {
       label: 'تعيين ممرض/ـة',
+      icon: UserPlus,
       onClick: (row: Record<string, unknown>) => {
-        setAssignTarget(row as unknown as EmergencyItem);
-        void fetchNurses();
+        const em = row as unknown as EmergencyItem;
+        setAssignTarget(em);
+        void fetchNearbyNurses(em);
+      },
+      hidden: (row: Record<string, unknown>) => (row as unknown as EmergencyItem).status !== 'pending',
+    },
+    {
+      label: 'تنفيذ مباشر',
+      icon: Zap,
+      onClick: (row: Record<string, unknown>) => setExecuteTarget(row as unknown as EmergencyItem),
+      hidden: (row: Record<string, unknown>) => {
+        const em = row as unknown as EmergencyItem;
+        return em.status !== 'pending' && em.status !== 'dispatched';
       },
     },
     {
-      label: 'تحديث الحالة',
-      onClick: (row: Record<string, unknown>) => {
-        setStatusTarget(row as unknown as EmergencyItem);
-        setNewStatus((row as unknown as EmergencyItem).status);
-      },
+      label: 'تم الحل',
+      icon: CheckCircle2,
+      onClick: (row: Record<string, unknown>) => handleResolve(row as unknown as EmergencyItem),
+      hidden: (row: Record<string, unknown>) => !isActive((row as unknown as EmergencyItem).status),
     },
   ];
 
   const activeCount = emergencies.filter((e) => isActive(e.status)).length;
+  const pendingCount = emergencies.filter((e) => e.status === 'pending').length;
 
   const EmergencyDetailView = ({ em }: { em: EmergencyItem }) => (
     <div className="space-y-4">
-      {/* Emergency Header with pulsing animation */}
+      {/* Emergency Header */}
       <div className={`rounded-xl border-2 p-4 ${
         isActive(em.status)
           ? 'border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20'
@@ -321,12 +398,7 @@ export default function AdminEmergenciesPage() {
               </span>
             </div>
           </div>
-          <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${
-            em.status === 'resolved' ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' :
-            em.status === 'pending' ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400' :
-            em.status === 'in_progress' ? 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400' :
-            'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400'
-          }`}>
+          <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${statusColors[em.status] ?? ''}`}>
             {statusLabelsAr[em.status] ?? em.status}
           </span>
         </div>
@@ -356,6 +428,14 @@ export default function AdminEmergenciesPage() {
           <p className="text-sm font-medium">{em.nurseName ?? 'غير معيَّن'}</p>
         </div>
       </div>
+
+      {/* Fee */}
+      {em.emergencyFee && (
+        <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
+          <span className="text-xs text-muted-foreground">رسوم الطوارئ</span>
+          <span className="font-bold text-red-600 text-sm">{em.emergencyFee.toLocaleString('ar-YE')} ر.ي</span>
+        </div>
+      )}
 
       {/* Location */}
       {em.address && (
@@ -398,29 +478,39 @@ export default function AdminEmergenciesPage() {
         <PageHeader title="إدارة الطوارئ" description="إدارة ومتابعة طلبات الطوارئ - تحديث تلقائي كل ١٥ ثانية" />
       </motion.div>
 
-      {activeCount > 0 && (
-        <motion.div variants={itemAnim}>
-          <GlassCard className="border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center animate-pulse">
-                <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 gap-3">
+        {activeCount > 0 && (
+          <motion.div variants={itemAnim}>
+            <GlassCard className="border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20 p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center animate-pulse">
+                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-red-700 dark:text-red-400 text-lg">{activeCount}</p>
+                  <p className="text-xs text-red-600/80">حالات نشطة</p>
+                </div>
               </div>
-              <div className="flex-1">
-                <p className="font-semibold text-red-700 dark:text-red-400">
-                  {activeCount} حالة طوارئ نشطة
-                </p>
-                <p className="text-sm text-red-600/80 dark:text-red-400/80">
-                  تتطلب اهتمامًا فوريًا
-                </p>
+            </GlassCard>
+          </motion.div>
+        )}
+        {pendingCount > 0 && (
+          <motion.div variants={itemAnim}>
+            <GlassCard className="border-yellow-200 dark:border-yellow-900/50 bg-yellow-50/50 dark:bg-yellow-950/20 p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center animate-pulse">
+                  <Timer className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-yellow-700 dark:text-yellow-400 text-lg">{pendingCount}</p>
+                  <p className="text-xs text-yellow-600/80">بانتظار التعيين</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                <Clock className="w-3.5 h-3.5" />
-                تحديث تلقائي كل ١٥ ثانية
-              </div>
-            </div>
-          </GlassCard>
-        </motion.div>
-      )}
+            </GlassCard>
+          </motion.div>
+        )}
+      </div>
 
       <motion.div variants={itemAnim}>
         <GlassCard variant="admin">
@@ -459,68 +549,119 @@ export default function AdminEmergenciesPage() {
         />
       </motion.div>
 
-      {/* View Details */}
+      {/* View Details Dialog */}
       <Dialog open={!!viewTarget} onOpenChange={(open) => { if (!open) setViewTarget(null); }}>
         <DialogContent dir="rtl" className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>تفاصيل حالة الطوارئ</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Siren className="w-5 h-5 text-red-500" />
+              تفاصيل حالة الطوارئ
+            </DialogTitle>
           </DialogHeader>
           {viewTarget && <EmergencyDetailView em={viewTarget} />}
         </DialogContent>
       </Dialog>
 
-      {/* Assign Nurse */}
-      <Dialog open={!!assignTarget} onOpenChange={(open) => { if (!open) setAssignTarget(null); }}>
-        <DialogContent dir="rtl">
+      {/* Assign Nurse Dialog - with nearby nurses sorted by distance */}
+      <Dialog open={!!assignTarget} onOpenChange={(open) => { if (!open) { setAssignTarget(null); setSelectedNurse(''); } }}>
+        <DialogContent dir="rtl" className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>تعيين ممرض/ـة للطوارئ</DialogTitle>
-            <DialogDescription>اختر ممرض/ـة للإرسال فورًا</DialogDescription>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-admin" />
+              تعيين ممرض/ـة للطوارئ
+            </DialogTitle>
+            <DialogDescription>الممرضون مرتبون حسب القرب من موقع الطوارئ</DialogDescription>
           </DialogHeader>
-          <div className="py-2">
-            <Label>اختر ممرض/ـة</Label>
-            <Select value={selectedNurse} onValueChange={setSelectedNurse}>
-              <SelectTrigger>
-                <SelectValue placeholder="اختر ممرض/ـة" />
-              </SelectTrigger>
-              <SelectContent>
-                {nurseOptions.map((n) => (
-                  <SelectItem key={n.id} value={n.id}>{n.name}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+
+          {isLoadingNurses ? (
+            <div className="flex items-center justify-center py-8">
+              <Loader2 className="w-6 h-6 animate-spin text-admin" />
+              <span className="mr-2 text-sm text-muted-foreground">جارٍ البحث عن الممرضين القريبين...</span>
+            </div>
+          ) : nearbyNurses.length === 0 ? (
+            <div className="text-center py-8">
+              <User className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+              <p className="text-sm text-muted-foreground">لا يوجد ممرضون متاحون بالقرب من الموقع</p>
+            </div>
+          ) : (
+            <div className="space-y-2 max-h-80 overflow-y-auto custom-scrollbar">
+              {nearbyNurses.map((nurse) => (
+                <button
+                  key={nurse.id}
+                  onClick={() => setSelectedNurse(nurse.id)}
+                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right ${
+                    selectedNurse === nurse.id
+                      ? 'ring-2 ring-admin bg-admin/5'
+                      : 'hover:bg-muted/50'
+                  }`}
+                >
+                  <Avatar className="w-10 h-10">
+                    <AvatarFallback className="bg-admin/10 text-admin text-xs">
+                      {nurse.name.slice(0, 2)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-medium truncate">{nurse.name}</p>
+                      {nurse.rating > 0 && (
+                        <div className="flex items-center gap-0.5">
+                          <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                          <span className="text-[10px]">{nurse.rating.toFixed(1)}</span>
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{nurse.specialty}</p>
+                  </div>
+                  <div className="text-left shrink-0">
+                    <div className="flex items-center gap-1">
+                      <MapPin className="w-3 h-3 text-red-500" />
+                      <span className="text-sm font-bold text-red-600">{nurse.distance} كم</span>
+                    </div>
+                    <span className={`text-[10px] ${nurse.isAvailable ? 'text-green-600' : 'text-gray-400'}`}>
+                      {nurse.isAvailable ? 'متاح' : 'غير متاح'}
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+
           <DialogFooter>
-            <Button variant="outline" onClick={() => setAssignTarget(null)} disabled={isAssigning}>إلغاء</Button>
+            <Button variant="outline" onClick={() => { setAssignTarget(null); setSelectedNurse(''); }} disabled={isAssigning}>إلغاء</Button>
             <Button onClick={handleAssign} disabled={isAssigning || !selectedNurse} className="bg-admin hover:bg-admin/90">
-              {isAssigning ? 'جارٍ التعيين...' : 'إرسال'}
+              {isAssigning ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <UserPlus className="w-4 h-4 ml-1" />}
+              {isAssigning ? 'جارٍ التعيين...' : 'تعيين وإرسال'}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
 
-      {/* Status Update - Arabic labels */}
-      <Dialog open={!!statusTarget} onOpenChange={(open) => { if (!open) setStatusTarget(null); }}>
-        <DialogContent dir="rtl">
+      {/* Direct Execute Confirmation */}
+      <Dialog open={!!executeTarget} onOpenChange={(open) => { if (!open) setExecuteTarget(null); }}>
+        <DialogContent dir="rtl" className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>تحديث حالة الطوارئ</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-orange-500" />
+              تنفيذ مباشر
+            </DialogTitle>
+            <DialogDescription>
+              سيتم تغيير حالة الطوارئ إلى "قيد التنفيذ" فوراً
+            </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4 py-2">
-            <Label>الحالة الجديدة</Label>
-            <Select value={newStatus} onValueChange={setNewStatus}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {Object.entries(statusLabelsAr).map(([key, label]) => (
-                  <SelectItem key={key} value={key}>{label}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          {executeTarget && (
+            <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-900/30">
+              <div className="flex items-center gap-2 mb-1">
+                <span className="text-lg">{typeIcons[executeTarget.type] ?? '🚨'}</span>
+                <span className="font-medium text-sm">{typeLabels[executeTarget.type] ?? executeTarget.type}</span>
+              </div>
+              <p className="text-xs text-muted-foreground">{executeTarget.beneficiaryName}</p>
+            </div>
+          )}
           <DialogFooter>
-            <Button variant="outline" onClick={() => setStatusTarget(null)} disabled={isUpdating}>إلغاء</Button>
-            <Button onClick={handleStatusUpdate} disabled={isUpdating} className="bg-admin hover:bg-admin/90">
-              {isUpdating ? 'جارٍ التحديث...' : 'تحديث'}
+            <Button variant="outline" onClick={() => setExecuteTarget(null)} disabled={isExecuting}>إلغاء</Button>
+            <Button onClick={handleDirectExecute} disabled={isExecuting} className="bg-orange-600 hover:bg-orange-700 text-white">
+              {isExecuting ? <Loader2 className="w-4 h-4 animate-spin ml-1" /> : <Play className="w-4 h-4 ml-1" />}
+              {isExecuting ? 'جارٍ التنفيذ...' : 'تنفيذ الآن'}
             </Button>
           </DialogFooter>
         </DialogContent>

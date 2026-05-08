@@ -1,10 +1,50 @@
-// POST /api/beneficiary/emergency - Create emergency request
+// GET/POST /api/beneficiary/emergency - List/Create emergency requests
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { EmergencyRequest, Notification, Nurse } from '@/models/mongoose';
+import { EmergencyRequest, Notification, Nurse, AdminSettings } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+
+export async function GET(request: NextRequest) {
+  try {
+    await connectDB();
+    const { user, error } = requireAuth(request);
+    if (error) return error;
+
+    if (user.role !== 'beneficiary') {
+      return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
+    }
+
+    const emergencies = await EmergencyRequest.find({
+      beneficiaryId: user.userId,
+    })
+      .sort({ createdAt: -1 })
+      .limit(10)
+      .lean();
+
+    // Populate nurse names
+    const nurseIds = [...new Set(emergencies.map((e: any) => e.nurseId?.toString()).filter(Boolean))];
+    const nurses = await Nurse.find({ _id: { $in: nurseIds } }).select('name').lean();
+    const nurseMap = new Map(nurses.map((n: any) => [n._id.toString(), n]));
+
+    const populatedEmergencies = emergencies.map((e: any) => ({
+      ...e,
+      id: e._id.toString(),
+      nurseName: e.nurseId ? (nurseMap.get(e.nurseId?.toString())?.name || null) : null,
+    }));
+
+    return Response.json({
+      success: true,
+      data: {
+        emergencies: populatedEmergencies,
+      },
+    });
+  } catch (error) {
+    console.error('[BENEFICIARY EMERGENCY LIST ERROR]', error);
+    return createErrorResponse('حدث خطأ أثناء جلب طلبات الطوارئ', 500, 'INTERNAL_ERROR');
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -23,6 +63,27 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('وصف الحالة الطارئة مطلوب', 400, 'VALIDATION_ERROR');
     }
 
+    // Prevent duplicate emergency requests - check if beneficiary has an active emergency
+    const activeEmergency = await EmergencyRequest.findOne({
+      beneficiaryId: user.userId,
+      status: { $in: ['pending', 'dispatched', 'in_progress'] },
+    }).lean();
+
+    if (activeEmergency) {
+      return createErrorResponse('لديك بالفعل طلب طوارئ نشط. يرجى الانتظار حتى يتم التعامل معه', 409, 'DUPLICATE_EMERGENCY');
+    }
+
+    // Calculate emergency fee from admin settings
+    let emergencyFee = 5000; // default fallback
+    try {
+      const settings = await AdminSettings.findOne().lean();
+      if (settings && settings.emergencyFee !== undefined) {
+        emergencyFee = settings.emergencyFee || 5000;
+      }
+    } catch {
+      // Use default
+    }
+
     const emergency = await EmergencyRequest.create({
       beneficiaryId: user.userId,
       type: type || 'medical',
@@ -32,28 +93,48 @@ export async function POST(request: NextRequest) {
       address,
       status: 'pending',
       priority: 'high',
+      emergencyFee,
     });
 
-    // Notify nearby available nurses (best effort)
+    // Notify nearby available nurses (best effort) - with geospatial search
     try {
       if (lat && lng) {
-        // Find verified nurses nearby (within 20km radius)
+        const maxDistanceKm = 20;
+        const latDelta = maxDistanceKm / 111;
+        const lngDelta = maxDistanceKm / (111 * Math.cos(lat * Math.PI / 180));
+
         const nearbyNurses = await Nurse.find({
           verificationStatus: 'verified',
           isAvailable: true,
-          lat: { $ne: null },
-          lng: { $ne: null },
-        }).select('_id').limit(10).lean();
+          lat: { $ne: null, $gte: lat - latDelta, $lte: lat + latDelta },
+          lng: { $ne: null, $gte: lng - lngDelta, $lte: lng + lngDelta },
+        })
+          .select('_id name lat lng')
+          .limit(15)
+          .lean();
 
-        for (const nurse of nearbyNurses) {
+        // Calculate distance for each nurse and sort
+        const nursesWithDistance = nearbyNurses.map(nurse => {
+          const R = 6371;
+          const dLat = ((nurse.lat || 0) - lat) * Math.PI / 180;
+          const dLon = ((nurse.lng || 0) - lng) * Math.PI / 180;
+          const a = Math.sin(dLat/2) * Math.sin(dLat/2) +
+                    Math.cos(lat * Math.PI / 180) * Math.cos((nurse.lat || 0) * Math.PI / 180) *
+                    Math.sin(dLon/2) * Math.sin(dLon/2);
+          const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          const distance = R * c;
+          return { ...nurse, distance: Math.round(distance * 10) / 10 };
+        }).sort((a, b) => a.distance - b.distance);
+
+        for (const nurse of nursesWithDistance) {
           await Notification.create({
             userId: nurse._id,
             userRole: 'nurse',
             titleAr: '🚨 حالة طوارئ!',
-            bodyAr: `حالة طوارئ جديدة بالقرب منك: ${description.substring(0, 100)}`,
+            bodyAr: `حالة طوارئ جديدة على بُعد ${nurse.distance} كم منك: ${description.substring(0, 100)}`,
             type: 'emergency',
             priority: 'urgent',
-            data: { emergencyRequestId: emergency._id.toString(), type: type || 'medical' },
+            data: { emergencyRequestId: emergency._id.toString(), type: type || 'medical', distance: nurse.distance },
             voiceEnabled: true,
           });
         }
@@ -64,7 +145,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...emergency.toObject(), id: emergency._id.toString() },
+      data: { ...emergency.toObject(), id: emergency._id.toString(), emergencyFee },
       message: 'تم إرسال طلب الطوارئ بنجاح. سيتم إرسال مساعدة فوراً',
     }, { status: 201 });
   } catch (error) {

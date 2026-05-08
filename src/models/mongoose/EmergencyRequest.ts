@@ -16,6 +16,7 @@ export interface IEmergencyRequest extends Document {
   resolvedAt?: Date;
   notes?: string;
   feedbackRating?: number;
+  emergencyFee?: number;
 }
 
 const EmergencyRequestSchema = new Schema<IEmergencyRequest>({
@@ -34,6 +35,7 @@ const EmergencyRequestSchema = new Schema<IEmergencyRequest>({
   resolvedAt: { type: Date },
   notes: { type: String },
   feedbackRating: { type: Number },
+  emergencyFee: { type: Number, default: 5000 },
 }, { timestamps: true });
 
 export const EmergencyRequest = mongoose.models.EmergencyRequest || mongoose.model<IEmergencyRequest>('EmergencyRequest', EmergencyRequestSchema);
