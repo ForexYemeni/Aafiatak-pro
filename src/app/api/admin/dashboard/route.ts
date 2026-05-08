@@ -4,12 +4,13 @@
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { User, Nurse, Beneficiary, ServiceRequest, EmergencyRequest, Transaction, Referral } from '@/models/mongoose';
-import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    const { user, error } = await requireSubadminPermission(request, 'view_reports');
+    // Allow all admins and subadmins to view the dashboard (no specific permission needed)
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
     if (error) return error;
 
     const now = new Date();

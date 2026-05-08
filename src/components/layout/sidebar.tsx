@@ -39,6 +39,8 @@ interface NavItem {
   permission?: SubAdminPermission;
   /** Whether this item is always visible to subadmins (like dashboard) */
   alwaysVisibleToSubadmin?: boolean;
+  /** Whether this item is ONLY visible to admin role (never shown to subadmin) */
+  adminOnly?: boolean;
 }
 
 const adminNavItems: NavItem[] = [
@@ -52,10 +54,10 @@ const adminNavItems: NavItem[] = [
   { label: 'الكوبونات', href: '/admin/coupons', icon: Tags, permission: 'manage_payments' },
   { label: 'التقييمات', href: '/admin/ratings', icon: Star, permission: 'view_reports' },
   { label: 'الشكاوى', href: '/admin/complaints', icon: MessageSquare, permission: 'manage_chat' },
-  { label: 'المديرون الفرعيون', href: '/admin/subadmins', icon: Shield }, // Admin only - no permission key
+  { label: 'المديرون الفرعيون', href: '/admin/subadmins', icon: Shield, adminOnly: true },
   { label: 'سجل النشاط', href: '/admin/activity/page', icon: ScrollText, permission: 'view_reports' },
   { label: 'إعداداتي', href: '/admin/subadmin-settings', icon: UserCog, alwaysVisibleToSubadmin: true },
-  { label: 'الإعدادات', href: '/admin/settings', icon: Settings, permission: 'manage_settings' },
+  { label: 'الإعدادات', href: '/admin/settings', icon: Settings, adminOnly: true },
 ];
 
 const nurseNavItems: NavItem[] = [
@@ -81,11 +83,13 @@ function getNavItems(role: UserRole, permissions?: SubAdminPermission[]): NavIte
       return adminNavItems;
     case 'subadmin': {
       // Filter items based on subadmin permissions
+      // adminOnly items are NEVER shown to subadmins
+      const nonAdminOnlyItems = adminNavItems.filter(item => !item.adminOnly);
       if (!permissions || permissions.length === 0) {
         // Subadmin with no permissions only sees dashboard
-        return adminNavItems.filter(item => item.alwaysVisibleToSubadmin);
+        return nonAdminOnlyItems.filter(item => item.alwaysVisibleToSubadmin);
       }
-      return adminNavItems.filter(item =>
+      return nonAdminOnlyItems.filter(item =>
         item.alwaysVisibleToSubadmin || (item.permission && permissions.includes(item.permission))
       );
     }

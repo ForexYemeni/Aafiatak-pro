@@ -10,7 +10,8 @@ import { logActivity } from '@/lib/api/helpers';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
-    const { user, error } = await requireSubadminPermission(request, 'manage_settings');
+    // Only full admin can view platform settings (not subadmin)
+    const { user, error } = requireRole(request, ['admin']);
     if (error) return error;
 
     let settings = await AdminSettings.findOne().lean();

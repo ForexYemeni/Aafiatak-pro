@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -21,14 +21,12 @@ import {
   Activity,
   Clock,
   Users,
-  Zap,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
@@ -117,54 +115,61 @@ const specializations = [
   { value: 'emergency', label: 'الطوارئ' },
 ];
 
-const loginRoles = [
-  {
-    value: 'beneficiary' as UserRole,
-    label: 'مستفيد',
-    subtitle: 'احصل على رعاية صحية منزلية',
-    icon: User,
-    gradient: 'from-purple-500 to-purple-700',
-    bgGlow: 'rgba(168, 85, 247, 0.15)',
-    borderColor: 'rgba(168, 85, 247, 0.5)',
-    textColor: 'text-purple-600 dark:text-purple-400',
-  },
-  {
-    value: 'nurse' as UserRole,
-    label: 'ممرض/ـة',
-    subtitle: 'انضم كممرض معتمد',
-    icon: Stethoscope,
-    gradient: 'from-sky-500 to-sky-700',
-    bgGlow: 'rgba(14, 165, 233, 0.15)',
-    borderColor: 'rgba(14, 165, 233, 0.5)',
-    textColor: 'text-sky-600 dark:text-sky-400',
-  },
-  {
-    value: 'admin' as UserRole,
-    label: 'مدير',
-    subtitle: 'لوحة تحكم الإدارة',
+// ============================================================================
+// Role Configuration for Auto-Detected Display
+// ============================================================================
+
+const roleConfig: Record<string, {
+  label: string;
+  icon: React.ElementType;
+  gradient: string;
+  bgGradient: string;
+  ringColor: string;
+  textColor: string;
+  welcomeMsg: string;
+  dashboardLabel: string;
+}> = {
+  admin: {
+    label: 'مدير النظام',
     icon: Shield,
     gradient: 'from-amber-500 to-amber-700',
-    bgGlow: 'rgba(245, 158, 11, 0.15)',
-    borderColor: 'rgba(245, 158, 11, 0.5)',
-    textColor: 'text-amber-600 dark:text-amber-400',
+    bgGradient: 'from-amber-600 via-amber-700 to-orange-800',
+    ringColor: 'rgba(245, 158, 11, 0.4)',
+    textColor: 'text-amber-500',
+    welcomeMsg: 'مرحباً بك في لوحة التحكم',
+    dashboardLabel: 'لوحة تحكم الإدارة',
   },
-  {
-    value: 'subadmin' as UserRole,
+  subadmin: {
     label: 'مدير فرعي',
-    subtitle: 'إدارة محدودة الصلاحيات',
     icon: ShieldCheck,
     gradient: 'from-orange-500 to-orange-700',
-    bgGlow: 'rgba(249, 115, 22, 0.15)',
-    borderColor: 'rgba(249, 115, 22, 0.5)',
-    textColor: 'text-orange-600 dark:text-orange-400',
+    bgGradient: 'from-orange-600 via-orange-700 to-red-800',
+    ringColor: 'rgba(249, 115, 22, 0.4)',
+    textColor: 'text-orange-500',
+    welcomeMsg: 'مرحباً بك في لوحة الإدارة',
+    dashboardLabel: 'لوحة الإدارة المحدودة',
   },
-];
-
-const demoAccounts = [
-  { role: 'مدير' as const, phone: '700000000', password: 'Admin@123', color: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20' },
-  { role: 'ممرض' as const, phone: '711111111', password: 'Nurse@123', color: 'bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-500/20' },
-  { role: 'مستفيد' as const, phone: '722222222', password: 'Benef@123', color: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20' },
-];
+  nurse: {
+    label: 'ممرض/ـة',
+    icon: Stethoscope,
+    gradient: 'from-sky-500 to-sky-700',
+    bgGradient: 'from-sky-600 via-sky-700 to-blue-800',
+    ringColor: 'rgba(14, 165, 233, 0.4)',
+    textColor: 'text-sky-500',
+    welcomeMsg: 'مرحباً بك في حسابك المهني',
+    dashboardLabel: 'لوحة الممرض/ـة',
+  },
+  beneficiary: {
+    label: 'مستفيد/ـة',
+    icon: User,
+    gradient: 'from-purple-500 to-purple-700',
+    bgGradient: 'from-purple-600 via-purple-700 to-indigo-800',
+    ringColor: 'rgba(168, 85, 247, 0.4)',
+    textColor: 'text-purple-500',
+    welcomeMsg: 'مرحباً بك في منصة عافيتك',
+    dashboardLabel: 'الرئيسية',
+  },
+};
 
 // ============================================================================
 // Dashboard redirect helper
@@ -396,6 +401,273 @@ function MobileHeroHeader() {
 }
 
 // ============================================================================
+// Post-Login Loading Screen with 5-Second Countdown
+// ============================================================================
+
+function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; role: string }; onComplete: () => void }) {
+  const [countdown, setCountdown] = useState(5);
+  const [progress, setProgress] = useState(0);
+  const config = roleConfig[user.role] || roleConfig.beneficiary;
+  const RoleIcon = config.icon;
+
+  useEffect(() => {
+    const startTime = Date.now();
+    const duration = 5000;
+
+    const interval = setInterval(() => {
+      const elapsed = Date.now() - startTime;
+      const remaining = Math.max(0, Math.ceil((duration - elapsed) / 1000));
+      const progressPercent = Math.min(100, (elapsed / duration) * 100);
+
+      setCountdown(remaining);
+      setProgress(progressPercent);
+
+      if (elapsed >= duration) {
+        clearInterval(interval);
+        onComplete();
+      }
+    }, 50);
+
+    return () => clearInterval(interval);
+  }, [onComplete]);
+
+  return (
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0, scale: 1.05 }}
+      transition={{ duration: 0.5 }}
+      className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden"
+      dir="rtl"
+    >
+      {/* Dynamic gradient background based on role */}
+      <div className={cn('absolute inset-0 bg-gradient-to-br', config.bgGradient)} />
+
+      {/* Animated orbs */}
+      <motion.div
+        className="absolute top-0 right-0 w-[800px] h-[800px] rounded-full"
+        style={{ background: `radial-gradient(circle, ${config.ringColor} 0%, transparent 70%)` }}
+        animate={{ scale: [1, 1.3, 1], x: [0, -50, 0], y: [0, 30, 0] }}
+        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut' }}
+      />
+      <motion.div
+        className="absolute bottom-0 left-0 w-[600px] h-[600px] rounded-full"
+        style={{ background: 'radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%)' }}
+        animate={{ scale: [1.2, 0.8, 1.2], x: [0, 40, 0], y: [0, -30, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
+      />
+
+      {/* Floating particles */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {Array.from({ length: 30 }).map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute rounded-full bg-white/15"
+            style={{
+              width: Math.random() * 6 + 2,
+              height: Math.random() * 6 + 2,
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              y: [0, -40, 0],
+              x: [0, Math.random() * 30 - 15, 0],
+              opacity: [0.2, 0.6, 0.2],
+            }}
+            transition={{
+              duration: Math.random() * 5 + 3,
+              repeat: Infinity,
+              ease: 'easeInOut',
+              delay: Math.random() * 3,
+            }}
+          />
+        ))}
+      </div>
+
+      {/* Content */}
+      <div className="relative z-10 flex flex-col items-center text-center px-6">
+        {/* Heartbeat animation icon */}
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
+          className="relative mb-8"
+        >
+          {/* Pulsing rings */}
+          <motion.div
+            animate={{
+              boxShadow: [
+                `0 0 0 0 ${config.ringColor}`,
+                `0 0 0 30px rgba(0,0,0,0)`,
+                `0 0 0 0 rgba(0,0,0,0)`,
+              ],
+            }}
+            transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
+            className="w-28 h-28 rounded-full flex items-center justify-center bg-white/15 backdrop-blur-xl border-2 border-white/30"
+          >
+            {/* Heartbeat effect */}
+            <motion.div
+              animate={{ scale: [1, 1.15, 1, 1.15, 1] }}
+              transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
+            >
+              <RoleIcon className="w-14 h-14 text-white" />
+            </motion.div>
+          </motion.div>
+
+          {/* Orbiting dot */}
+          <motion.div
+            className="absolute inset-0"
+            animate={{ rotate: 360 }}
+            transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
+          >
+            <div className="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-3 h-3 rounded-full bg-white/60 shadow-lg" />
+          </motion.div>
+        </motion.div>
+
+        {/* Welcome message */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.5, duration: 0.6 }}
+          className="mb-2"
+        >
+          <h2 className="text-3xl font-bold text-white mb-2">مرحباً، {user.name}</h2>
+        </motion.div>
+
+        {/* Role detection badge */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.8, duration: 0.5 }}
+          className="mb-6"
+        >
+          <div className="inline-flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-5 py-2.5 border border-white/20">
+            <Sparkles className="w-4 h-4 text-yellow-300" />
+            <span className="text-white/90 text-sm font-medium">تم التعرف على حسابك كـ</span>
+            <span className="text-white font-bold text-sm">{config.label}</span>
+            <Sparkles className="w-4 h-4 text-yellow-300" />
+          </div>
+        </motion.div>
+
+        {/* Dashboard label */}
+        <motion.p
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.2, duration: 0.5 }}
+          className="text-white/60 text-sm mb-8"
+        >
+          جارٍ التحويل إلى {config.dashboardLabel}...
+        </motion.p>
+
+        {/* Countdown timer - circular */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 1, duration: 0.4 }}
+          className="relative mb-6"
+        >
+          <svg className="w-20 h-20 -rotate-90" viewBox="0 0 80 80">
+            {/* Background circle */}
+            <circle
+              cx="40" cy="40" r="34"
+              fill="none"
+              stroke="rgba(255,255,255,0.15)"
+              strokeWidth="5"
+            />
+            {/* Progress circle */}
+            <motion.circle
+              cx="40" cy="40" r="34"
+              fill="none"
+              stroke="white"
+              strokeWidth="5"
+              strokeLinecap="round"
+              strokeDasharray={2 * Math.PI * 34}
+              strokeDashoffset={2 * Math.PI * 34 * (1 - progress / 100)}
+              style={{ transition: 'stroke-dashoffset 0.1s linear' }}
+            />
+          </svg>
+          <div className="absolute inset-0 flex items-center justify-center">
+            <motion.span
+              key={countdown}
+              initial={{ scale: 1.3, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.2 }}
+              className="text-2xl font-bold text-white"
+            >
+              {countdown}
+            </motion.span>
+          </div>
+        </motion.div>
+
+        {/* Progress bar */}
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.3 }}
+          className="w-64"
+        >
+          <div className="h-1.5 rounded-full bg-white/15 overflow-hidden">
+            <motion.div
+              className="h-full rounded-full bg-white/80"
+              style={{ width: `${progress}%`, transition: 'width 0.1s linear' }}
+            />
+          </div>
+        </motion.div>
+
+        {/* Loading steps */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5 }}
+          className="mt-6 space-y-2"
+        >
+          {[
+            { label: 'التحقق من الهوية', done: progress > 15 },
+            { label: 'تحميل بيانات الحساب', done: progress > 40 },
+            { label: 'إعداد لوحة التحكم', done: progress > 65 },
+            { label: 'جاهز للتحويل', done: progress > 85 },
+          ].map((step, i) => (
+            <motion.div
+              key={step.label}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 1.6 + i * 0.3 }}
+              className="flex items-center gap-2"
+            >
+              <AnimatePresence mode="wait">
+                {step.done ? (
+                  <motion.div
+                    key="done"
+                    initial={{ scale: 0 }}
+                    animate={{ scale: 1 }}
+                    className="w-4 h-4 rounded-full bg-white/30 flex items-center justify-center"
+                  >
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-300" />
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="loading"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                    className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white/80"
+                  />
+                )}
+              </AnimatePresence>
+              <span className={cn(
+                'text-xs transition-colors duration-300',
+                step.done ? 'text-white/80' : 'text-white/40'
+              )}>
+                {step.label}
+              </span>
+            </motion.div>
+          ))}
+        </motion.div>
+      </div>
+    </motion.div>
+  );
+}
+
+// ============================================================================
 // Main Login Page Component
 // ============================================================================
 
@@ -411,19 +683,27 @@ function LoginPageContent() {
   const [registerRole, setRegisterRole] = useState<string>('beneficiary');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [loginRole, setLoginRole] = useState<UserRole>('beneficiary');
+  const [showLoadingScreen, setShowLoadingScreen] = useState(false);
 
-  // Redirect if already authenticated (but not if user just logged out)
+  // Handle post-login redirect with loading screen
   const justLoggedOut = searchParams.get('logout') === 'true';
+
   useEffect(() => {
-    if (isAuthenticated && user && !justLoggedOut) {
-      const destination = redirectPath ?? getDashboardPath(user.role);
-      router.replace(destination);
+    if (isAuthenticated && user && !justLoggedOut && !showLoadingScreen) {
+      // Show the loading screen first
+      setShowLoadingScreen(true);
     }
     if (justLoggedOut && !isAuthenticated) {
       router.replace('/');
     }
-  }, [isAuthenticated, user, router, redirectPath, justLoggedOut]);
+  }, [isAuthenticated, user, justLoggedOut, showLoadingScreen]);
+
+  const handleLoadingComplete = useCallback(() => {
+    if (user) {
+      const destination = redirectPath ?? getDashboardPath(user.role);
+      router.replace(destination);
+    }
+  }, [user, redirectPath, router]);
 
   // ============================================================================
   // Login Form
@@ -499,22 +779,22 @@ function LoginPageContent() {
     }
   };
 
-  // Demo fill helper
-  const fillDemo = useCallback((phone: string, password: string) => {
-    loginForm.setValue('phone', phone);
-    loginForm.setValue('password', password);
-    loginForm.clearErrors();
-  }, [loginForm]);
-
-  // Get the selected role config
-  const selectedRoleConfig = loginRoles.find(r => r.value === loginRole) ?? loginRoles[0];
-
   // ============================================================================
   // Render
   // ============================================================================
 
   return (
     <div className="min-h-screen flex flex-col relative overflow-hidden" dir="rtl" lang="ar">
+      {/* Post-login loading screen */}
+      <AnimatePresence>
+        {showLoadingScreen && user && (
+          <PostLoginLoadingScreen
+            user={{ name: user.name, role: user.role }}
+            onComplete={handleLoadingComplete}
+          />
+        )}
+      </AnimatePresence>
+
       {/* ---- Desktop: Split-screen layout ---- */}
       <div className="hidden lg:flex lg:h-screen">
         {/* Right side: Hero branding */}
@@ -548,7 +828,7 @@ function LoginPageContent() {
               transition={{ delay: 0.4 }}
               className="mb-8"
             >
-              <h2 className="text-2xl font-bold text-foreground">مرحباً بك 👋</h2>
+              <h2 className="text-2xl font-bold text-foreground">مرحباً بك في عافيتك</h2>
               <p className="text-muted-foreground mt-1">سجّل دخولك للوصول إلى حسابك</p>
             </motion.div>
 
@@ -596,54 +876,22 @@ function LoginPageContent() {
                   {/* ====== Login Tab ====== */}
                   <TabsContent value="login" className="p-6 pt-5 mt-0">
                     <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-5">
-                      {/* Role selector 2x2 grid */}
-                      <div className="space-y-3">
-                        <Label className="text-sm font-medium">اختر نوع الحساب</Label>
-                        <div className="grid grid-cols-2 gap-3">
-                          {loginRoles.map((role) => {
-                            const isSelected = loginRole === role.value;
-                            return (
-                              <motion.button
-                                key={role.value}
-                                type="button"
-                                whileHover={{ scale: 1.02 }}
-                                whileTap={{ scale: 0.97 }}
-                                onClick={() => setLoginRole(role.value)}
-                                className={cn(
-                                  'relative rounded-2xl p-4 text-right transition-all duration-300 overflow-hidden',
-                                  'border-2',
-                                  isSelected
-                                    ? 'border-transparent shadow-lg'
-                                    : 'border-border/50 bg-muted/30 hover:bg-muted/50'
-                                )}
-                                style={isSelected ? {
-                                  borderColor: role.borderColor,
-                                  background: role.bgGlow,
-                                  boxShadow: `0 0 20px ${role.bgGlow}, 0 4px 12px rgba(0,0,0,0.1)`,
-                                } : undefined}
-                              >
-                                {/* Gradient overlay on selected */}
-                                {isSelected && (
-                                  <motion.div
-                                    layoutId="roleGlow"
-                                    className={cn('absolute inset-0 bg-gradient-to-br opacity-10', role.gradient)}
-                                    transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                                  />
-                                )}
-                                <div className="relative z-10">
-                                  <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center mb-2 bg-gradient-to-br', role.gradient, 'shadow-md')}>
-                                    <role.icon className="w-5 h-5 text-white" />
-                                  </div>
-                                  <p className={cn('text-sm font-bold', isSelected ? role.textColor : 'text-foreground')}>
-                                    {role.label}
-                                  </p>
-                                  <p className="text-[11px] text-muted-foreground mt-0.5">{role.subtitle}</p>
-                                </div>
-                              </motion.button>
-                            );
-                          })}
+                      {/* Smart login notice */}
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-gradient-to-l from-purple-500/5 via-sky-500/5 to-emerald-500/5 rounded-2xl p-4 border border-purple-500/10"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-500/20 to-sky-500/20 flex items-center justify-center shrink-0">
+                            <Sparkles className="w-5 h-5 text-purple-500" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-semibold text-foreground">تسجيل دخول ذكي</p>
+                            <p className="text-xs text-muted-foreground mt-0.5">سيتعرف النظام تلقائياً على نوع حسابك عند تسجيل الدخول</p>
+                          </div>
                         </div>
-                      </div>
+                      </motion.div>
 
                       {/* Phone */}
                       <div className="space-y-2">
@@ -697,7 +945,11 @@ function LoginPageContent() {
                       {/* Remember me + Forgot password */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Checkbox id="remember" />
+                          <input
+                            type="checkbox"
+                            id="remember"
+                            className="h-4 w-4 rounded border-border/50 text-purple-600 focus:ring-purple-500"
+                          />
                           <Label htmlFor="remember" className="text-sm font-normal cursor-pointer">تذكرني</Label>
                         </div>
                         <button type="button" className="text-xs text-purple-600 dark:text-purple-400 hover:underline">
@@ -705,14 +957,11 @@ function LoginPageContent() {
                         </button>
                       </div>
 
-                      {/* Submit button with gradient */}
+                      {/* Submit button */}
                       <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }}>
                         <Button
                           type="submit"
-                          className={cn(
-                            'w-full h-12 text-base font-bold rounded-xl shadow-lg transition-all duration-300',
-                            `bg-gradient-to-l ${selectedRoleConfig.gradient} hover:opacity-90 text-white`
-                          )}
+                          className="w-full h-12 text-base font-bold rounded-xl shadow-lg transition-all duration-300 bg-gradient-to-l from-purple-600 via-purple-700 to-sky-700 hover:opacity-90 text-white"
                           disabled={isLoading}
                         >
                           {isLoading ? (
@@ -726,26 +975,6 @@ function LoginPageContent() {
                         </Button>
                       </motion.div>
                     </form>
-
-                    {/* Demo accounts */}
-                    <div className="mt-5 pt-4 border-t border-border/30">
-                      <p className="text-[11px] text-muted-foreground text-center mb-2">حسابات تجريبية للتجربة</p>
-                      <div className="flex items-center justify-center gap-2 flex-wrap">
-                        {demoAccounts.map((demo) => (
-                          <button
-                            key={demo.phone}
-                            type="button"
-                            onClick={() => fillDemo(demo.phone, demo.password)}
-                            className={cn(
-                              'text-[10px] px-2.5 py-1 rounded-lg border font-medium transition-all hover:opacity-80',
-                              demo.color
-                            )}
-                          >
-                            {demo.role}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   </TabsContent>
 
                   {/* ====== Register Tab ====== */}
@@ -1014,47 +1243,22 @@ function LoginPageContent() {
                   {/* ====== Mobile Login Tab ====== */}
                   <TabsContent value="login" className="p-5 pt-4 mt-0">
                     <form onSubmit={loginForm.handleSubmit(onLoginSubmit)} className="space-y-4">
-                      {/* Role selector 2x2 grid */}
-                      <div className="space-y-2">
-                        <Label className="text-xs font-medium">اختر نوع الحساب</Label>
-                        <div className="grid grid-cols-2 gap-2">
-                          {loginRoles.map((role) => {
-                            const isSelected = loginRole === role.value;
-                            return (
-                              <motion.button
-                                key={role.value}
-                                type="button"
-                                whileTap={{ scale: 0.96 }}
-                                onClick={() => setLoginRole(role.value)}
-                                className={cn(
-                                  'relative rounded-xl p-3 text-right transition-all duration-300 overflow-hidden border-2',
-                                  isSelected
-                                    ? 'border-transparent shadow-md'
-                                    : 'border-border/50 bg-muted/30'
-                                )}
-                                style={isSelected ? {
-                                  borderColor: role.borderColor,
-                                  background: role.bgGlow,
-                                  boxShadow: `0 0 15px ${role.bgGlow}`,
-                                } : undefined}
-                              >
-                                {isSelected && <div className={cn('absolute inset-0 bg-gradient-to-br opacity-10', role.gradient)} />}
-                                <div className="relative z-10 flex items-center gap-2">
-                                  <div className={cn('w-8 h-8 rounded-lg flex items-center justify-center bg-gradient-to-br', role.gradient, 'shadow-sm')}>
-                                    <role.icon className="w-4 h-4 text-white" />
-                                  </div>
-                                  <div>
-                                    <p className={cn('text-xs font-bold', isSelected ? role.textColor : 'text-foreground')}>
-                                      {role.label}
-                                    </p>
-                                    <p className="text-[9px] text-muted-foreground leading-tight">{role.subtitle}</p>
-                                  </div>
-                                </div>
-                              </motion.button>
-                            );
-                          })}
+                      {/* Smart login notice */}
+                      <motion.div
+                        initial={{ opacity: 0, y: -10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="bg-gradient-to-l from-purple-500/5 via-sky-500/5 to-emerald-500/5 rounded-xl p-3 border border-purple-500/10"
+                      >
+                        <div className="flex items-center gap-2">
+                          <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-purple-500/20 to-sky-500/20 flex items-center justify-center shrink-0">
+                            <Sparkles className="w-4 h-4 text-purple-500" />
+                          </div>
+                          <div>
+                            <p className="text-xs font-semibold text-foreground">تسجيل دخول ذكي</p>
+                            <p className="text-[10px] text-muted-foreground">النظام يتعرف على نوع حسابك تلقائياً</p>
+                          </div>
                         </div>
-                      </div>
+                      </motion.div>
 
                       {/* Phone */}
                       <div className="space-y-1.5">
@@ -1082,7 +1286,7 @@ function LoginPageContent() {
                       {/* Remember + Forgot */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Checkbox id="m-remember" />
+                          <input type="checkbox" id="m-remember" className="h-3.5 w-3.5 rounded border-border/50 text-purple-600 focus:ring-purple-500" />
                           <Label htmlFor="m-remember" className="text-xs font-normal cursor-pointer">تذكرني</Label>
                         </div>
                         <button type="button" className="text-[11px] text-purple-600 dark:text-purple-400 hover:underline">نسيت كلمة المرور؟</button>
@@ -1090,23 +1294,11 @@ function LoginPageContent() {
 
                       {/* Submit */}
                       <motion.div whileTap={{ scale: 0.98 }}>
-                        <Button type="submit" className={cn('w-full h-11 text-sm font-bold rounded-xl shadow-lg bg-gradient-to-l', selectedRoleConfig.gradient, 'hover:opacity-90 text-white')} disabled={isLoading}>
+                        <Button type="submit" className="w-full h-11 text-sm font-bold rounded-xl shadow-lg bg-gradient-to-l from-purple-600 via-purple-700 to-sky-700 hover:opacity-90 text-white" disabled={isLoading}>
                           {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <span className="flex items-center gap-2">تسجيل الدخول <ArrowLeft className="w-4 h-4" /></span>}
                         </Button>
                       </motion.div>
                     </form>
-
-                    {/* Demo accounts */}
-                    <div className="mt-4 pt-3 border-t border-border/30">
-                      <p className="text-[10px] text-muted-foreground text-center mb-1.5">حسابات تجريبية</p>
-                      <div className="flex items-center justify-center gap-1.5">
-                        {demoAccounts.map((demo) => (
-                          <button key={demo.phone} type="button" onClick={() => fillDemo(demo.phone, demo.password)} className={cn('text-[9px] px-2 py-1 rounded-md border font-medium transition-all hover:opacity-80', demo.color)}>
-                            {demo.role}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
                   </TabsContent>
 
                   {/* ====== Mobile Register Tab ====== */}
@@ -1256,7 +1448,7 @@ export default function LoginPage() {
           <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-lg animate-pulse">
             <Heart className="w-8 h-8 text-white" fill="currentColor" />
           </div>
-          <div className="w-8 h-8 border-4 border-purple-500 border-t-transparent rounded-full animate-spin" />
+          <p className="text-muted-foreground text-sm">جارٍ التحميل...</p>
         </div>
       </div>
     }>
