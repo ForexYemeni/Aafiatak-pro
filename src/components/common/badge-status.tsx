@@ -75,8 +75,10 @@ const statusConfig: Record<BadgeStatusVariant, { label: string; className: strin
 };
 
 export function BadgeStatus({ status, label, className, size = 'sm' }: BadgeStatusProps) {
-  const config = statusConfig[status as BadgeStatusVariant] ?? {
-    label: status,
+  // Prevent "undefined" from being displayed as text
+  const safeStatus = status || 'pending';
+  const config = statusConfig[safeStatus as BadgeStatusVariant] ?? {
+    label: safeStatus,
     className: 'bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-400',
   };
 

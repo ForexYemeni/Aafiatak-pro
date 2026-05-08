@@ -19,7 +19,13 @@ import {
   Activity,
   PlayCircle,
   Phone,
+  Shield,
+  ChevronLeft,
+  ShieldCheck,
+  ShieldX,
+  Hourglass,
 } from 'lucide-react';
+import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -81,6 +87,46 @@ interface Assignment {
 
 type TabType = 'new' | 'active' | 'completed';
 
+// ---- Verification Status Config ----
+
+const verificationConfig: Record<string, {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+  iconBg: string;
+  iconColor: string;
+  borderColor: string;
+  bgGradient: string;
+}> = {
+  unverified: {
+    icon: Shield,
+    title: 'حسابك غير موثق',
+    description: 'لن تصلك أي طلبات حتى يتم توثيق حسابك. اضغط هنا لبدء التوثيق',
+    iconBg: 'bg-amber-100 dark:bg-amber-900/30',
+    iconColor: 'text-amber-600 dark:text-amber-400',
+    borderColor: 'border-amber-200 dark:border-amber-800/50',
+    bgGradient: 'from-amber-50/80 to-orange-50/50 dark:from-amber-900/10 dark:to-orange-900/5',
+  },
+  pending: {
+    icon: Hourglass,
+    title: 'حسابك قيد المراجعة',
+    description: 'تم رفع المستندات وجاري المراجعة من قبل الإدارة. سنقوم بإشعارك فوراً',
+    iconBg: 'bg-sky-100 dark:bg-sky-900/30',
+    iconColor: 'text-sky-600 dark:text-sky-400',
+    borderColor: 'border-sky-200 dark:border-sky-800/50',
+    bgGradient: 'from-sky-50/80 to-blue-50/50 dark:from-sky-900/10 dark:to-blue-900/5',
+  },
+  rejected: {
+    icon: ShieldX,
+    title: 'تم رفض التوثيق',
+    description: 'اضغط هنا لرفع المستندات مرة أخرى',
+    iconBg: 'bg-red-100 dark:bg-red-900/30',
+    iconColor: 'text-red-600 dark:text-red-400',
+    borderColor: 'border-red-200 dark:border-red-800/50',
+    bgGradient: 'from-red-50/80 to-rose-50/50 dark:from-red-900/10 dark:to-rose-900/5',
+  },
+};
+
 // ---- Service icon helper ----
 
 function getServiceIcon(category: string) {
@@ -119,9 +165,26 @@ export default function NurseTasksPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [counts, setCounts] = useState({ new: 0, active: 0, completed: 0 });
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
   const authFetch = useAuthFetch();
   const user = useAuthStore((s) => s.user);
   const orderUpdates = useOrderUpdates();
+
+  // Fetch nurse verification status from profile API
+  const fetchVerificationStatus = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/nurse/profile');
+      const data = await res.json();
+      if (data.success && data.data) {
+        const status = data.data.verificationStatus || 'unverified';
+        setVerificationStatus(status);
+      }
+    } catch {
+      // If profile fetch fails, default to unverified from auth store
+      const storedStatus = (user as Record<string, unknown>)?.verificationStatus as string | undefined;
+      setVerificationStatus(storedStatus || 'unverified');
+    }
+  }, [authFetch, user]);
 
   const fetchCounts = useCallback(async () => {
     try {
@@ -159,7 +222,8 @@ export default function NurseTasksPage() {
     setIsLoading(true);
     fetchAssignments();
     fetchCounts();
-  }, [fetchAssignments, fetchCounts]);
+    fetchVerificationStatus();
+  }, [fetchAssignments, fetchCounts, fetchVerificationStatus]);
 
   // Refresh on real-time order updates
   useEffect(() => {
@@ -261,11 +325,8 @@ export default function NurseTasksPage() {
     }
   };
 
-  const getWhatsAppUrl = (phone: string) => {
-    const cleanPhone = phone.replace(/\D/g, '');
-    const withCode = cleanPhone.startsWith('0') ? '967' + cleanPhone.substring(1) : cleanPhone.startsWith('967') ? cleanPhone : '967' + cleanPhone;
-    return `https://wa.me/${withCode}`;
-  };
+  // Get verification config for current status
+  const vConfig = verificationStatus ? verificationConfig[verificationStatus] : null;
 
   return (
     <div className="space-y-4">
@@ -273,6 +334,67 @@ export default function NurseTasksPage() {
         title={`مرحباً، ${user?.name?.split(' ')[0] ?? 'الممرض/ـة'}`}
         description="إدارة المهام والطلبات الموكلة إليك"
       />
+
+      {/* Verification Warning Banner */}
+      <AnimatePresence>
+        {verificationStatus && verificationStatus !== 'verified' && vConfig && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.98 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
+            <Link href="/nurse/profile" className="block">
+              <GlassCard
+                variant="nurse"
+                className={`p-4 cursor-pointer hover:shadow-md transition-all duration-300 border ${vConfig.borderColor} bg-gradient-to-l ${vConfig.bgGradient}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`w-11 h-11 rounded-xl ${vConfig.iconBg} flex items-center justify-center shrink-0`}>
+                    <vConfig.icon className={`w-5 h-5 ${vConfig.iconColor}`} />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className={`font-bold text-sm ${vConfig.iconColor} mb-0.5`}>
+                      {vConfig.title}
+                    </p>
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      {vConfig.description}
+                    </p>
+                  </div>
+                  <ChevronLeft className="w-5 h-5 text-muted-foreground shrink-0" />
+                </div>
+              </GlassCard>
+            </Link>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Verified Badge (shown when verified) */}
+      <AnimatePresence>
+        {verificationStatus === 'verified' && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.98 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={{ duration: 0.3, ease: 'easeOut' }}
+          >
+            <GlassCard variant="nurse" className="p-3 border-emerald-200 dark:border-emerald-800/50 bg-gradient-to-l from-emerald-50/80 to-teal-50/50 dark:from-emerald-900/10 dark:to-teal-900/5">
+              <div className="flex items-center gap-2.5">
+                <div className="w-9 h-9 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                  <ShieldCheck className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <div className="flex-1">
+                  <p className="font-bold text-sm text-emerald-700 dark:text-emerald-400">حسابك موثق</p>
+                  <p className="text-xs text-muted-foreground">يمكنك استقبال الطلبات والعمل بشكل طبيعي</p>
+                </div>
+                <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 text-[10px]">
+                  <ShieldCheck className="w-3 h-3 me-1" />
+                  موثق
+                </Badge>
+              </div>
+            </GlassCard>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3">
@@ -383,7 +505,7 @@ export default function NurseTasksPage() {
                                 طوارئ
                               </Badge>
                             )}
-                            <BadgeStatus status={assignment.status} />
+                            <BadgeStatus status={assignment.status || 'pending'} />
                           </div>
                         </div>
 

@@ -188,7 +188,7 @@ export default function NurseProfilePage() {
   // Availability toggle with confirmation
   const handleAvailabilityToggleRequest = (newAvailability: boolean) => {
     // If nurse is not verified, warn them
-    if (newAvailability && profile?.verificationStatus !== 'verified') {
+    if (newAvailability && (profile?.verificationStatus || 'unverified') !== 'verified') {
       setPendingAvailability(newAvailability);
       setShowAvailabilityConfirm(true);
       return;
@@ -491,7 +491,7 @@ export default function NurseProfilePage() {
                   </h3>
                   <p className="text-sm text-muted-foreground leading-relaxed">
                     {pendingAvailability ? (
-                      profile.verificationStatus !== 'verified'
+                      (profile.verificationStatus || 'unverified') !== 'verified'
                         ? 'حسابك غير موثق بعد. لن يتم إرسال أي طلبات لك حتى يتم توثيق حسابك من قبل الإدارة. هل تريد المتابعة؟'
                         : 'سيتم إعلام النظام بأنك متاح لاستقبال الطلبات والمهام الجديدة. هل أنت مستعد؟'
                     ) : (
@@ -500,7 +500,7 @@ export default function NurseProfilePage() {
                   </p>
                 </div>
 
-                {pendingAvailability && profile.verificationStatus !== 'verified' && (
+                {pendingAvailability && (profile.verificationStatus || 'unverified') !== 'verified' && (
                   <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800">
                     <div className="flex items-center gap-2 mb-1">
                       <AlertTriangle className="w-4 h-4 text-amber-600" />
@@ -536,7 +536,7 @@ export default function NurseProfilePage() {
       <PageHeader title="الملف الشخصي" />
 
       {/* Verification Warning Banner (if not verified) */}
-      {profile.verificationStatus !== 'verified' && (
+      {(profile.verificationStatus || 'unverified') !== 'verified' && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -548,12 +548,12 @@ export default function NurseProfilePage() {
               </div>
               <div className="flex-1">
                 <p className="font-semibold text-sm text-amber-700 dark:text-amber-400 mb-0.5">
-                  {profile.verificationStatus === 'unverified' && 'حسابك غير موثق'}
+                  {(!profile.verificationStatus || profile.verificationStatus === 'unverified') && 'حسابك غير موثق'}
                   {profile.verificationStatus === 'pending' && 'حسابك قيد المراجعة'}
                   {profile.verificationStatus === 'rejected' && 'تم رفض التوثيق'}
                 </p>
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  {profile.verificationStatus === 'unverified' && 'لن يتم إرسال أي طلبات أو مهام إليك حتى يتم توثيق حسابك. يرجى رفع الهوية الوطنية ومزاولة المهنة أدناه.'}
+                  {(!profile.verificationStatus || profile.verificationStatus === 'unverified') && 'لن يتم إرسال أي طلبات أو مهام إليك حتى يتم توثيق حسابك. يرجى رفع الهوية الوطنية ومزاولة المهنة أدناه.'}
                   {profile.verificationStatus === 'pending' && 'تم رفع المستندات وسيتم مراجعتها من قبل الإدارة قريباً. سنقوم بإشعارك فور التحقق.'}
                   {profile.verificationStatus === 'rejected' && `تم رفض التوثيق${profile.rejectedReason ? `: ${profile.rejectedReason}` : ''}. يرجى رفع المستندات مرة أخرى.`}
                 </p>
@@ -581,7 +581,7 @@ export default function NurseProfilePage() {
           <p className="text-sm text-muted-foreground mb-2">{profile.phone}</p>
 
           <div className="flex items-center gap-2 mb-3">
-            <BadgeStatus status={profile.verificationStatus} size="md" />
+            <BadgeStatus status={profile.verificationStatus || 'unverified'} size="md" />
             {profile.verificationStatus === 'rejected' && profile.rejectedReason && (
               <span className="text-xs text-red-500">({profile.rejectedReason})</span>
             )}
@@ -693,7 +693,7 @@ export default function NurseProfilePage() {
       <GlassCard variant="nurse" className="p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold">توثيق الحساب</h3>
-          <BadgeStatus status={profile.verificationStatus} size="md" />
+          <BadgeStatus status={profile.verificationStatus || 'unverified'} size="md" />
         </div>
 
         {profile.verificationStatus === 'verified' ? (
