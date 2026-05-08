@@ -198,3 +198,22 @@ Stage Summary:
 - Sub-admins: Email and permissions now saved
 - Activity log: userName now populated from User collection
 - Deployed to Vercel successfully
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix application error on aafiatak-v0-1.vercel.app and sub-admin issues
+
+Work Log:
+- Diagnosed client-side crash: `useCallback` was used in page.tsx line 701 but not imported
+- Added `useCallback` to the React import in src/app/page.tsx
+- Fixed sub-admin dashboard data loading error: wrapped individual API calls in try/catch blocks so that if sub-admin lacks specific permissions (manage_orders, manage_nurses, manage_beneficiaries), the dashboard still loads with stats but without the sections they can't access
+- Fixed sub-admin "المزيد" bottom nav link: created separate subadminBottomItems array that links to /admin/subadmin-settings instead of /admin/settings
+- Verified sidebar already correctly differentiates admin/subadmin settings
+- Built and deployed to Vercel successfully
+
+Stage Summary:
+- Root cause of application crash: missing useCallback import
+- Sub-admin dashboard now gracefully handles permission errors instead of showing full-page error
+- Sub-admin bottom nav "المزيد" now correctly goes to /admin/subadmin-settings
+- Deployed as commit e4a641e to main branch
