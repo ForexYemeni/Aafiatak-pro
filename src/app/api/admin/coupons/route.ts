@@ -17,9 +17,13 @@ export async function GET(request: NextRequest) {
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
     const activeOnly = searchParams.get('active') === 'true';
+    const search = searchParams.get('search');
 
     const filter: any = {};
     if (activeOnly) filter.isActive = true;
+    if (search) {
+      filter.code = { $regex: search, $options: 'i' };
+    }
 
     const [coupons, total] = await Promise.all([
       Coupon.find(filter).sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
@@ -59,11 +63,19 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('رمز الكوبون موجود بالفعل', 409, 'CODE_EXISTS');
     }
 
-    const coupon = await Coupon.create({
-      ...body,
+    // Only pick fields that exist in the schema
+    const couponData: any = {
       code: body.code.toUpperCase(),
+      discountPercent: Number(body.discountPercent),
+      maxUses: Number(body.maxUses) || 100,
+      minOrderAmount: Number(body.minOrderAmount) || 0,
+      maxDiscountAmount: body.maxDiscountAmount ? Number(body.maxDiscountAmount) : undefined,
+      expiresAt: new Date(body.expiresAt),
+      isActive: body.isActive !== false,
       createdById: user!.userId,
-    });
+    };
+
+    const coupon = await Coupon.create(couponData);
 
     await logActivity({
       userId: user!.userId,

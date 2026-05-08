@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Eye, RefreshCw, MapPin, Phone, Heart } from 'lucide-react';
+import { Users, Eye, RefreshCw, MapPin, Phone, MessageCircle, Ban, Trash2, Shield, Heart, Navigation } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -14,6 +14,7 @@ import { useAuthFetch } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -38,13 +39,20 @@ interface BeneficiaryItem {
   status: string;
   governorate: string | null;
   address: string | null;
+  lat?: number | null;
+  lng?: number | null;
   loyaltyPoints: number;
   loyaltyTier: string;
   totalSpent: number;
   orderCount: number;
   referralCode: string;
   gender: string | null;
-  dateOfBirth: string | null;
+  bloodType?: string | null;
+  medicalConditions?: string[];
+  allergies?: string[];
+  emergencyContactName?: string | null;
+  emergencyContactPhone?: string | null;
+  isBlocked?: boolean;
   createdAt: string;
 }
 
@@ -53,6 +61,20 @@ const tierLabels: Record<string, string> = {
   silver: 'فضي',
   gold: 'ذهبي',
   platinum: 'بلاتيني',
+};
+
+const tierColors: Record<string, string> = {
+  bronze: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 border-amber-200',
+  silver: 'bg-gray-100 text-gray-700 dark:bg-gray-800/40 dark:text-gray-300 border-gray-300',
+  gold: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-300',
+  platinum: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400 border-purple-300',
+};
+
+const tierIcons: Record<string, string> = {
+  bronze: '🥉',
+  silver: '🥈',
+  gold: '🥇',
+  platinum: '💎',
 };
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -70,6 +92,9 @@ export default function AdminBeneficiariesPage() {
 
   const [viewTarget, setViewTarget] = useState<BeneficiaryItem | null>(null);
   const [toggleTarget, setToggleTarget] = useState<BeneficiaryItem | null>(null);
+  const [blockTarget, setBlockTarget] = useState<BeneficiaryItem | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<BeneficiaryItem | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const fetchBeneficiaries = useCallback(async () => {
     setIsLoading(true);
@@ -117,30 +142,90 @@ export default function AdminBeneficiariesPage() {
     }
   };
 
+  const handleBlock = async () => {
+    if (!blockTarget) return;
+    try {
+      const res = await authFetch(`/api/admin/beneficiaries/${blockTarget.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          isBlocked: !blockTarget.isBlocked,
+          blockedReason: blockTarget.isBlocked ? '' : 'حظر بواسطة الإدارة',
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(blockTarget.isBlocked ? 'تم إلغاء حظر المستفيد' : 'تم حظر المستفيد');
+        void fetchBeneficiaries();
+      }
+    } catch {
+      toast.error('فشل تغيير حالة الحظر');
+    } finally {
+      setBlockTarget(null);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    setIsDeleting(true);
+    try {
+      const res = await authFetch(`/api/admin/beneficiaries/${deleteTarget.id}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم حذف المستفيد نهائياً');
+        void fetchBeneficiaries();
+      } else {
+        toast.error(json.message ?? 'فشل الحذف');
+      }
+    } catch {
+      toast.error('فشل حذف المستفيد');
+    } finally {
+      setIsDeleting(false);
+      setDeleteTarget(null);
+    }
+  };
+
+  const getWhatsAppUrl = (phone: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const withCode = cleanPhone.startsWith('0') ? '967' + cleanPhone.substring(1) : cleanPhone.startsWith('967') ? cleanPhone : '967' + cleanPhone;
+    return `https://wa.me/${withCode}`;
+  };
+
+  const getCallUrl = (phone: string) => `tel:${phone}`;
+
   const columns: ColumnDef<BeneficiaryItem, unknown>[] = [
     {
       accessorKey: 'name',
       header: 'الاسم',
       cell: ({ row }) => (
         <div className="flex items-center gap-3">
-          <Avatar className="w-8 h-8">
+          <Avatar className="w-9 h-9">
             <AvatarFallback className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 text-xs">
               {row.original.name.slice(0, 2)}
             </AvatarFallback>
           </Avatar>
           <div>
             <p className="font-medium text-sm">{row.original.name}</p>
-            <p className="text-xs text-muted-foreground">{row.original.phone}</p>
+            <div className="flex items-center gap-1.5">
+              <span className="text-xs text-muted-foreground">{row.original.phone}</span>
+              <a href={getCallUrl(row.original.phone)} className="text-blue-500 hover:text-blue-700" title="اتصال">
+                <Phone className="w-3 h-3" />
+              </a>
+              <a href={getWhatsAppUrl(row.original.phone)} target="_blank" rel="noopener noreferrer" className="text-green-500 hover:text-green-700" title="واتساب">
+                <MessageCircle className="w-3 h-3" />
+              </a>
+            </div>
           </div>
         </div>
       ),
     },
     {
       accessorKey: 'loyaltyTier',
-      header: 'المستوى',
+      header: 'الباقة',
       cell: ({ row }) => (
-        <span className="text-xs px-2 py-1 rounded-full bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400">
-          {tierLabels[row.original.loyaltyTier] ?? row.original.loyaltyTier}
+        <span className={`text-xs px-2.5 py-1 rounded-full border ${tierColors[row.original.loyaltyTier] ?? ''}`}>
+          {tierIcons[row.original.loyaltyTier] ?? ''} {tierLabels[row.original.loyaltyTier] ?? row.original.loyaltyTier}
         </span>
       ),
     },
@@ -152,12 +237,19 @@ export default function AdminBeneficiariesPage() {
     {
       accessorKey: 'orderCount',
       header: 'الطلبات',
-      cell: ({ row }) => <span className="text-sm">{row.original.orderCount}</span>,
+      cell: ({ row }) => <span className="text-sm font-medium">{row.original.orderCount}</span>,
     },
     {
       accessorKey: 'status',
       header: 'الحالة',
-      cell: ({ row }) => <BadgeStatus status={row.original.status} />,
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1.5">
+          <BadgeStatus status={row.original.status} />
+          {row.original.isBlocked && (
+            <Badge variant="destructive" className="text-[10px] px-1.5 py-0">محظور</Badge>
+          )}
+        </div>
+      ),
     },
   ];
 
@@ -170,59 +262,148 @@ export default function AdminBeneficiariesPage() {
       label: (row: Record<string, unknown>) => ((row as unknown as BeneficiaryItem).status === 'active' ? 'تعطيل' : 'تفعيل'),
       onClick: (row: Record<string, unknown>) => setToggleTarget(row as unknown as BeneficiaryItem),
     },
+    {
+      label: (row: Record<string, unknown>) => ((row as unknown as BeneficiaryItem).isBlocked ? 'إلغاء الحظر' : 'حظر'),
+      onClick: (row: Record<string, unknown>) => setBlockTarget(row as unknown as BeneficiaryItem),
+      variant: 'destructive' as const,
+    },
+    {
+      label: 'حذف نهائي',
+      onClick: (row: Record<string, unknown>) => setDeleteTarget(row as unknown as BeneficiaryItem),
+      variant: 'destructive' as const,
+    },
   ];
 
   const ViewContent = ({ ben }: { ben: BeneficiaryItem }) => (
     <div className="space-y-4 p-4">
+      {/* Profile Header */}
       <div className="flex items-center gap-4">
         <Avatar className="w-16 h-16">
           <AvatarFallback className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 text-xl">
             {ben.name.slice(0, 2)}
           </AvatarFallback>
         </Avatar>
-        <div>
+        <div className="flex-1">
           <h3 className="text-lg font-semibold">{ben.name}</h3>
           <div className="flex items-center gap-2 mt-1">
             <Phone className="w-3.5 h-3.5 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">{ben.phone}</span>
+            <span className="text-sm">{ben.phone}</span>
           </div>
-          <BadgeStatus status={ben.status} size="md" />
+          <div className="flex items-center gap-2 mt-1">
+            <BadgeStatus status={ben.status} size="sm" />
+            {ben.isBlocked && <Badge variant="destructive" className="text-[10px]">محظور</Badge>}
+          </div>
+        </div>
+        {/* Quick Contact Buttons */}
+        <div className="flex flex-col gap-2">
+          <a href={getCallUrl(ben.phone)}>
+            <Button size="sm" variant="outline" className="w-full gap-1.5 text-xs">
+              <Phone className="w-3.5 h-3.5" />
+              اتصال
+            </Button>
+          </a>
+          <a href={getWhatsAppUrl(ben.phone)} target="_blank" rel="noopener noreferrer">
+            <Button size="sm" className="w-full gap-1.5 text-xs bg-green-600 hover:bg-green-700">
+              <MessageCircle className="w-3.5 h-3.5" />
+              واتساب
+            </Button>
+          </a>
         </div>
       </div>
+
+      {/* Package / Loyalty Tier Card */}
+      <div className={`rounded-xl border-2 p-4 ${tierColors[ben.loyaltyTier] ?? 'bg-muted'}`}>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-2xl">{tierIcons[ben.loyaltyTier] ?? '⭐'}</span>
+            <div>
+              <p className="font-bold text-sm">باقة {tierLabels[ben.loyaltyTier] ?? ben.loyaltyTier}</p>
+              <p className="text-xs opacity-80">{ben.loyaltyPoints} نقطة ولاء</p>
+            </div>
+          </div>
+          <div className="text-left">
+            <p className="text-xs opacity-70">إجمالي الإنفاق</p>
+            <p className="font-bold text-sm"><Currency amount={ben.totalSpent} /></p>
+          </div>
+        </div>
+      </div>
+
+      {/* Stats Grid */}
       <div className="grid grid-cols-2 gap-3">
         <div className="glass rounded-xl p-3">
-          <p className="text-xs text-muted-foreground">نقاط الولاء</p>
-          <p className="text-sm font-medium">{ben.loyaltyPoints}</p>
-        </div>
-        <div className="glass rounded-xl p-3">
-          <p className="text-xs text-muted-foreground">المستوى</p>
-          <p className="text-sm font-medium">{tierLabels[ben.loyaltyTier] ?? ben.loyaltyTier}</p>
-        </div>
-        <div className="glass rounded-xl p-3">
-          <p className="text-xs text-muted-foreground">إجمالي الإنفاق</p>
-          <p className="text-sm font-medium"><Currency amount={ben.totalSpent} /></p>
-        </div>
-        <div className="glass rounded-xl p-3">
           <p className="text-xs text-muted-foreground">عدد الطلبات</p>
-          <p className="text-sm font-medium">{ben.orderCount}</p>
+          <p className="text-sm font-bold">{ben.orderCount}</p>
         </div>
+        <div className="glass rounded-xl p-3">
+          <p className="text-xs text-muted-foreground">كود الإحالة</p>
+          <p className="text-sm font-mono font-bold">{ben.referralCode}</p>
+        </div>
+        {ben.bloodType && (
+          <div className="glass rounded-xl p-3">
+            <p className="text-xs text-muted-foreground">فصيلة الدم</p>
+            <p className="text-sm font-bold text-red-600">{ben.bloodType}</p>
+          </div>
+        )}
+        {ben.gender && (
+          <div className="glass rounded-xl p-3">
+            <p className="text-xs text-muted-foreground">الجنس</p>
+            <p className="text-sm font-medium">{ben.gender === 'male' ? 'ذكر' : 'أنثى'}</p>
+          </div>
+        )}
       </div>
-      {ben.governorate && (
-        <div className="flex items-center gap-2 text-sm">
-          <MapPin className="w-4 h-4 text-muted-foreground" />
-          <span>{ben.governorate}</span>
-          {ben.address && <span className="text-muted-foreground">- {ben.address}</span>}
+
+      {/* Location */}
+      {(ben.governorate || ben.lat) && (
+        <div className="glass rounded-xl p-3 space-y-2">
+          <div className="flex items-center gap-2 text-sm">
+            <MapPin className="w-4 h-4 text-red-500" />
+            <span className="font-medium">
+              {ben.governorate || 'غير محدد'}
+              {ben.address && <span className="text-muted-foreground"> - {ben.address}</span>}
+            </span>
+          </div>
+          {ben.lat && ben.lng && (
+            <a
+              href={`https://www.google.com/maps?q=${ben.lat},${ben.lng}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-xs text-blue-600 hover:text-blue-800"
+            >
+              <Navigation className="w-3 h-3" />
+              عرض على الخريطة ({ben.lat.toFixed(4)}, {ben.lng.toFixed(4)})
+            </a>
+          )}
         </div>
       )}
-      <div className="glass rounded-xl p-3">
-        <p className="text-xs text-muted-foreground">كود الإحالة</p>
-        <p className="text-sm font-mono font-medium">{ben.referralCode}</p>
-      </div>
-      {ben.gender && (
-        <div className="text-sm">
-          الجنس: {ben.gender === 'male' ? 'ذكر' : 'أنثى'}
+
+      {/* Emergency Contact */}
+      {ben.emergencyContactName && (
+        <div className="glass rounded-xl p-3 border-red-200 dark:border-red-900/30">
+          <p className="text-xs text-red-600 font-medium">جهة اتصال الطوارئ</p>
+          <p className="text-sm font-medium">{ben.emergencyContactName}</p>
+          {ben.emergencyContactPhone && (
+            <div className="flex items-center gap-2 mt-1">
+              <span className="text-xs text-muted-foreground">{ben.emergencyContactPhone}</span>
+              <a href={getCallUrl(ben.emergencyContactPhone)} className="text-blue-500">
+                <Phone className="w-3 h-3" />
+              </a>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Medical Info */}
+      {ben.medicalConditions && ben.medicalConditions.length > 0 && (
+        <div className="glass rounded-xl p-3">
+          <p className="text-xs text-muted-foreground mb-1">الحالات المرضية</p>
+          <div className="flex flex-wrap gap-1">
+            {ben.medicalConditions.map((c, i) => (
+              <Badge key={i} variant="secondary" className="text-[10px]">{c}</Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
       <div className="text-xs text-muted-foreground">
         تاريخ التسجيل: <DateFormatter date={ben.createdAt} format="date" />
       </div>
@@ -271,6 +452,7 @@ export default function AdminBeneficiariesPage() {
         />
       </motion.div>
 
+      {/* View Details Dialog/Drawer */}
       {viewTarget && (
         isMobile ? (
           <Drawer open={!!viewTarget} onOpenChange={(open) => { if (!open) setViewTarget(null); }}>
@@ -293,6 +475,7 @@ export default function AdminBeneficiariesPage() {
         )
       )}
 
+      {/* Toggle Active/Inactive */}
       <ConfirmDialog
         open={!!toggleTarget}
         onOpenChange={(open) => { if (!open) setToggleTarget(null); }}
@@ -301,6 +484,29 @@ export default function AdminBeneficiariesPage() {
         confirmLabel={toggleTarget?.status === 'active' ? 'تعطيل' : 'تفعيل'}
         variant={toggleTarget?.status === 'active' ? 'warning' : 'info'}
         onConfirm={handleToggle}
+      />
+
+      {/* Block/Unblock */}
+      <ConfirmDialog
+        open={!!blockTarget}
+        onOpenChange={(open) => { if (!open) setBlockTarget(null); }}
+        title={blockTarget?.isBlocked ? 'إلغاء حظر المستفيد' : 'حظر المستفيد'}
+        description={`هل أنت متأكد من ${blockTarget?.isBlocked ? 'إلغاء حظر' : 'حظر'} "${blockTarget?.name ?? ''}"؟${!blockTarget?.isBlocked ? ' لن يتمكن المستفيد من استخدام المنصة.' : ''}`}
+        confirmLabel={blockTarget?.isBlocked ? 'إلغاء الحظر' : 'حظر'}
+        variant={blockTarget?.isBlocked ? 'info' : 'destructive'}
+        onConfirm={handleBlock}
+      />
+
+      {/* Delete Permanently */}
+      <ConfirmDialog
+        open={!!deleteTarget}
+        onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}
+        title="حذف المستفيد نهائياً"
+        description={`هل أنت متأكد من حذف "${deleteTarget?.name ?? ''}" نهائياً؟ هذا الإجراء لا يمكن التراجع عنه وسيتم حذف جميع بيانات المستفيد.`}
+        confirmLabel="حذف نهائي"
+        variant="destructive"
+        onConfirm={handleDelete}
+        isLoading={isDeleting}
       />
     </motion.div>
   );

@@ -1,9 +1,9 @@
-// GET /api/admin/emergencies - List emergency requests
+// GET /api/admin/emergencies - List emergency requests with populated names
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { EmergencyRequest } from '@/models/mongoose';
+import { EmergencyRequest, Beneficiary, Nurse } from '@/models/mongoose';
 import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
@@ -31,10 +31,30 @@ export async function GET(request: NextRequest) {
       EmergencyRequest.countDocuments(filter),
     ]);
 
+    // Populate names
+    const beneficiaryIds = [...new Set(emergencies.map((e: any) => e.beneficiaryId?.toString()).filter(Boolean))];
+    const nurseIds = [...new Set(emergencies.map((e: any) => e.nurseId?.toString()).filter(Boolean))];
+
+    const [beneficiaries, nurses] = await Promise.all([
+      Beneficiary.find({ _id: { $in: beneficiaryIds } }).select('name phone').lean(),
+      Nurse.find({ _id: { $in: nurseIds } }).select('name phone').lean(),
+    ]);
+
+    const beneficiaryMap = new Map(beneficiaries.map((b: any) => [b._id.toString(), b]));
+    const nurseMap = new Map(nurses.map((n: any) => [n._id.toString(), n]));
+
+    const populatedEmergencies = emergencies.map((e: any) => ({
+      ...e,
+      id: e._id.toString(),
+      beneficiaryName: beneficiaryMap.get(e.beneficiaryId?.toString())?.name || 'غير معروف',
+      beneficiaryPhone: beneficiaryMap.get(e.beneficiaryId?.toString())?.phone || '',
+      nurseName: e.nurseId ? (nurseMap.get(e.nurseId?.toString())?.name || 'غير معروف') : null,
+    }));
+
     return Response.json({
       success: true,
       data: {
-        emergencies: emergencies.map((e: any) => ({ ...e, id: e._id.toString() })),
+        emergencies: populatedEmergencies,
         total,
         page,
         pages: Math.ceil(total / limit),

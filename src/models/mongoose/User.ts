@@ -1,11 +1,26 @@
 import mongoose, { Schema, Document } from 'mongoose';
 
+export type SubAdminPermission =
+  | 'manage_nurses'
+  | 'manage_beneficiaries'
+  | 'manage_orders'
+  | 'manage_payments'
+  | 'manage_emergencies'
+  | 'view_reports'
+  | 'manage_services'
+  | 'manage_chat'
+  | 'manage_settings';
+
 export interface IUser extends Document {
   name: string;
   phone: string;
   password: string;
   role: 'admin' | 'subadmin' | 'nurse' | 'beneficiary';
+  email?: string;
+  permissions?: SubAdminPermission[];
   isActive: boolean;
+  isBlocked?: boolean;
+  blockedReason?: string;
   fcmToken?: string;
   lastLoginAt?: Date;
   createdAt: Date;
@@ -17,7 +32,14 @@ const UserSchema = new Schema<IUser>({
   phone: { type: String, required: true, unique: true, trim: true },
   password: { type: String, required: true },
   role: { type: String, enum: ['admin', 'subadmin', 'nurse', 'beneficiary'], required: true },
+  email: { type: String, trim: true },
+  permissions: [{ type: String, enum: [
+    'manage_nurses', 'manage_beneficiaries', 'manage_orders', 'manage_payments',
+    'manage_emergencies', 'view_reports', 'manage_services', 'manage_chat', 'manage_settings'
+  ] }],
   isActive: { type: Boolean, default: true },
+  isBlocked: { type: Boolean, default: false },
+  blockedReason: { type: String },
   fcmToken: { type: String },
   lastLoginAt: { type: Date },
 }, { timestamps: true, discriminatorKey: 'role' });

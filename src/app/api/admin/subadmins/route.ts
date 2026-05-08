@@ -4,7 +4,7 @@
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { User } from '@/models/mongoose';
-import { hashPassword, generateReferralCode, createErrorResponse } from '@/lib/auth';
+import { hashPassword, createErrorResponse } from '@/lib/auth';
 import { requireRole } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
@@ -17,8 +17,16 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
+    const search = searchParams.get('search');
 
     const filter: any = { role: 'subadmin' };
+    if (search) {
+      filter.$or = [
+        { name: { $regex: search, $options: 'i' } },
+        { phone: { $regex: search } },
+        { email: { $regex: search, $options: 'i' } },
+      ];
+    }
 
     const [subadmins, total] = await Promise.all([
       User.find(filter).select('-password').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
@@ -47,7 +55,7 @@ export async function POST(request: NextRequest) {
     if (error) return error;
 
     const body = await request.json();
-    const { name, phone, password } = body;
+    const { name, phone, password, email, permissions } = body;
 
     if (!name || !phone || !password) {
       return createErrorResponse('الاسم ورقم الهاتف وكلمة المرور مطلوبون', 400, 'VALIDATION_ERROR');
@@ -70,6 +78,8 @@ export async function POST(request: NextRequest) {
       phone,
       password: hashedPassword,
       role: 'subadmin',
+      email: email || undefined,
+      permissions: permissions || [],
       isActive: true,
     });
 
@@ -85,7 +95,15 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { id: subadmin._id.toString(), name: subadmin.name, phone: subadmin.phone, role: subadmin.role, isActive: subadmin.isActive },
+      data: {
+        id: subadmin._id.toString(),
+        name: subadmin.name,
+        phone: subadmin.phone,
+        email: subadmin.email,
+        permissions: subadmin.permissions || [],
+        role: subadmin.role,
+        isActive: subadmin.isActive,
+      },
       message: 'تم إنشاء المشرف بنجاح',
     }, { status: 201 });
   } catch (error) {

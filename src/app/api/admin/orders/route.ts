@@ -1,9 +1,9 @@
-// GET /api/admin/orders - List all orders with filters
+// GET /api/admin/orders - List all orders with filters and populated names
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { ServiceRequest } from '@/models/mongoose';
+import { ServiceRequest, Beneficiary, Nurse, Service } from '@/models/mongoose';
 import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
@@ -18,6 +18,7 @@ export async function GET(request: NextRequest) {
     const status = searchParams.get('status');
     const beneficiaryId = searchParams.get('beneficiaryId');
     const nurseId = searchParams.get('nurseId');
+    const search = searchParams.get('search');
     const dateFrom = searchParams.get('dateFrom');
     const dateTo = searchParams.get('dateTo');
 
@@ -31,6 +32,30 @@ export async function GET(request: NextRequest) {
       if (dateTo) filter.createdAt.$lte = new Date(dateTo);
     }
 
+    // If search term provided, find matching beneficiaries/nurses
+    if (search) {
+      const matchedBeneficiaries = await Beneficiary.find({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { phone: { $regex: search } },
+        ]
+      }).select('_id').lean();
+      const matchedNurses = await Nurse.find({
+        $or: [
+          { name: { $regex: search, $options: 'i' } },
+          { phone: { $regex: search } },
+        ]
+      }).select('_id').lean();
+
+      const beneficiaryIds = matchedBeneficiaries.map((b: any) => b._id);
+      const nurseIds = matchedNurses.map((n: any) => n._id);
+
+      filter.$or = [
+        { beneficiaryId: { $in: beneficiaryIds } },
+        { nurseId: { $in: nurseIds } },
+      ];
+    }
+
     const [orders, total] = await Promise.all([
       ServiceRequest.find(filter)
         .sort({ createdAt: -1 })
@@ -40,10 +65,35 @@ export async function GET(request: NextRequest) {
       ServiceRequest.countDocuments(filter),
     ]);
 
+    // Populate names
+    const beneficiaryIds = [...new Set(orders.map((o: any) => o.beneficiaryId?.toString()).filter(Boolean))];
+    const nurseIds = [...new Set(orders.map((o: any) => o.nurseId?.toString()).filter(Boolean))];
+    const serviceIds = [...new Set(orders.map((o: any) => o.serviceId?.toString()).filter(Boolean))];
+
+    const [beneficiaries, nurses, services] = await Promise.all([
+      Beneficiary.find({ _id: { $in: beneficiaryIds } }).select('name phone').lean(),
+      Nurse.find({ _id: { $in: nurseIds } }).select('name phone').lean(),
+      Service.find({ _id: { $in: serviceIds } }).select('nameAr').lean(),
+    ]);
+
+    const beneficiaryMap = new Map(beneficiaries.map((b: any) => [b._id.toString(), b]));
+    const nurseMap = new Map(nurses.map((n: any) => [n._id.toString(), n]));
+    const serviceMap = new Map(services.map((s: any) => [s._id.toString(), s]));
+
+    const populatedOrders = orders.map((o: any) => ({
+      ...o,
+      id: o._id.toString(),
+      beneficiaryName: beneficiaryMap.get(o.beneficiaryId?.toString())?.name || 'غير معروف',
+      beneficiaryPhone: beneficiaryMap.get(o.beneficiaryId?.toString())?.phone || '',
+      nurseName: o.nurseId ? (nurseMap.get(o.nurseId?.toString())?.name || 'غير معروف') : null,
+      nursePhone: o.nurseId ? (nurseMap.get(o.nurseId?.toString())?.phone || '') : '',
+      serviceName: serviceMap.get(o.serviceId?.toString())?.nameAr || 'خدمة غير معروفة',
+    }));
+
     return Response.json({
       success: true,
       data: {
-        orders: orders.map((o: any) => ({ ...o, id: o._id.toString() })),
+        orders: populatedOrders,
         total,
         page,
         pages: Math.ceil(total / limit),
