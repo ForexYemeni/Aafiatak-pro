@@ -24,6 +24,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     }
   }, [isLoading, isAuthenticated, user, router, _hasHydrated]);
 
+  // Only show loading spinner during initial hydration
   if (!_hasHydrated || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center" dir="rtl">
@@ -35,15 +36,9 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     );
   }
 
+  // If not authenticated or wrong role, return null (redirect is handled by useEffect)
   if (!isAuthenticated || !user || (user.role !== 'admin' && user.role !== 'subadmin')) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" dir="rtl">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-10 h-10 animate-spin text-admin" />
-          <p className="text-muted-foreground text-sm">جارٍ التحويل...</p>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return <AppShell>{children}</AppShell>;

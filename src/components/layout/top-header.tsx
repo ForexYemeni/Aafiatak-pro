@@ -168,9 +168,8 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
   };
 
   const handleLogout = () => {
+    // logout() already handles state clearing, cookie clearing, and navigation
     logout();
-    // Use replace to prevent going back to protected pages
-    router.replace('/');
   };
 
   const roleLabel: Record<UserRole, string> = {

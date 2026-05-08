@@ -191,11 +191,7 @@ export const useAuthStore = create<AuthState>()(
 
       // ---- Logout ----
       logout: () => {
-        // Fire and forget the logout API call
-        fetch('/api/auth/logout', { method: 'POST' }).catch(() => {
-          // Ignore logout API errors
-        });
-
+        // Clear local state immediately
         set({
           user: null,
           token: null,
@@ -205,10 +201,37 @@ export const useAuthStore = create<AuthState>()(
           error: null,
         });
 
-        // Navigate to login page
+        // Clear persisted storage immediately
         if (typeof window !== 'undefined') {
-          window.location.href = '/';
+          try {
+            localStorage.removeItem('aafiatak-auth-storage');
+          } catch {
+            // Ignore storage errors
+          }
         }
+
+        // Await the logout API call to ensure the HttpOnly cookie is cleared,
+        // THEN navigate. Use a timeout fallback to prevent hanging.
+        const navigateHome = () => {
+          if (typeof window !== 'undefined') {
+            window.location.href = '/?logout=true';
+          }
+        };
+
+        // Try to call the logout API with a 3-second timeout
+        const logoutPromise = fetch('/api/auth/logout', {
+          method: 'POST',
+          credentials: 'same-origin',
+        }).catch(() => {
+          // Ignore API errors
+        });
+
+        // Race: if API doesn't respond in 3 seconds, navigate anyway
+        const timeoutPromise = new Promise<void>((resolve) => {
+          setTimeout(resolve, 3000);
+        });
+
+        Promise.race([logoutPromise, timeoutPromise]).then(navigateHome);
       },
 
       // ---- Refresh Token ----

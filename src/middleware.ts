@@ -142,6 +142,14 @@ export async function middleware(request: NextRequest) {
 
   const token = extractToken(request);
 
+  // ---- Handle logout parameter ----
+  // If user just logged out, clear any remaining cookie and show login page
+  if (pathname === '/' && request.nextUrl.searchParams.get('logout') === 'true') {
+    const response = NextResponse.next();
+    response.cookies.delete('auth_token');
+    return applySecurityHeaders(request, response);
+  }
+
   // ---- Handle authenticated users on auth pages ----
   // Check exact match first (for '/' path), then prefix match (for '/login', '/register')
   const isAuthPage = AUTH_PATHS_EXACT.includes(pathname) || AUTH_PATHS_PREFIX.some((p) => pathname.startsWith(p));

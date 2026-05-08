@@ -202,13 +202,18 @@ function LoginPageContent() {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loginRole, setLoginRole] = useState<UserRole>('beneficiary');
 
-  // Redirect if already authenticated
+  // Redirect if already authenticated (but not if user just logged out)
+  const justLoggedOut = searchParams.get('logout') === 'true';
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && !justLoggedOut) {
       const destination = redirectPath ?? getDashboardPath(user.role);
       router.replace(destination);
     }
-  }, [isAuthenticated, user, router, redirectPath]);
+    // Clean URL if user just logged out
+    if (justLoggedOut && !isAuthenticated) {
+      router.replace('/');
+    }
+  }, [isAuthenticated, user, router, redirectPath, justLoggedOut]);
 
   // ============================================================================
   // Login Form

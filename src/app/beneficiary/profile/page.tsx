@@ -184,8 +184,8 @@ export default function ProfilePage() {
   };
 
   const handleLogout = () => {
+    // logout() already handles state clearing, cookie clearing, and navigation
     logout();
-    router.push('/login');
   };
 
   if (isLoading) {
