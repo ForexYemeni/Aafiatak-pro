@@ -13,6 +13,8 @@ import {
   CheckCircle2,
   Clock,
   ChevronLeft,
+  MessageCircle,
+  User,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -33,6 +35,7 @@ interface OrderWithDetails extends ServiceRequest {
   nurseAvatar?: string;
   nursePhone?: string;
   nurseRating?: number;
+  nurseIsOnline?: boolean;
 }
 
 const statusMap: Record<string, { label: string; variant: string }> = {
@@ -70,7 +73,6 @@ export default function OrdersPage() {
       });
       const data = await res.json();
       if (data.success) {
-        // API returns { data: { orders, total, page, pages } } format
         const ordersArray = data.data?.orders || data.data || [];
         setOrders(Array.isArray(ordersArray) ? ordersArray : []);
         if (data.data?.total !== undefined) {
@@ -133,6 +135,11 @@ export default function OrdersPage() {
       hour: '2-digit',
       minute: '2-digit',
     });
+  };
+
+  // Check if order has an assigned/accepted nurse
+  const hasNurse = (order: OrderWithDetails) => {
+    return order.nurseId && ['assigned', 'accepted', 'in_progress'].includes(order.status);
   };
 
   return (
@@ -205,8 +212,12 @@ export default function OrdersPage() {
                         <div className="flex items-start gap-4">
                           {/* Nurse Avatar */}
                           <Avatar className="w-12 h-12 shrink-0">
-                            <AvatarFallback className="bg-beneficiary/10 text-beneficiary text-sm">
-                              {order.nurseName ? order.nurseName.slice(0, 2) : 'ـ'}
+                            <AvatarFallback className={`text-sm ${
+                              hasNurse(order)
+                                ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                                : 'bg-beneficiary/10 text-beneficiary'
+                            }`}>
+                              {order.nurseName ? order.nurseName.slice(0, 2) : <User className="w-5 h-5" />}
                             </AvatarFallback>
                           </Avatar>
 
@@ -214,7 +225,10 @@ export default function OrdersPage() {
                             {/* Top row */}
                             <div className="flex items-center justify-between gap-2">
                               <h3 className="font-semibold text-sm truncate">
-                                {order.nurseName ?? 'بانتظار تعيين ممرض/ـة'}
+                                {hasNurse(order)
+                                  ? order.nurseName || 'الممرض/ـة'
+                                  : 'بانتظار تعيين ممرض/ـة'
+                                }
                               </h3>
                               {getStatusBadge(order.status)}
                             </div>
@@ -224,30 +238,75 @@ export default function OrdersPage() {
                               <p className="text-xs text-muted-foreground">{order.serviceName}</p>
                             )}
 
+                            {/* Nurse phone for assigned/accepted/in_progress */}
+                            {hasNurse(order) && order.nursePhone && (
+                              <div className="flex items-center gap-1.5 text-xs">
+                                <Phone className="w-3 h-3 text-green-600" />
+                                <span className="text-green-700 dark:text-green-400 font-medium" dir="ltr">
+                                  {order.nursePhone}
+                                </span>
+                                {order.nurseIsOnline && (
+                                  <span className="text-[10px] bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 px-1.5 py-0.5 rounded-full">
+                                    متصل
+                                  </span>
+                                )}
+                              </div>
+                            )}
+
                             {/* Time */}
                             <div className="flex items-center gap-1 text-xs text-muted-foreground">
                               <Clock className="w-3.5 h-3.5" />
                               {formatDate(order.scheduledAt ?? order.createdAt)}
                             </div>
 
-                            {/* Price */}
+                            {/* Price and actions */}
                             <div className="flex items-center justify-between pt-1">
                               <Currency amount={order.pricing?.totalPrice ?? 0} className="text-sm text-beneficiary" />
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1.5">
                                 {/* Action buttons based on status */}
-                                {(order.status === 'in_progress' || order.status === 'accepted') && (
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-xs h-7 gap-1 border-beneficiary text-beneficiary"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      if (order.nurseId) router.push(`/beneficiary/tracking/${order.nurseId}`);
-                                    }}
-                                  >
-                                    <MapPin className="w-3 h-3" />
-                                    تتبع
-                                  </Button>
+                                {hasNurse(order) && (
+                                  <>
+                                    {/* Call button */}
+                                    {order.nursePhone && (
+                                      <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="text-xs h-7 gap-1 border-green-600 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          window.open(`tel:${order.nursePhone}`);
+                                        }}
+                                      >
+                                        <Phone className="w-3 h-3" />
+                                        اتصال
+                                      </Button>
+                                    )}
+                                    {/* Chat button */}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-7 gap-1"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        router.push(`/beneficiary/chat/${order.nurseId}`);
+                                      }}
+                                    >
+                                      <MessageCircle className="w-3 h-3" />
+                                    </Button>
+                                    {/* Track button */}
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="text-xs h-7 gap-1 border-beneficiary text-beneficiary hover:bg-beneficiary/10"
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (order.nurseId) router.push(`/beneficiary/tracking/${order.nurseId}`);
+                                      }}
+                                    >
+                                      <MapPin className="w-3 h-3" />
+                                      تتبع
+                                    </Button>
+                                  </>
                                 )}
                                 {order.status === 'completed' && (
                                   <Button

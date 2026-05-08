@@ -37,6 +37,7 @@ interface OrderDetail extends ServiceRequest {
   nursePhone?: string;
   nurseRating?: number;
   nurseSpecialization?: string;
+  nurseIsOnline?: boolean;
 }
 
 const statusTimelineLabels: Record<string, { label: string; icon: React.ElementType }> = {
@@ -249,13 +250,23 @@ export default function OrderDetailPage() {
             معلومات الممرض/ـة
           </h3>
           <div className="flex items-center gap-4">
-            <Avatar className="w-14 h-14">
-              <AvatarFallback className="bg-beneficiary/10 text-beneficiary text-lg">
+            <Avatar className="w-16 h-16">
+              <AvatarFallback className="bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400 text-xl">
                 {order.nurseName ? order.nurseName.slice(0, 2) : 'م'}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1">
-              <p className="font-semibold">{order.nurseName ?? 'الممرض/ـة'}</p>
+              <div className="flex items-center gap-2">
+                <p className="font-bold text-lg">{order.nurseName ?? 'الممرض/ـة'}</p>
+                {order.nurseIsOnline !== undefined && (
+                  <div className="flex items-center gap-1">
+                    <div className={`w-2 h-2 rounded-full ${order.nurseIsOnline ? 'bg-green-500' : 'bg-gray-400'}`} />
+                    <span className={`text-xs ${order.nurseIsOnline ? 'text-green-600' : 'text-muted-foreground'}`}>
+                      {order.nurseIsOnline ? 'متصل' : 'غير متصل'}
+                    </span>
+                  </div>
+                )}
+              </div>
               {order.nurseSpecialization && (
                 <p className="text-sm text-muted-foreground">{order.nurseSpecialization}</p>
               )}
@@ -265,14 +276,19 @@ export default function OrderDetailPage() {
                   <span className="text-sm font-medium">{order.nurseRating.toFixed(1)}</span>
                 </div>
               )}
+              {order.nursePhone && (
+                <div className="flex items-center gap-1.5 mt-1 text-sm">
+                  <Phone className="w-3.5 h-3.5 text-green-600" />
+                  <span className="font-medium" dir="ltr">{order.nursePhone}</span>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex gap-2">
             {order.nursePhone && (
               <Button
-                variant="outline"
+                className="gap-2 flex-1 bg-green-600 hover:bg-green-700 text-white"
                 size="sm"
-                className="gap-2 flex-1"
                 onClick={() => window.open(`tel:${order.nursePhone}`)}
               >
                 <Phone className="w-4 h-4" />
@@ -288,7 +304,7 @@ export default function OrderDetailPage() {
               <MessageCircle className="w-4 h-4" />
               محادثة
             </Button>
-            {(order.status === 'accepted' || order.status === 'in_progress') && (
+            {['assigned', 'accepted', 'in_progress'].includes(order.status) && (
               <Button
                 variant="outline"
                 size="sm"
@@ -300,6 +316,17 @@ export default function OrderDetailPage() {
               </Button>
             )}
           </div>
+        </GlassCard>
+      )}
+
+      {/* Waiting for nurse assignment */}
+      {!order.nurseId && order.status === 'pending' && (
+        <GlassCard variant="beneficiary" className="text-center py-6">
+          <Clock className="w-10 h-10 text-beneficiary mx-auto mb-3" />
+          <p className="font-semibold">بانتظار تعيين ممرض/ـة</p>
+          <p className="text-sm text-muted-foreground mt-1">
+            سيتم إشعارك فور تعيين ممرض/ـة لطلبك
+          </p>
         </GlassCard>
       )}
 

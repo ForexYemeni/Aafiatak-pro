@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { ServiceRequest, Service, Beneficiary, AdminSettings, Transaction, Coupon, Notification } from '@/models/mongoose';
+import { ServiceRequest, Service, Beneficiary, Nurse, AdminSettings, Transaction, Coupon, Notification } from '@/models/mongoose';
 import { createErrorResponse } from '@/lib/auth';
 import { requireAuth } from '@/lib/auth/middleware';
 import { calculatePricing } from '@/lib/api/helpers';
@@ -35,10 +35,42 @@ export async function GET(request: NextRequest) {
       ServiceRequest.countDocuments(filter),
     ]);
 
+    // Collect unique nurseIds and serviceIds for batch lookup
+    const nurseIds = [...new Set(orders.map((o: any) => o.nurseId?.toString()).filter(Boolean))];
+    const serviceIds = [...new Set(orders.map((o: any) => o.serviceId?.toString()).filter(Boolean))];
+
+    // Batch fetch nurse and service data
+    const [nurses, services] = await Promise.all([
+      nurseIds.length > 0
+        ? Nurse.find({ _id: { $in: nurseIds } }).select('name phone rating isOnline').lean()
+        : [],
+      serviceIds.length > 0
+        ? Service.find({ _id: { $in: serviceIds } }).select('nameAr category basePrice').lean()
+        : [],
+    ]);
+
+    // Create lookup maps
+    const nurseMap = new Map(nurses.map((n: any) => [n._id.toString(), n]));
+    const serviceMap = new Map(services.map((s: any) => [s._id.toString(), s]));
+
+    const enrichedOrders = orders.map((o: any) => {
+      const nurse = nurseMap.get(o.nurseId?.toString());
+      const service = serviceMap.get(o.serviceId?.toString());
+      return {
+        ...o,
+        id: o._id.toString(),
+        nurseName: nurse?.name || null,
+        nursePhone: nurse?.phone || null,
+        nurseRating: nurse?.rating || 0,
+        nurseIsOnline: nurse?.isOnline || false,
+        serviceName: service?.nameAr || null,
+      };
+    });
+
     return Response.json({
       success: true,
       data: {
-        orders: orders.map((o: any) => ({ ...o, id: o._id.toString() })),
+        orders: enrichedOrders,
         total,
         page,
         pages: Math.ceil(total / limit),
