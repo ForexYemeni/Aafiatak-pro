@@ -38,6 +38,7 @@ import {
 } from '@/components/ui/select';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { YEMEN_GOVERNORATES } from '@/lib/constants/governorates';
+import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
 
@@ -1066,6 +1067,19 @@ function LoginPageContent() {
                             </div>
                             {beneficiaryForm.formState.errors.phone && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.phone.message}</p>}
                           </div>
+                          {/* GPS Location Detection */}
+                          <GpsLocationButton
+                            onLocationDetected={(loc) => {
+                              if (loc.governorate && loc.governorateValue) {
+                                beneficiaryForm.setValue('governorate', loc.governorateValue);
+                              }
+                              if (loc.address || loc.district) {
+                                beneficiaryForm.setValue('address', loc.district || loc.address);
+                              }
+                            }}
+                            size="sm"
+                            className="w-full"
+                          />
                           <div className="space-y-2">
                             <Label htmlFor="ben-address">العنوان</Label>
                             <div className="relative">
@@ -1155,6 +1169,16 @@ function LoginPageContent() {
                             <Input id="nurse-license" placeholder="رقم ترخيص المهنة" className="text-right h-11 rounded-xl" {...nurseForm.register('licenseNumber')} />
                             {nurseForm.formState.errors.licenseNumber && <p className="text-xs text-destructive">{nurseForm.formState.errors.licenseNumber.message}</p>}
                           </div>
+                          {/* GPS Location Detection */}
+                          <GpsLocationButton
+                            onLocationDetected={(loc) => {
+                              if (loc.governorate && loc.governorateValue) {
+                                nurseForm.setValue('governorate', loc.governorateValue);
+                              }
+                            }}
+                            size="sm"
+                            className="w-full"
+                          />
                           <div className="space-y-2">
                             <Label>المحافظة</Label>
                             <Select onValueChange={(v) => nurseForm.setValue('governorate', v)}>
@@ -1362,6 +1386,19 @@ function LoginPageContent() {
                             <div className="relative"><Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-phone" type="tel" placeholder="7XXXXXXXX" className="pr-10 text-right h-10 rounded-xl" dir="ltr" {...beneficiaryForm.register('phone')} /></div>
                             {beneficiaryForm.formState.errors.phone && <p className="text-xs text-destructive">{beneficiaryForm.formState.errors.phone.message}</p>}
                           </div>
+                          {/* GPS Location Detection */}
+                          <GpsLocationButton
+                            onLocationDetected={(loc) => {
+                              if (loc.governorate && loc.governorateValue) {
+                                beneficiaryForm.setValue('governorate', loc.governorateValue);
+                              }
+                              if (loc.address || loc.district) {
+                                beneficiaryForm.setValue('address', loc.district || loc.address);
+                              }
+                            }}
+                            size="sm"
+                            className="w-full"
+                          />
                           <div className="space-y-1.5">
                             <Label htmlFor="m-ben-address" className="text-xs">العنوان</Label>
                             <div className="relative"><MapPin className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" /><Input id="m-ben-address" placeholder="عنوانك التفصيلي" className="pr-10 text-right h-10 rounded-xl" {...beneficiaryForm.register('address')} /></div>
@@ -1415,6 +1452,16 @@ function LoginPageContent() {
                             <Input id="m-nurse-license" placeholder="رقم ترخيص المهنة" className="text-right h-10 rounded-xl" {...nurseForm.register('licenseNumber')} />
                             {nurseForm.formState.errors.licenseNumber && <p className="text-xs text-destructive">{nurseForm.formState.errors.licenseNumber.message}</p>}
                           </div>
+                          {/* GPS Location Detection */}
+                          <GpsLocationButton
+                            onLocationDetected={(loc) => {
+                              if (loc.governorate && loc.governorateValue) {
+                                nurseForm.setValue('governorate', loc.governorateValue);
+                              }
+                            }}
+                            size="sm"
+                            className="w-full"
+                          />
                           <div className="space-y-1.5">
                             <Label className="text-xs">المحافظة</Label>
                             <Select onValueChange={(v) => nurseForm.setValue('governorate', v)}><SelectTrigger className="h-10 rounded-xl"><SelectValue placeholder="اختر المحافظة" /></SelectTrigger><SelectContent>{YEMEN_GOVERNORATES.map((gov) => (<SelectItem key={gov.value} value={gov.value}>{gov.label}</SelectItem>))}</SelectContent></Select>

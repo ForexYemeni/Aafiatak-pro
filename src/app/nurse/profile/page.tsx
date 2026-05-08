@@ -27,6 +27,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { GlassCard } from '@/components/common/glass-card';
@@ -647,6 +648,17 @@ export default function NurseProfilePage() {
               <Label htmlFor="bio">نبذة عنك</Label>
               <Textarea id="bio" value={editBio} onChange={(e) => setEditBio(e.target.value)} rows={3} />
             </div>
+            {/* GPS Auto-Detect Location */}
+            <GpsLocationButton
+              onLocationDetected={(loc) => {
+                setEditGovernorate(loc.governorate || editGovernorate);
+                setEditCity(loc.district || loc.city || editCity);
+                setEditAddress(loc.address || editAddress);
+              }}
+              size="sm"
+              className="w-full"
+              label="تحديد موقعي الجغرافي تلقائياً"
+            />
             <div className="space-y-2">
               <Label htmlFor="address">العنوان</Label>
               <Input id="address" value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />

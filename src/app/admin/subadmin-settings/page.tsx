@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { UserCog, Mail, Phone, Lock, MapPin, Save, Loader2, Eye, EyeOff } from 'lucide-react';
+import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { useAuthFetch } from '@/hooks/use-auth';
@@ -271,6 +272,25 @@ export default function SubadminSettingsPage() {
           </GlassCardHeader>
           <GlassCardContent>
             <div className="space-y-6">
+              {/* GPS Auto-Detect Location Button */}
+              <GpsLocationButton
+                onLocationDetected={(loc) => {
+                  setProfile(prev => ({
+                    ...prev,
+                    governorate: loc.governorateValue || loc.governorate,
+                    district: loc.district || prev.district,
+                    address: loc.address || prev.address,
+                    lat: loc.latitude,
+                    lng: loc.longitude,
+                  }));
+                  setLatStr(String(loc.latitude));
+                  setLngStr(String(loc.longitude));
+                }}
+                size="default"
+                className="w-full"
+                label="تحديد موقعي الجغرافي تلقائياً"
+              />
+
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Governorate */}
                 <div className="space-y-2">

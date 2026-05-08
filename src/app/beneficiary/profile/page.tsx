@@ -26,6 +26,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { GlassCard } from '@/components/common/glass-card';
+import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useToast } from '@/hooks/use-toast';
 import type { ApiResponse } from '@/types';
@@ -75,6 +76,8 @@ export default function ProfilePage() {
   // Editable fields
   const [editName, setEditName] = useState('');
   const [editAddress, setEditAddress] = useState('');
+  const [editGovernorate, setEditGovernorate] = useState('');
+  const [editCity, setEditCity] = useState('');
   const [editEmergencyName, setEditEmergencyName] = useState('');
   const [editEmergencyPhone, setEditEmergencyPhone] = useState('');
   const [editEmergencyRelation, setEditEmergencyRelation] = useState('');
@@ -91,6 +94,8 @@ export default function ProfilePage() {
         setProfile(data.data);
         setEditName(data.data.name);
         setEditAddress(data.data.address ?? '');
+        setEditGovernorate(data.data.governorate ?? '');
+        setEditCity(data.data.city ?? '');
         setEditEmergencyName(data.data.emergencyContactName ?? '');
         setEditEmergencyPhone(data.data.emergencyContactPhone ?? '');
         setEditEmergencyRelation(data.data.emergencyContactRelation ?? '');
@@ -135,6 +140,8 @@ export default function ProfilePage() {
         body: JSON.stringify({
           name: editName,
           address: editAddress,
+          governorate: editGovernorate || undefined,
+          city: editCity || undefined,
           emergencyContactName: editEmergencyName,
           emergencyContactPhone: editEmergencyPhone,
           emergencyContactRelation: editEmergencyRelation,
@@ -286,12 +293,44 @@ export default function ProfilePage() {
             <p className="text-sm font-medium" dir="ltr">{profile?.phone ?? 'ـ'}</p>
           </div>
 
+          {/* GPS Auto-Detect Location */}
+          {isEditing && (
+            <GpsLocationButton
+              onLocationDetected={(loc) => {
+                setEditGovernorate(loc.governorate || editGovernorate);
+                setEditCity(loc.district || loc.city || editCity);
+                setEditAddress(loc.address || editAddress);
+              }}
+              size="sm"
+              className="w-full"
+              label="تحديد موقعي الجغرافي تلقائياً"
+            />
+          )}
+
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">العنوان</Label>
             {isEditing ? (
               <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />
             ) : (
               <p className="text-sm font-medium">{profile?.address ?? 'غير محدد'}</p>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">المحافظة</Label>
+            {isEditing ? (
+              <Input value={editGovernorate} onChange={(e) => setEditGovernorate(e.target.value)} placeholder="المحافظة" />
+            ) : (
+              <p className="text-sm font-medium">{profile?.governorate ?? 'غير محدد'}</p>
+            )}
+          </div>
+
+          <div className="space-y-1">
+            <Label className="text-xs text-muted-foreground">المدينة</Label>
+            {isEditing ? (
+              <Input value={editCity} onChange={(e) => setEditCity(e.target.value)} placeholder="المدينة" />
+            ) : (
+              <p className="text-sm font-medium">{profile?.city ?? 'غير محدد'}</p>
             )}
           </div>
 
