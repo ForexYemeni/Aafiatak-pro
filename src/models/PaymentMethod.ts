@@ -1,17 +1,28 @@
 import mongoose, { Schema, Document, Model } from 'mongoose';
 
 // ── TypeScript Interface ────────────────────────────────────────────
-export type PaymentMethodTypeEnum = 'cash' | 'wallet' | 'card' | 'bank_transfer';
-export type WalletTypeEnum = 'flous' | 'zain_cash' | 'mtn_momo' | 'halelflos';
+export type PaymentMethodTypeEnum = 'wallet_deposit' | 'bank_transfer' | 'cash';
+export type WalletTypeEnum =
+  | 'jeep' | 'jawali' | 'cash_wallet' | 'one_cash' | 'flousk'
+  | 'saba_cash' | 'balh' | 'tadawul' | 'cashq' | 'yomni'
+  | 'payos' | 'zain_cash' | 'mubashir' | 'rafid' | 'amwal'
+  | 'salaf' | 'halelflos' | 'yemen_wallet';
+export type ExchangeTypeEnum =
+  | 'al_najm' | 'yemen_express' | 'al_imtiaz' | 'al_hazmi'
+  | 'al_kabsi' | 'shamsan' | 'al_taiseer' | 'al_amal'
+  | 'al_thiqa' | 'al_safi' | 'al_rashid' | 'al_baraka';
 
 export interface IPaymentMethod extends Document {
   nameAr: string;
   nameEn: string;
   type: PaymentMethodTypeEnum;
   walletType: WalletTypeEnum | null;
+  exchangeType: ExchangeTypeEnum | null;
   icon: string;
   isActive: boolean;
-  instructions: string; // Arabic instructions
+  instructions: string;
+  accountName: string;
+  accountNumber: string;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -33,12 +44,26 @@ const paymentMethodSchema = new Schema<IPaymentMethod>(
     },
     type: {
       type: String,
-      enum: ['cash', 'wallet', 'card', 'bank_transfer'] as const,
+      enum: ['wallet_deposit', 'bank_transfer', 'cash'] as const,
       required: [true, 'نوع طريقة الدفع مطلوب'],
     },
     walletType: {
       type: String,
-      enum: ['flous', 'zain_cash', 'mtn_momo', 'halelflos'] as const,
+      enum: [
+        'jeep', 'jawali', 'cash_wallet', 'one_cash', 'flousk',
+        'saba_cash', 'balh', 'tadawul', 'cashq', 'yomni',
+        'payos', 'zain_cash', 'mubashir', 'rafid', 'amwal',
+        'salaf', 'halelflos', 'yemen_wallet',
+      ] as const,
+      default: null,
+    },
+    exchangeType: {
+      type: String,
+      enum: [
+        'al_najm', 'yemen_express', 'al_imtiaz', 'al_hazmi',
+        'al_kabsi', 'shamsan', 'al_taiseer', 'al_amal',
+        'al_thiqa', 'al_safi', 'al_rashid', 'al_baraka',
+      ] as const,
       default: null,
     },
     icon: {
@@ -56,6 +81,16 @@ const paymentMethodSchema = new Schema<IPaymentMethod>(
       trim: true,
       maxlength: [2000, 'التعليمات يجب أن لا تتجاوز 2000 حرف'],
     },
+    accountName: {
+      type: String,
+      default: '',
+      trim: true,
+    },
+    accountNumber: {
+      type: String,
+      default: '',
+      trim: true,
+    },
   },
   {
     timestamps: true,
@@ -72,6 +107,7 @@ const paymentMethodSchema = new Schema<IPaymentMethod>(
 paymentMethodSchema.index({ type: 1 });
 paymentMethodSchema.index({ isActive: 1 });
 paymentMethodSchema.index({ walletType: 1 }, { sparse: true });
+paymentMethodSchema.index({ exchangeType: 1 }, { sparse: true });
 
 // ── Model ───────────────────────────────────────────────────────────
 const PaymentMethod: Model<IPaymentMethod> =

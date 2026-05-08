@@ -35,19 +35,76 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json();
 
-    if (!body.nameAr) {
-      return createErrorResponse('اسم طريقة الدفع بالعربية مطلوب', 400, 'VALIDATION_ERROR');
+    if (!body.type) {
+      return createErrorResponse('نوع طريقة الدفع مطلوب', 400, 'VALIDATION_ERROR');
     }
 
     const pmData: any = {
-      nameAr: body.nameAr,
-      nameEn: body.nameEn || body.nameAr,
-      type: body.type || 'wallet',
-      walletType: body.type === 'wallet' ? (body.walletType || null) : null,
+      nameAr: body.nameAr || '',
+      nameEn: body.nameEn || '',
+      type: body.type,
+      walletType: body.type === 'wallet_deposit' ? (body.walletType || null) : null,
+      exchangeType: body.type === 'bank_transfer' ? (body.exchangeType || null) : null,
       icon: body.icon || '',
       isActive: body.isActive !== false,
       instructions: body.instructions || '',
+      accountName: body.accountName || '',
+      accountNumber: body.accountNumber || '',
     };
+
+    // Auto-generate name from wallet/exchange type if not provided
+    if (!pmData.nameAr) {
+      if (body.type === 'wallet_deposit' && body.walletType) {
+        const walletNames: Record<string, { ar: string; en: string }> = {
+          jeep: { ar: 'جيب', en: 'Jeeb' },
+          jawali: { ar: 'جوالي', en: 'Jawali' },
+          cash_wallet: { ar: 'كاش', en: 'Cash' },
+          one_cash: { ar: 'ون كاش', en: 'One Cash' },
+          flousk: { ar: 'فلوسك', en: 'Fulousk' },
+          saba_cash: { ar: 'سباء كاش', en: 'Saba Cash' },
+          balh: { ar: 'بلح', en: 'Balh' },
+          tadawul: { ar: 'تداول', en: 'Tadawul' },
+          cashq: { ar: 'كاشك', en: 'CashQ' },
+          yomni: { ar: 'يومني', en: 'Yomni' },
+          payos: { ar: 'بايوس', en: 'PayOS' },
+          zain_cash: { ar: 'زين كاش', en: 'Zain Cash' },
+          mubashir: { ar: 'مباشر', en: 'Mubashir' },
+          rafid: { ar: 'رافد', en: 'Rafid' },
+          amwal: { ar: 'أموال', en: 'Amwal' },
+          salaf: { ar: 'سلف', en: 'Salaf' },
+          halelflos: { ar: 'حالف فلوس', en: 'Halelflos' },
+          yemen_wallet: { ar: 'محفظة اليمن', en: 'Yemen Wallet' },
+        };
+        const wn = walletNames[body.walletType];
+        if (wn) {
+          pmData.nameAr = wn.ar;
+          pmData.nameEn = wn.en;
+        }
+      } else if (body.type === 'bank_transfer' && body.exchangeType) {
+        const exchangeNames: Record<string, { ar: string; en: string }> = {
+          al_najm: { ar: 'صرافة النجم', en: 'Al-Najm Exchange' },
+          yemen_express: { ar: 'صرافة يمن اكسبرس', en: 'Yemen Express' },
+          al_imtiaz: { ar: 'صرافة الامتياز', en: 'Al-Imtiaz Exchange' },
+          al_hazmi: { ar: 'صرافة الحزمي', en: 'Al-Hazmi Exchange' },
+          al_kabsi: { ar: 'صرافة الكبسي', en: 'Al-Kabsi Exchange' },
+          shamsan: { ar: 'صرافة شمسان', en: 'Shamsan Exchange' },
+          al_taiseer: { ar: 'صرافة التيسير', en: 'Al-Taiseer Exchange' },
+          al_amal: { ar: 'صرافة الأمل', en: 'Al-Amal Exchange' },
+          al_thiqa: { ar: 'صرافة الثقة', en: 'Al-Thiqa Exchange' },
+          al_safi: { ar: 'صرافة الصافي', en: 'Al-Safi Exchange' },
+          al_rashid: { ar: 'صرافة الرشيد', en: 'Al-Rashid Exchange' },
+          al_baraka: { ar: 'صرافة البركة', en: 'Al-Baraka Exchange' },
+        };
+        const en = exchangeNames[body.exchangeType];
+        if (en) {
+          pmData.nameAr = en.ar;
+          pmData.nameEn = en.en;
+        }
+      } else if (body.type === 'cash') {
+        pmData.nameAr = 'نقدي عند وصول الممرض';
+        pmData.nameEn = 'Cash on Nurse Arrival';
+      }
+    }
 
     const pm = await PaymentMethod.create(pmData);
 

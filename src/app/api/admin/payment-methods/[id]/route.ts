@@ -34,6 +34,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const body = await request.json();
     delete body._id;
 
+    // Clear irrelevant type fields
+    if (body.type === 'wallet_deposit') {
+      body.exchangeType = null;
+    } else if (body.type === 'bank_transfer') {
+      body.walletType = null;
+    } else {
+      body.walletType = null;
+      body.exchangeType = null;
+    }
+
     const pm = await PaymentMethod.findByIdAndUpdate(id, body, { new: true }).lean();
     if (!pm) return createErrorResponse('طريقة الدفع غير موجودة', 404, 'NOT_FOUND');
 

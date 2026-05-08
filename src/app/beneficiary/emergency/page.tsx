@@ -18,6 +18,8 @@ import {
   CheckCircle2,
   X,
   Wallet,
+  Clock,
+  ShieldCheck,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -54,6 +56,14 @@ const statusLabelsAr: Record<string, string> = {
   cancelled: 'ملغي',
 };
 
+const statusColors: Record<string, string> = {
+  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  dispatched: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
+  in_progress: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  resolved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+};
+
 interface ActiveEmergency {
   id: string;
   type: string;
@@ -61,6 +71,7 @@ interface ActiveEmergency {
   createdAt: string;
   nurseName?: string;
   emergencyFee?: number;
+  description?: string;
 }
 
 export default function EmergencyPage() {
@@ -80,7 +91,10 @@ export default function EmergencyPage() {
   const [showConfirmation, setShowConfirmation] = useState(false);
 
   // Emergency fee from admin settings
-  const [emergencyFee, setEmergencyFee] = useState(5000);
+  const [emergencyFee, setEmergencyFee] = useState<number | null>(null);
+
+  // Cooldown state for anti-spam (30 seconds)
+  const [cooldown, setCooldown] = useState(0);
 
   // Check for active emergency on load
   useEffect(() => {
@@ -106,11 +120,11 @@ export default function EmergencyPage() {
     checkActiveEmergency();
   }, [authFetch]);
 
-  // Fetch emergency fee
+  // Fetch emergency fee from public endpoint
   useEffect(() => {
     const fetchFee = async () => {
       try {
-        const res = await authFetch('/api/admin/settings');
+        const res = await fetch('/api/settings/emergency-fee');
         if (res.ok) {
           const data = await res.json();
           if (data.success && data.data) {
@@ -118,11 +132,18 @@ export default function EmergencyPage() {
           }
         }
       } catch {
-        // Use default
+        setEmergencyFee(5000);
       }
     };
     fetchFee();
-  }, [authFetch]);
+  }, []);
+
+  // Cooldown timer
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = setTimeout(() => setCooldown(prev => prev - 1), 1000);
+    return () => clearTimeout(timer);
+  }, [cooldown]);
 
   // Auto-detect location
   useEffect(() => {
@@ -142,7 +163,30 @@ export default function EmergencyPage() {
   }, []);
 
   const handleSubmit = async () => {
-    if (!selectedType || !description.trim()) return;
+    if (!selectedType || !description.trim() || isSubmitting || cooldown > 0) return;
+
+    // Double-check for active emergency before submitting
+    try {
+      const checkRes = await authFetch('/api/beneficiary/emergency');
+      if (checkRes.ok) {
+        const checkData = await checkRes.json();
+        if (checkData.success && checkData.data) {
+          const emergencies = Array.isArray(checkData.data) ? checkData.data : checkData.data.emergencies || [];
+          const active = emergencies.find((e: any) =>
+            ['pending', 'dispatched', 'in_progress'].includes(e.status)
+          );
+          if (active) {
+            setActiveEmergency(active);
+            setShowConfirmation(false);
+            toast.error('لديك بالفعل طلب طوارئ نشط');
+            return;
+          }
+        }
+      }
+    } catch {
+      // Continue with submission
+    }
+
     setIsSubmitting(true);
     try {
       const res = await authFetch('/api/beneficiary/emergency', {
@@ -159,10 +203,28 @@ export default function EmergencyPage() {
       if (data.success && data.data) {
         setActiveEmergency(data.data);
         setShowConfirmation(false);
+        setCooldown(60); // 60-second cooldown after submission
         toast.success('تم إرسال طلب الطوارئ بنجاح');
       } else {
         toast.error(data.message ?? 'فشل إرسال طلب الطوارئ');
         setShowConfirmation(false);
+        // If duplicate, set the active emergency
+        if (data.code === 'DUPLICATE_EMERGENCY') {
+          // Re-fetch to get the active emergency
+          try {
+            const checkRes = await authFetch('/api/beneficiary/emergency');
+            if (checkRes.ok) {
+              const checkData = await checkRes.json();
+              if (checkData.success && checkData.data) {
+                const emergencies = Array.isArray(checkData.data) ? checkData.data : checkData.data.emergencies || [];
+                const active = emergencies.find((e: any) =>
+                  ['pending', 'dispatched', 'in_progress'].includes(e.status)
+                );
+                if (active) setActiveEmergency(active);
+              }
+            }
+          } catch {}
+        }
       }
     } catch {
       toast.error('حدث خطأ في إرسال الطلب');
@@ -175,7 +237,6 @@ export default function EmergencyPage() {
   // If there's an active emergency, show its status
   if (activeEmergency) {
     const emergencyType = emergencyTypes.find(t => t.value === activeEmergency.type);
-    const StatusIcon = activeEmergency.status === 'resolved' ? CheckCircle2 : ShieldAlert;
 
     return (
       <div className="space-y-6">
@@ -184,61 +245,70 @@ export default function EmergencyPage() {
           animate={{ opacity: 1, y: 0 }}
           className="text-center"
         >
-          <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-3 animate-pulse">
-            <ShieldAlert className="w-8 h-8 text-red-600" />
+          <div className="w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4 animate-pulse">
+            <ShieldAlert className="w-10 h-10 text-red-600" />
           </div>
           <h1 className="text-2xl font-bold text-red-600">طلب طوارئ نشط</h1>
+          <p className="text-sm text-muted-foreground mt-1">يتم التعامل مع طلبك حالياً</p>
         </motion.div>
 
         <GlassCard variant="beneficiary" className="border-2 border-red-500/50 space-y-4 p-5">
-          {/* Status */}
+          {/* Status Header */}
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white ${emergencyType?.color || 'bg-red-500'}`}>
-                {emergencyType?.icon ? <emergencyType.icon className="w-6 h-6" /> : <AlertTriangle className="w-6 h-6" />}
+              <div className={`w-14 h-14 rounded-xl flex items-center justify-center text-white ${emergencyType?.color || 'bg-red-500'}`}>
+                {emergencyType?.icon ? <emergencyType.icon className="w-7 h-7" /> : <AlertTriangle className="w-7 h-7" />}
               </div>
               <div>
-                <p className="font-bold">{emergencyType?.label || 'طوارئ'}</p>
-                <p className="text-xs text-muted-foreground">
+                <p className="font-bold text-lg">{emergencyType?.label || 'طوارئ'}</p>
+                <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium ${statusColors[activeEmergency.status] || ''}`}>
+                  {activeEmergency.status === 'pending' && <Clock className="w-3 h-3" />}
+                  {activeEmergency.status === 'dispatched' && <Ambulance className="w-3 h-3" />}
+                  {activeEmergency.status === 'in_progress' && <ShieldCheck className="w-3 h-3" />}
                   {statusLabelsAr[activeEmergency.status] || activeEmergency.status}
-                </p>
+                </div>
               </div>
-            </div>
-            <div className={`px-3 py-1.5 rounded-full text-xs font-medium ${
-              activeEmergency.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-              activeEmergency.status === 'dispatched' ? 'bg-blue-100 text-blue-800' :
-              activeEmergency.status === 'in_progress' ? 'bg-orange-100 text-orange-800' :
-              'bg-green-100 text-green-800'
-            }`}>
-              {statusLabelsAr[activeEmergency.status] || activeEmergency.status}
             </div>
           </div>
 
           <Separator />
 
+          {/* Description */}
+          {activeEmergency.description && (
+            <div className="p-3 rounded-xl bg-muted/50">
+              <p className="text-xs text-muted-foreground mb-1">الوصف</p>
+              <p className="text-sm">{activeEmergency.description}</p>
+            </div>
+          )}
+
           {/* Nurse info */}
           {activeEmergency.nurseName && (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-green-50 dark:bg-green-900/20">
-              <CheckCircle2 className="w-5 h-5 text-green-600" />
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/30">
+              <div className="w-10 h-10 rounded-full bg-green-100 dark:bg-green-900/40 flex items-center justify-center">
+                <CheckCircle2 className="w-5 h-5 text-green-600" />
+              </div>
               <div>
-                <p className="text-sm font-medium">الممرض/ـة: {activeEmergency.nurseName}</p>
-                <p className="text-xs text-muted-foreground">في الطريق إليك</p>
+                <p className="font-semibold text-green-700 dark:text-green-400">الممرض/ـة: {activeEmergency.nurseName}</p>
+                <p className="text-xs text-green-600/80 dark:text-green-400/80">في الطريق إليك</p>
               </div>
             </div>
           )}
 
           {/* Emergency fee */}
-          <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
-            <span className="text-sm text-muted-foreground">رسوم خدمة الطوارئ</span>
-            <span className="font-bold text-red-600">{(activeEmergency.emergencyFee || emergencyFee).toLocaleString('ar-YE')} ر.ي</span>
+          <div className="flex items-center justify-between p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-red-600" />
+              <span className="text-sm font-medium text-red-700 dark:text-red-400">رسوم خدمة الطوارئ</span>
+            </div>
+            <span className="font-bold text-red-600 text-lg">{(activeEmergency.emergencyFee || emergencyFee || 5000).toLocaleString('ar-YE')} ر.ي</span>
           </div>
 
           {/* Action buttons */}
-          <div className="flex gap-2">
+          <div className="flex gap-3">
             {activeEmergency.nurseName && (
               <Button
                 variant="outline"
-                className="flex-1 gap-2"
+                className="flex-1 gap-2 h-12"
                 onClick={() => router.push('/beneficiary/chat')}
               >
                 <MessageSquare className="w-4 h-4" />
@@ -251,6 +321,8 @@ export default function EmergencyPage() {
     );
   }
 
+  const feeValue = emergencyFee || 5000;
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -259,11 +331,11 @@ export default function EmergencyPage() {
         animate={{ opacity: 1, y: 0 }}
         className="text-center"
       >
-        <div className="w-16 h-16 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-3">
-          <Ambulance className="w-8 h-8 text-red-600" />
+        <div className="w-20 h-20 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-4">
+          <Ambulance className="w-10 h-10 text-red-600" />
         </div>
         <h1 className="text-2xl font-bold text-red-600">طلب طوارئ</h1>
-        <p className="text-sm text-muted-foreground">سيتم إرسال ممرض/ـة فوراً إلى موقعك</p>
+        <p className="text-sm text-muted-foreground mt-1">سيتم إرسال ممرض/ـة فوراً إلى موقعك</p>
       </motion.div>
 
       {/* Warning + Price */}
@@ -273,29 +345,35 @@ export default function EmergencyPage() {
         transition={{ delay: 0.1 }}
         className="space-y-3"
       >
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300">
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-yellow-50 dark:bg-yellow-900/20 text-yellow-800 dark:text-yellow-300 border border-yellow-200 dark:border-yellow-900/30">
           <AlertTriangle className="w-5 h-5 shrink-0 mt-0.5" />
           <div className="text-sm">
             <p className="font-semibold mb-1">تنبيه هام</p>
-            <p>يرجى استخدام خدمة الطوارئ فقط في الحالات الطارئة الفعلية. سيتم إرسال ممرض فور تأكيد الطلب.</p>
+            <p>يرجى استخدام خدمة الطوارئ فقط في الحالات الطارئة الفعلية. لا يمكن إرسال طلب طوارئ آخر حتى يتم التعامل مع الطلب الحالي.</p>
           </div>
         </div>
 
         {/* Emergency Fee Card */}
-        <GlassCard variant="beneficiary" className="p-4 border-red-200 dark:border-red-900/30">
+        <GlassCard variant="beneficiary" className="p-4 border-2 border-red-200 dark:border-red-900/30">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                <Wallet className="w-5 h-5 text-red-600" />
+              <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <Wallet className="w-6 h-6 text-red-600" />
               </div>
               <div>
-                <p className="text-sm font-semibold">رسوم خدمة الطوارئ</p>
+                <p className="text-sm font-bold">رسوم خدمة الطوارئ</p>
                 <p className="text-[10px] text-muted-foreground">تدفع عند تقديم الخدمة</p>
               </div>
             </div>
             <div className="text-left">
-              <p className="text-lg font-bold text-red-600">{emergencyFee.toLocaleString('ar-YE')}</p>
-              <p className="text-[10px] text-muted-foreground">ريال يمني</p>
+              {emergencyFee === null ? (
+                <Loader2 className="w-5 h-5 animate-spin text-red-600" />
+              ) : (
+                <>
+                  <p className="text-2xl font-bold text-red-600">{feeValue.toLocaleString('ar-YE')}</p>
+                  <p className="text-[10px] text-muted-foreground text-left">ريال يمني</p>
+                </>
+              )}
             </div>
           </div>
         </GlassCard>
@@ -303,7 +381,7 @@ export default function EmergencyPage() {
 
       {/* Emergency Type Selection */}
       <div className="space-y-3">
-        <Label className="font-semibold">نوع الطوارئ</Label>
+        <Label className="font-semibold">نوع الطوارئ <span className="text-red-500">*</span></Label>
         <div className="grid grid-cols-3 gap-3">
           {emergencyTypes.map((type) => {
             const Icon = type.icon;
@@ -315,7 +393,7 @@ export default function EmergencyPage() {
                 onClick={() => setSelectedType(type.value)}
                 className={`flex flex-col items-center gap-2 p-4 rounded-2xl transition-all border-2 ${
                   isSelected
-                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20'
+                    ? 'border-red-500 bg-red-50 dark:bg-red-900/20 shadow-md'
                     : 'border-transparent glass hover:bg-red-50/50 dark:hover:bg-red-900/10'
                 }`}
               >
@@ -379,11 +457,20 @@ export default function EmergencyPage() {
       >
         <Button
           onClick={() => setShowConfirmation(true)}
-          disabled={!selectedType || !description.trim()}
+          disabled={!selectedType || !description.trim() || cooldown > 0}
           className="w-full h-14 text-lg gap-3 bg-red-600 hover:bg-red-700 text-white shadow-xl"
         >
-          <Ambulance className="w-6 h-6" />
-          إرسال طلب الطوارئ
+          {cooldown > 0 ? (
+            <>
+              <Clock className="w-6 h-6" />
+              انتظر {cooldown} ثانية
+            </>
+          ) : (
+            <>
+              <Ambulance className="w-6 h-6" />
+              إرسال طلب الطوارئ
+            </>
+          )}
         </Button>
       </motion.div>
 
@@ -406,10 +493,10 @@ export default function EmergencyPage() {
               dir="rtl"
             >
               {/* Header */}
-              <div className="bg-red-600 text-white p-5">
-                <div className="flex items-center gap-3">
-                  <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                    <AlertTriangle className="w-6 h-6" />
+              <div className="bg-gradient-to-l from-red-600 to-red-700 text-white p-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-full bg-white/20 flex items-center justify-center">
+                    <AlertTriangle className="w-7 h-7" />
                   </div>
                   <div>
                     <h3 className="font-bold text-lg">تأكيد طلب الطوارئ</h3>
@@ -421,29 +508,41 @@ export default function EmergencyPage() {
               {/* Body */}
               <div className="p-5 space-y-4">
                 {/* Emergency type */}
-                <div className="flex items-center gap-3">
-                  <span className="text-sm text-muted-foreground">نوع الطوارئ:</span>
-                  <span className="font-medium">
-                    {emergencyTypes.find(t => t.value === selectedType)?.label || selectedType}
-                  </span>
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
+                  <div className={`w-10 h-10 rounded-lg flex items-center justify-center text-white ${emergencyTypes.find(t => t.value === selectedType)?.color || 'bg-red-500'}`}>
+                    {(() => {
+                      const TypeIcon = emergencyTypes.find(t => t.value === selectedType)?.icon || AlertTriangle;
+                      return <TypeIcon className="w-5 h-5" />;
+                    })()}
+                  </div>
+                  <div>
+                    <p className="text-xs text-muted-foreground">نوع الطوارئ</p>
+                    <p className="font-semibold text-sm">{emergencyTypes.find(t => t.value === selectedType)?.label || selectedType}</p>
+                  </div>
                 </div>
 
                 {/* Description */}
-                <div>
-                  <span className="text-sm text-muted-foreground">الوصف:</span>
-                  <p className="text-sm mt-1 line-clamp-2">{description}</p>
+                <div className="p-3 rounded-xl bg-muted/50">
+                  <p className="text-xs text-muted-foreground mb-1">الوصف</p>
+                  <p className="text-sm line-clamp-3">{description}</p>
                 </div>
 
                 {/* Fee */}
-                <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
-                  <span className="text-sm font-medium text-red-700 dark:text-red-400">رسوم الطوارئ</span>
-                  <span className="font-bold text-red-600">{emergencyFee.toLocaleString('ar-YE')} ر.ي</span>
+                <div className="flex items-center justify-between p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
+                  <div className="flex items-center gap-2">
+                    <Wallet className="w-4 h-4 text-red-600" />
+                    <span className="text-sm font-bold text-red-700 dark:text-red-400">رسوم الطوارئ</span>
+                  </div>
+                  <span className="font-bold text-red-600 text-lg">{feeValue.toLocaleString('ar-YE')} ر.ي</span>
                 </div>
 
                 {/* Warning */}
-                <div className="flex items-start gap-2 text-xs text-muted-foreground">
-                  <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5 text-yellow-500" />
-                  <p>لا يمكن إرسال طلب طوارئ آخر حتى يتم التعامل مع الطلب الحالي</p>
+                <div className="flex items-start gap-2 p-3 rounded-lg bg-yellow-50 dark:bg-yellow-900/10 text-yellow-700 dark:text-yellow-400 border border-yellow-200 dark:border-yellow-900/30">
+                  <ShieldCheck className="w-4 h-4 shrink-0 mt-0.5" />
+                  <div className="text-xs space-y-1">
+                    <p className="font-semibold">تنبيه قبل التأكيد:</p>
+                    <p>لا يمكن إرسال طلب طوارئ آخر حتى يتم التعامل مع الطلب الحالي. تأكد من صحة المعلومات قبل الإرسال.</p>
+                  </div>
                 </div>
               </div>
 
