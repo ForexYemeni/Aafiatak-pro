@@ -12,15 +12,11 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
-import { YEMEN_GOVERNORATES } from '@/lib/constants/governorates';
 
 interface ProfileData {
   email: string;
   phone: string;
-  governorate: string;
-  district: string;
   address: string;
   lat: number | null;
   lng: number | null;
@@ -47,8 +43,6 @@ export default function SubadminSettingsPage() {
   const [profile, setProfile] = useState<ProfileData>({
     email: '',
     phone: '',
-    governorate: '',
-    district: '',
     address: '',
     lat: null,
     lng: null,
@@ -64,10 +58,6 @@ export default function SubadminSettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Lat/Lng inputs as string for easier input handling
-  const [latStr, setLatStr] = useState('');
-  const [lngStr, setLngStr] = useState('');
-
   useEffect(() => {
     const fetchProfile = async () => {
       try {
@@ -78,17 +68,12 @@ export default function SubadminSettingsPage() {
           setProfile({
             email: d.email || '',
             phone: d.phone || user?.phone || '',
-            governorate: d.governorate || '',
-            district: d.district || '',
             address: d.address || '',
             lat: d.lat ?? null,
             lng: d.lng ?? null,
           });
-          if (d.lat != null) setLatStr(String(d.lat));
-          if (d.lng != null) setLngStr(String(d.lng));
         }
       } catch {
-        // If API fails, use current user data
         setProfile(prev => ({
           ...prev,
           phone: user?.phone || '',
@@ -101,13 +86,11 @@ export default function SubadminSettingsPage() {
   }, [authFetch, user?.phone]);
 
   const handleSaveProfile = async () => {
-    // Validate email if provided
     if (profile.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
       toast.error('يرجى إدخال بريد إلكتروني صحيح');
       return;
     }
 
-    // Validate phone
     if (profile.phone && !/^[\d+]{9,15}$/.test(profile.phone.replace(/\s/g, ''))) {
       toast.error('يرجى إدخال رقم هاتف صحيح');
       return;
@@ -115,17 +98,12 @@ export default function SubadminSettingsPage() {
 
     setIsSavingProfile(true);
     try {
-      const lat = latStr ? parseFloat(latStr) : null;
-      const lng = lngStr ? parseFloat(lngStr) : null;
-
       const payload: Record<string, unknown> = {
         email: profile.email || undefined,
         phone: profile.phone || undefined,
-        governorate: profile.governorate || undefined,
-        district: profile.district || undefined,
         address: profile.address || undefined,
-        lat: isNaN(lat as number) ? null : lat,
-        lng: isNaN(lng as number) ? null : lng,
+        lat: profile.lat,
+        lng: profile.lng,
       };
 
       const res = await authFetch('/api/subadmin/profile', {
@@ -135,7 +113,6 @@ export default function SubadminSettingsPage() {
       const json = await res.json();
       if (json.success) {
         toast.success('تم تحديث الملف الشخصي بنجاح');
-        // Update auth store with new data
         if (json.data) {
           updateUser({
             phone: json.data.phone || profile.phone,
@@ -218,7 +195,6 @@ export default function SubadminSettingsPage() {
           </GlassCardHeader>
           <GlassCardContent>
             <div className="space-y-6">
-              {/* Name (read-only) */}
               <div className="space-y-2">
                 <Label>الاسم</Label>
                 <Input value={user?.name || ''} disabled className="bg-muted/50" />
@@ -227,7 +203,6 @@ export default function SubadminSettingsPage() {
 
               <Separator />
 
-              {/* Email */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Mail className="w-4 h-4" />
@@ -242,7 +217,6 @@ export default function SubadminSettingsPage() {
                 />
               </div>
 
-              {/* Phone */}
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Phone className="w-4 h-4" />
@@ -261,7 +235,7 @@ export default function SubadminSettingsPage() {
         </GlassCard>
       </motion.div>
 
-      {/* Location Card */}
+      {/* Location Card - Single GPS field only */}
       <motion.div variants={itemAnim}>
         <GlassCard variant="admin">
           <GlassCardHeader>
@@ -271,57 +245,19 @@ export default function SubadminSettingsPage() {
             </GlassCardTitle>
           </GlassCardHeader>
           <GlassCardContent>
-            <div className="space-y-4">
-              {/* GPS Auto-Detect Location - Single field with button */}
-              <GpsLocationButton
-                onLocationDetected={(loc) => {
-                  setProfile(prev => ({
-                    ...prev,
-                    governorate: loc.governorateValue || loc.governorate,
-                    district: loc.district || prev.district,
-                    address: loc.address || prev.address,
-                    lat: loc.latitude,
-                    lng: loc.longitude,
-                  }));
-                  setLatStr(String(loc.latitude));
-                  setLngStr(String(loc.longitude));
-                }}
-                value={profile.address}
-                placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
-                label="تحديد موقعي"
-                showMapLink={!!(latStr && lngStr)}
-              />
-
-              {/* Governorate + District in one row */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>المحافظة</Label>
-                  <Select
-                    value={profile.governorate}
-                    onValueChange={(v) => setProfile({ ...profile, governorate: v, district: '' })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="اختر المحافظة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {YEMEN_GOVERNORATES.map((gov) => (
-                        <SelectItem key={gov.value} value={gov.value}>
-                          {gov.label}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label>المديرية</Label>
-                  <Input
-                    value={profile.district}
-                    onChange={(e) => setProfile({ ...profile, district: e.target.value })}
-                    placeholder="أدخل اسم المديرية"
-                  />
-                </div>
-              </div>
-            </div>
+            <GpsLocationButton
+              onLocationDetected={(loc) => {
+                setProfile(prev => ({
+                  ...prev,
+                  address: loc.address || prev.address,
+                  lat: loc.latitude,
+                  lng: loc.longitude,
+                }));
+              }}
+              value={profile.address}
+              placeholder='اضغط "تحديد موقعي" لرفع موقعك الجغرافي'
+              label="تحديد موقعي"
+            />
           </GlassCardContent>
         </GlassCard>
       </motion.div>
@@ -359,7 +295,6 @@ export default function SubadminSettingsPage() {
           </GlassCardHeader>
           <GlassCardContent>
             <div className="space-y-6">
-              {/* Current Password */}
               <div className="space-y-2">
                 <Label>كلمة المرور الحالية</Label>
                 <div className="relative">
@@ -379,7 +314,6 @@ export default function SubadminSettingsPage() {
                 </div>
               </div>
 
-              {/* New Password */}
               <div className="space-y-2">
                 <Label>كلمة المرور الجديدة</Label>
                 <div className="relative">
@@ -399,7 +333,6 @@ export default function SubadminSettingsPage() {
                 </div>
               </div>
 
-              {/* Confirm Password */}
               <div className="space-y-2">
                 <Label>تأكيد كلمة المرور الجديدة</Label>
                 <div className="relative">

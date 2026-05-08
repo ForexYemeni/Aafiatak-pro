@@ -656,19 +656,9 @@ export default function NurseProfilePage() {
                 setEditAddress(loc.address || editAddress);
               }}
               value={editAddress}
-              placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+              placeholder='اضغط "تحديد موقعي" لرفع موقعك الجغرافي'
               label="تحديد موقعي"
             />
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label htmlFor="gov">المحافظة</Label>
-                <Input id="gov" value={editGovernorate} onChange={(e) => setEditGovernorate(e.target.value)} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="city">المدينة</Label>
-                <Input id="city" value={editCity} onChange={(e) => setEditCity(e.target.value)} />
-              </div>
-            </div>
             <div className="space-y-2">
               <Label htmlFor="experience">سنوات الخبرة</Label>
               <Input id="experience" type="number" value={editExperience} onChange={(e) => setEditExperience(e.target.value)} min={0} />

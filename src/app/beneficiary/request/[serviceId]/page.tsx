@@ -380,7 +380,7 @@ export default function ServiceRequestPage() {
                   }
                 }}
                 value={address}
-                placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+                placeholder='اضغط "تحديد موقعي" لرفع موقعك الجغرافي'
                 label="تحديد موقعي"
               />
               <div className="space-y-2">

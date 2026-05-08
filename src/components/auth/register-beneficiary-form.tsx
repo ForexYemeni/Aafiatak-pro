@@ -197,7 +197,7 @@ export function RegisterBeneficiaryForm({ onBack, className }: RegisterBeneficia
                 setValue('governorate', loc.governorateValue);
               }
             }}
-            placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+            placeholder='اضغط "تحديد موقعي" لرفع موقعك الجغرافي'
             label="تحديد موقعي"
           />
           <div className="relative">
@@ -212,24 +212,6 @@ export function RegisterBeneficiaryForm({ onBack, className }: RegisterBeneficia
           {errors.address && (
             <p className="text-xs text-destructive">{errors.address.message}</p>
           )}
-        </div>
-
-        {/* Governorate */}
-        <div className="space-y-2">
-          <Label>المحافظة</Label>
-          <Select onValueChange={(value) => setValue('governorate', value)}>
-            <SelectTrigger className="text-right">
-              <MapPin className="w-4 h-4 text-muted-foreground ml-2" />
-              <SelectValue placeholder="اختر المحافظة" />
-            </SelectTrigger>
-            <SelectContent>
-              {YEMEN_GOVERNORATES.map((gov) => (
-                <SelectItem key={gov.value} value={gov.value}>
-                  {gov.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Emergency Contact Name */}

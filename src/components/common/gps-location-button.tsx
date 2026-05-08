@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Loader2, CheckCircle2, AlertCircle, Navigation, ExternalLink } from 'lucide-react';
 import { useGeolocation, type LocationData } from '@/hooks/use-geolocation';
@@ -8,64 +8,71 @@ import { Input } from '@/components/ui/input';
 
 interface GpsLocationButtonProps {
   onLocationDetected: (location: LocationData) => void;
-  /** Current address value to display in the single field */
+  /** Current address value to display */
   value?: string;
-  /** Placeholder text for the location field */
+  /** Placeholder text */
   placeholder?: string;
-  variant?: 'default' | 'outline' | 'ghost';
-  size?: 'default' | 'sm' | 'lg' | 'icon';
   className?: string;
   label?: string;
-  /** Whether to show the map link */
-  showMapLink?: boolean;
 }
 
 export function GpsLocationButton({
   onLocationDetected,
   value = '',
-  placeholder = 'اضغط لتحديد موقعك الجغرافي تلقائياً',
+  placeholder = 'اضغط "تحديد موقعي" لرفع موقعك الجغرافي',
   className = '',
   label = 'تحديد موقعي',
-  showMapLink = true,
 }: GpsLocationButtonProps) {
-  const { location, isDetecting, error, detectLocation, clearError } = useGeolocation();
+  const { location, isDetecting, error, detectLocation, onAddressEnriched, clearError } = useGeolocation();
   const [detected, setDetected] = useState(false);
+  const [enrichedAddress, setEnrichedAddress] = useState('');
+
+  // Listen for background address enrichment
+  useEffect(() => {
+    onAddressEnriched((loc) => {
+      if (loc.address && loc.address !== `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`) {
+        setEnrichedAddress(loc.address);
+        // Also notify parent with enriched data
+        onLocationDetected(loc);
+      }
+    });
+  }, [onAddressEnriched, onLocationDetected]);
 
   const handleDetect = useCallback(async () => {
     clearError();
     setDetected(false);
+    setEnrichedAddress('');
     
     const result = await detectLocation();
     if (result) {
       setDetected(true);
       onLocationDetected(result);
       
-      // Reset detected state after 3 seconds
-      setTimeout(() => setDetected(false), 3000);
+      // Keep success state for 5 seconds
+      setTimeout(() => setDetected(false), 5000);
     }
   }, [detectLocation, onLocationDetected, clearError]);
 
-  const displayValue = value || (location?.address && location.address !== `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}` 
-    ? location.address 
-    : '');
+  // Show enriched address if available, otherwise show value
+  const displayValue = enrichedAddress || value;
 
   return (
-    <div className="space-y-1.5">
-      <div className="relative flex items-center gap-2">
-        {/* Single location input field */}
+    <div className="space-y-1">
+      <div className="flex items-center gap-2">
+        {/* Location display field */}
         <div className="relative flex-1">
-          <MapPin className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 ${
+          <MapPin className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
             detected ? 'text-emerald-500' : isDetecting ? 'text-amber-500 animate-pulse' : 'text-muted-foreground'
           }`} />
           <Input
             value={displayValue}
             readOnly
             placeholder={placeholder}
-            className={`pr-9 pl-3 text-sm ${
+            className={`pr-9 pl-3 text-sm transition-colors ${
               detected 
                 ? 'border-emerald-400 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20' 
                 : isDetecting 
-                  ? 'border-amber-400 dark:border-amber-700 bg-amber-50/50 dark:bg-amber-950/20'
+                  ? 'border-amber-400 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10'
                   : ''
             }`}
           />
@@ -79,10 +86,10 @@ export function GpsLocationButton({
           whileTap={{ scale: 0.95 }}
           className={`shrink-0 flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl text-sm font-medium transition-all ${
             detected
-              ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-500/25'
+              ? 'bg-emerald-500 text-white'
               : isDetecting
-                ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/25'
-                : 'bg-primary text-primary-foreground shadow-md hover:shadow-lg'
+                ? 'bg-amber-500 text-white'
+                : 'bg-primary text-primary-foreground shadow-md hover:shadow-lg active:scale-95'
           } ${className}`}
         >
           <AnimatePresence mode="wait">
@@ -124,25 +131,17 @@ export function GpsLocationButton({
         </motion.button>
       </div>
 
-      {/* Map link + quick info */}
-      {location && (detected || displayValue) && showMapLink && (
-        <div className="flex items-center gap-2 text-xs">
-          {location.governorate && (
-            <span className="text-emerald-600 dark:text-emerald-400 font-medium">
-              {location.governorate}
-              {location.district ? ` - ${location.district}` : ''}
-            </span>
-          )}
-          <a
-            href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="flex items-center gap-1 text-blue-600 hover:text-blue-800 dark:text-blue-400"
-          >
-            <ExternalLink className="w-3 h-3" />
-            عرض الخريطة
-          </a>
-        </div>
+      {/* Map link */}
+      {location && detected && (
+        <a
+          href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-800 dark:text-blue-400 mt-0.5"
+        >
+          <ExternalLink className="w-3 h-3" />
+          عرض الموقع على الخريطة
+        </a>
       )}
 
       {/* Error message */}

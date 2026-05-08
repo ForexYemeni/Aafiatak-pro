@@ -230,31 +230,18 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
           )}
         </div>
 
-        {/* Governorate + GPS Auto-Detect */}
+        {/* Location - GPS Auto-Detect */}
         <div className="space-y-2">
-          <Label>المحافظة</Label>
+          <Label>الموقع</Label>
           <GpsLocationButton
             onLocationDetected={(loc) => {
               if (loc.governorateValue) {
                 setValue('governorate', loc.governorateValue);
               }
             }}
-            placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+            placeholder='اضغط "تحديد موقعي" لرفع موقعك الجغرافي'
             label="تحديد موقعي"
           />
-          <Select onValueChange={(value) => setValue('governorate', value)}>
-            <SelectTrigger className="text-right">
-              <MapPin className="w-4 h-4 text-muted-foreground ml-2" />
-              <SelectValue placeholder="اختر المحافظة" />
-            </SelectTrigger>
-            <SelectContent>
-              {YEMEN_GOVERNORATES.map((gov) => (
-                <SelectItem key={gov.value} value={gov.value}>
-                  {gov.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
         </div>
 
         {/* Password */}

@@ -302,7 +302,7 @@ export default function ProfilePage() {
                 setEditAddress(loc.address || editAddress);
               }}
               value={editAddress}
-              placeholder="اضغط لتحديد موقعك الجغرافي تلقائياً"
+              placeholder='اضغط "تحديد موقعي" لرفع موقعك الجغرافي'
               label="تحديد موقعي"
             />
           )}
@@ -313,24 +313,6 @@ export default function ProfilePage() {
               <Input value={editAddress} onChange={(e) => setEditAddress(e.target.value)} />
             ) : (
               <p className="text-sm font-medium">{profile?.address ?? 'غير محدد'}</p>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">المحافظة</Label>
-            {isEditing ? (
-              <Input value={editGovernorate} onChange={(e) => setEditGovernorate(e.target.value)} placeholder="المحافظة" />
-            ) : (
-              <p className="text-sm font-medium">{profile?.governorate ?? 'غير محدد'}</p>
-            )}
-          </div>
-
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">المدينة</Label>
-            {isEditing ? (
-              <Input value={editCity} onChange={(e) => setEditCity(e.target.value)} placeholder="المدينة" />
-            ) : (
-              <p className="text-sm font-medium">{profile?.city ?? 'غير محدد'}</p>
             )}
           </div>
 
