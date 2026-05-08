@@ -17,6 +17,8 @@ import {
   Baby,
   UserRound,
   Activity,
+  PlayCircle,
+  Phone,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -32,6 +34,7 @@ import { useAuthFetch } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOrderUpdates } from '@/hooks/use-socket';
 import { formatDateOnly, formatTimeOnly, toArabicNum } from '@/components/common/date-formatter';
+import { toast } from 'sonner';
 
 // ---- Types ----
 
@@ -50,7 +53,7 @@ interface BeneficiaryInfo {
   address?: string;
 }
 
-interface ClipboardListRequest {
+interface AssignmentRequest {
   id: string;
   status: string;
   scheduledAt: string | null;
@@ -65,7 +68,7 @@ interface ClipboardListRequest {
   beneficiary: BeneficiaryInfo;
 }
 
-interface ClipboardList {
+interface Assignment {
   id: string;
   requestId: string;
   nurseId: string;
@@ -73,7 +76,7 @@ interface ClipboardList {
   assignedAt: string;
   respondedAt: string | null;
   estimatedArrivalMinutes: number | null;
-  request: ClipboardListRequest;
+  request: AssignmentRequest;
 }
 
 type TabType = 'new' | 'active' | 'completed';
@@ -111,7 +114,7 @@ const itemVariants = {
 
 export default function NurseTasksPage() {
   const [activeTab, setActiveTab] = useState<TabType>('new');
-  const [assignments, setClipboardLists] = useState<ClipboardList[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -119,17 +122,17 @@ export default function NurseTasksPage() {
   const user = useAuthStore((s) => s.user);
   const orderUpdates = useOrderUpdates();
 
-  const fetchClipboardLists = useCallback(async () => {
+  const fetchAssignments = useCallback(async () => {
     try {
       const statusMap: Record<TabType, string> = {
         new: 'pending',
-        active: 'accepted',
+        active: 'active',
         completed: 'completed',
       };
       const res = await authFetch(`/api/nurse/assignments?status=${statusMap[activeTab]}&limit=50`);
       const data = await res.json();
       if (data.success && data.data) {
-        setClipboardLists(data.data as ClipboardList[]);
+        setAssignments(data.data as Assignment[]);
       }
     } catch {
       // silently handle
@@ -141,67 +144,113 @@ export default function NurseTasksPage() {
 
   useEffect(() => {
     setIsLoading(true);
-    fetchClipboardLists();
-  }, [fetchClipboardLists]);
+    fetchAssignments();
+  }, [fetchAssignments]);
 
   // Refresh on real-time order updates
   useEffect(() => {
     if (orderUpdates.latestOrderUpdate) {
-      fetchClipboardLists();
+      fetchAssignments();
     }
-  }, [orderUpdates.latestOrderUpdate, fetchClipboardLists]);
+  }, [orderUpdates.latestOrderUpdate, fetchAssignments]);
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
-    await fetchClipboardLists();
+    await fetchAssignments();
   };
 
-  const handleAcceptClipboardList = async (assignmentId: string) => {
+  const handleAccept = async (assignmentId: string) => {
     setActionLoading(assignmentId);
     try {
       const res = await authFetch(`/api/nurse/assignments/${assignmentId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'accepted' }),
+        method: 'POST',
+        body: JSON.stringify({ action: 'accept' }),
       });
       const data = await res.json();
       if (data.success) {
-        setClipboardLists((prev) => prev.filter((a) => a.id !== assignmentId));
+        toast.success('تم قبول الطلب بنجاح');
+        setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
+      } else {
+        toast.error(data.message || 'فشل قبول الطلب');
       }
     } catch {
-      // silently handle
+      toast.error('حدث خطأ أثناء قبول الطلب');
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleRejectClipboardList = async (assignmentId: string) => {
+  const handleReject = async (assignmentId: string) => {
     setActionLoading(assignmentId);
     try {
       const res = await authFetch(`/api/nurse/assignments/${assignmentId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'rejected', rejectedReason: 'تم الرفض من الممرض' }),
+        method: 'POST',
+        body: JSON.stringify({ action: 'reject' }),
       });
       const data = await res.json();
       if (data.success) {
-        setClipboardLists((prev) => prev.filter((a) => a.id !== assignmentId));
+        toast.success('تم رفض الطلب');
+        setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
+      } else {
+        toast.error(data.message || 'فشل رفض الطلب');
       }
     } catch {
-      // silently handle
+      toast.error('حدث خطأ أثناء رفض الطلب');
     } finally {
       setActionLoading(null);
     }
   };
 
-  const getDistanceText = (assignment: ClipboardList): string | null => {
-    // In a real app, we'd calculate using nurse's GPS and beneficiary's GPS
-    // For now, show a placeholder
-    if (assignment.request.beneficiaryLat && assignment.request.beneficiaryLng) {
-      return `~${toArabicNum(Math.floor(Math.random() * 10 + 1))} كم`;
+  const handleStartService = async (assignmentId: string) => {
+    setActionLoading(assignmentId);
+    try {
+      const res = await authFetch(`/api/nurse/orders/${assignmentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'start' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('تم بدء تنفيذ الخدمة');
+        // Update the assignment status locally
+        setAssignments((prev) =>
+          prev.map((a) => (a.id === assignmentId ? { ...a, status: 'in_progress' } : a))
+        );
+      } else {
+        toast.error(data.message || 'فشل بدء الخدمة');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    } finally {
+      setActionLoading(null);
     }
-    return null;
   };
 
-  const filteredClipboardLists = assignments;
+  const handleCompleteService = async (assignmentId: string) => {
+    setActionLoading(assignmentId);
+    try {
+      const res = await authFetch(`/api/nurse/orders/${assignmentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'complete' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('تم إكمال الخدمة بنجاح');
+        setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
+      } else {
+        toast.error(data.message || 'فشل إكمال الخدمة');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const getWhatsAppUrl = (phone: string) => {
+    const cleanPhone = phone.replace(/\D/g, '');
+    const withCode = cleanPhone.startsWith('0') ? '967' + cleanPhone.substring(1) : cleanPhone.startsWith('967') ? cleanPhone : '967' + cleanPhone;
+    return `https://wa.me/${withCode}`;
+  };
 
   return (
     <div className="space-y-4">
@@ -213,11 +262,11 @@ export default function NurseTasksPage() {
       {/* Quick Stats */}
       <div className="grid grid-cols-3 gap-3">
         <GlassCard variant="nurse" className="p-3 text-center">
-          <p className="text-2xl font-bold text-nurse">{toArabicNum(assignments.filter(a => a.status === 'pending').length || 0)}</p>
+          <p className="text-2xl font-bold text-nurse">{toArabicNum(assignments.filter(a => a.status === 'assigned').length || 0)}</p>
           <p className="text-xs text-muted-foreground">جديدة</p>
         </GlassCard>
         <GlassCard variant="nurse" className="p-3 text-center">
-          <p className="text-2xl font-bold text-sky-600">{toArabicNum(assignments.filter(a => a.status === 'accepted').length || 0)}</p>
+          <p className="text-2xl font-bold text-sky-600">{toArabicNum(assignments.filter(a => ['accepted', 'in_progress'].includes(a.status)).length || 0)}</p>
           <p className="text-xs text-muted-foreground">نشطة</p>
         </GlassCard>
         <GlassCard variant="nurse" className="p-3 text-center">
@@ -249,7 +298,7 @@ export default function NurseTasksPage() {
                   <CardSkeleton key={i} />
                 ))}
               </div>
-            ) : filteredClipboardLists.length === 0 ? (
+            ) : assignments.length === 0 ? (
               <EmptyState
                 icon={<ClipboardList className="w-10 h-10 text-muted-foreground" />}
                 title={
@@ -271,7 +320,7 @@ export default function NurseTasksPage() {
                 className="space-y-3"
               >
                 <AnimatePresence mode="popLayout">
-                  {filteredClipboardLists.map((assignment) => (
+                  {assignments.map((assignment) => (
                     <motion.div
                       key={assignment.id}
                       variants={itemVariants}
@@ -283,17 +332,23 @@ export default function NurseTasksPage() {
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
                             <div className="w-10 h-10 rounded-xl bg-nurse/10 text-nurse flex items-center justify-center">
-                              {getServiceIcon(assignment.request.service.category)}
+                              {assignment.request?.service
+                                ? getServiceIcon(assignment.request.service.category)
+                                : <ClipboardList className="w-5 h-5" />}
                             </div>
                             <div>
-                              <h3 className="font-semibold text-sm">{assignment.request.service.nameAr}</h3>
+                              <h3 className="font-semibold text-sm">
+                                {assignment.request?.service?.nameAr || 'طلب خدمة'}
+                              </h3>
                               <p className="text-xs text-muted-foreground">
-                                {assignment.request.service.duration ? `${toArabicNum(assignment.request.service.duration)} دقيقة` : ''}
+                                {assignment.request?.service?.duration
+                                  ? `${toArabicNum(assignment.request.service.duration)} دقيقة`
+                                  : ''}
                               </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {assignment.request.isEmergency && (
+                            {assignment.request?.isEmergency && (
                               <Badge variant="destructive" className="text-[10px] gap-1">
                                 <AlertTriangle className="w-3 h-3" />
                                 طوارئ
@@ -305,32 +360,44 @@ export default function NurseTasksPage() {
 
                         {/* Beneficiary Info */}
                         <div className="space-y-2 mb-3">
-                          <div className="flex items-center gap-2 text-sm">
-                            <UserRound className="w-4 h-4 text-muted-foreground" />
-                            <span>{assignment.request.beneficiary.name}</span>
-                          </div>
-                          {assignment.request.beneficiaryAddress && (
+                          {assignment.request?.beneficiary && (
+                            <div className="flex items-center gap-2 text-sm">
+                              <UserRound className="w-4 h-4 text-muted-foreground" />
+                              <span>{assignment.request.beneficiary.name}</span>
+                              {assignment.request.beneficiary.phone && (
+                                <a href={`tel:${assignment.request.beneficiary.phone}`} className="text-blue-500">
+                                  <Phone className="w-3 h-3" />
+                                </a>
+                              )}
+                            </div>
+                          )}
+                          {assignment.request?.beneficiaryAddress && (
                             <div className="flex items-center gap-2 text-sm text-muted-foreground">
                               <MapPin className="w-4 h-4 shrink-0" />
                               <span className="line-clamp-1">{assignment.request.beneficiaryAddress}</span>
                             </div>
                           )}
+                          {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                            <a
+                              href={`https://www.google.com/maps?q=${assignment.request.beneficiaryLat},${assignment.request.beneficiaryLng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-xs text-blue-600"
+                            >
+                              <Navigation className="w-3 h-3" />
+                              عرض الموقع على الخريطة
+                            </a>
+                          )}
                         </div>
 
-                        {/* Time & Distance Row */}
+                        {/* Time Row */}
                         <div className="flex items-center gap-4 mb-3 text-sm">
-                          {assignment.request.scheduledAt && (
+                          {assignment.request?.scheduledAt && (
                             <div className="flex items-center gap-1.5 text-muted-foreground">
                               <Clock className="w-4 h-4" />
                               <span>{formatDateOnly(new Date(assignment.request.scheduledAt))}</span>
                               <span>•</span>
                               <span>{formatTimeOnly(new Date(assignment.request.scheduledAt))}</span>
-                            </div>
-                          )}
-                          {getDistanceText(assignment) && (
-                            <div className="flex items-center gap-1.5 text-muted-foreground">
-                              <Navigation className="w-4 h-4" />
-                              <span>{getDistanceText(assignment)}</span>
                             </div>
                           )}
                         </div>
@@ -340,7 +407,7 @@ export default function NurseTasksPage() {
                           <div className="flex items-center gap-1.5">
                             <DollarSign className="w-4 h-4 text-green-600" />
                             <span className="text-xs text-muted-foreground">أرباحك:</span>
-                            <Currency amount={assignment.request.nursePayout} className="text-green-600" />
+                            <Currency amount={assignment.request?.nursePayout || 0} className="text-green-600" />
                           </div>
 
                           {/* Action Buttons */}
@@ -351,7 +418,7 @@ export default function NurseTasksPage() {
                                 variant="outline"
                                 className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8"
                                 disabled={actionLoading === assignment.id}
-                                onClick={() => handleRejectClipboardList(assignment.id)}
+                                onClick={() => handleReject(assignment.id)}
                               >
                                 <XCircle className="w-4 h-4 me-1" />
                                 رفض
@@ -360,7 +427,7 @@ export default function NurseTasksPage() {
                                 size="sm"
                                 className="bg-green-600 hover:bg-green-700 h-8"
                                 disabled={actionLoading === assignment.id}
-                                onClick={() => handleAcceptClipboardList(assignment.id)}
+                                onClick={() => handleAccept(assignment.id)}
                               >
                                 {actionLoading === assignment.id ? (
                                   <RefreshCw className="w-4 h-4 animate-spin" />
@@ -373,14 +440,59 @@ export default function NurseTasksPage() {
                           )}
 
                           {activeTab === 'active' && (
-                            <Button
-                              size="sm"
-                              className="bg-nurse hover:bg-nurse/90 h-8"
-                              onClick={() => window.open(`/nurse/tracking`, '_self')}
-                            >
-                              <Navigation className="w-4 h-4 me-1" />
-                              اتجاه
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              {/* Navigate to beneficiary */}
+                              {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8"
+                                  onClick={() => {
+                                    window.open(
+                                      `https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`,
+                                      '_blank'
+                                    );
+                                  }}
+                                >
+                                  <Navigation className="w-4 h-4 me-1" />
+                                  اتجاه
+                                </Button>
+                              )}
+
+                              {/* Start service button (status: accepted) */}
+                              {assignment.status === 'accepted' && (
+                                <Button
+                                  size="sm"
+                                  className="bg-sky-600 hover:bg-sky-700 h-8"
+                                  disabled={actionLoading === assignment.id}
+                                  onClick={() => handleStartService(assignment.id)}
+                                >
+                                  {actionLoading === assignment.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <PlayCircle className="w-4 h-4 me-1" />
+                                  )}
+                                  بدء التنفيذ
+                                </Button>
+                              )}
+
+                              {/* Complete service button (status: in_progress) */}
+                              {assignment.status === 'in_progress' && (
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 h-8"
+                                  disabled={actionLoading === assignment.id}
+                                  onClick={() => handleCompleteService(assignment.id)}
+                                >
+                                  {actionLoading === assignment.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 className="w-4 h-4 me-1" />
+                                  )}
+                                  إكمال
+                                </Button>
+                              )}
+                            </div>
                           )}
 
                           {activeTab === 'completed' && (

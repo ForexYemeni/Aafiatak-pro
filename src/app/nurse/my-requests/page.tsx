@@ -17,6 +17,8 @@ import {
   UserRound,
   Activity,
   Filter,
+  PlayCircle,
+  Phone,
 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
@@ -31,6 +33,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { useOrderUpdates } from '@/hooks/use-socket';
 import { formatDateOnly, formatTimeOnly, toArabicNum } from '@/components/common/date-formatter';
+import { toast } from 'sonner';
 
 // ---- Types ----
 
@@ -113,6 +116,7 @@ export default function NurseMyRequestsPage() {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
   const authFetch = useAuthFetch();
   const orderUpdates = useOrderUpdates();
 
@@ -150,6 +154,50 @@ export default function NurseMyRequestsPage() {
   const handleRefresh = async () => {
     setIsRefreshing(true);
     await fetchAssignments();
+  };
+
+  const handleStartService = async (assignmentId: string) => {
+    setActionLoading(assignmentId);
+    try {
+      const res = await authFetch(`/api/nurse/orders/${assignmentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'start' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('تم بدء تنفيذ الخدمة');
+        setAssignments((prev) =>
+          prev.map((a) => (a.id === assignmentId ? { ...a, status: 'in_progress' } : a))
+        );
+      } else {
+        toast.error(data.message || 'فشل بدء الخدمة');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCompleteService = async (assignmentId: string) => {
+    setActionLoading(assignmentId);
+    try {
+      const res = await authFetch(`/api/nurse/orders/${assignmentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'complete' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('تم إكمال الخدمة بنجاح');
+        setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
+      } else {
+        toast.error(data.message || 'فشل إكمال الخدمة');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
   return (
@@ -254,6 +302,11 @@ export default function NurseMyRequestsPage() {
                             <div className="flex items-center gap-2 text-sm">
                               <UserRound className="w-4 h-4 text-muted-foreground" />
                               <span>{assignment.request.beneficiary.name}</span>
+                              {assignment.request.beneficiary.phone && (
+                                <a href={`tel:${assignment.request.beneficiary.phone}`} className="text-blue-500">
+                                  <Phone className="w-3 h-3" />
+                                </a>
+                              )}
                             </div>
                           )}
                           {assignment.request?.beneficiaryAddress && (
@@ -261,6 +314,17 @@ export default function NurseMyRequestsPage() {
                               <MapPin className="w-4 h-4 shrink-0" />
                               <span className="line-clamp-1">{assignment.request.beneficiaryAddress}</span>
                             </div>
+                          )}
+                          {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                            <a
+                              href={`https://www.google.com/maps?q=${assignment.request.beneficiaryLat},${assignment.request.beneficiaryLng}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex items-center gap-1.5 text-xs text-blue-600"
+                            >
+                              <Navigation className="w-3 h-3" />
+                              عرض الموقع على الخريطة
+                            </a>
                           )}
                         </div>
 
@@ -285,14 +349,59 @@ export default function NurseMyRequestsPage() {
                           </div>
 
                           {activeTab === 'active' && (
-                            <Button
-                              size="sm"
-                              className="bg-nurse hover:bg-nurse/90 h-8"
-                              onClick={() => window.open('/nurse/tracking', '_self')}
-                            >
-                              <Navigation className="w-4 h-4 me-1" />
-                              اتجاه
-                            </Button>
+                            <div className="flex items-center gap-2">
+                              {/* Navigate to beneficiary */}
+                              {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="h-8"
+                                  onClick={() => {
+                                    window.open(
+                                      `https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`,
+                                      '_blank'
+                                    );
+                                  }}
+                                >
+                                  <Navigation className="w-4 h-4 me-1" />
+                                  اتجاه
+                                </Button>
+                              )}
+
+                              {/* Start service button (status: accepted) */}
+                              {assignment.status === 'accepted' && (
+                                <Button
+                                  size="sm"
+                                  className="bg-sky-600 hover:bg-sky-700 h-8"
+                                  disabled={actionLoading === assignment.id}
+                                  onClick={() => handleStartService(assignment.id)}
+                                >
+                                  {actionLoading === assignment.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <PlayCircle className="w-4 h-4 me-1" />
+                                  )}
+                                  بدء التنفيذ
+                                </Button>
+                              )}
+
+                              {/* Complete service button (status: in_progress) */}
+                              {assignment.status === 'in_progress' && (
+                                <Button
+                                  size="sm"
+                                  className="bg-green-600 hover:bg-green-700 h-8"
+                                  disabled={actionLoading === assignment.id}
+                                  onClick={() => handleCompleteService(assignment.id)}
+                                >
+                                  {actionLoading === assignment.id ? (
+                                    <RefreshCw className="w-4 h-4 animate-spin" />
+                                  ) : (
+                                    <CheckCircle2 className="w-4 h-4 me-1" />
+                                  )}
+                                  إكمال
+                                </Button>
+                              )}
+                            </div>
                           )}
 
                           {activeTab === 'completed' && (

@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ClipboardList, Eye, UserPlus, RefreshCw, Phone, MessageCircle, MapPin, Clock, Calendar, Banknote, User, Stethoscope, Navigation, X, CheckCircle2, Search, Loader2, Star, Map } from 'lucide-react';
+import { ClipboardList, Eye, UserPlus, RefreshCw, Phone, MessageCircle, MapPin, Clock, Calendar, Banknote, User, Stethoscope, Navigation, X, CheckCircle2, Search, Loader2, Star, Map, Zap, XCircle, AlertCircle } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -17,6 +17,7 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
   Dialog,
   DialogContent,
@@ -71,7 +72,7 @@ interface NurseOption {
 
 const statusLabels: Record<string, string> = {
   pending: 'معلق',
-  assigned: 'مُعيَّن',
+  assigned: 'تم التعيين',
   accepted: 'مقبول',
   in_progress: 'قيد التنفيذ',
   completed: 'مكتمل',
@@ -139,6 +140,16 @@ export default function AdminOrdersPage() {
   // View dialog
   const [viewTarget, setViewTarget] = useState<OrderItem | null>(null);
 
+  // Execute dialog
+  const [executeTarget, setExecuteTarget] = useState<OrderItem | null>(null);
+  const [executeNotes, setExecuteNotes] = useState('');
+  const [isExecuting, setIsExecuting] = useState(false);
+
+  // Cancel dialog
+  const [cancelTarget, setCancelTarget] = useState<OrderItem | null>(null);
+  const [cancelReason, setCancelReason] = useState('');
+  const [isCancelling, setIsCancelling] = useState(false);
+
   // Auto-refresh
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -180,7 +191,6 @@ export default function AdminOrdersPage() {
     setIsLoadingNurses(true);
     setNurseSearch('');
     try {
-      // Fetch ALL verified nurses (not status=active which doesn't exist)
       const res = await authFetch('/api/admin/nurses?limit=200&status=verified');
       const json = await res.json();
       if (json.success && json.data) {
@@ -245,6 +255,57 @@ export default function AdminOrdersPage() {
     } finally {
       setIsAssigning(false);
       setSelectedNurse('');
+    }
+  };
+
+  const handleDirectExecute = async () => {
+    if (!executeTarget) return;
+    setIsExecuting(true);
+    try {
+      const res = await authFetch(`/api/admin/orders/${executeTarget.id}/execute`, {
+        method: 'POST',
+        body: JSON.stringify({ notes: executeNotes || undefined }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم تنفيذ الطلب مباشرة بنجاح');
+        void fetchOrders();
+        setExecuteTarget(null);
+        setExecuteNotes('');
+      } else {
+        toast.error(json.message ?? 'فشل التنفيذ');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء التنفيذ');
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  const handleCancelOrder = async () => {
+    if (!cancelTarget) return;
+    setIsCancelling(true);
+    try {
+      const res = await authFetch(`/api/admin/orders/${cancelTarget.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          status: 'cancelled',
+          cancelReason: cancelReason || 'إلغاء بواسطة الإدارة',
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم إلغاء الطلب');
+        void fetchOrders();
+        setCancelTarget(null);
+        setCancelReason('');
+      } else {
+        toast.error(json.message ?? 'فشل الإلغاء');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء الإلغاء');
+    } finally {
+      setIsCancelling(false);
     }
   };
 
@@ -327,19 +388,49 @@ export default function AdminOrdersPage() {
   const rowActions = [
     {
       label: 'عرض التفاصيل',
+      icon: Eye,
       onClick: (row: Record<string, unknown>) => setViewTarget(row as unknown as OrderItem),
     },
     {
       label: 'تعيين ممرض/ـة',
+      icon: UserPlus,
       onClick: (row: Record<string, unknown>) => openAssignDialog(row as unknown as OrderItem),
-      visible: (row: Record<string, unknown>) => !(row as unknown as OrderItem).nurseId,
+      visible: (row: Record<string, unknown>) => {
+        const order = row as unknown as OrderItem;
+        return !order.nurseId && order.status === 'pending';
+      },
+    },
+    {
+      label: 'تنفيذ مباشر',
+      icon: Zap,
+      onClick: (row: Record<string, unknown>) => {
+        setExecuteTarget(row as unknown as OrderItem);
+        setExecuteNotes('');
+      },
+      visible: (row: Record<string, unknown>) => {
+        const order = row as unknown as OrderItem;
+        return ['pending', 'assigned', 'accepted'].includes(order.status);
+      },
+    },
+    {
+      label: 'إلغاء الطلب',
+      icon: XCircle,
+      onClick: (row: Record<string, unknown>) => {
+        setCancelTarget(row as unknown as OrderItem);
+        setCancelReason('');
+      },
+      visible: (row: Record<string, unknown>) => {
+        const order = row as unknown as OrderItem;
+        return ['pending', 'assigned', 'accepted', 'in_progress'].includes(order.status);
+      },
     },
   ];
 
   const tabs = [
     { value: 'all', label: 'الكل' },
     { value: 'pending', label: 'معلق' },
-    { value: 'assigned', label: 'مُعيَّن' },
+    { value: 'assigned', label: 'تم التعيين' },
+    { value: 'accepted', label: 'مقبول' },
     { value: 'in_progress', label: 'قيد التنفيذ' },
     { value: 'completed', label: 'مكتمل' },
     { value: 'cancelled', label: 'ملغي' },
@@ -510,16 +601,43 @@ export default function AdminOrdersPage() {
         </div>
       )}
 
-      {/* Direct assign button if no nurse */}
-      {!order.nurseId && (
-        <Button
-          onClick={() => { setViewTarget(null); openAssignDialog(order); }}
-          className="w-full bg-admin hover:bg-admin/90 gap-2"
-        >
-          <UserPlus className="w-4 h-4" />
-          تعيين ممرض/ـة لهذا الطلب
-        </Button>
-      )}
+      {/* Action Buttons */}
+      <div className="space-y-2">
+        {/* Assign nurse if no nurse assigned */}
+        {!order.nurseId && order.status === 'pending' && (
+          <Button
+            onClick={() => { setViewTarget(null); openAssignDialog(order); }}
+            className="w-full bg-admin hover:bg-admin/90 gap-2"
+          >
+            <UserPlus className="w-4 h-4" />
+            تعيين ممرض/ـة لهذا الطلب
+          </Button>
+        )}
+
+        {/* Direct execution button */}
+        {['pending', 'assigned', 'accepted'].includes(order.status) && (
+          <Button
+            onClick={() => { setViewTarget(null); setExecuteTarget(order); setExecuteNotes(''); }}
+            variant="outline"
+            className="w-full gap-2 border-green-500 text-green-700 hover:bg-green-50 dark:text-green-400 dark:hover:bg-green-900/20"
+          >
+            <Zap className="w-4 h-4" />
+            تنفيذ مباشر من الإدارة
+          </Button>
+        )}
+
+        {/* Cancel order button */}
+        {['pending', 'assigned', 'accepted', 'in_progress'].includes(order.status) && (
+          <Button
+            onClick={() => { setViewTarget(null); setCancelTarget(order); setCancelReason(''); }}
+            variant="outline"
+            className="w-full gap-2 border-destructive text-destructive hover:bg-destructive/10"
+          >
+            <XCircle className="w-4 h-4" />
+            إلغاء الطلب
+          </Button>
+        )}
+      </div>
     </div>
   );
 
@@ -575,7 +693,7 @@ export default function AdminOrdersPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Assign Nurse Dialog - Direct assignment with nearby nurses */}
+      {/* Assign Nurse Dialog */}
       <Dialog open={!!assignTarget} onOpenChange={(open) => { if (!open) { setAssignTarget(null); setSelectedNurse(''); } }}>
         <DialogContent dir="rtl" className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -686,6 +804,143 @@ export default function AdminOrdersPage() {
               جارٍ التعيين...
             </div>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Direct Execute Dialog */}
+      <Dialog open={!!executeTarget} onOpenChange={(open) => { if (!open) { setExecuteTarget(null); setExecuteNotes(''); } }}>
+        <DialogContent dir="rtl" className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Zap className="w-5 h-5 text-green-600" />
+              تنفيذ مباشر من الإدارة
+            </DialogTitle>
+            <DialogDescription>
+              سيتم تحويل حالة الطلب إلى مكتمل مباشرة
+            </DialogDescription>
+          </DialogHeader>
+
+          {executeTarget && (
+            <div className="space-y-4 py-2">
+              {/* Order info */}
+              <div className="glass rounded-xl p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{executeTarget.beneficiaryName}</p>
+                    <p className="text-xs text-muted-foreground">{executeTarget.serviceName}</p>
+                  </div>
+                  <Currency amount={executeTarget.totalPrice} className="text-sm" />
+                </div>
+                <div className="flex items-center gap-2 mt-2">
+                  <span className="text-xs text-muted-foreground">الحالة الحالية:</span>
+                  <BadgeStatus status={executeTarget.status} />
+                </div>
+              </div>
+
+              {/* Warning */}
+              <div className="flex items-start gap-2 p-3 bg-amber-50 dark:bg-amber-900/20 rounded-xl">
+                <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
+                <p className="text-xs text-amber-700 dark:text-amber-400">
+                  سيتم تنفيذ الطلب مباشرة وتحديث حالته إلى مكتمل. {executeTarget.nurseId && 'سيتم إشعار الممرض المعين بإلغاء تعيينه.'}
+                </p>
+              </div>
+
+              {/* Optional notes */}
+              <div>
+                <Label className="text-sm mb-1.5 block">ملاحظات (اختياري)</Label>
+                <Textarea
+                  value={executeNotes}
+                  onChange={(e) => setExecuteNotes(e.target.value)}
+                  placeholder="أضف ملاحظات حول سبب التنفيذ المباشر..."
+                  className="min-h-[80px]"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setExecuteTarget(null); setExecuteNotes(''); }}
+              disabled={isExecuting}
+            >
+              إلغاء
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 gap-2"
+              onClick={handleDirectExecute}
+              disabled={isExecuting}
+            >
+              {isExecuting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Zap className="w-4 h-4" />
+              )}
+              تنفيذ مباشر
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cancel Order Dialog */}
+      <Dialog open={!!cancelTarget} onOpenChange={(open) => { if (!open) { setCancelTarget(null); setCancelReason(''); } }}>
+        <DialogContent dir="rtl" className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-destructive" />
+              إلغاء الطلب
+            </DialogTitle>
+            <DialogDescription>
+              هل أنت متأكد من إلغاء هذا الطلب؟
+            </DialogDescription>
+          </DialogHeader>
+
+          {cancelTarget && (
+            <div className="space-y-4 py-2">
+              <div className="glass rounded-xl p-3">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-medium">{cancelTarget.beneficiaryName}</p>
+                    <p className="text-xs text-muted-foreground">{cancelTarget.serviceName}</p>
+                  </div>
+                  <BadgeStatus status={cancelTarget.status} />
+                </div>
+              </div>
+
+              <div>
+                <Label className="text-sm mb-1.5 block">سبب الإلغاء</Label>
+                <Textarea
+                  value={cancelReason}
+                  onChange={(e) => setCancelReason(e.target.value)}
+                  placeholder="أدخل سبب إلغاء الطلب..."
+                  className="min-h-[80px]"
+                />
+              </div>
+            </div>
+          )}
+
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setCancelTarget(null); setCancelReason(''); }}
+              disabled={isCancelling}
+            >
+              تراجع
+            </Button>
+            <Button
+              variant="destructive"
+              className="gap-2"
+              onClick={handleCancelOrder}
+              disabled={isCancelling}
+            >
+              {isCancelling ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <XCircle className="w-4 h-4" />
+              )}
+              إلغاء الطلب
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </motion.div>

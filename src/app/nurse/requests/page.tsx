@@ -19,6 +19,7 @@ import {
   Activity,
   Filter,
   Shield,
+  ChevronLeft,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -168,8 +169,8 @@ export default function NurseAvailableRequestsPage() {
     setActionLoading(assignmentId);
     try {
       const res = await authFetch(`/api/nurse/assignments/${assignmentId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'accepted' }),
+        method: 'POST',
+        body: JSON.stringify({ action: 'accept' }),
       });
       const data = await res.json();
       if (data.success) {
@@ -186,8 +187,8 @@ export default function NurseAvailableRequestsPage() {
     setActionLoading(assignmentId);
     try {
       const res = await authFetch(`/api/nurse/assignments/${assignmentId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'rejected', rejectedReason: 'تم الرفض من الممرض' }),
+        method: 'POST',
+        body: JSON.stringify({ action: 'reject' }),
       });
       const data = await res.json();
       if (data.success) {

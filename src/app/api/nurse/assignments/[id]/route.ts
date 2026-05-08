@@ -1,4 +1,4 @@
-// POST /api/nurse/assignments/[id] - Accept/reject assignment
+// POST/PATCH /api/nurse/assignments/[id] - Accept/reject assignment
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
@@ -6,7 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
-export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+async function handleAssignmentAction(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
     const { user, error } = requireAuth(request);
@@ -17,7 +17,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     const { id } = await params;
-    const { action, rejectedReason } = await request.json();
+    const body = await request.json();
+
+    // Support both formats:
+    // 1. { action: 'accept' | 'reject' } (POST format)
+    // 2. { status: 'accepted' | 'rejected' } (PATCH format)
+    let action = body.action;
+    if (!action && body.status) {
+      if (body.status === 'accepted') action = 'accept';
+      else if (body.status === 'rejected') action = 'reject';
+    }
 
     if (!['accept', 'reject'].includes(action)) {
       return createErrorResponse('الإجراء مطلوب (accept/reject)', 400, 'VALIDATION_ERROR');
@@ -64,6 +73,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       order.nurseId = undefined;
       await order.save();
 
+      // Notify admin about rejection
+      try {
+        const nurse = await Nurse.findById(user.userId).select('name').lean();
+        await Notification.create({
+          userRole: 'admin',
+          titleAr: 'رفض ممرض طلباً',
+          bodyAr: `رفض الممرض ${nurse?.name || 'غير معروف'} الطلب الموكل إليه`,
+          type: 'status_change',
+          priority: 'high',
+          data: { requestId: id, status: 'rejected', nurseId: user.userId },
+          voiceEnabled: false,
+        });
+      } catch {
+        // Non-critical
+      }
+
       return Response.json({
         success: true,
         data: { ...order.toObject(), id: order._id.toString() },
@@ -74,4 +99,12 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     console.error('[NURSE ASSIGNMENT ACTION ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
   }
+}
+
+export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  return handleAssignmentAction(request, { params });
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  return handleAssignmentAction(request, { params });
 }

@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 
-type BadgeStatusVariant = 'active' | 'inactive' | 'pending' | 'suspended' | 'verified' | 'rejected' | 'completed' | 'cancelled' | 'in_progress' | 'dispatched' | 'unverified';
+type BadgeStatusVariant = 'active' | 'inactive' | 'pending' | 'assigned' | 'accepted' | 'suspended' | 'verified' | 'rejected' | 'completed' | 'cancelled' | 'in_progress' | 'dispatched' | 'unverified' | 'resolved';
 
 interface BadgeStatusProps {
   status: BadgeStatusVariant | string;
@@ -25,8 +25,16 @@ const statusConfig: Record<BadgeStatusVariant, { label: string; className: strin
     className: 'bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-400',
   },
   pending: {
-    label: 'قيد المراجعة',
+    label: 'معلق',
     className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  },
+  assigned: {
+    label: 'تم التعيين',
+    className: 'bg-purple-100 text-purple-800 dark:bg-purple-900/30 dark:text-purple-400',
+  },
+  accepted: {
+    label: 'مقبول',
+    className: 'bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-400',
   },
   suspended: {
     label: 'موقوف',
@@ -55,6 +63,10 @@ const statusConfig: Record<BadgeStatusVariant, { label: string; className: strin
   dispatched: {
     label: 'تم الإرسال',
     className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  },
+  resolved: {
+    label: 'تم الحل',
+    className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
   },
 };
 
