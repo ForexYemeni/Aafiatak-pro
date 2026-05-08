@@ -32,19 +32,34 @@ export async function GET(request: NextRequest) {
       if (dateTo) filter.createdAt.$lte = new Date(dateTo);
     }
 
-    // If search term provided, find matching beneficiaries/nurses
+    // If search term provided, find matching beneficiaries/nurses/orders by ID
     if (search) {
-      // Try matching by order ID (full or partial)
+      // Clean search: remove # prefix (from WhatsApp order number like #72397E)
+      const cleanSearch = search.replace(/^#/, '');
       const idFilter: any[] = [];
 
       // If search looks like an order ID (hex string), try exact or partial match
-      if (/^[0-9a-fA-F]+$/.test(search)) {
-        try {
-          const { Types } = await import('mongoose');
-          if (Types.ObjectId.isValid(search)) {
-            idFilter.push({ _id: new Types.ObjectId(search) });
-          }
-        } catch {}
+      if (/^[0-9a-fA-F]+$/.test(cleanSearch)) {
+        if (cleanSearch.length === 24) {
+          // Full 24-char ObjectId - exact match
+          try {
+            const { Types } = await import('mongoose');
+            if (Types.ObjectId.isValid(cleanSearch)) {
+              idFilter.push({ _id: new Types.ObjectId(cleanSearch) });
+            }
+          } catch {}
+        } else if (cleanSearch.length >= 4) {
+          // Partial hex string (like 72397E) - match using $expr + $regexMatch on _id string
+          idFilter.push({
+            $expr: {
+              $regexMatch: {
+                input: { $toString: '$_id' },
+                regex: cleanSearch,
+                options: 'i'
+              }
+            }
+          });
+        }
       }
 
       const matchedBeneficiaries = await Beneficiary.find({
