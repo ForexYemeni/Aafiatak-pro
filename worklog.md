@@ -165,3 +165,36 @@ Stage Summary:
 - Full block/unblock/delete functionality added
 - Image lightbox works with click-to-zoom on documents
 - Deployed to aafiatak-v0-1.vercel.app
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Major admin panel fixes - beneficiaries, orders, emergencies, payments, coupons, subadmins, activity log
+
+Work Log:
+- Fixed User mongoose model: Added email, permissions, isBlocked, blockedReason fields
+- Fixed subadmins API: Now saves email and permissions fields on create/update
+- Fixed activity log API: Now populates userName from User collection instead of returning undefined
+- Fixed coupons API: Added search parameter support, fixed field mapping to avoid schema mismatches
+- Created transactions/[id] API: Added GET and PATCH endpoints for confirming payments
+- Created payment-methods API: Full CRUD for managing Yemeni payment methods
+- Fixed orders API: Now populates beneficiaryName, beneficiaryPhone, nurseName, nursePhone, serviceName from related collections
+- Fixed emergencies API: Now populates beneficiaryName, beneficiaryPhone, nurseName
+- Fixed transactions API: Now populates beneficiaryName and nurseName
+- Rewrote beneficiaries page: Added WhatsApp/call buttons, block/delete, professional package display, location with Google Maps, emergency contact, medical conditions
+- Rewrote orders page: Full details (beneficiary phone, address, map, payment info, commission/nurse payout), nearby nurse suggestions with distance calculation, auto-refresh every 15s
+- Rewrote emergencies page: Arabic status labels (resolved=تم الحل), professional emergency cards with type icons/priority colors, auto-refresh every 15s, contact buttons
+- Rewrote payments page: Added payment methods management tab with Yemeni wallets (Flous, Zain Cash, MTN MoMo, Halelflos), bank transfer, account name/number, instructions, full CRUD
+- Added beneficiaries DELETE endpoint
+
+Stage Summary:
+- All 7 reported issues fixed
+- All API routes now properly populate related document names
+- Beneficiaries: WhatsApp, call, block, delete, location, packages
+- Orders: Full details, nearby nurse suggestions, auto-refresh
+- Emergencies: Arabic status, professional cards, auto-refresh
+- Payments: Yemeni wallets, bank transfer, payment method management
+- Coupons: Search fixed, field mapping fixed
+- Sub-admins: Email and permissions now saved
+- Activity log: userName now populated from User collection
+- Deployed to Vercel successfully
