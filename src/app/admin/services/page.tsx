@@ -58,6 +58,7 @@ const categoryLabels: Record<string, string> = {
   post_surgery: 'ما بعد الجراحة',
   lab: 'مختبرات',
   emergency: 'طوارئ',
+  therapy: 'علاج نفسي',
 };
 
 const categoryIcons: Record<string, React.ElementType> = {
@@ -69,6 +70,7 @@ const categoryIcons: Record<string, React.ElementType> = {
   post_surgery: Pill,
   lab: Syringe,
   emergency: Ambulance,
+  therapy: Brain,
 };
 
 const categoryColors: Record<string, string> = {
@@ -80,6 +82,7 @@ const categoryColors: Record<string, string> = {
   post_surgery: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600 dark:text-orange-400',
   lab: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600 dark:text-cyan-400',
   emergency: 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400',
+  therapy: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
 };
 
 const iconOptions = [
