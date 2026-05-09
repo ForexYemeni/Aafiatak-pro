@@ -1,9 +1,9 @@
 // ============================================================================
-// عافيتك (Aafiatak) Healthcare Platform - Sound Manager (Simplified & Reliable)
+// عافيتك (Aafiatak) Healthcare Platform - Sound Manager (ULTRA RELIABLE)
 // ============================================================================
 // Audio playback system that WORKS 100% of the time.
-// Uses HTML5 Audio elements as primary (most reliable) with Web Audio API fallback.
-// Pre-loads all sounds on first user interaction for instant playback.
+// Auto-initializes on first use. No need to call init() manually.
+// Uses HTML5 Audio elements as primary with Web Audio API fallback.
 // ============================================================================
 
 /** Options for sound playback */
@@ -29,7 +29,7 @@ const VIBRATION_PATTERNS: Record<string, number | number[]> = {
 };
 
 // ============================================================================
-// SoundManager Class - RELIABLE Audio Playback
+// SoundManager Class - AUTO-INITIALIZING & ULTRA RELIABLE
 // ============================================================================
 
 class SoundManager {
@@ -40,6 +40,7 @@ class SoundManager {
   private userHasInteracted = false;
   private pendingPlays: Array<{ name: string; options: SoundOptions }> = [];
   private audioContext: AudioContext | null = null;
+  private initListenersSet = false;
 
   // Sound file paths
   private readonly SOUND_FILES: Record<string, string> = {
@@ -50,10 +51,10 @@ class SoundManager {
     error: '/sounds/error.mp3',
   };
 
-  // ---- Initialization ----
+  // ---- Auto-Initialization ----
 
-  /** Initialize the sound system. Call this once on app load. */
-  init(): void {
+  /** Ensure the sound system is initialized. Called automatically on first play. */
+  private ensureInitialized(): void {
     if (this.initialized) return;
     if (typeof window === 'undefined') return;
 
@@ -63,21 +64,52 @@ class SoundManager {
     this.preloadAudioElements();
 
     // Listen for first user interaction to unlock audio playback
+    this.setupInteractionListeners();
+
+    // If user already interacted before we set up listeners
+    // (e.g., they clicked login before this code ran), mark it
+    this.checkExistingInteraction();
+  }
+
+  /** Public init() for explicit initialization - calls ensureInitialized internally */
+  init(): void {
+    this.ensureInitialized();
+  }
+
+  /** Check if user has already interacted before we set up listeners */
+  private checkExistingInteraction(): void {
+    // In most browsers, if the page has already had user interactions
+    // before our listener was set up, we can detect this by trying to play
+    // a silent Audio element
+    try {
+      const testAudio = new Audio();
+      testAudio.volume = 0.01;
+      testAudio.src = 'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEARKwAAIhYAQACABAAZGF0YQAAAAA=';
+      const playPromise = testAudio.play();
+      if (playPromise !== undefined) {
+        playPromise.then(() => {
+          // Playback succeeded = user has already interacted
+          this.markUserInteracted();
+          testAudio.pause();
+          testAudio.src = '';
+        }).catch(() => {
+          // Autoplay blocked = no interaction yet, that's fine
+          testAudio.src = '';
+        });
+      }
+    } catch {
+      // Ignore
+    }
+  }
+
+  /** Set up event listeners for first user interaction */
+  private setupInteractionListeners(): void {
+    if (this.initListenersSet) return;
+    this.initListenersSet = true;
+
     const interactionEvents = ['click', 'touchstart', 'keydown', 'pointerdown'] as const;
     const handleInteraction = (): void => {
-      this.userHasInteracted = true;
-      
-      // Unlock AudioContext
-      this.unlockAudioContext();
-
-      // Process any pending plays that were queued before interaction
-      if (this.pendingPlays.length > 0) {
-        const pending = [...this.pendingPlays];
-        this.pendingPlays = [];
-        for (const item of pending) {
-          this.play(item.name, item.options);
-        }
-      }
+      this.markUserInteracted();
 
       // Remove all listeners after first interaction
       for (const evt of interactionEvents) {
@@ -90,6 +122,24 @@ class SoundManager {
     }
   }
 
+  /** Mark user as interacted and process pending plays */
+  markUserInteracted(): void {
+    if (this.userHasInteracted) return;
+    this.userHasInteracted = true;
+
+    // Unlock AudioContext
+    this.unlockAudioContext();
+
+    // Process any pending plays that were queued before interaction
+    if (this.pendingPlays.length > 0) {
+      const pending = [...this.pendingPlays];
+      this.pendingPlays = [];
+      for (const item of pending) {
+        this.play(item.name, item.options);
+      }
+    }
+  }
+
   /** Pre-create and load Audio elements for all sounds */
   private preloadAudioElements(): void {
     for (const [name, src] of Object.entries(this.SOUND_FILES)) {
@@ -98,7 +148,7 @@ class SoundManager {
         audio.preload = 'auto';
         audio.volume = this.volume;
         audio.src = src;
-        
+
         // Handle load errors silently
         audio.addEventListener('error', () => {
           console.warn(`[SoundManager] Failed to preload: ${name}`);
@@ -131,9 +181,13 @@ class SoundManager {
 
   // ---- Sound Playback ----
 
-  /** Play a sound by name. Works with both Audio elements and Web Audio API. */
+  /** Play a sound by name. Auto-initializes if needed. */
   play(name: string, options: SoundOptions = {}): void {
     if (!this.enabled) return;
+    if (typeof window === 'undefined') return;
+
+    // Auto-initialize on first use
+    this.ensureInitialized();
 
     const soundVolume = options.volume ?? this.volume;
 
@@ -145,7 +199,7 @@ class SoundManager {
 
     // METHOD 1: Try HTML5 Audio element (most reliable)
     const played = this.playWithAudioElement(name, soundVolume, options.repeat ?? 1);
-    
+
     // METHOD 2: If Audio element failed, try Web Audio API oscillator fallback
     if (!played) {
       this.playOscillatorFallback(name, soundVolume);
@@ -160,22 +214,43 @@ class SoundManager {
 
   /** Play sound using HTML5 Audio element - MOST RELIABLE method */
   private playWithAudioElement(name: string, volume: number, repeat: number): boolean {
-    const audio = this.audioElements.get(name);
-    if (!audio) return false;
+    // If no preloaded element, try creating one on the fly
+    let audio = this.audioElements.get(name);
+    if (!audio) {
+      const src = this.SOUND_FILES[name];
+      if (src) {
+        try {
+          audio = new Audio();
+          audio.preload = 'auto';
+          audio.volume = volume;
+          audio.src = src;
+          this.audioElements.set(name, audio);
+        } catch {
+          return false;
+        }
+      } else {
+        return false;
+      }
+    }
 
     try {
       // Create a clone for each play to allow overlapping sounds
       const clone = audio.cloneNode() as HTMLAudioElement;
       clone.volume = Math.max(0, Math.min(1, volume));
-      
+
       // Set playback rate for emergency urgency
       if (name === 'emergency') {
         clone.playbackRate = 1.0;
       }
 
-      clone.play().catch(() => {
-        // Autoplay blocked - will work after user interaction
-      });
+      const playPromise = clone.play();
+      if (playPromise) {
+        playPromise.catch((err) => {
+          // Autoplay blocked - try one more time with AudioContext
+          console.warn(`[SoundManager] Autoplay blocked for ${name}, trying fallback`);
+          this.playOscillatorFallback(name, volume);
+        });
+      }
 
       // Handle repeat
       if (repeat > 1) {
@@ -300,10 +375,10 @@ class SoundManager {
 
   isEnabled(): boolean { return this.enabled; }
 
-  /** Force mark user as interacted (for testing or programmatic unlock) */
+  /** Force mark user as interacted (for testing or after login) */
   forceUserInteracted(): void {
-    this.userHasInteracted = true;
-    this.unlockAudioContext();
+    this.ensureInitialized();
+    this.markUserInteracted();
   }
 
   hasUserInteracted(): boolean { return this.userHasInteracted; }
@@ -321,6 +396,7 @@ class SoundManager {
       this.audioContext = null;
     }
     this.initialized = false;
+    this.initListenersSet = false;
   }
 }
 

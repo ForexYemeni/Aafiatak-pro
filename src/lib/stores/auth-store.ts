@@ -11,6 +11,7 @@ import type {
   RefreshTokenResponse,
   ApiResponse,
 } from '@/types';
+import { soundManager } from '@/lib/notifications/sound-manager';
 
 // ---- Auth State Interface ----
 
@@ -106,6 +107,8 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
               error: null,
             });
+            // Unlock audio playback - user clicked login button
+            soundManager.forceUserInteracted();
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'فشل تسجيل الدخول';
@@ -140,6 +143,8 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
               error: null,
             });
+            // Unlock audio playback - user clicked register button
+            soundManager.forceUserInteracted();
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'فشل تسجيل الممرض/ـة';
@@ -174,6 +179,8 @@ export const useAuthStore = create<AuthState>()(
               isLoading: false,
               error: null,
             });
+            // Unlock audio playback - user clicked register button
+            soundManager.forceUserInteracted();
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'فشل تسجيل المستفيد';

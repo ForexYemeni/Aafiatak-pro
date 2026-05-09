@@ -3,13 +3,14 @@
 import { useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import { soundManager } from '@/lib/notifications/sound-manager';
+import { notificationManager } from '@/lib/notifications/notification-manager';
 
 const OfflineWrapper = dynamic(
   () => import('@/components/common/offline-wrapper').then(mod => mod.OfflineWrapper),
   { ssr: false }
 );
 
-// Sound mapping for push notifications
+// Sound mapping for push notifications received from Service Worker
 const SOUND_MAP: Record<string, string> = {
   assignment: 'notification',
   service_request: 'notification',
@@ -38,6 +39,11 @@ function ServiceWorkerRegistrar() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
+    // ===== CRITICAL: Initialize the sound and notification systems =====
+    // This MUST be done early so sounds are ready when notifications arrive
+    notificationManager.init();
+    soundManager.init();
+
     // Register service worker
     if ('serviceWorker' in navigator) {
       navigator.serviceWorker.register('/sw.js').catch(() => {
@@ -50,10 +56,17 @@ function ServiceWorkerRegistrar() {
           if (event.data?.type === 'PUSH_NOTIFICATION_RECEIVED') {
             const payload = event.data.payload;
 
+            // Ensure sound system is ready
+            soundManager.init();
+
             if (payload.sound !== false) {
               const soundName = SOUND_MAP[payload.type] || 'notification';
               const isUrgent = payload.priority === 'urgent';
               const isHigh = payload.priority === 'high';
+
+              // Force user interacted since we're receiving a notification
+              // and the user must have interacted with the app before
+              soundManager.forceUserInteracted();
 
               soundManager.play(soundName, {
                 priority: payload.priority || 'medium',
@@ -69,7 +82,7 @@ function ServiceWorkerRegistrar() {
               }
             }
 
-            // Dispatch custom event for app UI
+            // Dispatch custom event for app UI (notification bell, toasts, etc.)
             window.dispatchEvent(new CustomEvent('app-notification', {
               detail: {
                 id: `push-${Date.now()}`,
@@ -87,8 +100,8 @@ function ServiceWorkerRegistrar() {
               void syncManager.fullSync();
             }).catch(() => {});
           }
-        } catch {
-          // Silently ignore SW message errors
+        } catch (err) {
+          console.error('[PWA] Error handling SW message:', err);
         }
       };
 
