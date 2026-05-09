@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Bell, Check, MessageSquare, CreditCard, AlertTriangle, Calendar, Star, Settings, Loader2 } from 'lucide-react';
+import { Bell, Check, MessageSquare, CreditCard, AlertTriangle, Calendar, Star, Settings, Loader2, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -36,17 +36,18 @@ interface NotificationItem {
 function getNotificationIcon(type: NotificationType | string) {
   switch (type) {
     case 'assignment':
+    case 'service_assigned':
       return <MessageSquare className="w-4 h-4" />;
     case 'payment':
       return <CreditCard className="w-4 h-4" />;
     case 'emergency':
+    case 'emergency_assigned':
       return <AlertTriangle className="w-4 h-4" />;
     case 'appointment':
       return <Calendar className="w-4 h-4" />;
     case 'rating':
       return <Star className="w-4 h-4" />;
     case 'system':
-      return <Settings className="w-4 h-4" />;
     case 'status_change':
       return <Settings className="w-4 h-4" />;
     default:
@@ -57,10 +58,13 @@ function getNotificationIcon(type: NotificationType | string) {
 function getNotificationColor(type: NotificationType | string): string {
   switch (type) {
     case 'emergency':
+    case 'emergency_assigned':
       return 'bg-red-100 text-red-600 dark:bg-red-900/30 dark:text-red-400';
     case 'payment':
+    case 'service_completed':
       return 'bg-green-100 text-green-600 dark:bg-green-900/30 dark:text-green-400';
     case 'assignment':
+    case 'service_assigned':
       return 'bg-blue-100 text-blue-600 dark:bg-blue-900/30 dark:text-blue-400';
     case 'rating':
       return 'bg-amber-100 text-amber-600 dark:bg-amber-900/30 dark:text-amber-400';
@@ -108,7 +112,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
     if (!token) return;
     setIsLoading(true);
     try {
-      const res = await fetch('/api/notifications?limit=20', {
+      const res = await fetch('/api/notifications?limit=50', {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
@@ -128,12 +132,12 @@ export function NotificationBell({ className }: NotificationBellProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [token]); // Removed unreadCount from deps to prevent re-render loop
+  }, [token]);
 
   // Fetch on mount and periodically (UI-only, no sounds)
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // poll every 30s for UI updates
+    const interval = setInterval(fetchNotifications, 30000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 
@@ -156,22 +160,18 @@ export function NotificationBell({ className }: NotificationBellProps) {
         body: JSON.stringify({ read: true }),
       });
       if (!res.ok) {
-        // Revert on failure
         setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: false } : n)));
         setUnreadCount((prev) => prev + 1);
       }
     } catch {
-      // Revert on failure
       setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: false } : n)));
       setUnreadCount((prev) => prev + 1);
     }
   };
 
   const markAllAsRead = async () => {
-    // Store previous state for rollback
     const prevNotifications = [...notifications];
     const prevUnreadCount = unreadCount;
-    // Optimistic update
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
     setUnreadCount(0);
     try {
@@ -184,14 +184,52 @@ export function NotificationBell({ className }: NotificationBellProps) {
         body: JSON.stringify({}),
       });
       if (!res.ok) {
-        // Revert on failure
         setNotifications(prevNotifications.map((n) => ({ ...n })));
         setUnreadCount(prevUnreadCount);
       }
     } catch {
-      // Revert on failure
       setNotifications(prevNotifications.map((n) => ({ ...n })));
       setUnreadCount(prevUnreadCount);
+    }
+  };
+
+  const deleteAllNotifications = async () => {
+    const prevNotifications = [...notifications];
+    const prevUnreadCount = unreadCount;
+    // Optimistic update
+    setNotifications([]);
+    setUnreadCount(0);
+    try {
+      const res = await fetch('/api/notifications/delete-all', {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+      if (!res.ok) {
+        setNotifications(prevNotifications.map((n) => ({ ...n })));
+        setUnreadCount(prevUnreadCount);
+      }
+    } catch {
+      setNotifications(prevNotifications.map((n) => ({ ...n })));
+      setUnreadCount(prevUnreadCount);
+    }
+  };
+
+  const deleteNotification = async (id: string) => {
+    setNotifications((prev) => prev.filter((n) => n.id !== id));
+    setUnreadCount((prev) => {
+      const notif = notifications.find((n) => n.id === id);
+      return notif && !notif.read ? Math.max(0, prev - 1) : prev;
+    });
+    try {
+      await fetch(`/api/notifications/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
+    } catch {
+      // Silently fail - local state already updated
     }
   };
 
@@ -203,7 +241,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
           {unreadCount > 0 && (
             <Badge
               variant="destructive"
-              className="absolute -top-1 -right-1 w-4 h-4 p-0 flex items-center justify-center text-[10px]"
+              className="absolute -top-1 -right-1 min-w-[18px] h-[18px] p-0 flex items-center justify-center text-[10px]"
             >
               {unreadCount > 9 ? '٩+' : unreadCount}
             </Badge>
@@ -211,76 +249,142 @@ export function NotificationBell({ className }: NotificationBellProps) {
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-80 p-0"
+        className="w-[360px] p-0 shadow-xl border rounded-lg"
         align="end"
         side="bottom"
-        sideOffset={8}
-        collisionPadding={16}
+        sideOffset={12}
+        collisionPadding={20}
         avoidCollisions={true}
         dir="rtl"
+        // Use sticky positioning to prevent overlap with page content
+        style={{ position: 'fixed', zIndex: 9999 }}
       >
-        <div className="flex items-center justify-between p-3">
-          <h3 className="font-semibold text-sm">الإشعارات</h3>
+        {/* Header */}
+        <div className="flex items-center justify-between p-3 border-b">
+          <h3 className="font-bold text-sm">الإشعارات</h3>
           <div className="flex items-center gap-1">
-            <Button variant="ghost" size="icon" className="w-7 h-7" onClick={fetchNotifications} title="تحديث">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="w-7 h-7"
+              onClick={fetchNotifications}
+              title="تحديث"
+            >
               <Loader2 className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
             {unreadCount > 0 && (
-              <Button variant="ghost" size="sm" className="text-xs h-auto py-1 px-2" onClick={markAllAsRead}>
-                تحديد الكل كمقروء
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[11px] h-7 px-2 text-blue-600 hover:text-blue-700"
+                onClick={markAllAsRead}
+                title="تحديد الكل كمقروء"
+              >
+                <Check className="w-3.5 h-3.5 ml-1" />
+                قراءة الكل
+              </Button>
+            )}
+            {notifications.length > 0 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-[11px] h-7 px-2 text-red-500 hover:text-red-600"
+                onClick={deleteAllNotifications}
+                title="حذف جميع الإشعارات"
+              >
+                <Trash2 className="w-3.5 h-3.5 ml-1" />
+                حذف الكل
               </Button>
             )}
           </div>
         </div>
-        <Separator />
-        <ScrollArea className="max-h-80">
+
+        {/* Notification List */}
+        <ScrollArea className="max-h-[420px]">
           {isLoading && notifications.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" />
+            <div className="p-6 text-center text-sm text-muted-foreground flex flex-col items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
               جاري التحميل...
             </div>
           ) : notifications.length === 0 ? (
-            <div className="p-4 text-center text-sm text-muted-foreground">
-              لا توجد إشعارات
+            <div className="p-8 text-center text-sm text-muted-foreground flex flex-col items-center gap-3">
+              <Bell className="w-10 h-10 text-muted-foreground/40" />
+              <p>لا توجد إشعارات</p>
             </div>
           ) : (
-            <div className="divide-y divide-border">
+            <div className="divide-y divide-border/50">
               {notifications.map((notification) => (
                 <div
                   key={notification.id}
                   className={cn(
-                    'flex items-start gap-3 p-3 transition-colors hover:bg-accent/50 cursor-pointer',
-                    !notification.read && 'bg-primary/5'
+                    'flex items-start gap-3 p-3 transition-colors hover:bg-accent/30 relative group',
+                    !notification.read && 'bg-blue-50/50 dark:bg-blue-950/20'
                   )}
-                  onClick={() => markAsRead(notification.id)}
                 >
+                  {/* Icon */}
                   <div
                     className={cn(
-                      'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
+                      'w-9 h-9 rounded-full flex items-center justify-center shrink-0',
                       getNotificationColor(notification.type)
                     )}
                   >
                     {getNotificationIcon(notification.type)}
                   </div>
-                  <div className="flex-1 min-w-0 overflow-hidden">
-                    <p className={cn('text-sm leading-5', !notification.read && 'font-medium')}>
+
+                  {/* Content */}
+                  <div
+                    className="flex-1 min-w-0 cursor-pointer"
+                    onClick={() => {
+                      if (!notification.read) markAsRead(notification.id);
+                    }}
+                  >
+                    <p className={cn(
+                      'text-sm leading-5',
+                      !notification.read && 'font-semibold'
+                    )}>
                       {notification.title}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5 leading-4 line-clamp-2">
                       {notification.body}
                     </p>
-                    <p className="text-[10px] text-muted-foreground mt-1">
+                    <p className="text-[10px] text-muted-foreground/70 mt-1">
                       {getRelativeTimeString(notification.createdAt)}
                     </p>
                   </div>
-                  {!notification.read && (
-                    <div className="w-2 h-2 rounded-full bg-primary shrink-0 mt-2" />
-                  )}
+
+                  {/* Unread indicator + Delete button */}
+                  <div className="flex flex-col items-center gap-2 shrink-0">
+                    {notification.read ? null : (
+                      <div className="w-2.5 h-2.5 rounded-full bg-blue-500" />
+                    )}
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteNotification(notification.id);
+                      }}
+                      title="حذف"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </ScrollArea>
+
+        {/* Footer - count info */}
+        {notifications.length > 0 && (
+          <div className="p-2 border-t bg-muted/20 text-center">
+            <p className="text-[10px] text-muted-foreground">
+              {notifications.length} إشعار
+              {unreadCount > 0 && ` · ${unreadCount} غير مقروء`}
+            </p>
+          </div>
+        )}
       </PopoverContent>
     </Popover>
   );

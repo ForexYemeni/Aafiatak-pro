@@ -10,6 +10,8 @@
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { socketService } from '@/lib/socket';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { soundManager } from '@/lib/notifications/sound-manager';
+import { markSoundPlayed } from '@/lib/notifications/sound-dedup';
 import type {
   UserRole,
   MessageType,
@@ -186,7 +188,7 @@ export function useChat(chatId: string): UseChatReturn {
     };
   }, [isConnected, chatId]);
 
-  // Listen for new messages
+  // Listen for new messages - play chat sound for incoming messages
   useEffect(() => {
     const unsubscribe = socketService.onMessage((data: NewMessageEvent) => {
       if (data.chatId === chatId) {
@@ -195,6 +197,17 @@ export function useChat(chatId: string): UseChatReturn {
           if (prev.some((m) => m.id === data.message.id)) {
             return prev;
           }
+
+          // Play chat sound for messages from OTHER users (not from self)
+          const currentUserId = useAuthStore.getState().user?.id;
+          if (data.message.senderId !== currentUserId) {
+            const soundId = `chat-${data.message.id}`;
+            if (!markSoundPlayed(soundId)) {
+              soundManager.forceUserInteracted();
+              soundManager.playChat();
+            }
+          }
+
           return [...prev, data.message];
         });
       }

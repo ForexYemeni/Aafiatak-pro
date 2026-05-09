@@ -7,6 +7,7 @@ import { notificationManager } from '@/lib/notifications/notification-manager';
 import { markSoundPlayed, clearPlayedSounds } from '@/lib/notifications/sound-dedup';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useNotificationStore } from '@/lib/stores/notification-store';
+import { socketService } from '@/lib/socket';
 
 const OfflineWrapper = dynamic(
   () => import('@/components/common/offline-wrapper').then(mod => mod.OfflineWrapper),
@@ -249,8 +250,31 @@ function ServiceWorkerRegistrar() {
 
       navigator.serviceWorker.addEventListener('message', handleSWMessage);
 
+      // Listen for incoming chat messages via Socket
+      // Play chat sound when user is NOT viewing the specific chat page
+      const unsubChatMessage = socketService.onMessage((data) => {
+        const currentUserId = useAuthStore.getState().user?.id;
+        // Don't play sound for own messages
+        if (data.message.senderId === currentUserId) return;
+
+        // Check if user is currently viewing this chat page
+        const pathname = window.location.pathname;
+        const isViewingChat = pathname.includes(`/chat/${data.chatId}`);
+
+        // Only play sound if NOT viewing this specific chat
+        // (the useChat hook handles sound when user IS in the chat page)
+        if (!isViewingChat) {
+          const soundId = `chat-bg-${data.message.id}`;
+          if (!markSoundPlayed(soundId)) {
+            soundManager.forceUserInteracted();
+            soundManager.playChat();
+          }
+        }
+      });
+
       return () => {
         navigator.serviceWorker.removeEventListener('message', handleSWMessage);
+        unsubChatMessage();
       };
     }
 
