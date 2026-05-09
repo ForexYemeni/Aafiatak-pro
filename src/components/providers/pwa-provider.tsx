@@ -226,17 +226,16 @@ function ServiceWorkerRegistrar() {
 
               // Voice alert for emergency notifications (TTS)
               if (payload.data?.voiceAlert && payload.data?.voiceText) {
-                try {
-                  const { voiceManager } = await import('@/lib/notifications/voice-manager');
+                import('@/lib/notifications/voice-manager').then(({ voiceManager }) => {
                   voiceManager.init();
                   voiceManager.speak(payload.data.voiceText, {
                     priority: 'urgent',
                     rate: 1.1,
                     volume: 1.0,
                   });
-                } catch {
+                }).catch(() => {
                   // TTS not available
-                }
+                });
               }
             }
 
