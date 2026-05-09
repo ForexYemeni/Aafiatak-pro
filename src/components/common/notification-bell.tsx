@@ -13,6 +13,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { soundManager } from '@/lib/notifications/sound-manager';
 import type { NotificationType } from '@/types';
 
 // ============================================================================
@@ -112,15 +113,22 @@ export function NotificationBell({ className }: NotificationBellProps) {
       const data = await res.json();
       if (data.success && data.data) {
         const notifs = data.data.notifications || [];
+        const newUnreadCount = data.data.unreadCount || 0;
+        
+        // Play notification sound if new unread notifications appeared
+        if (newUnreadCount > unreadCount && unreadCount > 0) {
+          soundManager.playNotification();
+        }
+        
         setNotifications(notifs);
-        setUnreadCount(data.data.unreadCount || 0);
+        setUnreadCount(newUnreadCount);
       }
     } catch {
       // silent - keep existing notifications
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [token, unreadCount]);
 
   // Fetch on mount and periodically
   useEffect(() => {

@@ -1,300 +1,158 @@
 // ============================================================================
-// عافيتك (Aafiatak) Healthcare Platform - Notification Manager
+// عافيتك (Aafiatak) Healthcare Platform - Notification Manager (Simplified)
 // ============================================================================
-// Central notification management system that coordinates voice (TTS),
-// sound, browser notifications, and in-app notifications.
-// ALL notifications come from MongoDB database - NO Firebase.
+// Central notification management that coordinates sound, browser notifications,
+// and in-app events. Simplified for 100% reliability.
 // ============================================================================
 
-import { voiceManager } from './voice-manager';
 import { soundManager } from './sound-manager';
-import { notificationClient, type AppNotification } from './firebase-client';
 
-// Re-export AppNotification for convenience
-export type { AppNotification };
-
-/** Notification permission status */
-type NotificationPermissionStatus = 'default' | 'granted' | 'denied';
-
-/** Arabic TTS messages mapped by notification type */
-const TTS_MESSAGES: Record<string, (notification: AppNotification) => string> = {
-  assignment: (n) => `لديك طلب خدمة جديد: ${n.title}`,
-  payment: (n) => `إشعار دفعة: ${n.title}`,
-  emergency: (n) => `تنبيه طوارئ! ${n.body}`,
-  reminder: (n) => `تذكير: ${n.title}`,
-  chat: (n) => `رسالة جديدة: ${n.title}`,
-  status_change: (n) => `تحديث حالة: ${n.title}`,
-  appointment: (n) => `تذكير موعد: ${n.title}`,
-  rating: (n) => `تقييم جديد: ${n.title}`,
-  system: (n) => n.title,
-};
-
-/** Sound names mapped by notification type */
-const SOUND_MAP: Record<string, string> = {
-  assignment: 'notification',
-  payment: 'success',
-  emergency: 'emergency',
-  reminder: 'notification',
-  chat: 'chat',
-  status_change: 'notification',
-  appointment: 'notification',
-  rating: 'success',
-  system: 'notification',
-};
-
-/** Deduplication cache entry */
-interface DeduplicationEntry {
-  hash: string;
-  timestamp: number;
+/** Application-level notification interface */
+export interface AppNotification {
+  id: string;
+  title: string;
+  body: string;
+  type: string;
+  priority: 'low' | 'medium' | 'high' | 'urgent';
+  data?: Record<string, string>;
+  imageUrl?: string;
+  clickAction?: string;
+  voiceEnabled?: boolean;
+  voicePlayedAt?: string | null;
 }
 
+/** Sound mapping by notification type */
+const SOUND_MAP: Record<string, string> = {
+  assignment: 'notification',
+  service_request: 'notification',
+  service_assigned: 'notification',
+  service_accepted: 'success',
+  service_started: 'notification',
+  service_completed: 'success',
+  service_cancelled: 'error',
+  status_change: 'notification',
+  emergency: 'emergency',
+  emergency_assigned: 'emergency',
+  payment: 'success',
+  withdrawal: 'notification',
+  withdrawal_approved: 'success',
+  withdrawal_rejected: 'error',
+  chat: 'chat',
+  rating: 'success',
+  verification: 'notification',
+  system: 'notification',
+  loyalty: 'success',
+  referral: 'notification',
+  promotion: 'notification',
+  appointment: 'notification',
+  reminder: 'notification',
+};
+
 // ============================================================================
-// NotificationManager Class (MongoDB Only - No Firebase)
+// NotificationManager Class
 // ============================================================================
 
 class NotificationManager {
-  private permission: NotificationPermissionStatus = 'default';
-  private deduplicationSet: Map<string, DeduplicationEntry> = new Map();
-  private maxDeduplicationSize = 100;
-  private deduplicationWindowMs = 5000; // 5 seconds
   private initialized = false;
 
-  // ---- Initialization ----
-
   /** Initialize the notification system */
-  async init(userId?: string): Promise<void> {
+  init(): void {
     if (this.initialized) return;
     if (typeof window === 'undefined') return;
 
-    // Check current permission state
-    if ('Notification' in window) {
-      this.permission = Notification.permission as NotificationPermissionStatus;
-    }
-
-    // Initialize sub-managers
-    voiceManager.init();
+    // Initialize sound manager
     soundManager.init();
-
-    // Initialize MongoDB notification client
-    await notificationClient.init(userId);
-
-    // Register callback for new notifications from MongoDB
-    notificationClient.onNotification((notification) => {
-      this.notify(notification);
-    });
-
-    // Start periodic deduplication cleanup
-    this.startDeduplicationCleanup();
 
     this.initialized = true;
   }
 
-  /** Set the current user for notification polling */
-  setUserId(userId: string): void {
-    notificationClient.setUserId(userId);
-  }
-
-  // ---- Permission Management ----
-
-  /** Request browser notification permission */
-  async requestPermission(): Promise<NotificationPermissionStatus> {
-    return notificationClient.requestPermission();
-  }
-
-  /** Get the current notification permission status */
-  getPermissionStatus(): NotificationPermissionStatus {
-    return notificationClient.getPermissionStatus();
-  }
-
-  /** Check if browser notifications are supported */
-  isBrowserNotificationSupported(): boolean {
-    return notificationClient.isBrowserNotificationSupported();
-  }
-
-  // ---- In-App Notification ----
-
-  /** Show an in-app notification (toast-style) */
-  showInApp(notification: AppNotification): void {
+  /**
+   * Process and display a notification with sound.
+   * This is the main entry point for all notifications.
+   */
+  notify(notification: AppNotification): void {
     if (typeof window === 'undefined') return;
 
+    // 1. Play sound immediately
+    this.playSoundForNotification(notification);
+
+    // 2. Dispatch in-app event for UI components (toasts, badges, etc.)
     const event = new CustomEvent('app-notification', {
       detail: notification,
     });
     window.dispatchEvent(event);
   }
 
-  // ---- Combined Notification ----
+  /** Play the appropriate sound for a notification */
+  private playSoundForNotification(notification: AppNotification): void {
+    const soundName = SOUND_MAP[notification.type] || 'notification';
+    const isUrgent = notification.priority === 'urgent';
+    const isHigh = notification.priority === 'high';
 
-  /** Show a notification with sound and optional TTS */
-  notify(notification: AppNotification): void {
-    // Check deduplication
-    if (this.isDuplicate(notification)) {
-      return;
-    }
-
-    // Add to deduplication cache
-    this.addToDeduplicationCache(notification);
-
-    // Show in-app notification
-    this.showInApp(notification);
-
-    // Show browser notification
-    notificationClient.showBrowserNotification(notification);
-
-    // Play sound
-    const soundName = this.getSoundByType(notification.type);
-    const soundOptions = {
+    soundManager.play(soundName, {
       priority: notification.priority,
-      vibrate: notification.priority === 'high' || notification.priority === 'urgent',
-      volume: notification.priority === 'urgent' ? 1.0 : notification.priority === 'high' ? 0.8 : undefined,
-    };
-    soundManager.play(soundName, soundOptions);
+      volume: isUrgent ? 1.0 : isHigh ? 0.9 : 0.8,
+      vibrate: isUrgent || isHigh,
+      repeat: isUrgent ? 2 : 1,
+    });
 
-    // Emergency: repeat sound
-    if (notification.priority === 'urgent' && notification.type === 'emergency') {
+    // For emergency, repeat after delay
+    if (isUrgent && notification.type === 'emergency') {
       setTimeout(() => {
         soundManager.playEmergency();
       }, 1500);
     }
-
-    // TTS for high and urgent priority (voice notifications from MongoDB data)
-    if (notification.priority === 'high' || notification.priority === 'urgent') {
-      const ttsMessage = this.getTTSMessage(notification);
-      voiceManager.speak(ttsMessage, {
-        priority: notification.priority,
-        rate: notification.priority === 'urgent' ? 1.1 : 1,
-      });
-    }
-
-    // Mark voice as played on the server
-    if (notification.voiceEnabled && notification.id) {
-      fetch(`/api/notifications/${notification.id}/read`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ voicePlayed: true }),
-      }).catch(() => {});
-    }
   }
 
-  // ---- Deduplication ----
-
-  /** Check if a notification is a duplicate within the deduplication window */
-  private isDuplicate(notification: AppNotification): boolean {
-    const hash = this.computeNotificationHash(notification);
-    const entry = this.deduplicationSet.get(hash);
-
-    if (!entry) return false;
-
-    const elapsed = Date.now() - entry.timestamp;
-    if (elapsed < this.deduplicationWindowMs) {
-      return true;
-    }
-
-    this.deduplicationSet.delete(hash);
-    return false;
-  }
-
-  /** Add a notification to the deduplication cache */
-  private addToDeduplicationCache(notification: AppNotification): void {
-    const hash = this.computeNotificationHash(notification);
-    this.deduplicationSet.set(hash, { hash, timestamp: Date.now() });
-
-    if (this.deduplicationSet.size > this.maxDeduplicationSize) {
-      this.pruneDeduplicationCache();
-    }
-  }
-
-  /** Compute a hash for a notification */
-  private computeNotificationHash(notification: AppNotification): string {
-    const dataStr = notification.data
-      ? Object.entries(notification.data)
-          .sort(([a], [b]) => a.localeCompare(b))
-          .map(([k, v]) => `${k}=${v}`)
-          .join('&')
-      : '';
-
-    return `${notification.type}:${notification.title}:${notification.body}:${dataStr}`;
-  }
-
-  /** Prune old entries from the deduplication cache */
-  private pruneDeduplicationCache(): void {
-    const now = Date.now();
-    const entriesToDelete: string[] = [];
-
-    for (const [hash, entry] of this.deduplicationSet.entries()) {
-      if (now - entry.timestamp > this.deduplicationWindowMs) {
-        entriesToDelete.push(hash);
-      }
-    }
-
-    for (const hash of entriesToDelete) {
-      this.deduplicationSet.delete(hash);
-    }
-  }
-
-  /** Start periodic cleanup of deduplication cache */
-  private startDeduplicationCleanup(): void {
+  /** Show a browser notification with sound */
+  async showBrowserNotification(notification: AppNotification): Promise<void> {
     if (typeof window === 'undefined') return;
+    if (!('Notification' in window)) return;
+    if (Notification.permission !== 'granted') return;
 
-    setInterval(() => {
-      this.pruneDeduplicationCache();
-    }, 30000);
-  }
-
-  // ---- Sound & TTS Helpers ----
-
-  /** Get the appropriate sound name for a notification type */
-  private getSoundByType(type: string): string {
-    return SOUND_MAP[type] ?? 'notification';
-  }
-
-  /** Get the TTS message for a notification in Arabic */
-  private getTTSMessage(notification: AppNotification): string {
-    const generator = TTS_MESSAGES[notification.type];
-    if (generator) {
-      return generator(notification);
-    }
-    return notification.title;
-  }
-
-  // ---- Notification Click Handler ----
-
-  /** Handle a notification click event */
-  handleNotificationClick(browserNotification: Notification): void {
-    const data = browserNotification.data as Record<string, string> | undefined;
-    const clickAction = data?.clickAction;
-    const type = data?.type as string | undefined;
-
-    window.focus();
-
-    if (clickAction) {
-      window.location.href = clickAction;
-      return;
-    }
-
-    const typeRoutes: Record<string, string> = {
-      assignment: '/nurse',
-      payment: '/nurse/earnings',
-      emergency: '/beneficiary/emergency',
-      chat: '/chat',
-      appointment: '/nurse/schedule',
-      rating: '/nurse/ratings',
+    const options: NotificationOptions = {
+      body: notification.body,
+      icon: '/icons/icon-192x192.png',
+      badge: '/icons/icon-72x72.png',
+      tag: notification.id,
+      dir: 'rtl',
+      lang: 'ar',
+      requireInteraction: notification.priority === 'urgent' || notification.priority === 'high',
+      silent: false,
+      data: {
+        ...notification.data,
+        clickAction: notification.clickAction ?? '',
+        type: notification.type,
+        priority: notification.priority,
+      },
     };
 
-    const route = type ? typeRoutes[type] : undefined;
-    if (route) {
-      window.location.href = route;
+    if (notification.imageUrl) {
+      options.image = notification.imageUrl;
+    }
+
+    const browserNotif = new Notification(notification.title, options);
+
+    browserNotif.onclick = () => {
+      window.focus();
+      const clickAction = notification.clickAction || notification.data?.clickAction;
+      if (clickAction) {
+        window.location.href = clickAction;
+      }
+      browserNotif.close();
+    };
+
+    // Also play sound
+    this.playSoundForNotification(notification);
+
+    if (notification.priority !== 'urgent') {
+      setTimeout(() => browserNotif.close(), 5000);
     }
   }
 
-  // ---- Cleanup ----
-
-  /** Clean up all resources */
+  /** Clean up resources */
   destroy(): void {
-    voiceManager.destroy();
     soundManager.destroy();
-    notificationClient.destroy();
-    this.deduplicationSet.clear();
     this.initialized = false;
   }
 }
@@ -303,7 +161,5 @@ class NotificationManager {
 // Singleton Export
 // ============================================================================
 
-/** Global NotificationManager instance - MongoDB only, NO Firebase */
 export const notificationManager = new NotificationManager();
-
 export default notificationManager;

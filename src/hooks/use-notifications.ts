@@ -69,10 +69,8 @@ export function useNotifications(): UseNotificationsReturn {
     if (isInitialized.current) return;
     isInitialized.current = true;
 
-    notificationManager.init().then(() => {
-      // Load default sounds
-      soundManager.loadDefaultSounds();
-    });
+    // Initialize managers - sounds are pre-loaded automatically in init()
+    notificationManager.init();
 
     // Fetch initial notifications
     fetchNotifications();
@@ -92,6 +90,8 @@ export function useNotifications(): UseNotificationsReturn {
       };
 
       addNotification(notification);
+      // Play sound via notification manager
+      notificationManager.notify(notification);
     });
 
     return unsubscribe;
@@ -174,16 +174,16 @@ export function useNotificationPermission(): UseNotificationPermissionReturn {
   const isSupported = typeof window !== 'undefined' && 'Notification' in window;
 
   const requestPermission = useCallback(async (): Promise<NotificationPermission> => {
-    const result = await notificationManager.requestPermission();
-    setPermission(result as NotificationPermission);
-    return result as NotificationPermission;
+    if (typeof window === 'undefined' || !('Notification' in window)) return 'denied';
+    const result = await Notification.requestPermission();
+    setPermission(result);
+    return result;
   }, []);
 
   // Listen for permission changes
   useEffect(() => {
     if (!isSupported) return;
 
-    // Check periodically for permission changes (some browsers don't fire events)
     const interval = setInterval(() => {
       if ('Notification' in window && Notification.permission !== permission) {
         setPermission(Notification.permission);
@@ -238,7 +238,7 @@ interface UseNotificationSoundReturn {
 export function useNotificationSound(): UseNotificationSoundReturn {
   const { soundEnabled, setSoundEnabled: storeSetSoundEnabled } = useNotificationStore();
   const [volume, setVolumeState] = useState(soundManager.getVolume());
-  const [hasInteracted, setHasInteracted] = useState(soundManager.hasUserInteracted());
+  const [hasInteracted, setHasInteracted] = useState(false);
 
   // Sync sound enabled state with sound manager
   useEffect(() => {
@@ -276,7 +276,6 @@ export function useNotificationSound(): UseNotificationSoundReturn {
   }, [soundEnabled]);
 
   const playEmergency = useCallback(() => {
-    // Emergency sounds always play regardless of settings
     soundManager.playEmergency();
   }, []);
 
@@ -308,8 +307,8 @@ export function useNotificationSound(): UseNotificationSoundReturn {
     playError,
     setVolume,
     volume,
-    isAvailable: soundManager.isAvailable(),
-    isVibrationAvailable: soundManager.isVibrationAvailable(),
+    isAvailable: typeof window !== 'undefined' && !!(window.AudioContext || (window as any).webkitAudioContext),
+    isVibrationAvailable: typeof navigator !== 'undefined' && 'vibrate' in navigator,
     hasUserInteracted: hasInteracted,
   };
 }
@@ -347,16 +346,13 @@ export function useNotificationTTS(): UseNotificationTTSReturn {
   const [queueLength, setQueueLength] = useState(0);
   const [arabicVoices, setArabicVoices] = useState<SpeechSynthesisVoice[]>([]);
 
-  // Initialize voice manager
   useEffect(() => {
     voiceManager.init();
 
-    // Load Arabic voices after a short delay (voices load async in some browsers)
     const voicesTimeout = setTimeout(() => {
       setArabicVoices(voiceManager.getArabicVoices());
     }, 100);
 
-    // Update speaking state periodically
     const interval = setInterval(() => {
       setIsSpeaking(voiceManager.getIsSpeaking());
       setQueueLength(voiceManager.getQueueLength());

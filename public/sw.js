@@ -5,9 +5,9 @@
 // Pure Web Push Protocol — NO Firebase dependency.
 // ============================================================================
 
-const CACHE_NAME = 'aafiatak-v2';
-const STATIC_CACHE = 'aafiatak-static-v2';
-const API_CACHE_NAME = 'aafiatak-api-v2';
+const CACHE_NAME = 'aafiatak-v3';
+const STATIC_CACHE = 'aafiatak-static-v3';
+const API_CACHE_NAME = 'aafiatak-api-v3';
 const API_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Assets to pre-cache
@@ -17,13 +17,17 @@ const PRECACHE_URLS = [
   '/icons/icon-192x192.png',
   '/icons/icon-512x512.png',
   '/manifest.json',
+  '/sounds/notification.mp3',
+  '/sounds/emergency.mp3',
+  '/sounds/chat.mp3',
+  '/sounds/success.mp3',
+  '/sounds/error.mp3',
 ];
 
 // ============================================================================
 // INSTALL & ACTIVATE
 // ============================================================================
 
-// Install event - pre-cache static assets
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(STATIC_CACHE).then((cache) => {
@@ -35,7 +39,6 @@ self.addEventListener('install', (event) => {
   self.skipWaiting();
 });
 
-// Activate event - clean old caches
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((cacheNames) => {
@@ -57,25 +60,19 @@ self.addEventListener('fetch', (event) => {
   const { request } = event;
   const url = new URL(request.url);
 
-  // Skip non-GET requests
   if (request.method !== 'GET') return;
-
-  // Skip chrome-extension and other non-http requests
   if (!url.protocol.startsWith('http')) return;
 
-  // API requests: network-first with cache fallback
   if (url.pathname.startsWith('/api/')) {
     event.respondWith(networkFirstWithCache(request));
     return;
   }
 
-  // Navigation requests: network-first with offline fallback
   if (request.mode === 'navigate') {
     event.respondWith(navigationHandler(request));
     return;
   }
 
-  // Static assets: cache-first with network fallback
   event.respondWith(cacheFirstWithNetwork(request));
 });
 
@@ -139,7 +136,6 @@ async function cacheFirstWithNetwork(request) {
 // PUSH NOTIFICATION HANDLING
 // ============================================================================
 
-// Vibration patterns by priority (milliseconds)
 const VIBRATIONS = {
   urgent: [500, 200, 500, 200, 500, 200, 500],
   high: [300, 100, 300, 100, 300],
@@ -147,7 +143,6 @@ const VIBRATIONS = {
   low: [100],
 };
 
-// Route mapping for notification types
 const ROUTE_MAP = {
   service_request: '/nurse',
   service_assigned: '/nurse',
@@ -172,14 +167,10 @@ const ROUTE_MAP = {
   promotion: '/beneficiary',
 };
 
-/**
- * Get URL for notification click based on type and user role
- */
 function getNotificationUrl(data) {
   if (data?.url) return data.url;
   if (data?.type) {
     const basePath = ROUTE_MAP[data.type] || '/';
-    // Add role prefix if not already present
     if (data.userRole === 'nurse' && !basePath.startsWith('/nurse')) {
       return '/nurse' + basePath;
     }
@@ -191,9 +182,6 @@ function getNotificationUrl(data) {
   return '/';
 }
 
-/**
- * Get action buttons based on notification type
- */
 function getNotificationActions(type, priority) {
   switch (type) {
     case 'service_request':
@@ -222,8 +210,9 @@ function getNotificationActions(type, priority) {
 }
 
 /**
- * Push event handler — the core of Web Push notifications.
- * This fires even when the app is closed (background push).
+ * Push event handler — fires even when the app is closed (background push).
+ * IMPORTANT: This shows the browser notification AND sends a message to
+ * any open app windows so they can play the notification sound.
  */
 self.addEventListener('push', (event) => {
   let payload = {
@@ -250,31 +239,52 @@ self.addEventListener('push', (event) => {
   const priority = payload.priority || 'medium';
   const vibrate = VIBRATIONS[priority] || VIBRATIONS.medium;
 
-  // Build notification options
-  const options = {
-    body: payload.body,
-    icon: payload.icon,
-    badge: payload.badge,
-    image: payload.image,
-    vibrate,
-    tag: payload.tag || `aafiatak-${payload.type}-${Date.now()}`,
-    data: {
-      ...payload.data,
-      type: payload.type,
-      priority,
-      url: getNotificationUrl(payload.data || {}),
-      userRole: payload.data?.userRole || payload.userRole,
-      timestamp: Date.now(),
-    },
-    dir: 'rtl',
-    lang: 'ar',
-    requireInteraction: priority === 'urgent' || priority === 'high',
-    silent: false,
-    actions: getNotificationActions(payload.type, priority),
-  };
-
+  // ── KEY FIX: Send message to ALL open app windows ──
+  // This allows the foreground app to play the notification sound
   event.waitUntil(
-    self.registration.showNotification(payload.title, options)
+    (async () => {
+      // 1. Send message to all open windows so they can play sound
+      const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of allClients) {
+        client.postMessage({
+          type: 'PUSH_NOTIFICATION_RECEIVED',
+          payload: {
+            title: payload.title,
+            body: payload.body,
+            type: payload.type,
+            priority: priority,
+            sound: payload.sound !== false,
+            data: payload.data,
+          },
+        });
+      }
+
+      // 2. Show browser notification (this handles the case when app is in background/closed)
+      //    With silent: false, the OS will play its default notification sound
+      const options = {
+        body: payload.body,
+        icon: payload.icon,
+        badge: payload.badge,
+        image: payload.image,
+        vibrate,
+        tag: payload.tag || `aafiatak-${payload.type}-${Date.now()}`,
+        data: {
+          ...payload.data,
+          type: payload.type,
+          priority,
+          url: getNotificationUrl(payload.data || {}),
+          userRole: payload.data?.userRole || payload.userRole,
+          timestamp: Date.now(),
+        },
+        dir: 'rtl',
+        lang: 'ar',
+        requireInteraction: priority === 'urgent' || priority === 'high',
+        silent: false,  // Important: lets the OS play default notification sound
+        actions: getNotificationActions(payload.type, priority),
+      };
+
+      await self.registration.showNotification(payload.title, options);
+    })()
   );
 });
 
@@ -289,23 +299,19 @@ self.addEventListener('notificationclick', (event) => {
   const action = event.action;
   const url = data.url || '/';
 
-  // Handle action buttons
   if (action === 'accept' || action === 'respond') {
     event.waitUntil(clients.openWindow(url + '?action=' + action));
     return;
   }
 
   if (action === 'reject') {
-    // Just close, no navigation needed
     return;
   }
 
-  // Default: open/focus the app window
   event.waitUntil(
     clients
       .matchAll({ type: 'window', includeUncontrolled: true })
       .then((windowClients) => {
-        // Focus existing window if available
         for (const client of windowClients) {
           if (
             client.url.includes(self.location.origin) &&
@@ -315,7 +321,6 @@ self.addEventListener('notificationclick', (event) => {
             return client.focus();
           }
         }
-        // Open new window
         return clients.openWindow(url);
       })
   );
@@ -331,12 +336,9 @@ self.addEventListener('pushsubscriptionchange', (event) => {
       try {
         const subscription = await self.registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: self.registration.pushManager
-            ? undefined // Will use existing VAPID key
-            : undefined,
+          applicationServerKey: undefined,
         });
 
-        // Send new subscription to server
         await fetch('/api/push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },

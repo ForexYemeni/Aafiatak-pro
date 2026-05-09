@@ -207,11 +207,13 @@ export const useNotificationStore = create<NotificationState>()(
       setBrowserNotificationsEnabled: (enabled: boolean) => {
         if (enabled) {
           // Request permission when enabling
-          notificationManager.requestPermission().then((permission) => {
-            set({
-              browserNotificationsEnabled: permission === 'granted',
+          if (typeof window !== 'undefined' && 'Notification' in window) {
+            Notification.requestPermission().then((permission) => {
+              set({
+                browserNotificationsEnabled: permission === 'granted',
+              });
             });
-          });
+          }
         } else {
           set({ browserNotificationsEnabled: false });
         }
