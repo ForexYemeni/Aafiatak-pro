@@ -23,7 +23,6 @@ import {
   Shield,
   UserCog,
   UserCircle,
-  MapPin,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -52,7 +51,6 @@ const adminNavItems: NavItem[] = [
   { label: 'المستفيدون', href: '/admin/beneficiaries', icon: Users, permission: 'manage_beneficiaries' },
   { label: 'الطلبات', href: '/admin/orders', icon: ClipboardList, permission: 'manage_orders' },
   { label: 'الطوارئ', href: '/admin/emergencies', icon: AlertTriangle, permission: 'manage_emergencies', badge: 0 },
-  { label: 'الخريطة', href: '/admin/map', icon: MapPin, permission: 'manage_emergencies' },
   { label: 'المدفوعات', href: '/admin/payments', icon: CreditCard, permission: 'manage_payments' },
   { label: 'الكوبونات', href: '/admin/coupons', icon: Tags, permission: 'manage_payments' },
   { label: 'التقييمات', href: '/admin/ratings', icon: Star, permission: 'view_reports' },

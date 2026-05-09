@@ -139,7 +139,7 @@ export async function POST(request: NextRequest) {
 
     const results: string[] = [];
 
-    // 1. Create Default Admin
+    // 1. Create Default Admin (or reset password if exists)
     const existingAdmin = await User.findOne({ role: 'admin' });
     if (!existingAdmin) {
       const hashedPassword = await hashPassword('Admin@123');
@@ -152,7 +152,14 @@ export async function POST(request: NextRequest) {
       });
       results.push('تم إنشاء حساب المدير الافتراضي (700000000 / Admin@123)');
     } else {
-      results.push('حساب المدير موجود بالفعل');
+      // Reset admin password to ensure known credentials
+      const hashedPassword = await hashPassword('Admin@123');
+      await User.findByIdAndUpdate(existingAdmin._id, {
+        password: hashedPassword,
+        phone: '700000000',
+        isActive: true,
+      });
+      results.push('تم تحديث كلمة مرور المدير (700000000 / Admin@123)');
     }
 
     // 2. Create Default Services (106 services)
