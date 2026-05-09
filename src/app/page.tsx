@@ -1206,41 +1206,6 @@ function LoginPageContent() {
   );
 
   // ============================================================================
-  // Smart login notice component
-  // ============================================================================
-  const SmartLoginNotice = ({ variant = 'light' }: { variant?: 'light' | 'dark' }) => (
-    <motion.div
-      initial={{ opacity: 0, y: -10 }}
-      animate={{ opacity: 1, y: 0 }}
-      className={cn(
-        'rounded-xl p-3 border',
-        variant === 'light'
-          ? 'bg-gradient-to-l from-teal-50 via-emerald-50/50 to-violet-50 border-teal-200/60'
-          : 'bg-gradient-to-l from-violet-500/10 via-purple-500/5 to-fuchsia-500/10 border-purple-500/15'
-      )}
-    >
-      <div className="flex items-center gap-2.5">
-        <div className={cn(
-          'w-8 h-8 rounded-lg flex items-center justify-center shrink-0',
-          variant === 'light'
-            ? 'bg-gradient-to-br from-teal-100 to-violet-100'
-            : 'bg-gradient-to-br from-violet-500/20 to-purple-500/20'
-        )}>
-          <Sparkles className={cn('w-4 h-4', variant === 'light' ? 'text-teal-600' : 'text-purple-300')} />
-        </div>
-        <div>
-          <p className={cn('text-xs font-semibold', variant === 'light' ? 'text-slate-700' : 'text-white/80')}>
-            تسجيل دخول ذكي
-          </p>
-          <p className={cn('text-[10px]', variant === 'light' ? 'text-slate-400' : 'text-white/40')}>
-            سيتعرف النظام تلقائياً على نوع حسابك
-          </p>
-        </div>
-      </div>
-    </motion.div>
-  );
-
-  // ============================================================================
   // Render
   // ============================================================================
 
@@ -1264,20 +1229,27 @@ function LoginPageContent() {
         </div>
 
         {/* RIGHT PANEL - Form (45%) */}
-        <div className="w-[45%] bg-[#FAFBFC] relative flex items-center justify-center overflow-y-auto">
-          <div className="w-full max-w-[440px] mx-auto px-8 py-10">
+        <div className="w-[45%] relative flex items-center justify-center overflow-y-auto">
+          {/* Subtle gradient background */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#FAFBFC] via-[#f0fdf9]/30 to-[#faf5ff]/20" />
+          
+          <div className="w-full max-w-[440px] mx-auto px-8 py-10 relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
+              className="login-form-container p-7"
             >
-              {/* Greeting */}
+              {/* Brand header inside form */}
               <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="mb-8"
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.1, duration: 0.4 }}
+                className="login-brand-header"
               >
+                <div className="login-brand-icon mx-auto">
+                  <Heart className="w-5 h-5 text-teal-600" fill="currentColor" />
+                </div>
                 <h2 className="text-2xl font-black text-slate-900 mb-1">
                   {activeTab === 'login' ? 'مرحباً بعودتك' : 'حساب جديد'}
                 </h2>
@@ -1285,6 +1257,13 @@ function LoginPageContent() {
                   {activeTab === 'login' ? 'سجّل دخولك للمتابعة إلى عافيتك' : 'أنشئ حسابك وابدأ رحلتك الصحية'}
                 </p>
               </motion.div>
+
+              {/* Elegant divider */}
+              <div className="login-divider login-divider-light mb-6">
+                <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider px-2">
+                  {activeTab === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب'}
+                </span>
+              </div>
 
               {/* Toggle */}
               <motion.div
@@ -1314,18 +1293,28 @@ function LoginPageContent() {
                     onSubmit={loginForm.handleSubmit(onLoginSubmit)}
                     className="space-y-4"
                   >
-                    <SmartLoginNotice variant="light" />
-
-                    <PremiumInput
-                      id="login-phone"
-                      label="رقم الهاتف"
-                      icon={Phone}
-                      type="tel"
-                      dir="ltr"
-                      variant="light"
-                      registration={loginForm.register('phone')}
-                      error={loginForm.formState.errors.phone?.message}
-                    />
+                    {/* Phone input with +967 prefix */}
+                    <div className="phone-input-wrapper">
+                      <div className="phone-prefix phone-prefix-light">
+                        <span className="yemen-flag">
+                          <span className="yemen-flag-top" />
+                          <span className="yemen-flag-mid" />
+                          <span className="yemen-flag-bot" />
+                        </span>
+                        <span>+967</span>
+                      </div>
+                      <PremiumInput
+                        id="login-phone"
+                        label="رقم الهاتف"
+                        icon={Phone}
+                        type="tel"
+                        dir="ltr"
+                        variant="light"
+                        registration={loginForm.register('phone')}
+                        error={loginForm.formState.errors.phone?.message}
+                        className="!pl-[100px]"
+                      />
+                    </div>
 
                     <PremiumInput
                       id="login-password"
@@ -1348,7 +1337,7 @@ function LoginPageContent() {
                         <input
                           type="checkbox"
                           id="remember"
-                          className="h-3.5 w-3.5 rounded border-slate-300 bg-white text-teal-600 focus:ring-teal-500/30"
+                          className="premium-checkbox-light"
                         />
                         <Label htmlFor="remember" className="text-xs font-normal cursor-pointer text-slate-500">تذكرني</Label>
                       </div>
@@ -1357,12 +1346,14 @@ function LoginPageContent() {
                       </button>
                     </div>
 
-                    <PremiumButton loading={isLoading} disabled={isLoading}>
-                      <span className="flex items-center gap-2 justify-center">
-                        تسجيل الدخول
-                        <ArrowLeft className="w-4 h-4" />
-                      </span>
-                    </PremiumButton>
+                    <div className="pt-1">
+                      <PremiumButton loading={isLoading} disabled={isLoading} className="premium-btn-elevated">
+                        <span className="flex items-center gap-2 justify-center">
+                          تسجيل الدخول
+                          <ArrowLeft className="w-4 h-4" />
+                        </span>
+                      </PremiumButton>
+                    </div>
                   </motion.form>
                 )}
               </AnimatePresence>
@@ -1378,6 +1369,20 @@ function LoginPageContent() {
                     transition={{ duration: 0.3 }}
                     className="space-y-4"
                   >
+                    {/* Step indicator */}
+                    <div className="reg-step-indicator px-2">
+                      <div className={cn('reg-step-dot', registerRole === 'beneficiary' ? 'reg-step-dot-active-light' : 'reg-step-dot-active-light')} />
+                      <div className={cn('reg-step-line', 'reg-step-line-active-light')} />
+                      <div className={cn('reg-step-dot', registerRole === 'beneficiary' ? 'reg-step-dot-active-light' : 'reg-step-dot-active-light')} />
+                      <div className={cn('reg-step-line', 'reg-step-line-inactive-light')} />
+                      <div className="reg-step-dot reg-step-dot-inactive-light" />
+                    </div>
+                    <div className="flex justify-between px-1 -mt-1 mb-1">
+                      <span className="text-[9px] font-semibold text-teal-600">نوع الحساب</span>
+                      <span className="text-[9px] font-semibold text-teal-600">البيانات</span>
+                      <span className="text-[9px] font-medium text-slate-300">تأكيد</span>
+                    </div>
+
                     {/* Role selector */}
                     <div className="grid grid-cols-2 gap-3">
                       <PremiumRoleCard
@@ -1415,7 +1420,7 @@ function LoginPageContent() {
                           className="space-y-3"
                         >
                           {/* Personal info */}
-                          <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-100 space-y-3">
+                          <div className="form-section-card-light space-y-3">
                             <FormSectionHeader icon={User} title="المعلومات الشخصية" color="text-teal-600" variant="light" />
                             <PremiumInput
                               id="ben-name"
@@ -1425,20 +1430,32 @@ function LoginPageContent() {
                               registration={beneficiaryForm.register('name')}
                               error={beneficiaryForm.formState.errors.name?.message}
                             />
-                            <PremiumInput
-                              id="ben-phone"
-                              label="رقم الهاتف"
-                              icon={Phone}
-                              type="tel"
-                              dir="ltr"
-                              variant="light"
-                              registration={beneficiaryForm.register('phone')}
-                              error={beneficiaryForm.formState.errors.phone?.message}
-                            />
+                            {/* Phone input with +967 prefix */}
+                            <div className="phone-input-wrapper">
+                              <div className="phone-prefix phone-prefix-light">
+                                <span className="yemen-flag">
+                                  <span className="yemen-flag-top" />
+                                  <span className="yemen-flag-mid" />
+                                  <span className="yemen-flag-bot" />
+                                </span>
+                                <span>+967</span>
+                              </div>
+                              <PremiumInput
+                                id="ben-phone"
+                                label="رقم الهاتف"
+                                icon={Phone}
+                                type="tel"
+                                dir="ltr"
+                                variant="light"
+                                registration={beneficiaryForm.register('phone')}
+                                error={beneficiaryForm.formState.errors.phone?.message}
+                                className="!pl-[100px]"
+                              />
+                            </div>
                           </div>
 
                           {/* Location info */}
-                          <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-100 space-y-3">
+                          <div className="form-section-card-light space-y-3">
                             <FormSectionHeader icon={MapPin} title="معلومات الموقع" color="text-teal-600" variant="light" />
                             <GpsLocationButton
                               onLocationDetected={(loc) => {
@@ -1471,7 +1488,7 @@ function LoginPageContent() {
                           </div>
 
                           {/* Security */}
-                          <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-100 space-y-3">
+                          <div className="form-section-card-light space-y-3">
                             <FormSectionHeader icon={Lock} title="الأمان" color="text-amber-600" variant="light" />
                             <PremiumInput
                               id="ben-password"
@@ -1489,12 +1506,14 @@ function LoginPageContent() {
                             <PasswordStrengthBar password={beneficiaryPasswordValue} variant="light" />
                           </div>
 
-                          <PremiumButton loading={isLoading} disabled={isLoading}>
-                            <span className="flex items-center gap-2 justify-center">
-                              <CheckCircle2 className="w-4 h-4" />
-                              إنشاء حساب مستفيد
-                            </span>
-                          </PremiumButton>
+                          <div className="pt-1">
+                            <PremiumButton loading={isLoading} disabled={isLoading} className="premium-btn-elevated">
+                              <span className="flex items-center gap-2 justify-center">
+                                <CheckCircle2 className="w-4 h-4" />
+                                إنشاء حساب مستفيد
+                              </span>
+                            </PremiumButton>
+                          </div>
                         </motion.form>
                       )}
 
@@ -1510,7 +1529,7 @@ function LoginPageContent() {
                           className="space-y-3 max-h-[55vh] overflow-y-auto custom-scrollbar pl-1"
                         >
                           {/* Personal info */}
-                          <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-100 space-y-3">
+                          <div className="form-section-card-light space-y-3">
                             <FormSectionHeader icon={User} title="المعلومات الشخصية" color="text-sky-600" variant="light" />
                             <motion.div
                               className="relative"
@@ -1540,20 +1559,32 @@ function LoginPageContent() {
                             {nurseForm.formState.errors.name && !nurseNameWarning && (
                               <p className="text-xs text-red-500">{nurseForm.formState.errors.name.message}</p>
                             )}
-                            <PremiumInput
-                              id="nurse-phone"
-                              label="رقم الهاتف"
-                              icon={Phone}
-                              type="tel"
-                              dir="ltr"
-                              variant="light"
-                              registration={nurseForm.register('phone')}
-                              error={nurseForm.formState.errors.phone?.message}
-                            />
+                            {/* Phone input with +967 prefix */}
+                            <div className="phone-input-wrapper">
+                              <div className="phone-prefix phone-prefix-light">
+                                <span className="yemen-flag">
+                                  <span className="yemen-flag-top" />
+                                  <span className="yemen-flag-mid" />
+                                  <span className="yemen-flag-bot" />
+                                </span>
+                                <span>+967</span>
+                              </div>
+                              <PremiumInput
+                                id="nurse-phone"
+                                label="رقم الهاتف"
+                                icon={Phone}
+                                type="tel"
+                                dir="ltr"
+                                variant="light"
+                                registration={nurseForm.register('phone')}
+                                error={nurseForm.formState.errors.phone?.message}
+                                className="!pl-[100px]"
+                              />
+                            </div>
                           </div>
 
                           {/* Professional info */}
-                          <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-100 space-y-3">
+                          <div className="form-section-card-light space-y-3">
                             <FormSectionHeader icon={Stethoscope} title="المعلومات المهنية" color="text-violet-600" variant="light" />
                             <div className="space-y-1.5">
                               <Label className="text-xs text-slate-500">التخصص</Label>
@@ -1582,7 +1613,7 @@ function LoginPageContent() {
                           </div>
 
                           {/* Location info */}
-                          <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-100 space-y-3">
+                          <div className="form-section-card-light space-y-3">
                             <FormSectionHeader icon={MapPin} title="معلومات الموقع" color="text-teal-600" variant="light" />
                             <GpsLocationButton
                               onLocationDetected={(loc) => {
@@ -1607,7 +1638,7 @@ function LoginPageContent() {
                           </div>
 
                           {/* Security */}
-                          <div className="bg-slate-50/80 rounded-xl p-3.5 border border-slate-100 space-y-3">
+                          <div className="form-section-card-light space-y-3">
                             <FormSectionHeader icon={Lock} title="الأمان" color="text-amber-600" variant="light" />
                             <PremiumInput
                               id="nurse-password"
@@ -1736,19 +1767,28 @@ function LoginPageContent() {
                       onSubmit={loginForm.handleSubmit(onLoginSubmit)}
                       className="space-y-3"
                     >
-                      <SmartLoginNotice variant="dark" />
-
-                      <PremiumInput
-                        id="m-login-phone"
-                        label="رقم الهاتف"
-                        icon={Phone}
-                        type="tel"
-                        dir="ltr"
-                        variant="dark"
-                        registration={loginForm.register('phone')}
-                        error={loginForm.formState.errors.phone?.message}
-                        className="h-11"
-                      />
+                      {/* Phone input with +967 prefix */}
+                      <div className="phone-input-wrapper">
+                        <div className="phone-prefix phone-prefix-dark">
+                          <span className="yemen-flag">
+                            <span className="yemen-flag-top" />
+                            <span className="yemen-flag-mid" />
+                            <span className="yemen-flag-bot" />
+                          </span>
+                          <span>+967</span>
+                        </div>
+                        <PremiumInput
+                          id="m-login-phone"
+                          label="رقم الهاتف"
+                          icon={Phone}
+                          type="tel"
+                          dir="ltr"
+                          variant="dark"
+                          registration={loginForm.register('phone')}
+                          error={loginForm.formState.errors.phone?.message}
+                          className="!pl-[90px] h-11"
+                        />
+                      </div>
 
                       <PremiumInput
                         id="m-login-password"
@@ -1769,13 +1809,13 @@ function LoginPageContent() {
 
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-1.5">
-                          <input type="checkbox" id="m-remember" className="h-3.5 w-3.5 rounded border-white/20 bg-white/10 text-teal-500 focus:ring-teal-500/30" />
+                          <input type="checkbox" id="m-remember" className="premium-checkbox-dark" />
                           <Label htmlFor="m-remember" className="text-[11px] font-normal cursor-pointer text-white/40">تذكرني</Label>
                         </div>
                         <button type="button" className="text-[11px] text-teal-400/70 hover:text-teal-300 transition-colors">نسيت كلمة المرور؟</button>
                       </div>
 
-                      <PremiumButton loading={isLoading} disabled={isLoading}>
+                      <PremiumButton loading={isLoading} disabled={isLoading} className="premium-btn-elevated">
                         <span className="flex items-center gap-2 justify-center text-sm">
                           تسجيل الدخول
                           <ArrowLeft className="w-4 h-4" />
@@ -1796,6 +1836,20 @@ function LoginPageContent() {
                       transition={{ duration: 0.25 }}
                       className="space-y-3"
                     >
+                      {/* Step indicator */}
+                      <div className="reg-step-indicator px-1">
+                        <div className="reg-step-dot reg-step-dot-active-dark" />
+                        <div className="reg-step-line reg-step-line-active-dark" />
+                        <div className="reg-step-dot reg-step-dot-active-dark" />
+                        <div className="reg-step-line reg-step-line-inactive-dark" />
+                        <div className="reg-step-dot reg-step-dot-inactive-dark" />
+                      </div>
+                      <div className="flex justify-between px-1 -mt-0.5 mb-1">
+                        <span className="text-[8px] font-semibold text-teal-400">نوع الحساب</span>
+                        <span className="text-[8px] font-semibold text-teal-400">البيانات</span>
+                        <span className="text-[8px] font-medium text-white/25">تأكيد</span>
+                      </div>
+
                       {/* Role selector */}
                       <div className="grid grid-cols-2 gap-2">
                         <PremiumRoleCard
@@ -1832,7 +1886,7 @@ function LoginPageContent() {
                             onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)}
                             className="space-y-2.5"
                           >
-                            <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                            <div className="form-section-card-dark space-y-2.5">
                               <FormSectionHeader icon={User} title="المعلومات الشخصية" color="text-teal-400" variant="dark" />
                               <PremiumInput
                                 id="m-ben-name"
@@ -1843,20 +1897,31 @@ function LoginPageContent() {
                                 error={beneficiaryForm.formState.errors.name?.message}
                                 className="h-10"
                               />
-                              <PremiumInput
-                                id="m-ben-phone"
-                                label="رقم الهاتف"
-                                icon={Phone}
-                                type="tel"
-                                dir="ltr"
-                                variant="dark"
-                                registration={beneficiaryForm.register('phone')}
-                                error={beneficiaryForm.formState.errors.phone?.message}
-                                className="h-10"
-                              />
+                              {/* Phone with +967 prefix */}
+                              <div className="phone-input-wrapper">
+                                <div className="phone-prefix phone-prefix-dark">
+                                  <span className="yemen-flag">
+                                    <span className="yemen-flag-top" />
+                                    <span className="yemen-flag-mid" />
+                                    <span className="yemen-flag-bot" />
+                                  </span>
+                                  <span>+967</span>
+                                </div>
+                                <PremiumInput
+                                  id="m-ben-phone"
+                                  label="رقم الهاتف"
+                                  icon={Phone}
+                                  type="tel"
+                                  dir="ltr"
+                                  variant="dark"
+                                  registration={beneficiaryForm.register('phone')}
+                                  error={beneficiaryForm.formState.errors.phone?.message}
+                                  className="!pl-[85px] h-10"
+                                />
+                              </div>
                             </div>
 
-                            <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                            <div className="form-section-card-dark space-y-2.5">
                               <FormSectionHeader icon={MapPin} title="معلومات الموقع" color="text-teal-400" variant="dark" />
                               <GpsLocationButton
                                 onLocationDetected={(loc) => {
@@ -1890,7 +1955,7 @@ function LoginPageContent() {
                               />
                             </div>
 
-                            <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                            <div className="form-section-card-dark space-y-2.5">
                               <FormSectionHeader icon={Lock} title="الأمان" color="text-amber-400" variant="dark" />
                               <PremiumInput
                                 id="m-ben-password"
@@ -1909,7 +1974,7 @@ function LoginPageContent() {
                               <PasswordStrengthBar password={beneficiaryPasswordValue} variant="dark" />
                             </div>
 
-                            <PremiumButton loading={isLoading} disabled={isLoading}>
+                            <PremiumButton loading={isLoading} disabled={isLoading} className="premium-btn-elevated">
                               <span className="flex items-center gap-2 justify-center text-sm">
                                 <CheckCircle2 className="w-4 h-4" />
                                 إنشاء حساب مستفيد
@@ -1929,7 +1994,7 @@ function LoginPageContent() {
                             onSubmit={nurseForm.handleSubmit(onNurseRegister)}
                             className="space-y-2.5 max-h-[58vh] overflow-y-auto custom-scrollbar pl-1"
                           >
-                            <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                            <div className="form-section-card-dark space-y-2.5">
                               <FormSectionHeader icon={User} title="المعلومات الشخصية" color="text-sky-400" variant="dark" />
                               <motion.div
                                 animate={nurseNameShake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
@@ -1958,20 +2023,31 @@ function LoginPageContent() {
                               {nurseForm.formState.errors.name && !nurseNameWarning && (
                                 <p className="text-xs text-red-400">{nurseForm.formState.errors.name.message}</p>
                               )}
-                              <PremiumInput
-                                id="m-nurse-phone"
-                                label="رقم الهاتف"
-                                icon={Phone}
-                                type="tel"
-                                dir="ltr"
-                                variant="dark"
-                                registration={nurseForm.register('phone')}
-                                error={nurseForm.formState.errors.phone?.message}
-                                className="h-10"
-                              />
+                              {/* Phone with +967 prefix */}
+                              <div className="phone-input-wrapper">
+                                <div className="phone-prefix phone-prefix-dark">
+                                  <span className="yemen-flag">
+                                    <span className="yemen-flag-top" />
+                                    <span className="yemen-flag-mid" />
+                                    <span className="yemen-flag-bot" />
+                                  </span>
+                                  <span>+967</span>
+                                </div>
+                                <PremiumInput
+                                  id="m-nurse-phone"
+                                  label="رقم الهاتف"
+                                  icon={Phone}
+                                  type="tel"
+                                  dir="ltr"
+                                  variant="dark"
+                                  registration={nurseForm.register('phone')}
+                                  error={nurseForm.formState.errors.phone?.message}
+                                  className="!pl-[85px] h-10"
+                                />
+                              </div>
                             </div>
 
-                            <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                            <div className="form-section-card-dark space-y-2.5">
                               <FormSectionHeader icon={Stethoscope} title="المعلومات المهنية" color="text-violet-400" variant="dark" />
                               <div className="space-y-1.5">
                                 <Label className="text-[10px] text-white/40">التخصص</Label>
@@ -2000,7 +2076,7 @@ function LoginPageContent() {
                               />
                             </div>
 
-                            <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                            <div className="form-section-card-dark space-y-2.5">
                               <FormSectionHeader icon={MapPin} title="معلومات الموقع" color="text-teal-400" variant="dark" />
                               <GpsLocationButton
                                 onLocationDetected={(loc) => {
@@ -2025,7 +2101,7 @@ function LoginPageContent() {
                               />
                             </div>
 
-                            <div className="bg-white/[0.04] rounded-xl p-2.5 border border-white/[0.06] space-y-2.5">
+                            <div className="form-section-card-dark space-y-2.5">
                               <FormSectionHeader icon={Lock} title="الأمان" color="text-amber-400" variant="dark" />
                               <PremiumInput
                                 id="m-nurse-password"
@@ -2044,7 +2120,7 @@ function LoginPageContent() {
                               <PasswordStrengthBar password={nursePasswordValue} variant="dark" />
                             </div>
 
-                            <PremiumButton loading={isLoading} disabled={isLoading} variant="nurse">
+                            <PremiumButton loading={isLoading} disabled={isLoading} variant="nurse" className="premium-btn-elevated">
                               <span className="flex items-center gap-2 justify-center text-sm">
                                 <CheckCircle2 className="w-4 h-4" />
                                 إنشاء حساب ممرض/ـة

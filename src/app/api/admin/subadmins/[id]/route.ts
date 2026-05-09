@@ -4,7 +4,7 @@
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { User } from '@/models/mongoose';
-import { hashPassword, createErrorResponse } from '@/lib/auth';
+import { hashPassword, verifyPassword, createErrorResponse } from '@/lib/auth';
 import { requireRole } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
@@ -69,6 +69,23 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
     await connectDB();
     const { user, error } = requireRole(request, ['admin']);
     if (error) return error;
+
+    // Verify admin password before allowing deletion
+    const body = await request.json();
+    const { adminPassword } = body;
+    if (!adminPassword) {
+      return createErrorResponse('يرجى إدخال كلمة مرور المدير', 400, 'MISSING_PASSWORD');
+    }
+
+    const adminUser = await User.findOne({ role: 'admin' }).select('+password').lean();
+    if (!adminUser) {
+      return createErrorResponse('لم يتم العثور على حساب المدير', 404, 'ADMIN_NOT_FOUND');
+    }
+
+    const isPasswordValid = await verifyPassword(adminPassword, adminUser.password);
+    if (!isPasswordValid) {
+      return createErrorResponse('كلمة مرور المدير غير صحيحة', 401, 'INVALID_PASSWORD');
+    }
 
     const { id } = await params;
     const subadmin = await User.findOneAndDelete({ _id: id, role: 'subadmin' }).lean();

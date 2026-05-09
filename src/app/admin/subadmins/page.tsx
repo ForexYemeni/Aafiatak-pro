@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Shield, Plus, Edit, RefreshCw, Users, ShieldCheck, ShieldX, Mail, Phone, Clock, Eye } from 'lucide-react';
+import { Shield, Plus, Edit, RefreshCw, Users, ShieldCheck, ShieldX, Mail, Phone, Clock, Eye, Trash2 } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
@@ -102,6 +102,11 @@ export default function AdminSubAdminsPage() {
   const [isSaving, setIsSaving] = useState(false);
 
   const [deactivateTarget, setDeactivateTarget] = useState<SubAdminItem | null>(null);
+
+  // Delete dialog state
+  const [deleteTarget, setDeleteTarget] = useState<SubAdminItem | null>(null);
+  const [adminPassword, setAdminPassword] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // View permissions dialog
   const [viewPermsTarget, setViewPermsTarget] = useState<SubAdminItem | null>(null);
@@ -220,6 +225,34 @@ export default function AdminSubAdminsPage() {
     setDialogOpen(true);
   };
 
+  const handleDelete = async () => {
+    if (!deleteTarget) return;
+    if (!adminPassword) {
+      toast.error('يرجى إدخال كلمة مرور المدير');
+      return;
+    }
+    setIsDeleting(true);
+    try {
+      const res = await authFetch(`/api/admin/subadmins/${deleteTarget.id}`, {
+        method: 'DELETE',
+        body: JSON.stringify({ adminPassword }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم حذف المدير الفرعي بنجاح');
+        setDeleteTarget(null);
+        setAdminPassword('');
+        void fetchSubAdmins();
+      } else {
+        toast.error(json.error?.message ?? json.message ?? 'فشل الحذف');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء الحذف');
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   const togglePermission = (perm: SubAdminPermission) => {
     setForm((prev) => ({
       ...prev,
@@ -318,6 +351,14 @@ export default function AdminSubAdminsPage() {
     {
       label: (row: Record<string, unknown>) => ((row as unknown as SubAdminItem).isActive ? 'تعطيل' : 'تفعيل'),
       onClick: (row: Record<string, unknown>) => setDeactivateTarget(row as unknown as SubAdminItem),
+      variant: 'destructive' as const,
+    },
+    {
+      label: 'حذف',
+      onClick: (row: Record<string, unknown>) => {
+        setDeleteTarget(row as unknown as SubAdminItem);
+        setAdminPassword('');
+      },
       variant: 'destructive' as const,
     },
   ];
@@ -518,6 +559,66 @@ export default function AdminSubAdminsPage() {
         variant={deactivateTarget?.isActive ? 'warning' : 'info'}
         onConfirm={handleDeactivate}
       />
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) { setDeleteTarget(null); setAdminPassword(''); } }}>
+        <DialogContent dir="rtl" className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 text-red-600">
+              <Trash2 className="w-5 h-5" />
+              حذف المدير الفرعي
+            </DialogTitle>
+            <DialogDescription>
+              هل أنت متأكد من حذف "{deleteTarget?.name ?? ''}"؟ لا يمكن التراجع عن هذا الإجراء.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div className="rounded-xl border border-red-200 dark:border-red-900/50 bg-red-50 dark:bg-red-950/20 p-4">
+              <p className="text-sm text-red-700 dark:text-red-400 font-medium">تأكيد كلمة مرور المدير</p>
+              <p className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">يرجى إدخال كلمة مرور المدير الرئيسي لتأكيد الحذف</p>
+            </div>
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">كلمة مرور المدير *</Label>
+              <Input
+                type="password"
+                value={adminPassword}
+                onChange={(e) => setAdminPassword(e.target.value)}
+                placeholder="أدخل كلمة مرور المدير"
+                dir="ltr"
+                className="bg-background/50"
+                disabled={isDeleting}
+              />
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setDeleteTarget(null); setAdminPassword(''); }}
+              disabled={isDeleting}
+            >
+              إلغاء
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDelete}
+              disabled={isDeleting || !adminPassword}
+              className="gap-2 min-w-32"
+            >
+              {isDeleting ? (
+                <>
+                  <RefreshCw className="w-4 h-4 animate-spin" />
+                  جارٍ الحذف...
+                </>
+              ) : (
+                <>
+                  <Trash2 className="w-4 h-4" />
+                  حذف
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

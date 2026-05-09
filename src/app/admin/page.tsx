@@ -132,79 +132,94 @@ export default function AdminDashboardPage() {
     setIsLoading(true);
     setError(null);
     try {
-      const res = await authFetch('/api/admin/dashboard');
-      const json = await res.json();
-      if (json.success && json.data) {
-        setDashboard(json.data);
+      // Parallel API calls for faster loading
+      const [dashboardRes, ordersRes, nursesRes, benRes] = await Promise.allSettled([
+        authFetch('/api/admin/dashboard'),
+        authFetch('/api/admin/orders?limit=5&page=1'),
+        authFetch('/api/admin/nurses?limit=3&page=1'),
+        authFetch('/api/admin/beneficiaries?limit=3&page=1'),
+      ]);
+
+      // Process dashboard data
+      if (dashboardRes.status === 'fulfilled') {
+        const json = await dashboardRes.value.json();
+        if (json.success && json.data) {
+          setDashboard(json.data);
+        } else {
+          setError(json.message ?? 'فشل تحميل البيانات');
+        }
       } else {
-        setError(json.message ?? 'فشل تحميل البيانات');
+        setError('فشل تحميل البيانات');
       }
 
-      try {
-        const ordersRes = await authFetch('/api/admin/orders?limit=5&page=1');
-        if (ordersRes.ok) {
-          const ordersJson = await ordersRes.json();
-          if (ordersJson.success && ordersJson.data) {
-            const ordersArray = ordersJson.data.orders ?? ordersJson.data;
-            const orders = (Array.isArray(ordersArray) ? ordersArray : []).map((o: Record<string, unknown>) => ({
-              id: String(o.id ?? o._id ?? ''),
-              beneficiaryName: String((o.beneficiary as Record<string, unknown>)?.name ?? (o as any).beneficiaryName ?? 'غير معروف'),
-              serviceName: String((o.service as Record<string, unknown>)?.nameAr ?? (o as any).serviceName ?? 'خدمة'),
-              status: String(o.status ?? 'pending'),
-              totalPrice: Number(o.totalPrice ?? o.basePrice ?? 0),
-              createdAt: String(o.createdAt ?? new Date().toISOString()),
-            }));
-            setRecentOrders(orders);
+      // Process orders
+      if (ordersRes.status === 'fulfilled') {
+        try {
+          const res = ordersRes.value;
+          if (res.ok) {
+            const ordersJson = await res.json();
+            if (ordersJson.success && ordersJson.data) {
+              const ordersArray = ordersJson.data.orders ?? ordersJson.data;
+              const orders = (Array.isArray(ordersArray) ? ordersArray : []).map((o: Record<string, unknown>) => ({
+                id: String(o.id ?? o._id ?? ''),
+                beneficiaryName: String((o.beneficiary as Record<string, unknown>)?.name ?? (o as any).beneficiaryName ?? 'غير معروف'),
+                serviceName: String((o.service as Record<string, unknown>)?.nameAr ?? (o as any).serviceName ?? 'خدمة'),
+                status: String(o.status ?? 'pending'),
+                totalPrice: Number(o.totalPrice ?? o.basePrice ?? 0),
+                createdAt: String(o.createdAt ?? new Date().toISOString()),
+              }));
+              setRecentOrders(orders);
+            }
           }
-        }
-      } catch {
-        // Permission denied or network error - skip orders section
+        } catch { /* skip */ }
       }
 
+      // Process nurses & beneficiaries
       const nurses: RecentRegistration[] = [];
-      try {
-        const nursesRes = await authFetch('/api/admin/nurses?limit=3&page=1');
-        if (nursesRes.ok) {
-          const nursesJson = await nursesRes.json();
-          if (nursesJson.success && nursesJson.data) {
-            const nursesArray = nursesJson.data.nurses ?? nursesJson.data;
-            const nursesList = Array.isArray(nursesArray) ? nursesArray : [];
-            for (const n of nursesList as Record<string, unknown>[]) {
-              nurses.push({
-                id: String(n.id ?? n._id ?? ''),
-                name: String(n.name ?? ''),
-                type: 'nurse',
-                status: String(n.verificationStatus ?? n.status ?? 'pending'),
-                createdAt: String(n.createdAt ?? new Date().toISOString()),
-              });
+      const beneficiaries: RecentRegistration[] = [];
+
+      if (nursesRes.status === 'fulfilled') {
+        try {
+          const res = nursesRes.value;
+          if (res.ok) {
+            const nursesJson = await res.json();
+            if (nursesJson.success && nursesJson.data) {
+              const nursesArray = nursesJson.data.nurses ?? nursesJson.data;
+              const nursesList = Array.isArray(nursesArray) ? nursesArray : [];
+              for (const n of nursesList as Record<string, unknown>[]) {
+                nurses.push({
+                  id: String(n.id ?? n._id ?? ''),
+                  name: String(n.name ?? ''),
+                  type: 'nurse',
+                  status: String(n.verificationStatus ?? n.status ?? 'pending'),
+                  createdAt: String(n.createdAt ?? new Date().toISOString()),
+                });
+              }
             }
           }
-        }
-      } catch {
-        // Permission denied or network error - skip nurses section
+        } catch { /* skip */ }
       }
 
-      const beneficiaries: RecentRegistration[] = [];
-      try {
-        const benRes = await authFetch('/api/admin/beneficiaries?limit=3&page=1');
-        if (benRes.ok) {
-          const benJson = await benRes.json();
-          if (benJson.success && benJson.data) {
-            const benArray = benJson.data.beneficiaries ?? benJson.data;
-            const benList = Array.isArray(benArray) ? benArray : [];
-            for (const b of benList as Record<string, unknown>[]) {
-              beneficiaries.push({
-                id: String(b.id ?? b._id ?? ''),
-                name: String(b.name ?? ''),
-                type: 'beneficiary',
-                status: String(b.status ?? 'active'),
-                createdAt: String(b.createdAt ?? new Date().toISOString()),
-              });
+      if (benRes.status === 'fulfilled') {
+        try {
+          const res = benRes.value;
+          if (res.ok) {
+            const benJson = await res.json();
+            if (benJson.success && benJson.data) {
+              const benArray = benJson.data.beneficiaries ?? benJson.data;
+              const benList = Array.isArray(benArray) ? benArray : [];
+              for (const b of benList as Record<string, unknown>[]) {
+                beneficiaries.push({
+                  id: String(b.id ?? b._id ?? ''),
+                  name: String(b.name ?? ''),
+                  type: 'beneficiary',
+                  status: String(b.status ?? 'active'),
+                  createdAt: String(b.createdAt ?? new Date().toISOString()),
+                });
+              }
             }
           }
-        }
-      } catch {
-        // Permission denied or network error - skip beneficiaries section
+        } catch { /* skip */ }
       }
 
       setRecentRegistrations(

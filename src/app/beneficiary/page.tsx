@@ -68,28 +68,6 @@ const categoryColors: Record<string, string> = {
   emergency: 'from-red-600 to-red-700',
 };
 
-const categoryIconBg: Record<string, string> = {
-  medical: 'bg-blue-100 dark:bg-blue-900/30',
-  nursing: 'bg-rose-100 dark:bg-rose-900/30',
-  physiotherapy: 'bg-emerald-100 dark:bg-emerald-900/30',
-  elderly_care: 'bg-amber-100 dark:bg-amber-900/30',
-  pediatric: 'bg-violet-100 dark:bg-violet-900/30',
-  post_surgery: 'bg-orange-100 dark:bg-orange-900/30',
-  lab: 'bg-cyan-100 dark:bg-cyan-900/30',
-  emergency: 'bg-red-100 dark:bg-red-900/30',
-};
-
-const categoryIconColor: Record<string, string> = {
-  medical: 'text-blue-600 dark:text-blue-400',
-  nursing: 'text-rose-600 dark:text-rose-400',
-  physiotherapy: 'text-emerald-600 dark:text-emerald-400',
-  elderly_care: 'text-amber-600 dark:text-amber-400',
-  pediatric: 'text-violet-600 dark:text-violet-400',
-  post_surgery: 'text-orange-600 dark:text-orange-400',
-  lab: 'text-cyan-600 dark:text-cyan-400',
-  emergency: 'text-red-600 dark:text-red-400',
-};
-
 const serviceIconMap: Record<string, React.ElementType> = {
   Stethoscope,
   Heart,
@@ -128,7 +106,11 @@ export default function BeneficiaryHomePage() {
       });
       const data: ApiResponse<Service[]> = await res.json();
       if (data.success && data.data) {
-        setServices(data.data);
+        const sorted = [...data.data].sort((a: Service, b: Service) => {
+          if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+          return a.nameAr.localeCompare(b.nameAr, 'ar');
+        });
+        setServices(sorted);
       }
     } catch {
       setServices([]);
@@ -321,27 +303,25 @@ export default function BeneficiaryHomePage() {
             {popularServices.map((service) => {
               const ServiceIcon = getServiceIcon(service.icon);
               const isSelected = selectedServices.has(service.id);
-              const catColor = categoryIconBg[service.category] || 'bg-beneficiary/10';
-              const iconColor = categoryIconColor[service.category] || 'text-beneficiary';
+              const gradient = categoryColors[service.category] || 'from-gray-400 to-gray-500';
               return (
                 <motion.div
                   key={service.id}
                   whileTap={{ scale: 0.97 }}
-                  className={`shrink-0 w-44 rounded-2xl border-2 transition-all cursor-pointer ${
-                    isSelected ? 'border-beneficiary bg-beneficiary/5' : 'border-transparent bg-card shadow-sm hover:shadow-md'
+                  className={`shrink-0 w-44 rounded-2xl border-2 transition-all duration-200 cursor-pointer ${
+                    isSelected ? 'border-beneficiary bg-beneficiary/5 shadow-md' : 'border-transparent bg-card shadow-sm hover:shadow-md hover:-translate-y-0.5'
                   }`}
                   onClick={() => toggleService(service.id)}
                 >
                   <div className="p-4 space-y-3">
-                    <div className={`w-12 h-12 rounded-xl ${catColor} flex items-center justify-center`}>
-                      <ServiceIcon className={`w-6 h-6 ${iconColor}`} />
+                    <div className={`w-12 h-12 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-sm`}>
+                      <ServiceIcon className="w-6 h-6 text-white" />
                     </div>
                     <div>
                       <h3 className="font-semibold text-sm leading-tight line-clamp-2">{service.nameAr}</h3>
-                      <div className="flex items-center gap-1 mt-1">
-                        <Clock className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">{service.duration ? `${toArabicNum(service.duration)} دقيقة` : ''}</span>
-                      </div>
+                      {service.isEmergency && (
+                        <span className="text-[10px] text-red-500 font-medium mt-1 block">طوارئ</span>
+                      )}
                     </div>
                     <div className="flex items-center justify-between">
                       <Currency amount={service.basePrice} className="text-sm font-bold" />
@@ -385,8 +365,7 @@ export default function BeneficiaryHomePage() {
             {services.map((service, index) => {
               const ServiceIcon = getServiceIcon(service.icon);
               const isSelected = selectedServices.has(service.id);
-              const catColor = categoryIconBg[service.category] || 'bg-beneficiary/10';
-              const iconColor = categoryIconColor[service.category] || 'text-beneficiary';
+              const gradient = categoryColors[service.category] || 'from-gray-400 to-gray-500';
               return (
                 <motion.div
                   key={service.id}
@@ -398,38 +377,39 @@ export default function BeneficiaryHomePage() {
                 >
                   <GlassCard
                     variant="beneficiary"
-                    className={`flex flex-col items-center text-center gap-3 h-full cursor-pointer transition-all group relative ${
-                      isSelected ? 'ring-2 ring-beneficiary bg-beneficiary/5' : 'hover:shadow-lg'
+                    className={`flex flex-col items-center text-center gap-3 h-full cursor-pointer transition-all duration-200 group relative rounded-2xl ${
+                      isSelected ? 'ring-2 ring-beneficiary bg-beneficiary/5 shadow-md' : 'hover:shadow-lg hover:-translate-y-0.5'
                     }`}
                     onClick={() => toggleService(service.id)}
                   >
                     {/* Selection indicator */}
-                    <div className={`absolute top-2 left-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                      isSelected ? 'border-beneficiary bg-beneficiary' : 'border-muted-foreground/30'
+                    <div className={`absolute top-2 left-2 w-6 h-6 rounded-full border-2 flex items-center justify-center transition-all duration-200 ${
+                      isSelected ? 'border-beneficiary bg-beneficiary scale-100' : 'border-muted-foreground/30 scale-90'
                     }`}>
-                      {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-beneficiary-foreground" />}
+                      {isSelected && <CheckCircle2 className="w-4 h-4 text-beneficiary-foreground" />}
                     </div>
 
-                    <div className={`w-14 h-14 rounded-2xl ${catColor} flex items-center justify-center group-hover:scale-110 transition-transform`}>
-                      <ServiceIcon className={`w-7 h-7 ${iconColor}`} />
+                    {/* Emergency badge */}
+                    {service.isEmergency && (
+                      <div className="absolute top-2 right-2">
+                        <Badge variant="destructive" className="text-[9px] px-1.5 py-0">طوارئ</Badge>
+                      </div>
+                    )}
+
+                    <div className={`w-14 h-14 rounded-2xl bg-gradient-to-br ${gradient} flex items-center justify-center group-hover:scale-110 transition-transform duration-200 shadow-sm`}>
+                      <ServiceIcon className="w-7 h-7 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      <h3 className="font-semibold text-sm leading-tight mb-1 line-clamp-2">
+                      <h3 className="font-semibold text-sm leading-tight line-clamp-2">
                         {service.nameAr}
                       </h3>
-                      <div className="flex items-center justify-center gap-1">
-                        <Clock className="w-3 h-3 text-muted-foreground" />
-                        <span className="text-xs text-muted-foreground">
-                          {service.duration ? `${toArabicNum(service.duration)} دقيقة` : ''}
-                        </span>
-                      </div>
                     </div>
                     <div className="flex items-center justify-between w-full gap-2 pt-2 border-t border-border/30">
                       <Currency amount={service.basePrice} className="text-sm font-bold" />
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                      <span className={`text-[10px] px-2.5 py-1 rounded-full font-medium transition-colors duration-200 ${
                         isSelected
                           ? 'bg-beneficiary text-beneficiary-foreground'
-                          : 'bg-muted text-muted-foreground'
+                          : 'bg-muted text-muted-foreground group-hover:bg-beneficiary/10 group-hover:text-beneficiary'
                       }`}>
                         {isSelected ? 'محدد ✓' : 'اختر'}
                       </span>

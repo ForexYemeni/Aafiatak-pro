@@ -871,3 +871,312 @@
 .select-light-trigger:focus {
   box-shadow: 0 0 0 3px rgba(13, 148, 136, 0.12);
 }
+
+/* ============================================================================
+   Ultra-Premium Login Page Enhancements
+   ============================================================================ */
+
+/* Login form gradient container */
+.login-form-container {
+  background: linear-gradient(145deg, #ffffff 0%, #f8fffe 40%, #f0fdf9 70%, #faf5ff 100%);
+  border-radius: 24px;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.04),
+    0 8px 24px rgba(13,148,136,0.06),
+    0 24px 48px rgba(0,0,0,0.03);
+  border: 1px solid rgba(13,148,136,0.08);
+}
+
+/* Phone input with +967 prefix */
+.phone-input-wrapper {
+  position: relative;
+}
+
+.phone-prefix {
+  position: absolute;
+  left: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 4px 8px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 10;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
+.phone-prefix-light {
+  background: linear-gradient(135deg, #f0fdf9, #ecfdf5);
+  color: #0d9488;
+  border: 1px solid rgba(13,148,136,0.15);
+}
+
+.phone-prefix-dark {
+  background: rgba(255,255,255,0.08);
+  color: rgba(255,255,255,0.6);
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Yemen flag icon in phone prefix */
+.yemen-flag {
+  width: 20px;
+  height: 14px;
+  border-radius: 2px;
+  overflow: hidden;
+  display: inline-flex;
+  flex-direction: column;
+  flex-shrink: 0;
+}
+
+.yemen-flag-top { background: #CE1126; flex: 1; }
+.yemen-flag-mid { background: #FFFFFF; flex: 1; }
+.yemen-flag-bot { background: #000000; flex: 1; }
+
+/* Enhanced divider between tabs */
+.login-divider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.login-divider::before,
+.login-divider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+}
+
+.login-divider-light::before,
+.login-divider-light::after {
+  background: linear-gradient(90deg, transparent, rgba(13,148,136,0.15), transparent);
+}
+
+.login-divider-dark::before,
+.login-divider-dark::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.08), transparent);
+}
+
+/* Registration step indicator */
+.reg-step-indicator {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+
+.reg-step-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.reg-step-dot-active-light {
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+  box-shadow: 0 0 0 3px rgba(13,148,136,0.15);
+}
+
+.reg-step-dot-inactive-light {
+  background: #e2e8f0;
+}
+
+.reg-step-dot-active-dark {
+  background: linear-gradient(135deg, #2dd4bf, #14b8a6);
+  box-shadow: 0 0 0 3px rgba(20,184,166,0.2);
+}
+
+.reg-step-dot-inactive-dark {
+  background: rgba(255,255,255,0.15);
+}
+
+.reg-step-line {
+  flex: 1;
+  height: 2px;
+  transition: all 0.3s ease;
+}
+
+.reg-step-line-active-light {
+  background: linear-gradient(90deg, #14b8a6, #0d9488);
+}
+
+.reg-step-line-inactive-light {
+  background: #e2e8f0;
+}
+
+.reg-step-line-active-dark {
+  background: linear-gradient(90deg, #2dd4bf, #14b8a6);
+}
+
+.reg-step-line-inactive-dark {
+  background: rgba(255,255,255,0.08);
+}
+
+/* Premium input focus micro-animation */
+.premium-input-group input:focus {
+  transform: translateY(-1px);
+}
+
+.premium-input-group input {
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Enhanced premium button with deeper shadow */
+.premium-btn-elevated {
+  box-shadow:
+    0 4px 12px rgba(13,148,136,0.25),
+    0 12px 28px rgba(13,148,136,0.15),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.premium-btn-elevated:hover {
+  box-shadow:
+    0 6px 16px rgba(13,148,136,0.3),
+    0 16px 36px rgba(13,148,136,0.2),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+  transform: translateY(-2px);
+}
+
+.premium-btn-elevated:active {
+  transform: translateY(0);
+  box-shadow:
+    0 2px 8px rgba(13,148,136,0.2),
+    0 8px 16px rgba(13,148,136,0.1);
+}
+
+/* Form section card enhanced */
+.form-section-card-light {
+  background: linear-gradient(135deg, #f8fafc, #f1f5f9);
+  border: 1px solid rgba(226,232,240,0.8);
+  border-radius: 16px;
+  padding: 16px;
+  transition: all 0.25s ease;
+}
+
+.form-section-card-light:hover {
+  border-color: rgba(13,148,136,0.2);
+  box-shadow: 0 2px 8px rgba(13,148,136,0.05);
+}
+
+.form-section-card-dark {
+  background: rgba(255,255,255,0.03);
+  border: 1px solid rgba(255,255,255,0.06);
+  border-radius: 14px;
+  padding: 12px;
+  transition: all 0.25s ease;
+}
+
+.form-section-card-dark:hover {
+  border-color: rgba(255,255,255,0.1);
+}
+
+/* Branding header inside login form */
+.login-brand-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.login-brand-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 16px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, rgba(13,148,136,0.1), rgba(139,92,246,0.08));
+  border: 1px solid rgba(13,148,136,0.12);
+  margin-bottom: 10px;
+}
+
+.login-brand-icon-dark {
+  background: linear-gradient(135deg, rgba(13,148,136,0.15), rgba(139,92,246,0.1));
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+/* Enhanced checkbox */
+.premium-checkbox-light {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid #cbd5e1;
+  border-radius: 5px;
+  background: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.premium-checkbox-light:checked {
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+  border-color: transparent;
+}
+
+.premium-checkbox-light:checked::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 5px;
+  height: 9px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.premium-checkbox-dark {
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  border: 2px solid rgba(255,255,255,0.2);
+  border-radius: 4px;
+  background: rgba(255,255,255,0.06);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+}
+
+.premium-checkbox-dark:checked {
+  background: linear-gradient(135deg, #14b8a6, #0d9488);
+  border-color: transparent;
+}
+
+.premium-checkbox-dark:checked::after {
+  content: '';
+  position: absolute;
+  top: 1px;
+  left: 4px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
+}
+
+/* Enhanced error display */
+.error-display-premium-light {
+  background: linear-gradient(135deg, #fef2f2, #fff1f2);
+  border: 1px solid rgba(239,68,68,0.15);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #dc2626;
+}
+
+.error-display-premium-dark {
+  background: rgba(239,68,68,0.08);
+  border: 1px solid rgba(239,68,68,0.15);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: #fca5a5;
+}

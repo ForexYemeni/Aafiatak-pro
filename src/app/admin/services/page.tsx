@@ -85,6 +85,18 @@ const categoryColors: Record<string, string> = {
   therapy: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400',
 };
 
+const categoryGradients: Record<string, string> = {
+  medical: 'from-blue-400 to-blue-600',
+  nursing: 'from-rose-400 to-rose-600',
+  physiotherapy: 'from-emerald-400 to-emerald-600',
+  elderly_care: 'from-amber-400 to-amber-600',
+  pediatric: 'from-violet-400 to-violet-600',
+  post_surgery: 'from-orange-400 to-orange-600',
+  lab: 'from-cyan-400 to-cyan-600',
+  emergency: 'from-red-500 to-red-700',
+  therapy: 'from-purple-400 to-purple-600',
+};
+
 const iconOptions = [
   { value: 'Stethoscope', label: 'سماعة طبيب', icon: Stethoscope },
   { value: 'Heart', label: 'قلب', icon: Heart },
@@ -110,7 +122,6 @@ const defaultForm = {
   descriptionAr: '',
   basePrice: '' as string | number,
   category: 'nursing',
-  duration: 60,
   icon: 'Stethoscope',
   isActive: true,
   isEmergency: false,
@@ -149,7 +160,12 @@ export default function AdminServicesPage() {
       const json = await res.json();
       if (json.success && json.data) {
         const items = json.data.services ?? json.data;
-        setServices(Array.isArray(items) ? items : []);
+        const sorted = Array.isArray(items) ? items : [];
+        sorted.sort((a: ServiceItem, b: ServiceItem) => {
+          if (a.sortOrder !== b.sortOrder) return a.sortOrder - b.sortOrder;
+          return a.nameAr.localeCompare(b.nameAr, 'ar');
+        });
+        setServices(sorted);
       }
     } catch {
       toast.error('فشل تحميل الخدمات');
@@ -181,7 +197,6 @@ export default function AdminServicesPage() {
         descriptionAr: form.descriptionAr,
         basePrice: price,
         category: form.category,
-        duration: form.duration || 60,
         icon: form.icon,
         isActive: form.isActive,
         isEmergency: form.isEmergency,
@@ -270,7 +285,6 @@ export default function AdminServicesPage() {
       descriptionAr: svc.descriptionAr || '',
       basePrice: svc.basePrice || '',
       category: svc.category,
-      duration: svc.duration || 60,
       icon: svc.icon || 'Stethoscope',
       isActive: svc.isActive,
       isEmergency: svc.isEmergency,
@@ -438,27 +452,32 @@ export default function AdminServicesPage() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
             {services.map((service) => {
               const Icon = categoryIcons[service.category] || getIconComponent(service.icon);
-              const catColor = categoryColors[service.category] || 'bg-muted text-muted-foreground';
+              const gradient = categoryGradients[service.category] || 'from-gray-400 to-gray-500';
               return (
                 <motion.div
                   key={service.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`rounded-2xl border bg-card shadow-sm transition-all hover:shadow-md ${!service.isActive ? 'opacity-60' : ''}`}
+                  className={`rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 group ${!service.isActive ? 'opacity-60' : ''}`}
                 >
                   <div className="p-4 space-y-3">
-                    {/* Header with icon and status */}
+                    {/* Header with gradient icon and status */}
                     <div className="flex items-start justify-between">
-                      <div className={`w-10 h-10 rounded-xl ${catColor.split(' ').slice(0, 1).join(' ')} flex items-center justify-center`}>
-                        <Icon className={`w-5 h-5 ${catColor.split(' ').slice(2).join(' ')}`} />
+                      <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-sm`}>
+                        <Icon className="w-5 h-5 text-white" />
                       </div>
-                      <div className="flex items-center gap-1">
+                      <div className="flex items-center gap-1.5">
                         {service.isEmergency && (
                           <Badge variant="destructive" className="text-[10px] px-1.5 py-0">طوارئ</Badge>
                         )}
-                        <Badge variant={service.isActive ? 'default' : 'secondary'} className={`text-[10px] px-1.5 py-0 ${service.isActive ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400' : ''}`}>
+                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                          service.isActive
+                            ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                            : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
+                        }`}>
+                          <div className={`w-1.5 h-1.5 rounded-full ${service.isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
                           {service.isActive ? 'نشطة' : 'متوقفة'}
-                        </Badge>
+                        </div>
                       </div>
                     </div>
 
@@ -475,10 +494,14 @@ export default function AdminServicesPage() {
                       {categoryLabels[service.category] || service.category}
                     </Badge>
 
-                    {/* Price & Duration */}
+                    {/* Price & Sort Order */}
                     <div className="flex items-center justify-between pt-2 border-t border-border/30">
                       <Currency amount={service.basePrice} className="text-sm font-bold" />
-                      <span className="text-xs text-muted-foreground">{toArabicNum(service.duration)} د</span>
+                      {service.sortOrder > 0 && (
+                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                          {toArabicNum(service.sortOrder)}
+                        </span>
+                      )}
                     </div>
 
                     {/* Actions */}
@@ -514,7 +537,6 @@ export default function AdminServicesPage() {
                     <th className="text-right text-xs font-medium text-muted-foreground p-3">الخدمة</th>
                     <th className="text-right text-xs font-medium text-muted-foreground p-3">الفئة</th>
                     <th className="text-right text-xs font-medium text-muted-foreground p-3">السعر</th>
-                    <th className="text-right text-xs font-medium text-muted-foreground p-3">المدة</th>
                     <th className="text-right text-xs font-medium text-muted-foreground p-3">الحالة</th>
                     {!isSubadmin && <th className="text-right text-xs font-medium text-muted-foreground p-3">إجراءات</th>}
                   </tr>
@@ -542,7 +564,6 @@ export default function AdminServicesPage() {
                           <Badge variant="outline" className="text-[10px]">{categoryLabels[service.category] || service.category}</Badge>
                         </td>
                         <td className="p-3"><Currency amount={service.basePrice} className="text-sm" /></td>
-                        <td className="p-3 text-sm text-muted-foreground">{toArabicNum(service.duration)} د</td>
                         <td className="p-3">
                           <BadgeStatus
                             status={service.isActive ? 'active' : 'inactive'}
@@ -628,16 +649,6 @@ export default function AdminServicesPage() {
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>المدة (دقيقة)</Label>
-                <Input
-                  type="number"
-                  value={form.duration}
-                  onChange={(e) => setForm({ ...form, duration: parseInt(e.target.value) || 60 })}
-                  min={5}
-                  max={300}
-                />
-              </div>
-              <div className="space-y-2">
                 <Label>الأيقونة</Label>
                 <Select value={form.icon} onValueChange={(v) => setForm({ ...form, icon: v })}>
                   <SelectTrigger>
@@ -655,8 +666,6 @@ export default function AdminServicesPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>ترتيب الفرز</Label>
                 <Input
@@ -666,21 +675,21 @@ export default function AdminServicesPage() {
                   min={0}
                 />
               </div>
-              <div className="flex flex-col gap-3 justify-center">
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={form.isActive}
-                    onCheckedChange={(v) => setForm({ ...form, isActive: v })}
-                  />
-                  <Label>نشطة</Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <Switch
-                    checked={form.isEmergency}
-                    onCheckedChange={(v) => setForm({ ...form, isEmergency: v })}
-                  />
-                  <Label>خدمة طوارئ</Label>
-                </div>
+            </div>
+            <div className="flex items-center gap-6">
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.isActive}
+                  onCheckedChange={(v) => setForm({ ...form, isActive: v })}
+                />
+                <Label>نشطة</Label>
+              </div>
+              <div className="flex items-center gap-2">
+                <Switch
+                  checked={form.isEmergency}
+                  onCheckedChange={(v) => setForm({ ...form, isEmergency: v })}
+                />
+                <Label>خدمة طوارئ</Label>
               </div>
             </div>
 
@@ -698,7 +707,7 @@ export default function AdminServicesPage() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="font-semibold text-sm">{form.nameAr}</p>
-                      <p className="text-xs text-muted-foreground">{categoryLabels[form.category]} • {toArabicNum(form.duration || 60)} دقيقة</p>
+                      <p className="text-xs text-muted-foreground">{categoryLabels[form.category]}</p>
                     </div>
                     <Currency amount={Number(form.basePrice) || 0} className="text-sm font-bold" />
                   </div>
