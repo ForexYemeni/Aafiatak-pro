@@ -295,7 +295,11 @@ export default function AdminServicesPage() {
 
   const openAdd = () => {
     setEditingService(null);
-    setForm(defaultForm);
+    // Auto-calculate next sort order based on existing services
+    const maxSortOrder = services.length > 0
+      ? Math.max(...services.map(s => s.sortOrder || 0))
+      : 0;
+    setForm({ ...defaultForm, sortOrder: maxSortOrder + 1 });
     setDialogOpen(true);
   };
 
@@ -667,7 +671,12 @@ export default function AdminServicesPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>ترتيب الفرز</Label>
+                <Label className="flex items-center gap-1.5">
+                  ترتيب الفرز
+                  {!editingService && (
+                    <span className="text-[10px] text-green-600 dark:text-green-400 font-normal">(تلقائي)</span>
+                  )}
+                </Label>
                 <Input
                   type="number"
                   value={form.sortOrder}

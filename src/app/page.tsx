@@ -719,7 +719,7 @@ function BrandPanel() {
 }
 
 // ============================================================================
-// Premium Input - Light variant for desktop right panel
+// Premium Input - Enhanced for desktop and mobile
 // ============================================================================
 
 function PremiumInput({
@@ -756,7 +756,7 @@ function PremiumInput({
       <div className="premium-input-group">
         <div className="relative">
           <Icon className={cn(
-            'absolute right-3.5 top-1/2 -translate-y-1/2 w-4 h-4 z-10 pointer-events-none transition-colors duration-200',
+            'absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] z-10 pointer-events-none transition-colors duration-200',
             isLight ? 'text-slate-400' : 'text-white/40'
           )} />
           <Input
@@ -765,7 +765,9 @@ function PremiumInput({
             placeholder=" "
             dir={dir}
             className={cn(
-              'peer pr-11 pl-11 text-right h-12 rounded-xl premium-input-glow transition-all duration-200',
+              'peer pr-11 pl-11 text-right rounded-xl premium-input-glow transition-all duration-200',
+              // Default: desktop h-12, mobile h-12 (48px touch target)
+              'h-12 text-[15px]',
               isLight
                 ? cn(
                     'bg-white border-slate-200 text-slate-900 placeholder-transparent',
@@ -797,7 +799,7 @@ function PremiumInput({
               type="button"
               onClick={onToggle}
               className={cn(
-                'absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors z-10',
+                'absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[44px] min-h-[44px] flex items-center justify-center -my-1',
                 isLight ? 'text-slate-400 hover:text-slate-600' : 'text-white/40 hover:text-white/70'
               )}
             >
@@ -810,7 +812,7 @@ function PremiumInput({
         <motion.p
           initial={{ opacity: 0, y: -3 }}
           animate={{ opacity: 1, y: 0 }}
-          className={cn('text-xs mr-2', isLight ? 'text-red-500' : 'text-red-400')}
+          className={cn('text-xs mr-3', isLight ? 'text-red-500' : 'text-red-400')}
         >
           {error}
         </motion.p>
@@ -820,7 +822,7 @@ function PremiumInput({
 }
 
 // ============================================================================
-// Premium Button - Gradient CTA with shimmer
+// Premium Button - Gradient CTA with shimmer - Enhanced
 // ============================================================================
 
 function PremiumButton({
@@ -849,7 +851,7 @@ function PremiumButton({
         onClick={onClick}
         disabled={disabled}
         className={cn(
-          'premium-shimmer-btn relative w-full h-12 rounded-xl font-bold text-base text-white overflow-hidden',
+          'premium-shimmer-btn relative w-full h-[52px] rounded-2xl font-bold text-[15px] text-white overflow-hidden',
           isNurse
             ? 'bg-gradient-to-l from-sky-600 via-cyan-600 to-teal-600 hover:from-sky-500 hover:via-cyan-500 hover:to-teal-500 shadow-lg shadow-sky-500/20 hover:shadow-xl hover:shadow-sky-500/25'
             : 'bg-gradient-to-l from-teal-600 via-emerald-600 to-violet-600 hover:from-teal-500 hover:via-emerald-500 hover:to-violet-500 shadow-lg shadow-teal-500/20 hover:shadow-xl hover:shadow-teal-500/25',
@@ -869,7 +871,7 @@ function PremiumButton({
 }
 
 // ============================================================================
-// Premium Toggle - Tab switch with sliding indicator
+// Premium Toggle - Tab switch with sliding indicator - Enhanced
 // ============================================================================
 
 function PremiumToggle({
@@ -885,15 +887,15 @@ function PremiumToggle({
 
   return (
     <div className={cn(
-      'relative flex rounded-xl p-1',
-      isLight ? 'bg-slate-100 border border-slate-200' : 'bg-white/[0.06] border border-white/[0.08]'
+      'relative flex rounded-2xl p-1.5 premium-toggle-enhanced',
+      isLight ? 'bg-slate-100 border border-slate-200/80' : 'bg-white/[0.06] border border-white/[0.08]'
     )}>
       {/* Sliding indicator */}
       <motion.div
         className={cn(
-          'absolute top-1 bottom-1 rounded-lg',
+          'absolute top-1.5 bottom-1.5 rounded-xl',
           isLight
-            ? 'bg-white shadow-md shadow-slate-200/50'
+            ? 'bg-white shadow-lg shadow-slate-200/50'
             : 'bg-gradient-to-l from-teal-500/80 to-violet-600/80 shadow-lg shadow-teal-500/20'
         )}
         initial={false}
@@ -908,7 +910,7 @@ function PremiumToggle({
         type="button"
         onClick={() => onTabChange('login')}
         className={cn(
-          'relative z-10 flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors duration-200',
+          'relative z-10 flex-1 py-3 text-sm font-bold rounded-xl transition-colors duration-200 min-h-[44px]',
           isLight
             ? (activeTab === 'login' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600')
             : (activeTab === 'login' ? 'text-white' : 'text-white/50 hover:text-white/70')
@@ -920,7 +922,7 @@ function PremiumToggle({
         type="button"
         onClick={() => onTabChange('register')}
         className={cn(
-          'relative z-10 flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors duration-200',
+          'relative z-10 flex-1 py-3 text-sm font-bold rounded-xl transition-colors duration-200 min-h-[44px]',
           isLight
             ? (activeTab === 'register' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600')
             : (activeTab === 'register' ? 'text-white' : 'text-white/50 hover:text-white/70')
@@ -933,7 +935,7 @@ function PremiumToggle({
 }
 
 // ============================================================================
-// Premium Role Card - Animated selection
+// Premium Role Card - Animated selection - Enhanced
 // ============================================================================
 
 function PremiumRoleCard({
@@ -964,10 +966,10 @@ function PremiumRoleCard({
       whileHover={{ scale: 1.02 }}
       onClick={onClick}
       className={cn(
-        'relative rounded-xl p-4 text-center transition-all duration-300 overflow-hidden border',
+        'relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border min-h-[100px] role-card-enhanced',
         isLight
           ? (isActive
-            ? 'border-teal-300 bg-teal-50/80 shadow-md shadow-teal-100/50'
+            ? 'border-teal-300 bg-teal-50/80 shadow-lg shadow-teal-100/50'
             : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50')
           : (isActive
             ? 'border-white/25 bg-white/[0.12] shadow-lg'
@@ -983,14 +985,14 @@ function PremiumRoleCard({
       )}
       <div className="relative z-10">
         <div className={cn(
-          'w-11 h-11 rounded-xl mx-auto mb-2 flex items-center justify-center transition-all duration-300',
+          'w-12 h-12 rounded-xl mx-auto mb-2.5 flex items-center justify-center transition-all duration-300',
           isActive
             ? cn('bg-gradient-to-br shadow-lg', activeColor, 'text-white')
             : isLight
               ? 'bg-slate-100 text-slate-400'
               : 'bg-white/[0.08] text-white/40'
         )}>
-          {isActive ? <Icon className="w-5 h-5" /> : <Icon className="w-5 h-5" />}
+          <Icon className="w-5 h-5" />
         </div>
         <span className={cn(
           'text-sm font-bold transition-colors duration-300',
@@ -1001,7 +1003,7 @@ function PremiumRoleCard({
           {title}
         </span>
         <p className={cn(
-          'text-[10px] mt-0.5',
+          'text-[11px] mt-0.5',
           isLight ? 'text-slate-400' : 'text-white/30'
         )}>{subtitle}</p>
       </div>
@@ -1010,21 +1012,22 @@ function PremiumRoleCard({
 }
 
 // ============================================================================
-// Form Section Divider
+// Form Section Divider - Enhanced
 // ============================================================================
 
 function FormSectionHeader({ icon: Icon, title, color, variant = 'light' }: { icon: React.ElementType; title: string; color: string; variant?: 'light' | 'dark' }) {
-  const isLight = variant === 'light';
   return (
-    <div className="flex items-center gap-1.5 mb-1">
-      <Icon className={cn('w-3.5 h-3.5', color)} />
-      <span className={cn('text-[11px] font-semibold', color)}>{title}</span>
+    <div className="flex items-center gap-2 mb-2">
+      <div className={cn('w-6 h-6 rounded-lg flex items-center justify-center', variant === 'light' ? 'bg-slate-100/80' : 'bg-white/[0.06]')}>
+        <Icon className={cn('w-3.5 h-3.5', color)} />
+      </div>
+      <span className={cn('text-xs font-semibold', color)}>{title}</span>
     </div>
   );
 }
 
 // ============================================================================
-// Main Login Page Component - WORLD-CLASS REDESIGN
+// Main Login Page Component - EXTREMELY PROFESSIONAL REDESIGN
 // ============================================================================
 
 function LoginPageContent() {
@@ -1056,8 +1059,6 @@ function LoginPageContent() {
     // redirect IMMEDIATELY without the 5-second loading screen
     if (isAuthenticated && user && !justLoggedOut && !isFreshLogin) {
       const destination = redirectPath ?? getDashboardPath(user.role);
-      // Use window.location.href for reliable full-page navigation
-      // This ensures the auth cookie is sent with the request
       window.location.href = destination;
       return;
     }
@@ -1075,8 +1076,6 @@ function LoginPageContent() {
   const handleLoadingComplete = useCallback(() => {
     if (user) {
       const destination = redirectPath ?? getDashboardPath(user.role);
-      // Use window.location.href for reliable full-page navigation
-      // This ensures the auth cookie is sent with the request
       window.location.href = destination;
     }
   }, [user, redirectPath]);
@@ -1206,6 +1205,20 @@ function LoginPageContent() {
   );
 
   // ============================================================================
+  // Shared phone prefix component
+  // ============================================================================
+  const PhonePrefix = ({ variant }: { variant: 'light' | 'dark' }) => (
+    <div className={cn('phone-prefix', variant === 'light' ? 'phone-prefix-light' : 'phone-prefix-dark')}>
+      <span className="yemen-flag">
+        <span className="yemen-flag-top" />
+        <span className="yemen-flag-mid" />
+        <span className="yemen-flag-bot" />
+      </span>
+      <span>+967</span>
+    </div>
+  );
+
+  // ============================================================================
   // Render
   // ============================================================================
 
@@ -1233,12 +1246,12 @@ function LoginPageContent() {
           {/* Subtle gradient background */}
           <div className="absolute inset-0 bg-gradient-to-br from-[#FAFBFC] via-[#f0fdf9]/30 to-[#faf5ff]/20" />
           
-          <div className="w-full max-w-[440px] mx-auto px-8 py-10 relative z-10">
+          <div className="w-full max-w-[460px] mx-auto px-10 py-12 relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="login-form-container p-7"
+              className="login-form-container-v2 p-8"
             >
               {/* Brand header inside form */}
               <motion.div
@@ -1295,14 +1308,7 @@ function LoginPageContent() {
                   >
                     {/* Phone input with +967 prefix */}
                     <div className="phone-input-wrapper">
-                      <div className="phone-prefix phone-prefix-light">
-                        <span className="yemen-flag">
-                          <span className="yemen-flag-top" />
-                          <span className="yemen-flag-mid" />
-                          <span className="yemen-flag-bot" />
-                        </span>
-                        <span>+967</span>
-                      </div>
+                      <PhonePrefix variant="light" />
                       <PremiumInput
                         id="login-phone"
                         label="رقم الهاتف"
@@ -1371,13 +1377,13 @@ function LoginPageContent() {
                   >
                     {/* Step indicator */}
                     <div className="reg-step-indicator px-2">
-                      <div className={cn('reg-step-dot', registerRole === 'beneficiary' ? 'reg-step-dot-active-light' : 'reg-step-dot-active-light')} />
-                      <div className={cn('reg-step-line', 'reg-step-line-active-light')} />
-                      <div className={cn('reg-step-dot', registerRole === 'beneficiary' ? 'reg-step-dot-active-light' : 'reg-step-dot-active-light')} />
-                      <div className={cn('reg-step-line', 'reg-step-line-inactive-light')} />
+                      <div className="reg-step-dot reg-step-dot-active-light" />
+                      <div className="reg-step-line reg-step-line-active-light" />
+                      <div className="reg-step-dot reg-step-dot-active-light" />
+                      <div className="reg-step-line reg-step-line-inactive-light" />
                       <div className="reg-step-dot reg-step-dot-inactive-light" />
                     </div>
-                    <div className="flex justify-between px-1 -mt-1 mb-1">
+                    <div className="flex justify-between px-1 -mt-1 mb-2">
                       <span className="text-[9px] font-semibold text-teal-600">نوع الحساب</span>
                       <span className="text-[9px] font-semibold text-teal-600">البيانات</span>
                       <span className="text-[9px] font-medium text-slate-300">تأكيد</span>
@@ -1432,14 +1438,7 @@ function LoginPageContent() {
                             />
                             {/* Phone input with +967 prefix */}
                             <div className="phone-input-wrapper">
-                              <div className="phone-prefix phone-prefix-light">
-                                <span className="yemen-flag">
-                                  <span className="yemen-flag-top" />
-                                  <span className="yemen-flag-mid" />
-                                  <span className="yemen-flag-bot" />
-                                </span>
-                                <span>+967</span>
-                              </div>
+                              <PhonePrefix variant="light" />
                               <PremiumInput
                                 id="ben-phone"
                                 label="رقم الهاتف"
@@ -1561,14 +1560,7 @@ function LoginPageContent() {
                             )}
                             {/* Phone input with +967 prefix */}
                             <div className="phone-input-wrapper">
-                              <div className="phone-prefix phone-prefix-light">
-                                <span className="yemen-flag">
-                                  <span className="yemen-flag-top" />
-                                  <span className="yemen-flag-mid" />
-                                  <span className="yemen-flag-bot" />
-                                </span>
-                                <span>+967</span>
-                              </div>
+                              <PhonePrefix variant="light" />
                               <PremiumInput
                                 id="nurse-phone"
                                 label="رقم الهاتف"
@@ -1589,7 +1581,7 @@ function LoginPageContent() {
                             <div className="space-y-1.5">
                               <Label className="text-xs text-slate-500">التخصص</Label>
                               <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}>
-                                <SelectTrigger className="h-11 rounded-xl bg-white border-slate-200 text-slate-800 hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/15">
+                                <SelectTrigger className="h-12 rounded-xl bg-white border-slate-200 text-slate-800 hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/15">
                                   <SelectValue placeholder="اختر التخصص" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -1673,55 +1665,60 @@ function LoginPageContent() {
         </div>
       </div>
 
-      {/* ============ MOBILE: Full-screen dark layout ============ */}
-      <div className="lg:hidden flex flex-col min-h-screen">
-        {/* Dark gradient background */}
-        <div className="fixed inset-0 bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#0F172A] -z-10" />
+      {/* ============ MOBILE: Professional full-screen dark layout ============ */}
+      <div className="lg:hidden flex flex-col min-h-dvh">
+        {/* Dark gradient background - fixed */}
+        <div className="fixed inset-0 bg-gradient-to-br from-[#0B1120] via-[#0F172A] to-[#1a1035] -z-10" />
 
-        {/* Animated blobs for mobile */}
+        {/* Subtle mesh gradient overlay */}
         <div className="fixed inset-0 -z-5 overflow-hidden pointer-events-none">
           <div
             className="absolute mesh-blob-1"
             style={{
-              width: '300px', height: '300px',
-              top: '-10%', right: '-10%',
+              width: '350px', height: '350px',
+              top: '-15%', right: '-10%',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(13,148,136,0.25) 0%, transparent 70%)',
-              filter: 'blur(40px)',
+              background: 'radial-gradient(circle, rgba(13,148,136,0.2) 0%, rgba(13,148,136,0.05) 40%, transparent 70%)',
+              filter: 'blur(50px)',
             }}
           />
           <div
             className="absolute mesh-blob-2"
             style={{
-              width: '250px', height: '250px',
+              width: '280px', height: '280px',
               bottom: '-5%', left: '-8%',
               borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(139,92,246,0.2) 0%, transparent 70%)',
-              filter: 'blur(40px)',
+              background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
+              filter: 'blur(45px)',
             }}
           />
         </div>
 
-        {/* Mobile header with logo */}
-        <motion.div
-          initial={{ opacity: 0, y: -10 }}
+        {/* Mobile header with brand */}
+        <motion.header
+          initial={{ opacity: 0, y: -15 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1 }}
-          className="px-6 pt-10 pb-4 text-center"
+          transition={{ delay: 0.1, duration: 0.5 }}
+          className="mobile-header-gradient pt-12 pb-5 px-6 text-center safe-top"
         >
+          {/* Logo with glow */}
           <motion.div
             initial={{ scale: 0, rotate: -90 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-            className="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center bg-gradient-to-br from-teal-500/25 to-violet-600/15 backdrop-blur-xl border border-white/15 shadow-lg shadow-teal-500/10"
+            className="relative inline-block mb-3"
           >
-            <Heart className="w-7 h-7 text-white" fill="currentColor" />
+            <div className="absolute inset-0 blur-xl bg-teal-400/25 rounded-2xl" />
+            <div className="relative w-16 h-16 rounded-2xl mx-auto flex items-center justify-center bg-gradient-to-br from-teal-500/25 to-violet-600/15 backdrop-blur-xl border border-white/15 shadow-lg shadow-teal-500/10">
+              <Heart className="w-8 h-8 text-white" fill="currentColor" />
+            </div>
           </motion.div>
+
           <motion.h1
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-2xl font-black text-white"
+            className="text-3xl font-black text-white tracking-tight"
           >
             عافيتك
           </motion.h1>
@@ -1729,23 +1726,23 @@ function LoginPageContent() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="text-xs text-white/50 mt-1"
+            className="text-[13px] text-white/50 mt-1.5 font-medium"
           >
             رعاية صحية منزلية بلمسة زر
           </motion.p>
-        </motion.div>
+        </motion.header>
 
-        {/* Form card */}
-        <div className="flex-1 px-4 pb-6">
+        {/* Form card - Scrollable content */}
+        <div className="flex-1 px-4 sm:px-5 pb-6 mobile-safe-area">
           <motion.div
-            initial={{ opacity: 0, y: 30 }}
+            initial={{ opacity: 0, y: 25 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5 }}
+            transition={{ delay: 0.3, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="relative glass-ultra rounded-2xl noise-overlay">
-              <div className="relative z-10 p-5">
+            <div className="relative glass-ultra-v2">
+              <div className="relative z-10 p-5 sm:p-6">
                 {/* Toggle */}
-                <div className="mb-4">
+                <div className="mb-5">
                   <PremiumToggle
                     activeTab={activeTab}
                     onTabChange={(tab) => { setActiveTab(tab); clearError(); }}
@@ -1765,18 +1762,11 @@ function LoginPageContent() {
                       exit={{ opacity: 0, x: 15 }}
                       transition={{ duration: 0.25 }}
                       onSubmit={loginForm.handleSubmit(onLoginSubmit)}
-                      className="space-y-3"
+                      className="space-y-4"
                     >
                       {/* Phone input with +967 prefix */}
                       <div className="phone-input-wrapper">
-                        <div className="phone-prefix phone-prefix-dark">
-                          <span className="yemen-flag">
-                            <span className="yemen-flag-top" />
-                            <span className="yemen-flag-mid" />
-                            <span className="yemen-flag-bot" />
-                          </span>
-                          <span>+967</span>
-                        </div>
+                        <PhonePrefix variant="dark" />
                         <PremiumInput
                           id="m-login-phone"
                           label="رقم الهاتف"
@@ -1786,7 +1776,7 @@ function LoginPageContent() {
                           variant="dark"
                           registration={loginForm.register('phone')}
                           error={loginForm.formState.errors.phone?.message}
-                          className="!pl-[90px] h-11"
+                          className="!pl-[95px]"
                         />
                       </div>
 
@@ -1802,21 +1792,22 @@ function LoginPageContent() {
                         toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                         registration={loginForm.register('password')}
                         error={loginForm.formState.errors.password?.message}
-                        className="h-11"
                       />
 
                       <PasswordStrengthBar password={loginPasswordValue} variant="dark" />
 
                       <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-2">
                           <input type="checkbox" id="m-remember" className="premium-checkbox-dark" />
-                          <Label htmlFor="m-remember" className="text-[11px] font-normal cursor-pointer text-white/40">تذكرني</Label>
+                          <Label htmlFor="m-remember" className="text-[12px] font-normal cursor-pointer text-white/40">تذكرني</Label>
                         </div>
-                        <button type="button" className="text-[11px] text-teal-400/70 hover:text-teal-300 transition-colors">نسيت كلمة المرور؟</button>
+                        <button type="button" className="text-[12px] text-teal-400/70 hover:text-teal-300 transition-colors font-medium">
+                          نسيت كلمة المرور؟
+                        </button>
                       </div>
 
                       <PremiumButton loading={isLoading} disabled={isLoading} className="premium-btn-elevated">
-                        <span className="flex items-center gap-2 justify-center text-sm">
+                        <span className="flex items-center gap-2 justify-center">
                           تسجيل الدخول
                           <ArrowLeft className="w-4 h-4" />
                         </span>
@@ -1834,24 +1825,24 @@ function LoginPageContent() {
                       animate={{ opacity: 1, x: 0 }}
                       exit={{ opacity: 0, x: -15 }}
                       transition={{ duration: 0.25 }}
-                      className="space-y-3"
+                      className="space-y-4"
                     >
-                      {/* Step indicator */}
-                      <div className="reg-step-indicator px-1">
-                        <div className="reg-step-dot reg-step-dot-active-dark" />
-                        <div className="reg-step-line reg-step-line-active-dark" />
-                        <div className="reg-step-dot reg-step-dot-active-dark" />
-                        <div className="reg-step-line reg-step-line-inactive-dark" />
-                        <div className="reg-step-dot reg-step-dot-inactive-dark" />
+                      {/* Step indicator - Enhanced */}
+                      <div className="reg-step-indicator-enhanced">
+                        <div className="reg-step-dot-enhanced reg-step-dot-active-dark" />
+                        <div className="reg-step-line-enhanced reg-step-line-active-dark" />
+                        <div className="reg-step-dot-enhanced reg-step-dot-active-dark" />
+                        <div className="reg-step-line-enhanced reg-step-line-inactive-dark" />
+                        <div className="reg-step-dot-enhanced reg-step-dot-inactive-dark" />
                       </div>
-                      <div className="flex justify-between px-1 -mt-0.5 mb-1">
-                        <span className="text-[8px] font-semibold text-teal-400">نوع الحساب</span>
-                        <span className="text-[8px] font-semibold text-teal-400">البيانات</span>
-                        <span className="text-[8px] font-medium text-white/25">تأكيد</span>
+                      <div className="flex justify-between px-1 -mt-0.5 mb-2">
+                        <span className="text-[10px] font-semibold text-teal-400">نوع الحساب</span>
+                        <span className="text-[10px] font-semibold text-teal-400">البيانات</span>
+                        <span className="text-[10px] font-medium text-white/25">تأكيد</span>
                       </div>
 
                       {/* Role selector */}
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-2 gap-3">
                         <PremiumRoleCard
                           role="beneficiary"
                           isActive={registerRole === 'beneficiary'}
@@ -1884,9 +1875,9 @@ function LoginPageContent() {
                             exit={{ opacity: 0, x: 12 }}
                             transition={{ duration: 0.2 }}
                             onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)}
-                            className="space-y-2.5"
+                            className="space-y-3.5"
                           >
-                            <div className="form-section-card-dark space-y-2.5">
+                            <div className="form-section-dark-enhanced space-y-3">
                               <FormSectionHeader icon={User} title="المعلومات الشخصية" color="text-teal-400" variant="dark" />
                               <PremiumInput
                                 id="m-ben-name"
@@ -1895,18 +1886,10 @@ function LoginPageContent() {
                                 variant="dark"
                                 registration={beneficiaryForm.register('name')}
                                 error={beneficiaryForm.formState.errors.name?.message}
-                                className="h-10"
                               />
                               {/* Phone with +967 prefix */}
                               <div className="phone-input-wrapper">
-                                <div className="phone-prefix phone-prefix-dark">
-                                  <span className="yemen-flag">
-                                    <span className="yemen-flag-top" />
-                                    <span className="yemen-flag-mid" />
-                                    <span className="yemen-flag-bot" />
-                                  </span>
-                                  <span>+967</span>
-                                </div>
+                                <PhonePrefix variant="dark" />
                                 <PremiumInput
                                   id="m-ben-phone"
                                   label="رقم الهاتف"
@@ -1916,12 +1899,12 @@ function LoginPageContent() {
                                   variant="dark"
                                   registration={beneficiaryForm.register('phone')}
                                   error={beneficiaryForm.formState.errors.phone?.message}
-                                  className="!pl-[85px] h-10"
+                                  className="!pl-[90px]"
                                 />
                               </div>
                             </div>
 
-                            <div className="form-section-card-dark space-y-2.5">
+                            <div className="form-section-dark-enhanced space-y-3">
                               <FormSectionHeader icon={MapPin} title="معلومات الموقع" color="text-teal-400" variant="dark" />
                               <GpsLocationButton
                                 onLocationDetected={(loc) => {
@@ -1942,7 +1925,6 @@ function LoginPageContent() {
                                 variant="dark"
                                 registration={beneficiaryForm.register('address')}
                                 error={beneficiaryForm.formState.errors.address?.message}
-                                className="h-10"
                               />
                               <PremiumInput
                                 id="m-ben-referral"
@@ -1951,11 +1933,10 @@ function LoginPageContent() {
                                 dir="ltr"
                                 variant="dark"
                                 registration={beneficiaryForm.register('referralCode')}
-                                className="h-10"
                               />
                             </div>
 
-                            <div className="form-section-card-dark space-y-2.5">
+                            <div className="form-section-dark-enhanced space-y-3">
                               <FormSectionHeader icon={Lock} title="الأمان" color="text-amber-400" variant="dark" />
                               <PremiumInput
                                 id="m-ben-password"
@@ -1969,13 +1950,12 @@ function LoginPageContent() {
                                 toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 registration={beneficiaryForm.register('password')}
                                 error={beneficiaryForm.formState.errors.password?.message}
-                                className="h-10"
                               />
                               <PasswordStrengthBar password={beneficiaryPasswordValue} variant="dark" />
                             </div>
 
                             <PremiumButton loading={isLoading} disabled={isLoading} className="premium-btn-elevated">
-                              <span className="flex items-center gap-2 justify-center text-sm">
+                              <span className="flex items-center gap-2 justify-center text-[15px]">
                                 <CheckCircle2 className="w-4 h-4" />
                                 إنشاء حساب مستفيد
                               </span>
@@ -1992,9 +1972,9 @@ function LoginPageContent() {
                             exit={{ opacity: 0, x: -12 }}
                             transition={{ duration: 0.2 }}
                             onSubmit={nurseForm.handleSubmit(onNurseRegister)}
-                            className="space-y-2.5 max-h-[58vh] overflow-y-auto custom-scrollbar pl-1"
+                            className="space-y-3.5 mobile-nurse-scroll custom-scrollbar pl-0.5"
                           >
-                            <div className="form-section-card-dark space-y-2.5">
+                            <div className="form-section-dark-enhanced space-y-3">
                               <FormSectionHeader icon={User} title="المعلومات الشخصية" color="text-sky-400" variant="dark" />
                               <motion.div
                                 animate={nurseNameShake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
@@ -2007,7 +1987,7 @@ function LoginPageContent() {
                                   variant="dark"
                                   registration={nurseForm.register('name')}
                                   error={nurseNameShake ? undefined : nurseForm.formState.errors.name?.message}
-                                  className={cn('h-10', nurseNameShake && '!border-red-400/60')}
+                                  className={cn(nurseNameShake && '!border-red-400/60')}
                                 />
                               </motion.div>
                               {nurseNameWarning && (
@@ -2016,8 +1996,8 @@ function LoginPageContent() {
                                   animate={{ opacity: 1, y: 0 }}
                                   className="flex items-center gap-1.5"
                                 >
-                                  <AlertTriangle className="w-3 h-3 text-red-400 shrink-0" />
-                                  <p className="text-[10px] text-red-400 font-medium">يجب أن تكتب اسمك الرباعي (أربعة أجزاء)</p>
+                                  <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
+                                  <p className="text-[11px] text-red-400 font-medium">يجب أن تكتب اسمك الرباعي (أربعة أجزاء)</p>
                                 </motion.div>
                               )}
                               {nurseForm.formState.errors.name && !nurseNameWarning && (
@@ -2025,14 +2005,7 @@ function LoginPageContent() {
                               )}
                               {/* Phone with +967 prefix */}
                               <div className="phone-input-wrapper">
-                                <div className="phone-prefix phone-prefix-dark">
-                                  <span className="yemen-flag">
-                                    <span className="yemen-flag-top" />
-                                    <span className="yemen-flag-mid" />
-                                    <span className="yemen-flag-bot" />
-                                  </span>
-                                  <span>+967</span>
-                                </div>
+                                <PhonePrefix variant="dark" />
                                 <PremiumInput
                                   id="m-nurse-phone"
                                   label="رقم الهاتف"
@@ -2042,17 +2015,17 @@ function LoginPageContent() {
                                   variant="dark"
                                   registration={nurseForm.register('phone')}
                                   error={nurseForm.formState.errors.phone?.message}
-                                  className="!pl-[85px] h-10"
+                                  className="!pl-[90px]"
                                 />
                               </div>
                             </div>
 
-                            <div className="form-section-card-dark space-y-2.5">
+                            <div className="form-section-dark-enhanced space-y-3">
                               <FormSectionHeader icon={Stethoscope} title="المعلومات المهنية" color="text-violet-400" variant="dark" />
                               <div className="space-y-1.5">
-                                <Label className="text-[10px] text-white/40">التخصص</Label>
+                                <Label className="text-[11px] text-white/40">التخصص</Label>
                                 <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}>
-                                  <SelectTrigger className="h-10 rounded-xl bg-white/[0.06] border-white/[0.1] text-white/80 text-xs hover:bg-white/[0.08] focus:border-teal-400/50">
+                                  <SelectTrigger className="h-12 rounded-xl bg-white/[0.06] border-white/[0.1] text-white/80 text-sm hover:bg-white/[0.08] focus:border-teal-400/50">
                                     <SelectValue placeholder="اختر التخصص" />
                                   </SelectTrigger>
                                   <SelectContent>
@@ -2072,11 +2045,10 @@ function LoginPageContent() {
                                 variant="dark"
                                 registration={nurseForm.register('licenseNumber')}
                                 error={nurseForm.formState.errors.licenseNumber?.message}
-                                className="h-10"
                               />
                             </div>
 
-                            <div className="form-section-card-dark space-y-2.5">
+                            <div className="form-section-dark-enhanced space-y-3">
                               <FormSectionHeader icon={MapPin} title="معلومات الموقع" color="text-teal-400" variant="dark" />
                               <GpsLocationButton
                                 onLocationDetected={(loc) => {
@@ -2097,11 +2069,10 @@ function LoginPageContent() {
                                 variant="dark"
                                 registration={nurseForm.register('address')}
                                 error={nurseForm.formState.errors.address?.message}
-                                className="h-10"
                               />
                             </div>
 
-                            <div className="form-section-card-dark space-y-2.5">
+                            <div className="form-section-dark-enhanced space-y-3">
                               <FormSectionHeader icon={Lock} title="الأمان" color="text-amber-400" variant="dark" />
                               <PremiumInput
                                 id="m-nurse-password"
@@ -2115,13 +2086,12 @@ function LoginPageContent() {
                                 toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                                 registration={nurseForm.register('password')}
                                 error={nurseForm.formState.errors.password?.message}
-                                className="h-10"
                               />
                               <PasswordStrengthBar password={nursePasswordValue} variant="dark" />
                             </div>
 
                             <PremiumButton loading={isLoading} disabled={isLoading} variant="nurse" className="premium-btn-elevated">
-                              <span className="flex items-center gap-2 justify-center text-sm">
+                              <span className="flex items-center gap-2 justify-center text-[15px]">
                                 <CheckCircle2 className="w-4 h-4" />
                                 إنشاء حساب ممرض/ـة
                               </span>
@@ -2132,6 +2102,17 @@ function LoginPageContent() {
                     </motion.div>
                   )}
                 </AnimatePresence>
+
+                {/* Trust badge at bottom of card */}
+                <motion.div
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ delay: 0.6 }}
+                  className="mt-5 pt-4 border-t border-white/[0.06] flex items-center justify-center gap-1.5 text-white/20 text-[10px]"
+                >
+                  <Shield className="w-3 h-3" />
+                  <span>بياناتك مشفرة ومحمية</span>
+                </motion.div>
               </div>
             </div>
           </motion.div>
@@ -2149,10 +2130,13 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#0F172A]" dir="rtl">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0B1120] via-[#0F172A] to-[#1a1035]" dir="rtl">
           <div className="flex flex-col items-center gap-4">
-            <div className="w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center animate-pulse">
-              <Heart className="w-8 h-8 text-white/60" fill="currentColor" />
+            <div className="relative">
+              <div className="absolute inset-0 blur-xl bg-teal-400/20 rounded-2xl" />
+              <div className="relative w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center animate-pulse">
+                <Heart className="w-8 h-8 text-white/60" fill="currentColor" />
+              </div>
             </div>
             <div className="flex items-center gap-2 text-white/40 text-sm">
               <Loader2 className="w-4 h-4 animate-spin" />

@@ -1063,15 +1063,16 @@
 }
 
 .form-section-card-dark {
-  background: rgba(255,255,255,0.03);
-  border: 1px solid rgba(255,255,255,0.06);
-  border-radius: 14px;
-  padding: 12px;
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 14px;
   transition: all 0.25s ease;
 }
 
 .form-section-card-dark:hover {
-  border-color: rgba(255,255,255,0.1);
+  border-color: rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.05);
 }
 
 /* Branding header inside login form */
@@ -1129,10 +1130,10 @@
 
 .premium-checkbox-dark {
   appearance: none;
-  width: 16px;
-  height: 16px;
+  width: 18px;
+  height: 18px;
   border: 2px solid rgba(255,255,255,0.2);
-  border-radius: 4px;
+  border-radius: 5px;
   background: rgba(255,255,255,0.06);
   cursor: pointer;
   transition: all 0.2s ease;
@@ -1147,12 +1148,12 @@
 .premium-checkbox-dark:checked::after {
   content: '';
   position: absolute;
-  top: 1px;
-  left: 4px;
-  width: 4px;
-  height: 8px;
+  top: 2px;
+  left: 5px;
+  width: 5px;
+  height: 9px;
   border: solid white;
-  border-width: 0 1.5px 1.5px 0;
+  border-width: 0 2px 2px 0;
   transform: rotate(45deg);
 }
 
@@ -1179,4 +1180,112 @@
   gap: 8px;
   font-size: 12px;
   color: #fca5a5;
+}
+
+/* ============================================================================
+   V2 Professional Redesign - Enhanced Mobile & Desktop
+   ============================================================================ */
+
+/* Enhanced mobile glass card - more depth and polish */
+.glass-ultra-v2 {
+  background: rgba(255, 255, 255, 0.07);
+  backdrop-filter: blur(40px);
+  -webkit-backdrop-filter: blur(40px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.25),
+    0 0 0 1px rgba(255, 255, 255, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+}
+
+/* Enhanced mobile header gradient */
+.mobile-header-gradient {
+  background: linear-gradient(180deg, rgba(13,148,136,0.15) 0%, transparent 100%);
+}
+
+/* Enhanced role card with better hover */
+.role-card-enhanced {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.role-card-enhanced:active {
+  transform: scale(0.97);
+}
+
+/* Mobile form section with better spacing */
+.form-section-dark-enhanced {
+  background: rgba(255,255,255,0.04);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: 16px;
+  padding: 16px;
+  transition: all 0.25s ease;
+}
+
+/* Step indicator enhanced for mobile */
+.reg-step-indicator-enhanced {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  padding: 0 4px;
+}
+
+.reg-step-dot-enhanced {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  transition: all 0.3s ease;
+}
+
+.reg-step-line-enhanced {
+  flex: 1;
+  height: 2px;
+  transition: all 0.3s ease;
+}
+
+/* Premium toggle enhanced touch target */
+.premium-toggle-enhanced {
+  min-height: 48px;
+}
+
+/* Enhanced desktop login container */
+.login-form-container-v2 {
+  background: linear-gradient(145deg, #ffffff 0%, #f8fffe 30%, #f0fdf9 60%, #faf5ff 100%);
+  border-radius: 28px;
+  box-shadow:
+    0 1px 3px rgba(0,0,0,0.03),
+    0 4px 16px rgba(13,148,136,0.05),
+    0 16px 40px rgba(0,0,0,0.02);
+  border: 1px solid rgba(13,148,136,0.06);
+}
+
+/* Mobile scroll area for nurse form */
+.mobile-nurse-scroll {
+  max-height: calc(100dvh - 380px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Enhanced phone prefix for better mobile experience */
+.phone-prefix-enhanced {
+  position: absolute;
+  left: 10px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px 5px 8px;
+  border-radius: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  z-index: 10;
+  pointer-events: none;
+  letter-spacing: 0.02em;
+}
+
+/* Mobile safe area enhanced */
+.mobile-safe-area {
+  padding-bottom: max(env(safe-area-inset-bottom, 16px), 16px);
 }

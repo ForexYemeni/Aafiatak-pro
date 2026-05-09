@@ -621,6 +621,60 @@ export default function ServiceRequestPage() {
                 طريقة الدفع
               </h2>
 
+              {/* Total Amount Summary */}
+              {pricing && (
+                <div className="rounded-xl bg-beneficiary/5 border border-beneficiary/20 p-4 space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm text-muted-foreground">الخدمة</span>
+                    <span className="text-sm font-medium">{service.nameAr}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm text-muted-foreground">السعر الأساسي</span>
+                    <Currency amount={pricing.basePrice} className="text-sm" />
+                  </div>
+                  {pricing.nightFee > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-orange-600">رسوم ليلية</span>
+                      <Currency amount={pricing.nightFee} className="text-xs text-orange-600" />
+                    </div>
+                  )}
+                  {pricing.fridayFee > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-orange-600">رسوم الجمعة</span>
+                      <Currency amount={pricing.fridayFee} className="text-xs text-orange-600" />
+                    </div>
+                  )}
+                  {pricing.emergencyFee > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-red-600">رسوم الطوارئ</span>
+                      <Currency amount={pricing.emergencyFee} className="text-xs text-red-600" />
+                    </div>
+                  )}
+                  {pricing.discount > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-green-600">خصم الكوبون</span>
+                      <Currency amount={-pricing.discount} className="text-xs text-green-600" />
+                    </div>
+                  )}
+                  {pricing.loyaltyDiscount > 0 && (
+                    <div className="flex justify-between items-center">
+                      <span className="text-xs text-green-600">خصم نقاط الولاء</span>
+                      <Currency amount={-pricing.loyaltyDiscount} className="text-xs text-green-600" />
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center pt-2 border-t border-beneficiary/20">
+                    <span className="font-bold text-base">المبلغ الإجمالي</span>
+                    <Currency amount={pricing.totalPrice} className="text-lg text-beneficiary font-bold" />
+                  </div>
+                  {selectedPaymentMethod && (
+                    <div className="flex justify-between items-center pt-1">
+                      <span className="text-xs text-muted-foreground">طريقة الدفع المختارة</span>
+                      <span className="text-xs font-semibold text-beneficiary">{selectedPaymentMethod.nameAr}</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {paymentMethods.length === 0 ? (
                 <div className="text-center py-8">
                   <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-3" />

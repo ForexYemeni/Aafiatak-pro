@@ -151,6 +151,9 @@ export default function AdminEmergenciesPage() {
   const [nurseSearch, setNurseSearch] = useState('');
   const [nurseSearchDebounce, setNurseSearchDebounce] = useState('');
 
+  // Assign confirmation
+  const [assignConfirmNurse, setAssignConfirmNurse] = useState<NearbyNurse | null>(null);
+
   // Execute & Resolve dialogs
   const [executeTarget, setExecuteTarget] = useState<EmergencyItem | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
@@ -251,6 +254,7 @@ export default function AdminEmergenciesPage() {
       setNearbyNurses([]);
       setNurseSearch('');
       setNurseSearchDebounce('');
+      setAssignConfirmNurse(null);
     }
   };
 
@@ -973,9 +977,81 @@ export default function AdminEmergenciesPage() {
               setNurseSearch('');
               setNurseSearchDebounce('');
             }} disabled={isAssigning}>إلغاء</Button>
-            <Button onClick={handleAssign} disabled={isAssigning || !selectedNurse} className="bg-admin hover:bg-admin/90 gap-2">
-              {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
-              {isAssigning ? 'جارٍ التعيين...' : 'تعيين وإرسال'}
+            <Button onClick={() => {
+              const nurse = nearbyNurses.find(n => n.id === selectedNurse);
+              if (nurse) setAssignConfirmNurse(nurse);
+            }} disabled={!selectedNurse} className="bg-admin hover:bg-admin/90 gap-2">
+              <UserPlus className="w-4 h-4" />
+              تعيين وإرسال
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* ═══════════════ ASSIGN NURSE CONFIRMATION DIALOG ═══════════════ */}
+      <Dialog open={!!assignConfirmNurse} onOpenChange={(open) => { if (!open) setAssignConfirmNurse(null); }}>
+        <DialogContent dir="rtl" className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-admin" />
+              تأكيد تعيين الممرض/ـة
+            </DialogTitle>
+            <DialogDescription>
+              هل أنت متأكد من تعيين هذا الممرض/ـة لحالة الطوارئ؟
+            </DialogDescription>
+          </DialogHeader>
+          {assignConfirmNurse && assignTarget && (() => {
+            const tc = typeColors[assignTarget.type] || typeColors.other;
+            const TypeIcon = typeIconMap[assignTarget.type] || ShieldAlert;
+            return (
+              <div className="space-y-4">
+                {/* Emergency Info */}
+                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
+                  <div className="flex items-center gap-2 mb-1">
+                    <div className={`w-7 h-7 rounded-lg ${tc.icon} flex items-center justify-center`}>
+                      <TypeIcon className={`w-3.5 h-3.5 ${tc.text}`} />
+                    </div>
+                    <span className="font-bold text-sm">{typeLabels[assignTarget.type] || assignTarget.type}</span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">المستفيد: {assignTarget.beneficiaryName}</p>
+                </div>
+
+                {/* Nurse Info */}
+                <div className="p-3 rounded-xl bg-admin/5 border border-admin/20">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="w-12 h-12">
+                      <AvatarFallback className="text-sm font-bold bg-admin/10 text-admin">
+                        {assignConfirmNurse.name.slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="font-bold text-sm">{assignConfirmNurse.name}</p>
+                      <p className="text-xs text-muted-foreground">{assignConfirmNurse.specialization}</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {assignConfirmNurse.distance !== null && (
+                          <span className="text-[10px] flex items-center gap-0.5 text-muted-foreground">
+                            <MapPin className="w-3 h-3 text-red-500" />
+                            {assignConfirmNurse.distance} كم
+                          </span>
+                        )}
+                        {assignConfirmNurse.rating > 0 && (
+                          <span className="text-[10px] flex items-center gap-0.5">
+                            <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                            {assignConfirmNurse.rating.toFixed(1)}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          })()}
+          <DialogFooter className="gap-2">
+            <Button variant="outline" onClick={() => setAssignConfirmNurse(null)} disabled={isAssigning}>إلغاء</Button>
+            <Button onClick={handleAssign} disabled={isAssigning} className="bg-admin hover:bg-admin/90 gap-2">
+              {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+              {isAssigning ? 'جارٍ التعيين...' : 'تأكيد التعيين'}
             </Button>
           </DialogFooter>
         </DialogContent>
