@@ -39,7 +39,10 @@ const SECURITY_HEADERS: Record<string, string> = {
 // ============================================================================
 
 const nextConfig: NextConfig = {
-  output: "standalone",
+  // "standalone" output is for Docker / self-hosted deployments.
+  // Vercel automatically detects Next.js and does not need this flag.
+  // If deploying to Vercel, comment out the next line.
+  // output: "standalone",
 
   typescript: {
     ignoreBuildErrors: true,

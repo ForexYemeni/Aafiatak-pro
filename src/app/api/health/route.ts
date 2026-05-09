@@ -8,8 +8,6 @@ export async function GET(request: NextRequest) {
     env: {
       hasMongoUri: !!process.env.MONGODB_URI,
       mongoUriPrefix: process.env.MONGODB_URI ? process.env.MONGODB_URI.substring(0, 25) + '...' : 'NOT SET',
-      hasDatabaseUrl: !!process.env.DATABASE_URL,
-      databaseUrlPrefix: process.env.DATABASE_URL ? process.env.DATABASE_URL.substring(0, 25) + '...' : 'NOT SET',
       hasJwtSecret: !!process.env.JWT_SECRET,
       nodeEnv: process.env.NODE_ENV,
     }

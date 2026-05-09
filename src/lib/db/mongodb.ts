@@ -1,37 +1,10 @@
-import mongoose from 'mongoose';
+// ============================================================================
+// MongoDB Connection — Client-side / Offline-compatible wrapper
+// ============================================================================
+// Re-exports the main connectDB from @/lib/mongodb to keep a single source
+// of truth. This file previously had its own connection logic; it now
+// delegates to the canonical module so that build-time safety fixes are
+// applied everywhere.
+// ============================================================================
 
-const MONGODB_URI = process.env.MONGODB_URI || 'mongodb://localhost:27017/aafiatak';
-
-interface MongooseCache {
-  conn: typeof mongoose | null;
-  promise: Promise<typeof mongoose> | null;
-}
-
-declare global {
-  var mongooseCache: MongooseCache | undefined;
-}
-
-let cached: MongooseCache = global.mongooseCache || { conn: null, promise: null };
-
-if (!global.mongooseCache) {
-  global.mongooseCache = cached;
-}
-
-async function connectDB(): Promise<typeof mongoose> {
-  if (cached.conn) return cached.conn;
-  if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
-      bufferCommands: false,
-    });
-  }
-  try {
-    cached.conn = await cached.promise;
-  } catch (error) {
-    cached.promise = null;
-    throw error;
-  }
-  return cached.conn;
-}
-
-export default connectDB;
-export { connectDB };
+export { connectDB, default } from '@/lib/mongodb';
