@@ -323,29 +323,73 @@ self.addEventListener('notificationclick', (event) => {
 // PUSH SUBSCRIPTION CHANGE
 // ============================================================================
 
+// VAPID public key for push subscription (must match server-side key)
+const VAPID_PUBLIC_KEY = 'BN36yGFOlkT2JcWmoW_vDsUBxD9icwAisjLwRZ9imYkWfExWulyeGjd0ANwWP7uZOr26p6trG3RjhJ1CxNGVtrU';
+
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = self.atob(base64);
+  const outputArray = new Uint8Array(rawData.length);
+  for (let i = 0; i < rawData.length; ++i) {
+    outputArray[i] = rawData.charCodeAt(i);
+  }
+  return outputArray;
+}
+
 self.addEventListener('pushsubscriptionchange', (event) => {
   event.waitUntil(
     (async () => {
       try {
+        const applicationServerKey = urlBase64ToUint8Array(VAPID_PUBLIC_KEY);
         const subscription = await self.registration.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: undefined,
+          applicationServerKey,
         });
+
+        // Get stored auth data for the subscribe API
+        const authData = await getStoredAuthData();
 
         await fetch('/api/push/subscribe', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(authData ? { 'Authorization': `Bearer ${authData.token}` } : {}),
+          },
           body: JSON.stringify({
             endpoint: subscription.endpoint,
             keys: subscription.toJSON().keys,
+            platform: 'web',
+            deviceId: authData?.deviceId || `device-${Date.now()}`,
           }),
         });
+
+        console.log('[SW] Push subscription renewed successfully');
       } catch (error) {
         console.error('[SW] Failed to resubscribe:', error);
       }
     })()
   );
 });
+
+// Store auth data for push subscription renewal
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'STORE_AUTH_DATA') {
+    try {
+      // Store in SW's global scope for re-subscription
+      self._authData = event.data.payload;
+    } catch (e) {
+      console.error('[SW] Failed to store auth data:', e);
+    }
+  }
+  if (event.data && event.data.type === 'SKIP_WAITING') {
+    self.skipWaiting();
+  }
+});
+
+async function getStoredAuthData() {
+  return self._authData || null;
+}
 
 // ============================================================================
 // BACKGROUND SYNC
@@ -368,8 +412,4 @@ async function syncOfflineQueue() {
 // MESSAGE HANDLER
 // ============================================================================
 
-self.addEventListener('message', (event) => {
-  if (event.data && event.data.type === 'SKIP_WAITING') {
-    self.skipWaiting();
-  }
-});
+// (message handler moved above to combine with STORE_AUTH_DATA)

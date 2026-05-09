@@ -16,6 +16,11 @@ const OfflineWrapper = dynamic(
   { ssr: false }
 );
 
+const NotificationPermissionBanner = dynamic(
+  () => import('@/components/common/notification-permission-banner').then(mod => mod.NotificationPermissionBanner),
+  { ssr: false }
+);
+
 // ============================================================================
 // Sound mapping for notification types
 // ============================================================================
@@ -246,11 +251,27 @@ function VoiceNotificationPoller() {
       intervalRef.current = setInterval(pollForVoiceNotifications, VOICE_POLL_INTERVAL);
     }
 
+    // Listen for visibility change — when user returns to the app from background,
+    // immediately poll for any voice-pending notifications that may have arrived
+    // while the app was in background (push notifications showed browser notification
+    // but voice/TTS couldn't play in background)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible' && isAuthenticated && token) {
+        // Small delay to ensure app is fully focused
+        setTimeout(() => {
+          pollForVoiceNotifications();
+        }, 300);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
     return () => {
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
         intervalRef.current = null;
       }
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [hasHydrated, isAuthenticated, token, pollForVoiceNotifications]);
 
@@ -403,7 +424,9 @@ function ServiceWorkerRegistrar() {
 }
 
 // ============================================================================
-// Push Subscription Manager - Auto-subscribes to push notifications
+// Push Subscription Manager - Robust auto-subscribe for push notifications
+// Ensures subscriptions are ALWAYS active and properly registered on the server.
+// Re-subscribes on every login and validates the server-side subscription status.
 // ============================================================================
 
 function PushSubscriptionManager() {
@@ -419,34 +442,112 @@ function PushSubscriptionManager() {
 
     const subscribeToPush = async () => {
       try {
+        // 0. Clean up old inactive subscriptions on the server
+        try {
+          const deviceId = localStorage.getItem('aafiatak-device-id');
+          await fetch('/api/push/cleanup', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`,
+            },
+            body: JSON.stringify({ keepDeviceId: deviceId || undefined }),
+          });
+        } catch {
+          // Non-critical
+        }
+
+        // 1. Ensure service worker is ready
         const registration = await navigator.serviceWorker.ready;
-        const existingSubscription = await registration.pushManager.getSubscription();
 
-        if (existingSubscription) return;
+        // 2. Send auth data to SW so it can re-subscribe on pushsubscriptionchange
+        if (registration.active) {
+          let deviceId = localStorage.getItem('aafiatak-device-id');
+          if (!deviceId) {
+            deviceId = `device-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+            localStorage.setItem('aafiatak-device-id', deviceId);
+          }
+          registration.active.postMessage({
+            type: 'STORE_AUTH_DATA',
+            payload: { token, userId: user.id, deviceId },
+          });
+        }
 
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
+        // 3. Request notification permission if not already granted
+        if (Notification.permission === 'default') {
+          const permission = await Notification.requestPermission();
+          if (permission !== 'granted') {
+            console.warn('[PUSH] Notification permission denied');
+            return;
+          }
+        } else if (Notification.permission === 'denied') {
+          console.warn('[PUSH] Notification permission denied — cannot send push');
+          return;
+        }
 
-        const keyResponse = await fetch('/api/push/vapid-key');
-        const keyData = await keyResponse.json();
-        const publicKey = keyData.data?.publicKey;
+        // 4. Get existing subscription
+        let subscription = await registration.pushManager.getSubscription();
 
-        if (!publicKey) return;
+        // 5. Validate subscription with server — check if it's still active
+        let needsResubscribe = false;
 
-        const applicationServerKey = urlBase64ToUint8Array(publicKey);
+        if (subscription) {
+          // Check if this subscription is registered on the server
+          try {
+            const checkResponse = await fetch('/api/push/check-subscription', {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${token}`,
+              },
+              body: JSON.stringify({ endpoint: subscription.endpoint }),
+            });
+            const checkData = await checkResponse.json();
+            if (!checkData.success || !checkData.data?.isActive) {
+              needsResubscribe = true;
+            }
+          } catch {
+            // If check fails, assume subscription is OK (don't unnecessarily re-subscribe)
+          }
+        } else {
+          needsResubscribe = true;
+        }
 
-        const subscription = await registration.pushManager.subscribe({
-          userVisibleOnly: true,
-          applicationServerKey,
-        });
+        // 6. If no valid subscription, create one
+        if (needsResubscribe) {
+          // Unsubscribe old one if exists
+          if (subscription) {
+            try { await subscription.unsubscribe(); } catch {}
+          }
 
+          const keyResponse = await fetch('/api/push/vapid-key');
+          const keyData = await keyResponse.json();
+          const publicKey = keyData.data?.publicKey;
+
+          if (!publicKey) {
+            console.error('[PUSH] No VAPID public key available');
+            return;
+          }
+
+          const applicationServerKey = urlBase64ToUint8Array(publicKey);
+
+          subscription = await registration.pushManager.subscribe({
+            userVisibleOnly: true,
+            applicationServerKey,
+          });
+
+          console.log('[PUSH] New push subscription created');
+        }
+
+        // 7. Always register/update the subscription on the server
         let deviceId = localStorage.getItem('aafiatak-device-id');
         if (!deviceId) {
           deviceId = `device-${Date.now()}-${Math.random().toString(36).slice(2)}`;
           localStorage.setItem('aafiatak-device-id', deviceId);
         }
 
-        await fetch('/api/push/subscribe', {
+        const subJSON = subscription.toJSON();
+        const response = await fetch('/api/push/subscribe', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
@@ -454,18 +555,32 @@ function PushSubscriptionManager() {
           },
           body: JSON.stringify({
             endpoint: subscription.endpoint,
-            keys: subscription.toJSON().keys,
+            keys: subJSON.keys,
             platform: 'web',
             deviceId,
           }),
         });
+
+        if (response.ok) {
+          console.log('[PUSH] Subscription registered/updated on server');
+        } else {
+          console.warn('[PUSH] Failed to register subscription on server');
+        }
       } catch (error) {
         console.warn('[PUSH] Failed to subscribe:', error);
       }
     };
 
-    const timeout = setTimeout(subscribeToPush, 3000);
-    return () => clearTimeout(timeout);
+    // Subscribe after a short delay to allow SW to be fully ready
+    const timeout = setTimeout(subscribeToPush, 2000);
+
+    // Also re-validate subscription periodically (every 5 minutes)
+    const interval = setInterval(subscribeToPush, 5 * 60 * 1000);
+
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
   }, [hasHydrated, isAuthenticated, token, user]);
 
   return null;
@@ -659,6 +774,7 @@ export function PWAInitializer() {
       <NotificationPoller />
       <WelcomeBackPlayer />
       <PushSubscriptionManager />
+      <NotificationPermissionBanner />
       <OfflineWrapper />
     </>
   );
