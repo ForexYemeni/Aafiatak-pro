@@ -141,16 +141,21 @@ export function formatYemeniPhone(phone: string): string {
 /**
  * Create a Set-Cookie header value for the auth token.
  * Uses SameSite=Lax for better compatibility (allows top-level navigations).
+ * Only sets Secure flag on HTTPS origins to ensure cookies work in development.
  */
 export function createAuthCookie(token: string, maxAge: number = 7 * 24 * 60 * 60): string {
-  return `auth_token=${encodeURIComponent(token)}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secure = isProduction ? '; Secure' : '';
+  return `auth_token=${encodeURIComponent(token)}; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=${maxAge}`;
 }
 
 /**
  * Create a Set-Cookie header value that clears the auth token.
  */
 export function createClearAuthCookie(): string {
-  return 'auth_token=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0';
+  const isProduction = process.env.NODE_ENV === 'production';
+  const secure = isProduction ? '; Secure' : '';
+  return `auth_token=; HttpOnly${secure}; SameSite=Lax; Path=/; Max-Age=0`;
 }
 
 // ---- Error Response Helper ----

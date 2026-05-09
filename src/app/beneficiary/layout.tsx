@@ -15,9 +15,10 @@ export default function BeneficiaryLayout({ children }: { children: ReactNode })
     // Wait for hydration before checking auth to prevent redirect loops
     if (!_hasHydrated) return;
     if (!isAuthenticated || user?.role !== 'beneficiary') {
-      router.replace('/?redirect=/beneficiary');
+      // Use window.location.href for reliable redirect with cookie
+      window.location.href = '/?redirect=/beneficiary';
     }
-  }, [isAuthenticated, user, router, _hasHydrated]);
+  }, [isAuthenticated, user, _hasHydrated]);
 
   // Safety timeout: if hydration takes more than 5 seconds, show retry option
   useEffect(() => {

@@ -1056,7 +1056,9 @@ function LoginPageContent() {
     // redirect IMMEDIATELY without the 5-second loading screen
     if (isAuthenticated && user && !justLoggedOut && !isFreshLogin) {
       const destination = redirectPath ?? getDashboardPath(user.role);
-      router.replace(destination);
+      // Use window.location.href for reliable full-page navigation
+      // This ensures the auth cookie is sent with the request
+      window.location.href = destination;
       return;
     }
 
@@ -1073,9 +1075,11 @@ function LoginPageContent() {
   const handleLoadingComplete = useCallback(() => {
     if (user) {
       const destination = redirectPath ?? getDashboardPath(user.role);
-      router.replace(destination);
+      // Use window.location.href for reliable full-page navigation
+      // This ensures the auth cookie is sent with the request
+      window.location.href = destination;
     }
-  }, [user, redirectPath, router]);
+  }, [user, redirectPath]);
 
   // ============================================================================
   // Login Form

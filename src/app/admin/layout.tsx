@@ -15,15 +15,16 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     // Wait for hydration before checking auth to prevent redirect loops
     if (!_hasHydrated) return;
     if (!isAuthenticated) {
-      router.replace('/?redirect=/admin');
+      // Use window.location.href for reliable redirect with cookie
+      window.location.href = '/?redirect=/admin';
       return;
     }
     if (isAuthenticated && user) {
       if (user.role !== 'admin' && user.role !== 'subadmin') {
-        router.replace('/?redirect=/admin');
+        window.location.href = '/?redirect=/admin';
       }
     }
-  }, [isAuthenticated, user, router, _hasHydrated]);
+  }, [isAuthenticated, user, _hasHydrated]);
 
   // Safety timeout: if hydration takes more than 5 seconds, show retry option
   useEffect(() => {
