@@ -4,22 +4,21 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle, Eye, UserPlus, RefreshCw, Clock, Phone, MessageCircle,
-  MapPin, Navigation, Siren, Play, CheckCircle2, X,
-  Loader2, Zap, Timer, User, Star, ShieldAlert, Ambulance,
-  ArrowRight, Radio, CircleDot
+  MapPin, Navigation, Siren, CheckCircle2, X, Loader2, Zap, Timer,
+  User, Star, ShieldAlert, Ambulance, Search, Filter, ChevronDown,
+  Radio, CircleDot, Activity, Stethoscope, Heart, Flame, TrendingUp,
+  Users, Wifi, WifiOff, Sparkles, ArrowUpRight, XCircle, CircleCheck
 } from 'lucide-react';
-import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
-import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
-import { DateFormatter } from '@/components/common/date-formatter';
+import { GlassCard } from '@/components/common/glass-card';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
-import { Input } from '@/components/ui/input';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Dialog,
   DialogContent,
@@ -29,8 +28,9 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
-import type { ColumnDef } from '@tanstack/react-table';
+import { toArabicNum } from '@/components/common/date-formatter';
 
+/* ─────────────── Types ─────────────── */
 interface EmergencyItem {
   id: string;
   beneficiaryName: string;
@@ -54,72 +54,57 @@ interface NearbyNurse {
   phone: string;
   specialization: string;
   rating: number;
-  distance: number;
+  distance: number | null;
   isAvailable: boolean;
   isOnline: boolean;
   governorate: string;
+  completedJobs?: number;
+  experience?: number;
 }
 
+/* ─────────────── Constants ─────────────── */
 const typeLabels: Record<string, string> = {
-  medical: 'طبي',
+  medical: 'طبي عام',
   injury: 'إصابة',
   breathing: 'تنفسي',
   cardiac: 'قلبي',
   fall: 'سقوط',
   other: 'أخرى',
+  general_medical: 'طبي عام',
 };
 
-const typeIcons: Record<string, React.ReactNode> = {
-  medical: '🏥',
-  injury: '🩹',
-  breathing: '🫁',
-  cardiac: '❤️',
-  fall: '🚨',
-  other: '⚕️',
+const typeColors: Record<string, { bg: string; text: string; icon: string }> = {
+  medical:     { bg: 'bg-red-500',    text: 'text-red-600 dark:text-red-400',    icon: 'bg-red-100 dark:bg-red-900/30' },
+  injury:      { bg: 'bg-orange-500', text: 'text-orange-600 dark:text-orange-400', icon: 'bg-orange-100 dark:bg-orange-900/30' },
+  breathing:   { bg: 'bg-blue-500',   text: 'text-blue-600 dark:text-blue-400',   icon: 'bg-blue-100 dark:bg-blue-900/30' },
+  cardiac:     { bg: 'bg-rose-500',   text: 'text-rose-600 dark:text-rose-400',   icon: 'bg-rose-100 dark:bg-rose-900/30' },
+  fall:        { bg: 'bg-amber-500',  text: 'text-amber-600 dark:text-amber-400', icon: 'bg-amber-100 dark:bg-amber-900/30' },
+  other:       { bg: 'bg-gray-500',   text: 'text-gray-600 dark:text-gray-400',   icon: 'bg-gray-100 dark:bg-gray-900/30' },
+  general_medical: { bg: 'bg-red-500', text: 'text-red-600 dark:text-red-400', icon: 'bg-red-100 dark:bg-red-900/30' },
 };
 
-const typeColors: Record<string, string> = {
-  medical: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  injury: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400',
-  breathing: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  cardiac: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  fall: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400',
-  other: 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
+const typeIconMap: Record<string, React.ElementType> = {
+  medical: Activity, injury: Heart, breathing: Stethoscope,
+  cardiac: Heart, fall: AlertTriangle, other: ShieldAlert,
+  general_medical: Activity,
 };
 
-const statusLabelsAr: Record<string, string> = {
-  pending: 'معلق',
-  dispatched: 'تم الإرسال',
-  in_progress: 'قيد التنفيذ',
-  resolved: 'تم الحل',
-  cancelled: 'ملغي',
+const statusConfig: Record<string, { label: string; color: string; dotColor: string }> = {
+  pending:     { label: 'معلق',         color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300', dotColor: 'bg-yellow-500' },
+  dispatched:  { label: 'تم الإرسال',    color: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',        dotColor: 'bg-blue-500' },
+  in_progress: { label: 'قيد التنفيذ',   color: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300', dotColor: 'bg-orange-500' },
+  resolved:    { label: 'تم الحل',       color: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',     dotColor: 'bg-green-500' },
+  cancelled:   { label: 'ملغي',         color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',         dotColor: 'bg-gray-500' },
 };
 
-const statusColors: Record<string, string> = {
-  pending: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
-  dispatched: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400',
-  in_progress: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
-  resolved: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
-  cancelled: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-400',
+const priorityConfig: Record<string, { label: string; color: string; glow: string }> = {
+  low:    { label: 'منخفض', color: 'border-green-400 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300', glow: '' },
+  medium: { label: 'متوسط', color: 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300', glow: '' },
+  high:   { label: 'مرتفع', color: 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300', glow: 'shadow-orange-500/20 shadow-md' },
+  urgent: { label: 'عاجل',  color: 'border-red-400 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300', glow: 'shadow-red-500/30 shadow-lg animate-pulse' },
 };
 
-const priorityColors: Record<string, string> = {
-  low: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400 border-green-300',
-  medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400 border-yellow-300',
-  high: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400 border-orange-300',
-  urgent: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400 border-red-300',
-};
-
-const priorityLabels: Record<string, string> = {
-  low: 'منخفض',
-  medium: 'متوسط',
-  high: 'مرتفع',
-  urgent: 'عاجل',
-};
-
-const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
-const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
-
+/* ─────────────── Helpers ─────────────── */
 function getWhatsAppUrl(phone: string) {
   const cleanPhone = phone.replace(/\D/g, '');
   const withCode = cleanPhone.startsWith('0') ? '967' + cleanPhone.substring(1) : cleanPhone.startsWith('967') ? cleanPhone : '967' + cleanPhone;
@@ -134,16 +119,25 @@ function getTimeAgo(dateStr: string): string {
   const diffMin = Math.floor(diffSec / 60);
   if (diffMin < 60) return `منذ ${diffMin} دقيقة`;
   const diffHr = Math.floor(diffMin / 60);
-  return `منذ ${diffHr} ساعة`;
+  if (diffHr < 24) return `منذ ${diffHr} ساعة`;
+  const diffDay = Math.floor(diffHr / 24);
+  return `منذ ${diffDay} يوم`;
 }
 
+/* ─────────────── Animation ─────────────── */
+const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } };
+const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
+const cardHover = { whileHover: { scale: 1.01 }, whileTap: { scale: 0.99 } };
+
+/* ════════════════════════════════════════════════════════════════ */
+/* ═══════════════ MAIN COMPONENT ════════════════════════════════ */
+/* ════════════════════════════════════════════════════════════════ */
 export default function AdminEmergenciesPage() {
   const authFetch = useAuthFetch();
   const [emergencies, setEmergencies] = useState<EmergencyItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
-  const [page, setPage] = useState(1);
-  const [totalPages, setTotalPages] = useState(1);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Detail dialog
   const [viewTarget, setViewTarget] = useState<EmergencyItem | null>(null);
@@ -155,22 +149,21 @@ export default function AdminEmergenciesPage() {
   const [isAssigning, setIsAssigning] = useState(false);
   const [isLoadingNurses, setIsLoadingNurses] = useState(false);
   const [nurseSearch, setNurseSearch] = useState('');
+  const [nurseSearchDebounce, setNurseSearchDebounce] = useState('');
 
-  // Execute dialog
+  // Execute & Resolve dialogs
   const [executeTarget, setExecuteTarget] = useState<EmergencyItem | null>(null);
   const [isExecuting, setIsExecuting] = useState(false);
-
-  // Resolve dialog
   const [resolveTarget, setResolveTarget] = useState<EmergencyItem | null>(null);
   const [isResolving, setIsResolving] = useState(false);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  /* ── Fetch emergencies ── */
   const fetchEmergencies = useCallback(async () => {
     try {
       const params = new URLSearchParams({
-        page: String(page),
-        limit: '10',
+        limit: '100',
         ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
       });
       const res = await authFetch(`/api/admin/emergencies?${params}`);
@@ -178,16 +171,13 @@ export default function AdminEmergenciesPage() {
       if (json.success && json.data) {
         const emergenciesArray = json.data.emergencies ?? json.data;
         setEmergencies(Array.isArray(emergenciesArray) ? emergenciesArray : []);
-        if (json.data.pages || json.data.totalPages) {
-          setTotalPages(json.data.pages ?? json.data.totalPages ?? 1);
-        }
       }
     } catch {
       // silent for auto-refresh
     } finally {
       setIsLoading(false);
     }
-  }, [authFetch, page, statusFilter]);
+  }, [authFetch, statusFilter]);
 
   useEffect(() => {
     setIsLoading(true);
@@ -200,8 +190,8 @@ export default function AdminEmergenciesPage() {
     return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
   }, [fetchEmergencies]);
 
-  // Fetch nearby nurses using the dedicated API
-  const fetchNearbyNurses = async (em: EmergencyItem) => {
+  /* ── Fetch nearby nurses ── */
+  const fetchNearbyNurses = useCallback(async (em: EmergencyItem, searchTerm?: string) => {
     setIsLoadingNurses(true);
     setNearbyNurses([]);
     try {
@@ -209,23 +199,34 @@ export default function AdminEmergenciesPage() {
         ...(em.id ? { emergencyId: em.id } : {}),
         ...(em.lat ? { lat: String(em.lat) } : {}),
         ...(em.lng ? { lng: String(em.lng) } : {}),
-        maxDistance: '50',
-        limit: '30',
+        maxDistance: '100',
+        limit: '50',
+        ...(searchTerm ? { search: searchTerm } : {}),
       });
       const res = await authFetch(`/api/admin/emergencies/nearby-nurses?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
         setNearbyNurses(json.data.nurses || []);
       } else {
-        toast.error('فشل البحث عن الممرضين القريبين');
+        toast.error('فشل البحث عن الممرضين');
       }
     } catch {
       toast.error('فشل تحميل قائمة الممرضين');
     } finally {
       setIsLoadingNurses(false);
     }
-  };
+  }, [authFetch]);
 
+  // Debounced nurse search - triggers API call
+  useEffect(() => {
+    if (!assignTarget) return;
+    const timer = setTimeout(() => {
+      void fetchNearbyNurses(assignTarget, nurseSearchDebounce);
+    }, 400);
+    return () => clearTimeout(timer);
+  }, [nurseSearchDebounce, assignTarget, fetchNearbyNurses]);
+
+  /* ── Actions ── */
   const handleAssign = async () => {
     if (!assignTarget || !selectedNurse) return;
     setIsAssigning(true);
@@ -236,7 +237,7 @@ export default function AdminEmergenciesPage() {
       });
       const json = await res.json();
       if (json.success) {
-        toast.success('تم إرسال الممرض/ـة للطوارئ');
+        toast.success('تم إرسال الممرض/ـة للطوارئ بنجاح');
         void fetchEmergencies();
       } else {
         toast.error(json.message ?? 'فشل التعيين');
@@ -248,6 +249,8 @@ export default function AdminEmergenciesPage() {
       setAssignTarget(null);
       setSelectedNurse('');
       setNearbyNurses([]);
+      setNurseSearch('');
+      setNurseSearchDebounce('');
     }
   };
 
@@ -297,221 +300,356 @@ export default function AdminEmergenciesPage() {
     }
   };
 
+  /* ── Derived state ── */
   const isActive = (status: string) => ['pending', 'dispatched', 'in_progress'].includes(status);
-
-  const columns: ColumnDef<EmergencyItem, unknown>[] = [
-    {
-      accessorKey: 'type',
-      header: 'النوع',
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          {isActive(row.original.status) && (
-            <span className="w-2 h-2 rounded-full bg-red-500 animate-pulse" />
-          )}
-          <span className="text-lg">{typeIcons[row.original.type] ?? '⚕️'}</span>
-          <span className="font-medium">{typeLabels[row.original.type] ?? row.original.type}</span>
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'beneficiaryName',
-      header: 'المستفيد',
-      cell: ({ row }) => (
-        <div>
-          <p className="font-medium text-sm">{row.original.beneficiaryName}</p>
-          {row.original.beneficiaryPhone && (
-            <div className="flex items-center gap-1.5 mt-0.5">
-              <span className="text-xs text-muted-foreground">{row.original.beneficiaryPhone}</span>
-              <a href={`tel:${row.original.beneficiaryPhone}`} className="text-blue-500"><Phone className="w-3 h-3" /></a>
-              <a href={getWhatsAppUrl(row.original.beneficiaryPhone)} target="_blank" rel="noopener noreferrer" className="text-green-500"><MessageCircle className="w-3 h-3" /></a>
-            </div>
-          )}
-        </div>
-      ),
-    },
-    {
-      accessorKey: 'priority',
-      header: 'الأولوية',
-      cell: ({ row }) => (
-        <span className={`text-xs px-2.5 py-1 rounded-full border font-medium ${priorityColors[row.original.priority] ?? ''}`}>
-          {priorityLabels[row.original.priority] ?? row.original.priority}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'status',
-      header: 'الحالة',
-      cell: ({ row }) => (
-        <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${statusColors[row.original.status] ?? ''}`}>
-          {statusLabelsAr[row.original.status] ?? row.original.status}
-        </span>
-      ),
-    },
-    {
-      accessorKey: 'nurseName',
-      header: 'الممرض/ـة',
-      cell: ({ row }) => <span className="text-sm">{row.original.nurseName ?? '—'}</span>,
-    },
-    {
-      accessorKey: 'createdAt',
-      header: 'الوقت',
-      cell: ({ row }) => <DateFormatter date={row.original.createdAt} format="relative" />,
-    },
-  ];
-
-  const rowActions = [
-    {
-      label: 'عرض التفاصيل',
-      icon: Eye,
-      onClick: (row: Record<string, unknown>) => setViewTarget(row as unknown as EmergencyItem),
-    },
-    {
-      label: 'تعيين ممرض/ـة',
-      icon: UserPlus,
-      onClick: (row: Record<string, unknown>) => {
-        const em = row as unknown as EmergencyItem;
-        setAssignTarget(em);
-        void fetchNearbyNurses(em);
-      },
-      hidden: (row: Record<string, unknown>) => (row as unknown as EmergencyItem).status !== 'pending',
-    },
-    {
-      label: 'تنفيذ مباشر',
-      icon: Zap,
-      onClick: (row: Record<string, unknown>) => setExecuteTarget(row as unknown as EmergencyItem),
-      hidden: (row: Record<string, unknown>) => {
-        const em = row as unknown as EmergencyItem;
-        return em.status !== 'pending' && em.status !== 'dispatched';
-      },
-    },
-    {
-      label: 'تم الحل',
-      icon: CheckCircle2,
-      onClick: (row: Record<string, unknown>) => setResolveTarget(row as unknown as EmergencyItem),
-      hidden: (row: Record<string, unknown>) => !isActive((row as unknown as EmergencyItem).status),
-    },
-  ];
 
   const activeCount = emergencies.filter((e) => isActive(e.status)).length;
   const pendingCount = emergencies.filter((e) => e.status === 'pending').length;
   const dispatchedCount = emergencies.filter((e) => e.status === 'dispatched').length;
   const inProgressCount = emergencies.filter((e) => e.status === 'in_progress').length;
+  const resolvedCount = emergencies.filter((e) => e.status === 'resolved').length;
 
-  // Filter nearby nurses by search
-  const filteredNurses = nurseSearch
-    ? nearbyNurses.filter(n =>
-        n.name.includes(nurseSearch) ||
-        n.phone.includes(nurseSearch) ||
-        n.specialization.includes(nurseSearch)
+  // Filter emergencies by search
+  const filteredEmergencies = searchQuery
+    ? emergencies.filter(e =>
+        e.beneficiaryName?.includes(searchQuery) ||
+        e.beneficiaryPhone?.includes(searchQuery) ||
+        e.description?.includes(searchQuery) ||
+        e.address?.includes(searchQuery) ||
+        (typeLabels[e.type] || e.type)?.includes(searchQuery)
       )
-    : nearbyNurses;
+    : emergencies;
 
+  // Group by status priority
+  const activeEmergencies = filteredEmergencies.filter(e => isActive(e.status));
+  const resolvedEmergencies = filteredEmergencies.filter(e => !isActive(e.status));
+
+  /* ════════════════════════════════════════════════════════════════ */
+  /* ═══════════════ RENDER ═══════════════════════════════════════ */
+  /* ════════════════════════════════════════════════════════════════ */
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+      {/* ── Header ── */}
       <motion.div variants={itemAnim}>
-        <PageHeader title="إدارة الطوارئ" description="إدارة ومتابعة طلبات الطوارئ - تحديث تلقائي كل ١٥ ثانية" />
+        <PageHeader
+          title="إدارة الطوارئ"
+          description="متابعة وإدارة طلبات الطوارئ - تحديث تلقائي كل ١٥ ثانية"
+        />
       </motion.div>
 
-      {/* Stats Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {activeCount > 0 && (
-          <motion.div variants={itemAnim}>
-            <GlassCard className="border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20 p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center animate-pulse">
-                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                </div>
-                <div>
-                  <p className="font-bold text-red-700 dark:text-red-400 text-lg">{activeCount}</p>
-                  <p className="text-xs text-red-600/80">حالات نشطة</p>
-                </div>
-              </div>
-            </GlassCard>
-          </motion.div>
-        )}
-        {pendingCount > 0 && (
-          <motion.div variants={itemAnim}>
-            <GlassCard className="border-yellow-200 dark:border-yellow-900/50 bg-yellow-50/50 dark:bg-yellow-950/20 p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center animate-pulse">
-                  <Timer className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
-                </div>
-                <div>
-                  <p className="font-bold text-yellow-700 dark:text-yellow-400 text-lg">{pendingCount}</p>
-                  <p className="text-xs text-yellow-600/80">بانتظار التعيين</p>
-                </div>
-              </div>
-            </GlassCard>
-          </motion.div>
-        )}
-        {dispatchedCount > 0 && (
-          <motion.div variants={itemAnim}>
-            <GlassCard className="border-blue-200 dark:border-blue-900/50 bg-blue-50/50 dark:bg-blue-950/20 p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                  <Ambulance className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <p className="font-bold text-blue-700 dark:text-blue-400 text-lg">{dispatchedCount}</p>
-                  <p className="text-xs text-blue-600/80">تم الإرسال</p>
-                </div>
-              </div>
-            </GlassCard>
-          </motion.div>
-        )}
-        {inProgressCount > 0 && (
-          <motion.div variants={itemAnim}>
-            <GlassCard className="border-orange-200 dark:border-orange-900/50 bg-orange-50/50 dark:bg-orange-950/20 p-4">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
-                  <Radio className="w-5 h-5 text-orange-600 dark:text-orange-400" />
-                </div>
-                <div>
-                  <p className="font-bold text-orange-700 dark:text-orange-400 text-lg">{inProgressCount}</p>
-                  <p className="text-xs text-orange-600/80">قيد التنفيذ</p>
-                </div>
-              </div>
-            </GlassCard>
-          </motion.div>
-        )}
-      </div>
+      {/* ── Stats Row ── */}
+      <motion.div variants={itemAnim} className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <GlassCard variant="admin" className="p-4 border-r-4 border-red-500">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+              <Flame className="w-5 h-5 text-red-600 dark:text-red-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-red-600 dark:text-red-400">{toArabicNum(activeCount)}</p>
+              <p className="text-[11px] text-muted-foreground font-medium">حالات نشطة</p>
+            </div>
+          </div>
+        </GlassCard>
 
+        <GlassCard variant="admin" className="p-4 border-r-4 border-yellow-500">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
+              <Timer className="w-5 h-5 text-yellow-600 dark:text-yellow-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-yellow-600 dark:text-yellow-400">{toArabicNum(pendingCount)}</p>
+              <p className="text-[11px] text-muted-foreground font-medium">بانتظار التعيين</p>
+            </div>
+          </div>
+        </GlassCard>
+
+        <GlassCard variant="admin" className="p-4 border-r-4 border-blue-500">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+              <Ambulance className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-blue-600 dark:text-blue-400">{toArabicNum(dispatchedCount)}</p>
+              <p className="text-[11px] text-muted-foreground font-medium">تم الإرسال</p>
+            </div>
+          </div>
+        </GlassCard>
+
+        <GlassCard variant="admin" className="p-4 border-r-4 border-orange-500">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+              <Radio className="w-5 h-5 text-orange-600 dark:text-orange-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-orange-600 dark:text-orange-400">{toArabicNum(inProgressCount)}</p>
+              <p className="text-[11px] text-muted-foreground font-medium">قيد التنفيذ</p>
+            </div>
+          </div>
+        </GlassCard>
+
+        <GlassCard variant="admin" className="p-4 border-r-4 border-green-500">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <CircleCheck className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-green-600 dark:text-green-400">{toArabicNum(resolvedCount)}</p>
+              <p className="text-[11px] text-muted-foreground font-medium">تم الحل</p>
+            </div>
+          </div>
+        </GlassCard>
+      </motion.div>
+
+      {/* ── Filter Bar ── */}
       <motion.div variants={itemAnim}>
-        <GlassCard variant="admin">
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-44">
-                <SelectValue placeholder="الحالة" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">جميع الحالات</SelectItem>
-                <SelectItem value="pending">معلق</SelectItem>
-                <SelectItem value="dispatched">تم الإرسال</SelectItem>
-                <SelectItem value="in_progress">قيد التنفيذ</SelectItem>
-                <SelectItem value="resolved">تم الحل</SelectItem>
-                <SelectItem value="cancelled">ملغي</SelectItem>
-              </SelectContent>
-            </Select>
-            <Button variant="outline" size="icon" onClick={() => { setIsLoading(true); void fetchEmergencies(); }}>
-              <RefreshCw className="w-4 h-4" />
+        <GlassCard variant="admin" className="p-4">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <div className="relative flex-1">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                placeholder="بحث بالاسم، الهاتف، العنوان..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pr-10"
+              />
+            </div>
+            <div className="flex gap-2 overflow-x-auto scrollbar-none">
+              {[
+                { key: 'all', label: 'الكل', count: emergencies.length },
+                { key: 'pending', label: 'معلق', count: pendingCount },
+                { key: 'dispatched', label: 'مرسل', count: dispatchedCount },
+                { key: 'in_progress', label: 'قيد التنفيذ', count: inProgressCount },
+                { key: 'resolved', label: 'تم الحل', count: resolvedCount },
+              ].map((tab) => (
+                <button
+                  key={tab.key}
+                  onClick={() => setStatusFilter(tab.key)}
+                  className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all whitespace-nowrap ${
+                    statusFilter === tab.key
+                      ? 'bg-admin text-white shadow-sm'
+                      : 'bg-muted/60 hover:bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {tab.label}
+                  <span className={`px-1.5 py-0.5 rounded-md text-[10px] ${
+                    statusFilter === tab.key ? 'bg-white/20' : 'bg-muted'
+                  }`}>
+                    {toArabicNum(tab.count)}
+                  </span>
+                </button>
+              ))}
+            </div>
+            <Button variant="outline" size="icon" className="shrink-0" onClick={() => { setIsLoading(true); void fetchEmergencies(); }}>
+              <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
             </Button>
           </div>
         </GlassCard>
       </motion.div>
 
-      <motion.div variants={itemAnim}>
-        <DataTable
-          columns={columns}
-          data={emergencies}
-          isLoading={isLoading}
-          emptyMessage="لا توجد حالات طوارئ"
-          emptyAction={{ label: 'تحديث', onClick: () => { setIsLoading(true); void fetchEmergencies(); } }}
-          rowActions={rowActions as never}
-          currentPage={page}
-          pageCount={totalPages}
-          onPageChange={setPage}
-        />
-      </motion.div>
+      {/* ── Active Emergencies ── */}
+      {activeEmergencies.length > 0 && (
+        <motion.div variants={itemAnim}>
+          <div className="flex items-center gap-2 mb-4">
+            <div className="flex items-center gap-2">
+              <span className="w-3 h-3 rounded-full bg-red-500 animate-pulse" />
+              <h2 className="text-lg font-bold">حالات الطوارئ النشطة</h2>
+            </div>
+            <Badge variant="destructive" className="text-xs">{toArabicNum(activeEmergencies.length)} حالة</Badge>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+            {activeEmergencies.map((em) => {
+              const tc = typeColors[em.type] || typeColors.other;
+              const pc = priorityConfig[em.priority] || priorityConfig.medium;
+              const sc = statusConfig[em.status] || statusConfig.pending;
+              const TypeIcon = typeIconMap[em.type] || ShieldAlert;
+
+              return (
+                <motion.div key={em.id} {...cardHover} className={`rounded-2xl border bg-card shadow-sm transition-all hover:shadow-lg ${pc.glow}`}>
+                  {/* Priority Strip */}
+                  <div className={`h-1.5 rounded-t-2xl ${tc.bg}`} />
+
+                  <div className="p-4 space-y-3">
+                    {/* Header Row */}
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`w-10 h-10 rounded-xl ${tc.icon} flex items-center justify-center`}>
+                          <TypeIcon className={`w-5 h-5 ${tc.text}`} />
+                        </div>
+                        <div>
+                          <p className="font-bold text-sm">{typeLabels[em.type] || em.type}</p>
+                          <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-semibold ${pc.color}`}>
+                            {priorityConfig[em.priority]?.label || em.priority}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <span className={`w-2 h-2 rounded-full ${sc.dotColor} ${isActive(em.status) ? 'animate-pulse' : ''}`} />
+                        <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${sc.color}`}>
+                          {sc.label}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Beneficiary Info */}
+                    <div className="flex items-center gap-2.5 p-2.5 rounded-xl bg-muted/40">
+                      <Avatar className="w-8 h-8">
+                        <AvatarFallback className="text-[10px] bg-admin/10 text-admin">
+                          {em.beneficiaryName?.slice(0, 2) || '؟'}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{em.beneficiaryName}</p>
+                        {em.beneficiaryPhone && (
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] text-muted-foreground">{em.beneficiaryPhone}</span>
+                            <a href={`tel:${em.beneficiaryPhone}`} className="text-blue-500 hover:text-blue-600"><Phone className="w-3 h-3" /></a>
+                            <a href={getWhatsAppUrl(em.beneficiaryPhone)} target="_blank" rel="noopener noreferrer" className="text-green-500 hover:text-green-600"><MessageCircle className="w-3 h-3" /></a>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Description */}
+                    {em.description && (
+                      <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{em.description}</p>
+                    )}
+
+                    {/* Location & Time Row */}
+                    <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
+                      <div className="flex items-center gap-1">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>{getTimeAgo(em.createdAt)}</span>
+                      </div>
+                      {em.address && (
+                        <div className="flex items-center gap-1 flex-1 min-w-0">
+                          <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                          <span className="truncate">{em.address}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Nurse Info */}
+                    {em.nurseName && (
+                      <div className="flex items-center gap-2 p-2 rounded-lg bg-blue-50 dark:bg-blue-900/10 border border-blue-100 dark:border-blue-900/30">
+                        <Stethoscope className="w-3.5 h-3.5 text-blue-600" />
+                        <span className="text-xs font-medium text-blue-700 dark:text-blue-300">{em.nurseName}</span>
+                      </div>
+                    )}
+
+                    {/* Action Buttons */}
+                    <div className="flex gap-2 pt-1">
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 text-xs gap-1 flex-1"
+                        onClick={() => setViewTarget(em)}
+                      >
+                        <Eye className="w-3.5 h-3.5" /> التفاصيل
+                      </Button>
+                      {em.status === 'pending' && (
+                        <Button
+                          size="sm"
+                          className="h-8 text-xs gap-1 flex-1 bg-admin hover:bg-admin/90 text-white"
+                          onClick={() => {
+                            setAssignTarget(em);
+                            void fetchNearbyNurses(em);
+                          }}
+                        >
+                          <UserPlus className="w-3.5 h-3.5" /> تعيين
+                        </Button>
+                      )}
+                      {(em.status === 'pending' || em.status === 'dispatched') && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs gap-1 border-orange-300 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                          onClick={() => setExecuteTarget(em)}
+                        >
+                          <Zap className="w-3.5 h-3.5" /> تنفيذ
+                        </Button>
+                      )}
+                      {isActive(em.status) && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-8 text-xs gap-1 border-green-300 text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20"
+                          onClick={() => setResolveTarget(em)}
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5" /> حل
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Resolved/Closed Emergencies ── */}
+      {resolvedEmergencies.length > 0 && (
+        <motion.div variants={itemAnim}>
+          <div className="flex items-center gap-2 mb-4">
+            <CheckCircle2 className="w-5 h-5 text-green-500" />
+            <h2 className="text-lg font-bold">الحالات المنتهية</h2>
+            <Badge variant="secondary" className="text-xs">{toArabicNum(resolvedEmergencies.length)}</Badge>
+          </div>
+          <div className="space-y-2">
+            {resolvedEmergencies.map((em) => {
+              const sc = statusConfig[em.status] || statusConfig.resolved;
+              const tc = typeColors[em.type] || typeColors.other;
+
+              return (
+                <motion.div key={em.id} {...cardHover}>
+                  <GlassCard variant="admin" className="p-3 opacity-80 hover:opacity-100 transition-opacity">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-9 h-9 rounded-lg ${tc.icon} flex items-center justify-center`}>
+                        <ShieldAlert className={`w-4 h-4 ${tc.text}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-medium">{typeLabels[em.type] || em.type}</p>
+                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${sc.color}`}>{sc.label}</span>
+                        </div>
+                        <div className="flex items-center gap-3 text-[11px] text-muted-foreground mt-0.5">
+                          <span>{em.beneficiaryName}</span>
+                          {em.nurseName && <span>• {em.nurseName}</span>}
+                          <span>• {getTimeAgo(em.createdAt)}</span>
+                        </div>
+                      </div>
+                      <Button size="sm" variant="ghost" className="h-8 text-xs" onClick={() => setViewTarget(em)}>
+                        <Eye className="w-3.5 h-3.5" />
+                      </Button>
+                    </div>
+                  </GlassCard>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* ── Empty State ── */}
+      {!isLoading && filteredEmergencies.length === 0 && (
+        <motion.div variants={itemAnim}>
+          <GlassCard variant="admin" className="p-16 text-center">
+            <div className="w-16 h-16 rounded-2xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
+              <CheckCircle2 className="w-8 h-8 text-green-500" />
+            </div>
+            <h3 className="font-bold text-lg mb-1">لا توجد حالات طوارئ</h3>
+            <p className="text-sm text-muted-foreground">جميع حالات الطوارئ تم التعامل معها بنجاح</p>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* ── Loading State ── */}
+      {isLoading && emergencies.length === 0 && (
+        <GlassCard variant="admin" className="p-16 text-center">
+          <Loader2 className="w-10 h-10 text-admin animate-spin mx-auto mb-4" />
+          <p className="text-sm text-muted-foreground">جارٍ تحميل حالات الطوارئ...</p>
+        </GlassCard>
+      )}
 
       {/* ═══════════════ VIEW DETAILS DIALOG ═══════════════ */}
       <Dialog open={!!viewTarget} onOpenChange={(open) => { if (!open) setViewTarget(null); }}>
@@ -522,130 +660,138 @@ export default function AdminEmergenciesPage() {
               تفاصيل حالة الطوارئ
             </DialogTitle>
           </DialogHeader>
-          {viewTarget && (
-            <div className="space-y-4">
-              {/* Emergency Header */}
-              <div className={`rounded-xl border-2 p-4 ${
-                isActive(viewTarget.status)
-                  ? 'border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20'
-                  : 'border-green-300 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center text-2xl ${
-                      isActive(viewTarget.status) ? 'bg-red-100 dark:bg-red-900/30 animate-pulse' : 'bg-green-100 dark:bg-green-900/30'
-                    }`}>
-                      {typeIcons[viewTarget.type] ?? '🚨'}
+          {viewTarget && (() => {
+            const tc = typeColors[viewTarget.type] || typeColors.other;
+            const pc = priorityConfig[viewTarget.priority] || priorityConfig.medium;
+            const sc = statusConfig[viewTarget.status] || statusConfig.pending;
+            const TypeIcon = typeIconMap[viewTarget.type] || ShieldAlert;
+
+            return (
+              <div className="space-y-4">
+                {/* Emergency Header */}
+                <div className={`rounded-2xl border-2 p-4 ${
+                  isActive(viewTarget.status)
+                    ? 'border-red-300 dark:border-red-800 bg-red-50/50 dark:bg-red-950/20'
+                    : 'border-green-300 dark:border-green-800 bg-green-50/50 dark:bg-green-950/20'
+                }`}>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-14 h-14 rounded-xl ${tc.icon} flex items-center justify-center ${isActive(viewTarget.status) ? 'animate-pulse' : ''}`}>
+                        <TypeIcon className={`w-7 h-7 ${tc.text}`} />
+                      </div>
+                      <div>
+                        <p className="font-bold">{typeLabels[viewTarget.type] || viewTarget.type}</p>
+                        <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full border font-semibold ${pc.color}`}>
+                          أولوية: {pc.label}
+                        </span>
+                      </div>
                     </div>
-                    <div>
-                      <p className="font-bold text-sm">{typeLabels[viewTarget.type] ?? viewTarget.type}</p>
-                      <span className={`text-xs px-2 py-0.5 rounded-full border ${priorityColors[viewTarget.priority] ?? ''}`}>
-                        أولوية: {priorityLabels[viewTarget.priority] ?? viewTarget.priority}
-                      </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className={`w-2.5 h-2.5 rounded-full ${sc.dotColor} ${isActive(viewTarget.status) ? 'animate-pulse' : ''}`} />
+                      <span className={`text-xs px-3 py-1.5 rounded-full font-semibold ${sc.color}`}>{sc.label}</span>
                     </div>
                   </div>
-                  <span className={`text-xs px-3 py-1.5 rounded-full font-medium ${statusColors[viewTarget.status] ?? ''}`}>
-                    {statusLabelsAr[viewTarget.status] ?? viewTarget.status}
-                  </span>
                 </div>
-              </div>
 
-              {/* Time */}
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <Clock className="w-4 h-4" />
-                <span>تم الإرسال {getTimeAgo(viewTarget.createdAt)}</span>
-              </div>
-
-              {/* Description */}
-              <div className="glass rounded-xl p-3">
-                <p className="text-xs text-muted-foreground mb-1">الوصف</p>
-                <p className="text-sm">{viewTarget.description}</p>
-              </div>
-
-              {/* Beneficiary & Nurse */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="glass rounded-xl p-3">
-                  <p className="text-xs text-muted-foreground mb-1">المستفيد</p>
-                  <p className="text-sm font-medium">{viewTarget.beneficiaryName}</p>
-                  {viewTarget.beneficiaryPhone && (
-                    <div className="flex items-center gap-1.5 mt-1">
-                      <span className="text-xs text-muted-foreground">{viewTarget.beneficiaryPhone}</span>
-                      <a href={`tel:${viewTarget.beneficiaryPhone}`}><Phone className="w-3 h-3 text-blue-500" /></a>
-                      <a href={getWhatsAppUrl(viewTarget.beneficiaryPhone)} target="_blank" rel="noopener noreferrer"><MessageCircle className="w-3 h-3 text-green-500" /></a>
-                    </div>
-                  )}
+                {/* Time */}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Clock className="w-4 h-4" />
+                  <span>تم الإرسال {getTimeAgo(viewTarget.createdAt)}</span>
                 </div>
-                <div className="glass rounded-xl p-3">
-                  <p className="text-xs text-muted-foreground mb-1">الممرض/ـة</p>
-                  <p className="text-sm font-medium">{viewTarget.nurseName ?? 'غير معيَّن'}</p>
-                </div>
-              </div>
 
-              {/* Fee */}
-              {viewTarget.emergencyFee && (
-                <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
-                  <span className="text-xs text-muted-foreground">رسوم الطوارئ</span>
-                  <span className="font-bold text-red-600 text-sm">{viewTarget.emergencyFee.toLocaleString('ar-YE')} ر.ي</span>
-                </div>
-              )}
-
-              {/* Location */}
-              {viewTarget.address && (
-                <div className="glass rounded-xl p-3">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <MapPin className="w-3.5 h-3.5 text-red-500" />
-                    <p className="text-xs text-muted-foreground">العنوان</p>
+                {/* Description */}
+                {viewTarget.description && (
+                  <div className="rounded-xl bg-muted/40 p-3">
+                    <p className="text-[10px] text-muted-foreground mb-1 font-medium">الوصف</p>
+                    <p className="text-sm leading-relaxed">{viewTarget.description}</p>
                   </div>
-                  <p className="text-sm font-medium">{viewTarget.address}</p>
-                  {viewTarget.lat && viewTarget.lng && (
-                    <a href={`https://www.google.com/maps?q=${viewTarget.lat},${viewTarget.lng}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 mt-1">
-                      <Navigation className="w-3 h-3" /> عرض على الخريطة
-                    </a>
-                  )}
-                </div>
-              )}
+                )}
 
-              {/* Quick Actions in Detail View */}
-              {isActive(viewTarget.status) && (
-                <div className="flex gap-2 pt-2">
-                  {viewTarget.status === 'pending' && (
+                {/* Beneficiary & Nurse */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-xl bg-muted/40 p-3">
+                    <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">المستفيد</p>
+                    <p className="text-sm font-medium">{viewTarget.beneficiaryName}</p>
+                    {viewTarget.beneficiaryPhone && (
+                      <div className="flex items-center gap-1.5 mt-1.5">
+                        <span className="text-xs text-muted-foreground">{viewTarget.beneficiaryPhone}</span>
+                        <a href={`tel:${viewTarget.beneficiaryPhone}`}><Phone className="w-3 h-3 text-blue-500" /></a>
+                        <a href={getWhatsAppUrl(viewTarget.beneficiaryPhone)} target="_blank" rel="noopener noreferrer"><MessageCircle className="w-3 h-3 text-green-500" /></a>
+                      </div>
+                    )}
+                  </div>
+                  <div className="rounded-xl bg-muted/40 p-3">
+                    <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">الممرض/ـة</p>
+                    <p className="text-sm font-medium">{viewTarget.nurseName ?? 'غير معيَّن'}</p>
+                  </div>
+                </div>
+
+                {/* Fee */}
+                {viewTarget.emergencyFee && (
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
+                    <span className="text-xs text-muted-foreground">رسوم الطوارئ</span>
+                    <span className="font-bold text-red-600 text-sm">{viewTarget.emergencyFee.toLocaleString('ar-YE')} ر.ي</span>
+                  </div>
+                )}
+
+                {/* Location */}
+                {viewTarget.address && (
+                  <div className="rounded-xl bg-muted/40 p-3">
+                    <div className="flex items-center gap-1.5 mb-1">
+                      <MapPin className="w-3.5 h-3.5 text-red-500" />
+                      <p className="text-[10px] text-muted-foreground font-medium">العنوان</p>
+                    </div>
+                    <p className="text-sm font-medium">{viewTarget.address}</p>
+                    {viewTarget.lat && viewTarget.lng && (
+                      <a href={`https://www.google.com/maps?q=${viewTarget.lat},${viewTarget.lng}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 mt-1 hover:underline">
+                        <Navigation className="w-3 h-3" /> عرض على الخريطة
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                {/* Quick Actions in Detail View */}
+                {isActive(viewTarget.status) && (
+                  <div className="flex gap-2 pt-2">
+                    {viewTarget.status === 'pending' && (
+                      <Button
+                        className="flex-1 gap-2 bg-admin hover:bg-admin/90"
+                        onClick={() => {
+                          setAssignTarget(viewTarget);
+                          setViewTarget(null);
+                          void fetchNearbyNurses(viewTarget);
+                        }}
+                      >
+                        <UserPlus className="w-4 h-4" />
+                        تعيين ممرض/ـة
+                      </Button>
+                    )}
                     <Button
-                      className="flex-1 gap-2 bg-admin hover:bg-admin/90"
+                      className="flex-1 gap-2 bg-orange-600 hover:bg-orange-700 text-white"
                       onClick={() => {
-                        setAssignTarget(viewTarget);
+                        setExecuteTarget(viewTarget);
                         setViewTarget(null);
-                        void fetchNearbyNurses(viewTarget);
                       }}
                     >
-                      <UserPlus className="w-4 h-4" />
-                      تعيين ممرض/ـة
+                      <Zap className="w-4 h-4" />
+                      تنفيذ مباشر
                     </Button>
-                  )}
-                  <Button
-                    className="flex-1 gap-2 bg-orange-600 hover:bg-orange-700 text-white"
-                    onClick={() => {
-                      setExecuteTarget(viewTarget);
-                      setViewTarget(null);
-                    }}
-                  >
-                    <Zap className="w-4 h-4" />
-                    تنفيذ مباشر
-                  </Button>
-                  <Button
-                    variant="outline"
-                    className="gap-2 text-green-600 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
-                    onClick={() => {
-                      setResolveTarget(viewTarget);
-                      setViewTarget(null);
-                    }}
-                  >
-                    <CheckCircle2 className="w-4 h-4" />
-                    تم الحل
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
+                    <Button
+                      variant="outline"
+                      className="gap-2 text-green-600 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
+                      onClick={() => {
+                        setResolveTarget(viewTarget);
+                        setViewTarget(null);
+                      }}
+                    >
+                      <CheckCircle2 className="w-4 h-4" />
+                      تم الحل
+                    </Button>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
         </DialogContent>
       </Dialog>
 
@@ -656,6 +802,7 @@ export default function AdminEmergenciesPage() {
           setSelectedNurse('');
           setNearbyNurses([]);
           setNurseSearch('');
+          setNurseSearchDebounce('');
         }
       }}>
         <DialogContent dir="rtl" className="max-w-lg max-h-[90vh] overflow-y-auto">
@@ -665,110 +812,166 @@ export default function AdminEmergenciesPage() {
               تعيين ممرض/ـة للطوارئ
             </DialogTitle>
             <DialogDescription>
-              الممرضون مرتبون حسب القرب من موقع الطوارئ - المتاحون أولاً
+              ابحث بالاسم أو الهاتف - الممرضون المتاحون يظهرون أولاً
             </DialogDescription>
           </DialogHeader>
 
           {/* Emergency Info Summary */}
-          {assignTarget && (
-            <div className="flex items-center gap-3 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
-              <span className="text-xl">{typeIcons[assignTarget.type] ?? '🚨'}</span>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{typeLabels[assignTarget.type]} - {assignTarget.beneficiaryName}</p>
-                <p className="text-xs text-muted-foreground truncate">{assignTarget.description}</p>
+          {assignTarget && (() => {
+            const tc = typeColors[assignTarget.type] || typeColors.other;
+            const TypeIcon = typeIconMap[assignTarget.type] || ShieldAlert;
+            return (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
+                <div className={`w-10 h-10 rounded-lg ${tc.icon} flex items-center justify-center`}>
+                  <TypeIcon className={`w-5 h-5 ${tc.text}`} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-bold">{typeLabels[assignTarget.type] || assignTarget.type} - {assignTarget.beneficiaryName}</p>
+                  <p className="text-xs text-muted-foreground truncate">{assignTarget.address || assignTarget.description || 'حالة طوارئ'}</p>
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           {/* Search nurses */}
-          <div className="space-y-2">
-            <Label className="text-xs font-medium">بحث عن ممرض/ـة</Label>
+          <div className="relative">
+            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
             <Input
-              placeholder="ابحث بالاسم أو الهاتف..."
+              placeholder="ابحث بالاسم أو الهاتف أو التخصص..."
               value={nurseSearch}
-              onChange={(e) => setNurseSearch(e.target.value)}
+              onChange={(e) => {
+                setNurseSearch(e.target.value);
+                setNurseSearchDebounce(e.target.value);
+              }}
+              className="pr-10"
             />
+            {nurseSearch && (
+              <button
+                onClick={() => { setNurseSearch(''); setNurseSearchDebounce(''); }}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            )}
           </div>
 
           {isLoadingNurses ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="w-6 h-6 animate-spin text-admin" />
-              <span className="mr-2 text-sm text-muted-foreground">جارٍ البحث عن الممرضين القريبين...</span>
+            <div className="flex flex-col items-center justify-center py-10 gap-3">
+              <Loader2 className="w-8 h-8 animate-spin text-admin" />
+              <span className="text-sm text-muted-foreground">جارٍ البحث عن الممرضين...</span>
             </div>
-          ) : filteredNurses.length === 0 ? (
-            <div className="text-center py-8">
-              <User className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-              <p className="text-sm text-muted-foreground font-medium">لا يوجد ممرضون متاحون بالقرب من الموقع</p>
-              <p className="text-xs text-muted-foreground mt-1">جرّب زيادة نطاق البحث أو التحقق من حالة الممرضين</p>
+          ) : nearbyNurses.length === 0 ? (
+            <div className="text-center py-10">
+              <div className="w-16 h-16 rounded-2xl bg-muted/50 flex items-center justify-center mx-auto mb-3">
+                <Users className="w-8 h-8 text-muted-foreground" />
+              </div>
+              <p className="text-sm font-medium text-muted-foreground">لا يوجد ممرضون متاحون</p>
+              <p className="text-xs text-muted-foreground mt-1">جرّب تغيير كلمات البحث أو تحقق من حالة الممرضين</p>
             </div>
           ) : (
-            <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
-              <div className="flex items-center justify-between px-1">
-                <span className="text-xs text-muted-foreground">{filteredNurses.length} ممرض/ـة قريب</span>
-              </div>
-              {filteredNurses.map((nurse) => (
-                <button
-                  key={nurse.id}
-                  onClick={() => setSelectedNurse(nurse.id)}
-                  className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right ${
-                    selectedNurse === nurse.id
-                      ? 'ring-2 ring-admin bg-admin/5 shadow-sm'
-                      : 'hover:bg-muted/50'
-                  }`}
-                >
-                  <Avatar className="w-10 h-10">
-                    <AvatarFallback className={`text-xs ${
-                      nurse.isOnline && nurse.isAvailable
-                        ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
-                        : 'bg-muted text-muted-foreground'
-                    }`}>
-                      {nurse.name.slice(0, 2)}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <p className="text-sm font-medium truncate">{nurse.name}</p>
-                      {nurse.isOnline && (
-                        <span className="w-2 h-2 rounded-full bg-green-500" title="متصل" />
-                      )}
-                    </div>
-                    <p className="text-xs text-muted-foreground truncate">{nurse.specialization}</p>
-                    {nurse.governorate && (
-                      <p className="text-[10px] text-muted-foreground">{nurse.governorate}</p>
-                    )}
+            <ScrollArea className="max-h-[350px]">
+              <div className="space-y-2 pr-1">
+                <div className="flex items-center justify-between px-1">
+                  <span className="text-[11px] text-muted-foreground font-medium">{toArabicNum(nearbyNurses.length)} ممرض/ـة</span>
+                  <div className="flex items-center gap-1 text-[10px] text-muted-foreground">
+                    <span className="w-2 h-2 rounded-full bg-green-500" /> متاح
+                    <span className="w-2 h-2 rounded-full bg-gray-400 mr-1" /> غير متاح
                   </div>
-                  <div className="text-left shrink-0 space-y-1">
-                    <div className="flex items-center gap-1">
-                      <MapPin className="w-3 h-3 text-red-500" />
-                      <span className="text-sm font-bold text-red-600">{nurse.distance} كم</span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      {nurse.rating > 0 && (
-                        <div className="flex items-center gap-0.5">
-                          <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
-                          <span className="text-[10px]">{nurse.rating.toFixed(1)}</span>
+                </div>
+                {nearbyNurses.map((nurse) => {
+                  const isSelected = selectedNurse === nurse.id;
+                  const isAvailable = nurse.isOnline && nurse.isAvailable;
+
+                  return (
+                    <motion.button
+                      key={nurse.id}
+                      onClick={() => setSelectedNurse(nurse.id)}
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl transition-all text-right border-2 ${
+                        isSelected
+                          ? 'border-admin bg-admin/5 shadow-sm'
+                          : 'border-transparent hover:border-muted hover:bg-muted/30'
+                      }`}
+                    >
+                      <div className="relative">
+                        <Avatar className="w-11 h-11">
+                          <AvatarFallback className={`text-xs font-bold ${
+                            isAvailable
+                              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+                              : nurse.isAvailable
+                              ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {nurse.name.slice(0, 2)}
+                          </AvatarFallback>
+                        </Avatar>
+                        {/* Online indicator */}
+                        <span className={`absolute -bottom-0.5 -left-0.5 w-3.5 h-3.5 rounded-full border-2 border-card ${
+                          isAvailable ? 'bg-green-500' : nurse.isAvailable ? 'bg-yellow-500' : 'bg-gray-400'
+                        }`} />
+                      </div>
+
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm font-bold truncate">{nurse.name}</p>
+                          {isAvailable && (
+                            <Badge className="text-[9px] px-1.5 py-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-0">
+                              متاح الآن
+                            </Badge>
+                          )}
+                        </div>
+                        <p className="text-xs text-muted-foreground truncate mt-0.5">{nurse.specialization}</p>
+                        <div className="flex items-center gap-3 mt-1">
+                          {nurse.governorate && (
+                            <span className="text-[10px] text-muted-foreground">{nurse.governorate}</span>
+                          )}
+                          {nurse.completedJobs > 0 && (
+                            <span className="text-[10px] text-muted-foreground">{toArabicNum(nurse.completedJobs)} مهمة</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="text-left shrink-0 space-y-1.5">
+                        {nurse.distance !== null ? (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-red-500" />
+                            <span className="text-sm font-bold text-red-600 dark:text-red-400">{nurse.distance} كم</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1">
+                            <MapPin className="w-3 h-3 text-muted-foreground" />
+                            <span className="text-[10px] text-muted-foreground">الموقع غير متاح</span>
+                          </div>
+                        )}
+                        {nurse.rating > 0 && (
+                          <div className="flex items-center gap-0.5">
+                            <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                            <span className="text-xs font-medium">{nurse.rating.toFixed(1)}</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Selected checkmark */}
+                      {isSelected && (
+                        <div className="w-6 h-6 rounded-full bg-admin flex items-center justify-center shrink-0">
+                          <CheckCircle2 className="w-4 h-4 text-white" />
                         </div>
                       )}
-                      <span className={`text-[10px] font-medium ${
-                        nurse.isAvailable
-                          ? 'text-green-600 dark:text-green-400'
-                          : 'text-gray-400'
-                      }`}>
-                        {nurse.isAvailable ? 'متاح' : 'غير متاح'}
-                      </span>
-                    </div>
-                  </div>
-                </button>
-              ))}
-            </div>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </ScrollArea>
           )}
 
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => {
               setAssignTarget(null);
               setSelectedNurse('');
               setNearbyNurses([]);
               setNurseSearch('');
+              setNurseSearchDebounce('');
             }} disabled={isAssigning}>إلغاء</Button>
             <Button onClick={handleAssign} disabled={isAssigning || !selectedNurse} className="bg-admin hover:bg-admin/90 gap-2">
               {isAssigning ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserPlus className="w-4 h-4" />}
@@ -787,27 +990,33 @@ export default function AdminEmergenciesPage() {
               تنفيذ مباشر
             </DialogTitle>
             <DialogDescription>
-              سيتم تغيير حالة الطوارئ إلى "قيد التنفيذ" فوراً بدون تعيين ممرض
+              سيتم تغيير حالة الطوارئ إلى &quot;قيد التنفيذ&quot; فوراً بدون تعيين ممرض
             </DialogDescription>
           </DialogHeader>
-          {executeTarget && (
-            <div className="p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-900/30 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{typeIcons[executeTarget.type] ?? '🚨'}</span>
-                <span className="font-bold">{typeLabels[executeTarget.type] ?? executeTarget.type}</span>
-              </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <User className="w-3.5 h-3.5" />
-                <span>{executeTarget.beneficiaryName}</span>
-              </div>
-              {executeTarget.address && (
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <MapPin className="w-3.5 h-3.5" />
-                  <span className="truncate">{executeTarget.address}</span>
+          {executeTarget && (() => {
+            const tc = typeColors[executeTarget.type] || typeColors.other;
+            const TypeIcon = typeIconMap[executeTarget.type] || ShieldAlert;
+            return (
+              <div className="p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-900/30 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-lg ${tc.icon} flex items-center justify-center`}>
+                    <TypeIcon className={`w-4 h-4 ${tc.text}`} />
+                  </div>
+                  <span className="font-bold">{typeLabels[executeTarget.type] || executeTarget.type}</span>
                 </div>
-              )}
-            </div>
-          )}
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <User className="w-3.5 h-3.5" />
+                  <span>{executeTarget.beneficiaryName}</span>
+                </div>
+                {executeTarget.address && (
+                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span className="truncate">{executeTarget.address}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setExecuteTarget(null)} disabled={isExecuting}>إلغاء</Button>
             <Button onClick={handleDirectExecute} disabled={isExecuting} className="bg-orange-600 hover:bg-orange-700 text-white gap-2">
@@ -827,21 +1036,27 @@ export default function AdminEmergenciesPage() {
               تأكيد حل حالة الطوارئ
             </DialogTitle>
             <DialogDescription>
-              سيتم تحديث حالة الطوارئ إلى "تم الحل"
+              سيتم تحديث حالة الطوارئ إلى &quot;تم الحل&quot;
             </DialogDescription>
           </DialogHeader>
-          {resolveTarget && (
-            <div className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/30 space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="text-xl">{typeIcons[resolveTarget.type] ?? '🚨'}</span>
-                <span className="font-bold">{typeLabels[resolveTarget.type] ?? resolveTarget.type}</span>
+          {resolveTarget && (() => {
+            const tc = typeColors[resolveTarget.type] || typeColors.other;
+            const TypeIcon = typeIconMap[resolveTarget.type] || ShieldAlert;
+            return (
+              <div className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-900/30 space-y-2">
+                <div className="flex items-center gap-2">
+                  <div className={`w-8 h-8 rounded-lg ${tc.icon} flex items-center justify-center`}>
+                    <TypeIcon className={`w-4 h-4 ${tc.text}`} />
+                  </div>
+                  <span className="font-bold">{typeLabels[resolveTarget.type] || resolveTarget.type}</span>
+                </div>
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <User className="w-3.5 h-3.5" />
+                  <span>{resolveTarget.beneficiaryName}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <User className="w-3.5 h-3.5" />
-                <span>{resolveTarget.beneficiaryName}</span>
-              </div>
-            </div>
-          )}
+            );
+          })()}
           <DialogFooter>
             <Button variant="outline" onClick={() => setResolveTarget(null)} disabled={isResolving}>إلغاء</Button>
             <Button onClick={handleResolve} disabled={isResolving} className="bg-green-600 hover:bg-green-700 text-white gap-2">
