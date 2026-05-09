@@ -1,80 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { jwtVerify } from 'jose';
-import type { UserRole } from '@/types';
 
-// ---- Route Protection Configuration ----
-
-interface RouteProtection {
-  pathPrefix: string;
-  allowedRoles: UserRole[];
-}
-
-const PROTECTED_ROUTES: RouteProtection[] = [
-  { pathPrefix: '/admin', allowedRoles: ['admin', 'subadmin'] },
-  { pathPrefix: '/nurse', allowedRoles: ['nurse'] },
-  { pathPrefix: '/beneficiary', allowedRoles: ['beneficiary'] },
-];
-
-// ---- JWT Secret (Edge-compatible) ----
-
-function getJwtSecret(): Uint8Array {
-  const secret = process.env.JWT_SECRET ?? 'aafiatak-dev-jwt-secret-change-in-production';
-  return new TextEncoder().encode(secret);
-}
-
-// ---- Helper: Extract token from request ----
-
-function extractToken(request: NextRequest): string | null {
-  // Try cookie first
-  const cookieToken = request.cookies.get('auth_token')?.value;
-  if (cookieToken) {
-    return cookieToken;
-  }
-
-  // Try Authorization header
-  const authHeader = request.headers.get('Authorization');
-  if (authHeader?.startsWith('Bearer ')) {
-    return authHeader.slice(7).trim();
-  }
-
-  return null;
-}
-
-// ---- Helper: Get user role from token (Edge-compatible using jose) ----
-
-async function getUserRoleFromToken(token: string): Promise<UserRole | null> {
-  try {
-    const secret = getJwtSecret();
-    const { payload } = await jwtVerify(token, secret);
-
-    if (typeof payload === 'object' && payload !== null && 'role' in payload) {
-      const role = payload.role as string;
-      if (['admin', 'subadmin', 'nurse', 'beneficiary'].includes(role)) {
-        return role as UserRole;
-      }
-    }
-
-    return null;
-  } catch {
-    return null;
-  }
-}
-
-// ---- Helper: Get dashboard path for a role ----
-
-function getDashboardPath(role: UserRole): string {
-  switch (role) {
-    case 'admin':
-    case 'subadmin':
-      return '/admin';
-    case 'nurse':
-      return '/nurse';
-    case 'beneficiary':
-      return '/beneficiary';
-    default:
-      return '/';
-  }
-}
+// ============================================================================
+// عافيتك (Aafiatak) - Simplified Middleware
+// ============================================================================
+// ONLY handles API rate limiting and CORS.
+// Page-level auth redirects are handled entirely by client-side code
+// (AuthHydrationGuard in each layout) to avoid redirect loops.
+// API routes protect themselves via requireAuth() / requireRole().
+// ============================================================================
 
 // ---- Simple Rate Limiting (Edge-compatible) ----
 
@@ -143,7 +76,7 @@ export async function middleware(request: NextRequest) {
   }
 
   // ============================================================
-  // Rate Limiting & CORS for API routes
+  // Rate Limiting & CORS for API routes ONLY
   // ============================================================
   if (pathname.startsWith('/api/')) {
     const clientIP = getClientIP(request);
@@ -203,63 +136,10 @@ export async function middleware(request: NextRequest) {
   }
 
   // ============================================================
-  // Auth pages: '/', '/login', '/register'
-  // Do NOT redirect authenticated users here — let the client handle it.
-  // The client has better context about the auth state and can avoid
-  // the redirect loop that occurs when middleware redirects but
-  // the cookie is expired/invalid while localStorage has stale auth data.
+  // All non-API, non-static routes: just pass through.
+  // Auth protection is handled by client-side AuthHydrationGuard.
+  // API routes protect themselves via requireAuth().
   // ============================================================
-
-  const token = extractToken(request);
-
-  // ---- Handle logout parameter ----
-  if (pathname === '/' && request.nextUrl.searchParams.get('logout') === 'true') {
-    const response = NextResponse.next();
-    response.cookies.delete('auth_token');
-    return response;
-  }
-
-  // ---- Check if current path is protected ----
-  const matchingProtection = PROTECTED_ROUTES.find((protection) =>
-    pathname.startsWith(protection.pathPrefix)
-  );
-
-  // Not a protected route, allow through
-  if (!matchingProtection) {
-    return NextResponse.next();
-  }
-
-  // ---- No token found, redirect to login ----
-  if (!token) {
-    const loginUrl = new URL('/', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(loginUrl);
-  }
-
-  // ---- Verify token and check role ----
-  const userRole = await getUserRoleFromToken(token);
-
-  if (!userRole) {
-    // Token is invalid/expired, clear cookie and redirect to login
-    const loginUrl = new URL('/', request.url);
-    loginUrl.searchParams.set('redirect', pathname);
-    const response = NextResponse.redirect(loginUrl);
-    response.cookies.delete('auth_token');
-    return response;
-  }
-
-  // ---- Check role authorization ----
-  if (!matchingProtection.allowedRoles.includes(userRole)) {
-    // User doesn't have the right role, redirect to their own dashboard
-    const dashboardPath = getDashboardPath(userRole);
-    // Prevent redirect loop: don't redirect to the same path
-    if (pathname === dashboardPath) {
-      return NextResponse.next();
-    }
-    return NextResponse.redirect(new URL(dashboardPath, request.url));
-  }
-
-  // ---- Authorized, allow through ----
   return NextResponse.next();
 }
 

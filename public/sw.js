@@ -5,9 +5,9 @@
 // Pure Web Push Protocol — NO Firebase dependency.
 // ============================================================================
 
-const CACHE_NAME = 'aafiatak-v5';
-const STATIC_CACHE = 'aafiatak-static-v5';
-const API_CACHE_NAME = 'aafiatak-api-v5';
+const CACHE_NAME = 'aafiatak-v6';
+const STATIC_CACHE = 'aafiatak-static-v6';
+const API_CACHE_NAME = 'aafiatak-api-v6';
 const API_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Assets to pre-cache
@@ -68,8 +68,12 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
+  // Do NOT intercept navigation requests.
+  // Previously, the navigationHandler would cache redirect responses
+  // which caused infinite refresh loops when the server redirected
+  // between / and /admin (or other protected pages).
+  // Let the browser handle navigation requests natively.
   if (request.mode === 'navigate') {
-    event.respondWith(navigationHandler(request));
     return;
   }
 
@@ -95,20 +99,9 @@ async function networkFirstWithCache(request) {
   }
 }
 
-async function navigationHandler(request) {
-  try {
-    const networkResponse = await fetch(request);
-    return networkResponse;
-  } catch {
-    const cachedResponse = await caches.match(request);
-    if (cachedResponse) return cachedResponse;
-
-    const offlinePage = await caches.match('/offline.html');
-    if (offlinePage) return offlinePage;
-
-    return new Response('غير متصل بالإنترنت', { status: 503 });
-  }
-}
+// navigationHandler removed — navigation requests are no longer intercepted
+// by the service worker. This prevents caching of redirect responses
+// which caused infinite refresh loops.
 
 async function cacheFirstWithNetwork(request) {
   const cachedResponse = await caches.match(request);

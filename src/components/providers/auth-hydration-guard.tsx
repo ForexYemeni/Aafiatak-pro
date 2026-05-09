@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useState, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { RefreshCw } from 'lucide-react';
@@ -8,11 +8,15 @@ import { RefreshCw } from 'lucide-react';
 // ============================================================================
 // Auth Hydration Guard
 // ============================================================================
-// Robust loading guard that doesn't rely solely on Zustand's _hasHydrated.
-// Reads directly from localStorage as a fallback to prevent the app from
-// being permanently stuck on "جاري التحميل...".
-// Uses router.replace() instead of window.location.href to avoid
-// hard navigation redirect loops.
+// Waits for Zustand hydration, then checks authentication and role.
+// Redirects unauthenticated / wrong-role users to the login page
+// using router.replace() (client-side navigation) to avoid redirect loops.
+//
+// Key design decisions:
+// - No localStorage fallback: Zustand is the single source of truth.
+// - Uses a ref to track redirect attempts (survives re-renders).
+// - 3-second safety timeout forces ready state if hydration stalls.
+// - No server-side (middleware) redirects — everything is client-side.
 // ============================================================================
 
 interface AuthHydrationGuardProps {
@@ -27,38 +31,6 @@ interface AuthHydrationGuardProps {
   spinnerColorClass: string;
 }
 
-interface LocalAuthState {
-  isAuthenticated: boolean;
-  user: {
-    id: string;
-    name: string;
-    role: string;
-  } | null;
-}
-
-/**
- * Read auth state directly from localStorage (Zustand persist format).
- * This is a FALLBACK for when Zustand hydration fails or is slow.
- */
-function readAuthFromLocalStorage(): LocalAuthState | null {
-  if (typeof window === 'undefined') return null;
-  try {
-    const raw = localStorage.getItem('aafiatak-auth-storage');
-    if (!raw) return null;
-    const parsed = JSON.parse(raw);
-    if (parsed?.state) {
-      return {
-        isAuthenticated: parsed.state.isAuthenticated ?? false,
-        user: parsed.state.user ?? null,
-      };
-    }
-  } catch {
-    // Corrupted data - clear it
-    try { localStorage.removeItem('aafiatak-auth-storage'); } catch {}
-  }
-  return null;
-}
-
 export function AuthHydrationGuard({
   children,
   requiredRoles,
@@ -68,26 +40,14 @@ export function AuthHydrationGuard({
 }: AuthHydrationGuardProps) {
   const router = useRouter();
   const zustandHydrated = useAuthStore((s) => s._hasHydrated);
-  const zustandAuth = useAuthStore((s) => s.isAuthenticated);
-  const zustandUser = useAuthStore((s) => s.user);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
 
   const [isReady, setIsReady] = useState(false);
-  const [localAuth, setLocalAuth] = useState<LocalAuthState | null>(null);
   const [showRetry, setShowRetry] = useState(false);
-  const [redirectAttempted, setRedirectAttempted] = useState(false);
+  const redirectAttemptedRef = useRef(false);
 
-  // Phase 1: Try to read from localStorage immediately (synchronous)
-  useEffect(() => {
-    const local = readAuthFromLocalStorage();
-    setLocalAuth(local);
-
-    // If localStorage has valid auth data, we can skip the loading state
-    if (local?.isAuthenticated && local.user) {
-      setIsReady(true);
-    }
-  }, []);
-
-  // Phase 2: Wait for Zustand hydration (with 3-second timeout)
+  // Phase 1: Wait for Zustand hydration (with 3-second timeout)
   useEffect(() => {
     if (zustandHydrated) {
       setIsReady(true);
@@ -97,7 +57,7 @@ export function AuthHydrationGuard({
     // Safety timeout: force ready after 3 seconds
     const timer = setTimeout(() => {
       setIsReady(true);
-      // Also force Zustand hydration flag
+      // Also force Zustand hydration flag so the rest of the app works
       useAuthStore.setState({ _hasHydrated: true });
     }, 3000);
 
@@ -112,29 +72,27 @@ export function AuthHydrationGuard({
     };
   }, [zustandHydrated]);
 
-  // Phase 3: Auth check and redirect (using router.replace to avoid hard navigation loops)
+  // Phase 2: Auth check and redirect (using router.replace to avoid loops)
   useEffect(() => {
-    if (!isReady || redirectAttempted) return;
-
-    // Use Zustand state as primary, localStorage as fallback
-    const isAuthenticated = zustandAuth || localAuth?.isAuthenticated || false;
-    const user = zustandUser || localAuth?.user || null;
+    if (!isReady) return;
+    if (redirectAttemptedRef.current) return;
 
     if (!isAuthenticated || !user) {
-      // Not authenticated - use router.replace instead of window.location.href
-      // to prevent hard navigation redirect loops
-      setRedirectAttempted(true);
+      // Not authenticated — redirect to login
+      redirectAttemptedRef.current = true;
       router.replace(redirectPath);
       return;
     }
 
     if (!requiredRoles.includes(user.role)) {
-      // Wrong role - use router.replace instead of window.location.href
-      setRedirectAttempted(true);
+      // Wrong role — redirect to login
+      redirectAttemptedRef.current = true;
       router.replace(redirectPath);
       return;
     }
-  }, [isReady, zustandAuth, zustandUser, localAuth, requiredRoles, redirectPath, router, redirectAttempted]);
+
+    // Authenticated with correct role — the guard will render children below
+  }, [isReady, isAuthenticated, user, requiredRoles, redirectPath, router]);
 
   // Show loading spinner while not ready
   if (!isReady) {
@@ -146,6 +104,7 @@ export function AuthHydrationGuard({
           {showRetry && (
             <button
               onClick={() => {
+                // Clear any stale auth state and reload
                 try { localStorage.removeItem('aafiatak-auth-storage'); } catch {}
                 window.location.href = '/';
               }}
@@ -160,12 +119,8 @@ export function AuthHydrationGuard({
     );
   }
 
-  // Auth check using combined state
-  const isAuthenticated = zustandAuth || localAuth?.isAuthenticated || false;
-  const user = zustandUser || localAuth?.user || null;
-
+  // Auth check: if not authenticated or wrong role, return null while redirect happens
   if (!isAuthenticated || !user || !requiredRoles.includes(user.role)) {
-    // Return null while redirect is happening
     return null;
   }
 

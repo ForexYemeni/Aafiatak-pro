@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -1050,30 +1050,32 @@ function LoginPageContent() {
   const [isFreshLogin, setIsFreshLogin] = useState(false);
 
   // Track if we've already attempted a redirect to prevent infinite loops
-  const [hasRedirected, setHasRedirected] = useState(false);
+  // Uses a ref so it survives re-renders without triggering the effect again
+  const hasRedirectedRef = useRef(false);
 
   // Handle post-login redirect with loading screen
   const justLoggedOut = searchParams.get('logout') === 'true';
 
   useEffect(() => {
     if (!_hasHydrated) return;
-    if (hasRedirected) return; // Prevent redirect loop
+    if (hasRedirectedRef.current) return; // Prevent redirect loop
+
+    // If user just logged out, clear the flag and stay on the login page
+    if (justLoggedOut) return;
 
     // If user is already authenticated (returning to app with saved session)
-    // Validate the token with the server BEFORE redirecting to avoid
-    // the common loop: client thinks authenticated → redirects to dashboard →
-    // middleware says not authenticated → redirects back to login → repeat
-    if (isAuthenticated && user && !justLoggedOut && !isFreshLogin) {
-      // Validate the stored token with the server first
+    // Validate the token with the server BEFORE redirecting.
+    // This is the ONLY place where token validation + redirect happens.
+    if (isAuthenticated && user && !isFreshLogin) {
       const token = useAuthStore.getState().token;
       if (token) {
-        setHasRedirected(true); // Mark as redirected to prevent re-triggering
+        hasRedirectedRef.current = true; // Prevent re-triggering
         fetch('/api/auth/me', {
           headers: { 'Authorization': `Bearer ${token}` },
         })
           .then(res => {
             if (res.ok) {
-              // Token is valid, proceed with redirect
+              // Token is valid, proceed with redirect using router.replace
               const destination = redirectPath ?? getDashboardPath(user.role);
               router.replace(destination);
             } else {
@@ -1085,7 +1087,7 @@ function LoginPageContent() {
                 isAuthenticated: false,
               });
               try { localStorage.removeItem('aafiatak-auth-storage'); } catch {}
-              setHasRedirected(false);
+              hasRedirectedRef.current = false;
             }
           })
           .catch(() => {
@@ -1102,7 +1104,6 @@ function LoginPageContent() {
           isAuthenticated: false,
         });
         try { localStorage.removeItem('aafiatak-auth-storage'); } catch {}
-        setHasRedirected(false);
       }
       return;
     }
@@ -1111,7 +1112,7 @@ function LoginPageContent() {
     if (isAuthenticated && user && isFreshLogin && !showLoadingScreen) {
       setShowLoadingScreen(true);
     }
-  }, [isAuthenticated, user, justLoggedOut, showLoadingScreen, isFreshLogin, redirectPath, router, _hasHydrated, hasRedirected]);
+  }, [isAuthenticated, user, justLoggedOut, showLoadingScreen, isFreshLogin, redirectPath, router, _hasHydrated]);
 
   const handleLoadingComplete = useCallback(() => {
     if (user) {

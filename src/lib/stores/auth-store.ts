@@ -343,13 +343,10 @@ export const useAuthStore = create<AuthState>()(
           if (typeof window === 'undefined') return;
 
           // Use setTimeout(0) to defer setState until after the store
-          // is fully initialized. Without this, we get:
-          // "Cannot access 'k' before initialization" (minified reference error)
-          // because onRehydrateStorage fires during store creation.
+          // is fully initialized.
           setTimeout(() => {
             if (error) {
               console.error('[AuthStore] Rehydration error:', error);
-              // Clear corrupted state so the user can start fresh
               try {
                 localStorage.removeItem('aafiatak-auth-storage');
               } catch {}
@@ -357,35 +354,13 @@ export const useAuthStore = create<AuthState>()(
               return;
             }
 
-            // Set hydrated so the app can render
+            // Mark hydration as complete so the app can render.
+            // DO NOT validate the token here — that is done by the
+            // login page (page.tsx) and the AuthHydrationGuard.
+            // Validating here caused a race condition where this callback
+            // and the login-page useEffect both called /api/auth/me
+            // and could clear each other's state, producing redirect loops.
             useAuthStore.setState({ _hasHydrated: true });
-
-            // Then validate the stored token in the background (non-blocking)
-            if (state?.isAuthenticated && state?.token) {
-              fetch('/api/auth/me', {
-                headers: { 'Authorization': `Bearer ${state.token}` },
-              })
-                .then(res => {
-                  if (!res.ok) {
-                    // Token is invalid — clear auth state
-                    console.warn('[AuthStore] Stored token is invalid, clearing auth state');
-                    useAuthStore.setState({
-                      user: null,
-                      token: null,
-                      refreshToken: null,
-                      isAuthenticated: false,
-                    });
-                    try {
-                      localStorage.removeItem('aafiatak-auth-storage');
-                    } catch {}
-                  }
-                  // If valid, do nothing - state is already correct
-                })
-                .catch(() => {
-                  // Network error — keep the stored auth state,
-                  // the user might be offline. App is already hydrated.
-                });
-            }
           }, 0);
         };
       },
