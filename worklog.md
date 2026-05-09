@@ -86,3 +86,26 @@ Stage Summary:
 - Chat sound notifications work globally (not just when viewing chat page)
 - Delete All button was already present
 - 6 files changed
+
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix app stuck on loading screen after login
+
+Work Log:
+- Identified root cause: auth store's onRehydrateStorage waited for /api/auth/me API call before setting _hasHydrated=true, causing the app to be stuck on loading if the API was slow
+- Fixed auth store: Set _hasHydrated=true IMMEDIATELY after rehydration, validate token in background
+- Fixed all 3 dashboard layouts (beneficiary, nurse, admin): Removed isLoading from loading screen check, only check _hasHydrated
+- Added 5-second safety timeout in dashboard layouts that forces _hasHydrated=true
+- Simplified SocketProvider: Removed duplicate chat sound listener
+- Added dedicated ChatSoundPlayer component in PWA provider using socketService
+- Removed duplicate chat sound from useChat hook in use-socket.ts
+- Cleaned up unused imports
+
+Stage Summary:
+- Auth store now hydrates immediately without blocking on API calls
+- Dashboard layouts no longer block on auth isLoading state
+- Safety timeout prevents permanent stuck state
+- Single source of truth for chat sounds (ChatSoundPlayer in PWA provider)
+- Build successful, pushed to GitHub (commit 7537a3d)
+- Vercel auto-deployment triggered
