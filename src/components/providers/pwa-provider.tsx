@@ -72,12 +72,13 @@ function playNotificationSound(type: string, priority: string, notifId: string):
 
 // ============================================================================
 // Notification Poller - Polls for new notifications every N seconds
-// *** ONLY updates the store (UI). Does NOT play sounds. ***
-// Sounds are ONLY triggered by real-time events: Push + Socket.
+// Updates the store (UI) AND plays sounds/TTS for voice-pending notifications.
+// This is the PRIMARY delivery mechanism on Vercel where Socket.IO is unavailable.
 // ============================================================================
 
-const POLL_INTERVAL = 15000; // 15 seconds - only for UI updates
-const POLL_URL = '/api/notifications?limit=5&unread=true';
+const POLL_INTERVAL = 15000; // 15 seconds for UI-only store refresh
+const VOICE_POLL_INTERVAL = 2000; // 2 seconds for voice-pending notifications (near-instant)
+const VOICE_POLL_URL = '/api/notifications/voice-pending';
 
 function NotificationPoller() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -91,7 +92,7 @@ function NotificationPoller() {
 
     isPollingRef.current = true;
     try {
-      const response = await fetch(POLL_URL, {
+      const response = await fetch('/api/notifications?limit=5&unread=true', {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
@@ -110,8 +111,6 @@ function NotificationPoller() {
       }
 
       // Silently update the store if unread count changed
-      // This ONLY updates the UI (bell badge, notification list)
-      // It does NOT play any sounds
       if (typeof data.data.unreadCount === 'number') {
         const store = useNotificationStore.getState();
         if (store.unreadCount !== data.data.unreadCount) {
@@ -144,6 +143,115 @@ function NotificationPoller() {
       }
     };
   }, [hasHydrated, isAuthenticated, token, pollForNotifications]);
+
+  return null;
+}
+
+// ============================================================================
+// Voice Notification Poller - FAST polling for voice-pending notifications
+// This is the PRIMARY mechanism for delivering voice alerts on Vercel.
+// Since Socket.IO server doesn't run on Vercel serverless, we poll every
+// 2 seconds for voice-pending notifications and play sound + TTS immediately.
+// The API endpoint marks them as played automatically to prevent re-playing.
+// ============================================================================
+
+function VoiceNotificationPoller() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const token = useAuthStore((s) => s.token);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const isPollingRef = useRef(false);
+
+  const pollForVoiceNotifications = useCallback(async () => {
+    if (!isAuthenticated || !token || isPollingRef.current) return;
+
+    isPollingRef.current = true;
+    try {
+      const response = await fetch(VOICE_POLL_URL, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        isPollingRef.current = false;
+        return;
+      }
+
+      const data = await response.json();
+      if (!data.success || !data.data?.notifications?.length) {
+        isPollingRef.current = false;
+        return;
+      }
+
+      // Process each voice-pending notification
+      const { ttsEnabled } = useNotificationStore.getState();
+
+      for (const notif of data.data.notifications) {
+        const notifId = `voice-poll-${notif.id}`;
+
+        // Play sound with dedup (won't replay if already played by push/socket)
+        playNotificationSound(
+          notif.type || 'system',
+          notif.priority || 'medium',
+          notifId
+        );
+
+        // Play TTS voice alert if voiceText is available
+        const voiceText = notif.data?.voiceText;
+        if (voiceText) {
+          const voiceId = `voice-${notifId}`;
+          if (!markSoundPlayed(voiceId) && ttsEnabled) {
+            voiceManager.init();
+            voiceManager.speak(voiceText, {
+              priority: notif.priority === 'urgent' ? 'urgent' : notif.priority === 'high' ? 'high' : 'medium',
+              rate: 1.1,
+              volume: 1.0,
+            });
+          }
+        }
+
+        // Dispatch custom event for UI (notification bell, toasts, etc.)
+        window.dispatchEvent(new CustomEvent('app-notification', {
+          detail: {
+            id: notif.id,
+            title: notif.title,
+            body: notif.body,
+            type: notif.type,
+            priority: notif.priority,
+            data: notif.data,
+          },
+        }));
+      }
+
+      // Refresh notification store to update UI badge
+      useNotificationStore.getState().fetchNotifications();
+    } catch {
+      // Network error - ignore
+    } finally {
+      isPollingRef.current = false;
+    }
+  }, [isAuthenticated, token]);
+
+  useEffect(() => {
+    if (!hasHydrated) return;
+
+    if (isAuthenticated && token) {
+      // Initial poll immediately on auth
+      pollForVoiceNotifications();
+
+      // Fast polling for voice notifications (every 2 seconds)
+      intervalRef.current = setInterval(pollForVoiceNotifications, VOICE_POLL_INTERVAL);
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
+  }, [hasHydrated, isAuthenticated, token, pollForVoiceNotifications]);
 
   return null;
 }
@@ -188,7 +296,7 @@ function WelcomeBackPlayer() {
 // ============================================================================
 // Service Worker Registrar
 // - Registers SW and listens for push notifications
-// - Push notifications are the PRIMARY source for sound playing
+// - Push notifications are an additional source for sound playing
 // ============================================================================
 
 function ServiceWorkerRegistrar() {
@@ -209,17 +317,14 @@ function ServiceWorkerRegistrar() {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
 
       // Listen for push notifications from Service Worker
-      // This is one of TWO places where sounds are triggered (the other is socket events)
       const handleSWMessage = (event: MessageEvent) => {
         try {
           if (event.data?.type === 'PUSH_NOTIFICATION_RECEIVED') {
             const payload = event.data.payload;
 
             if (payload.sound !== false) {
-              // Use the notification's real ID for dedup, or generate one
               const notifId = payload.data?.notificationId || `push-${payload.type}-${Date.now()}`;
 
-              // Play sound with shared dedup - prevents duplicate with socket
               playNotificationSound(
                 payload.type || 'system',
                 payload.priority || 'medium',
@@ -227,7 +332,6 @@ function ServiceWorkerRegistrar() {
               );
 
               // Voice alert for emergency notifications (TTS)
-              // Check ttsEnabled preference AND dedup to prevent duplicate speech
               if (payload.data?.voiceAlert && payload.data?.voiceText) {
                 const voiceId = `voice-${notifId}`;
                 if (!markSoundPlayed(voiceId)) {
@@ -245,7 +349,6 @@ function ServiceWorkerRegistrar() {
             }
 
             // Dispatch custom event for UI (notification bell, toasts, etc.)
-            // NO sound playing from listeners of this event!
             window.dispatchEvent(new CustomEvent('app-notification', {
               detail: {
                 id: payload.data?.notificationId || `push-${Date.now()}`,
@@ -380,10 +483,6 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 }
 
 // ============================================================================
-// PWA Initializer - Main Export
-// ============================================================================
-
-// ============================================================================
 // Global Chat Message Sound Player
 // Plays chat sound when a new message arrives and the user is NOT
 // currently viewing that specific chat page.
@@ -427,14 +526,10 @@ function ChatSoundPlayer() {
 }
 
 // ============================================================================
-// PWA Initializer - Main Export
-// ============================================================================
-
-// ============================================================================
 // Emergency Sound Player - Listens for Socket.IO emergency events
-// and triggers sound + TTS for emergency_dispatched and emergency_alert events.
-// This ensures nurses get audible + voice notifications even if push
-// notifications fail (no subscription, expired, network issues).
+// Kept as an ADDITIONAL delivery channel alongside VoiceNotificationPoller.
+// When Socket.IO is available (e.g., on-premise), this provides instant delivery.
+// On Vercel serverless, VoiceNotificationPoller is the primary mechanism.
 // ============================================================================
 
 function EmergencySoundPlayer() {
@@ -449,10 +544,8 @@ function EmergencySoundPlayer() {
       try {
         const notifId = `socket-dispatched-${data.emergencyRequestId}`;
 
-        // Play emergency sound with dedup
         playNotificationSound('emergency_assigned', 'urgent', notifId);
 
-        // TTS voice alert
         const voiceId = `voice-${notifId}`;
         if (!markSoundPlayed(voiceId)) {
           const { ttsEnabled } = useNotificationStore.getState();
@@ -465,7 +558,6 @@ function EmergencySoundPlayer() {
           }
         }
 
-        // Also update notification store for UI
         useNotificationStore.getState().fetchNotifications();
       } catch {
         // Silently fail
@@ -477,10 +569,8 @@ function EmergencySoundPlayer() {
       try {
         const notifId = `socket-alert-${data.emergencyRequestId}`;
 
-        // Play emergency sound with dedup
         playNotificationSound('emergency', 'urgent', notifId);
 
-        // TTS voice alert
         const voiceId = `voice-${notifId}`;
         if (!markSoundPlayed(voiceId)) {
           const { ttsEnabled } = useNotificationStore.getState();
@@ -522,14 +612,12 @@ function EmergencySoundPlayer() {
     // Listen for general socket notifications (fallback)
     const unsubNotification = socketService.onNotification((data) => {
       try {
-        // Only process if it has emergency-related type
         const emergencyTypes = ['emergency', 'emergency_assigned'];
         if (!emergencyTypes.includes(data.type)) return;
 
         const notifId = `socket-notif-${data.id}`;
         playNotificationSound(data.type, data.priority, notifId);
 
-        // TTS for emergency_assigned notifications to nurse
         if (data.type === 'emergency_assigned' && data.data?.voiceText) {
           const voiceId = `voice-${notifId}`;
           if (!markSoundPlayed(voiceId)) {
@@ -565,6 +653,7 @@ export function PWAInitializer() {
     <>
       <ServiceWorkerRegistrar />
       <EmergencySoundPlayer />
+      <VoiceNotificationPoller />
       <ChatSoundPlayer />
       <NotificationPoller />
       <WelcomeBackPlayer />

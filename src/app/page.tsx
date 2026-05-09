@@ -234,15 +234,15 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
   const RoleIcon = config.icon;
 
   useEffect(() => {
+    // Quick 800ms welcome animation then navigate immediately
     const startTime = Date.now();
-    const duration = 2000;
+    const duration = 800;
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime;
-      const remaining = Math.max(0, Math.ceil((duration - elapsed) / 1000));
       const progressPercent = Math.min(100, (elapsed / duration) * 100);
 
-      setCountdown(remaining);
+      setCountdown(0);
       setProgress(progressPercent);
 
       if (elapsed >= duration) {
@@ -1098,9 +1098,9 @@ function LoginPageContent() {
         })
           .then(res => {
             if (res.ok) {
-              // Token is valid, proceed with redirect using router.replace
+              // Token is valid — use hard navigation for reliability
               const destination = redirectPath ?? getDashboardPath(user.role);
-              router.replace(destination);
+              window.location.href = destination;
             } else {
               // Token is invalid, clear auth state and stay on login page
               useAuthStore.setState({
@@ -1114,9 +1114,9 @@ function LoginPageContent() {
             }
           })
           .catch(() => {
-            // Network error — assume offline, allow redirect
+            // Network error — assume offline, allow redirect via hard navigation
             const destination = redirectPath ?? getDashboardPath(user.role);
-            router.replace(destination);
+            window.location.href = destination;
           });
       } else {
         // No token in store but isAuthenticated is true — corrupted state, clear it
@@ -1140,11 +1140,13 @@ function LoginPageContent() {
   const handleLoadingComplete = useCallback(() => {
     if (user) {
       const destination = redirectPath ?? getDashboardPath(user.role);
-      // Use router.replace for client-side navigation (no hard refresh)
-      // This avoids the middleware redirect loop that window.location.href causes
-      router.replace(destination);
+      // Use window.location.href for RELIABLE hard navigation.
+      // router.replace() client-side navigation can be flaky on Vercel
+      // (hydration issues, state not syncing, page not rendering properly).
+      // Since middleware no longer does page-level redirects, hard navigation is safe.
+      window.location.href = destination;
     }
-  }, [user, redirectPath, router]);
+  }, [user, redirectPath]);
 
   // ============================================================================
   // Login Form
