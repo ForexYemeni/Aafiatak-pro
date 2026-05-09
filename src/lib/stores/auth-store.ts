@@ -339,24 +339,24 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => {
         return (state, error) => {
-          // ALWAYS set _hasHydrated to true, even if there was an error.
+          // ALWAYS set _hasHydrated to true IMMEDIATELY.
           // This prevents the app from being stuck on the loading screen forever.
+          // Token validation happens in the background - if invalid, we redirect later.
           if (error) {
             console.error('[AuthStore] Rehydration error:', error);
             // Clear corrupted state so the user can start fresh
             try {
               localStorage.removeItem('aafiatak-auth-storage');
             } catch {}
-
-            // Set hydrated immediately on error
-            useAuthStore.setState({ _hasHydrated: true });
+            useAuthStore.setState({ _hasHydrated: true, isAuthenticated: false, user: null, token: null, refreshToken: null });
             return;
           }
 
-          // Validate the stored token if the user appears authenticated
+          // Set hydrated IMMEDIATELY so the app can render
+          useAuthStore.setState({ _hasHydrated: true });
+
+          // Then validate the stored token in the background (non-blocking)
           if (state?.isAuthenticated && state?.token) {
-            // Validate token with the server BEFORE setting hydrated
-            // This prevents redirect loops (auth → dashboard → invalid → login → auth)
             fetch('/api/auth/me', {
               headers: { 'Authorization': `Bearer ${state.token}` },
             })
@@ -369,24 +369,17 @@ export const useAuthStore = create<AuthState>()(
                     token: null,
                     refreshToken: null,
                     isAuthenticated: false,
-                    _hasHydrated: true,
                   });
                   try {
                     localStorage.removeItem('aafiatak-auth-storage');
                   } catch {}
-                } else {
-                  // Token is valid — mark as hydrated
-                  useAuthStore.setState({ _hasHydrated: true });
                 }
+                // If valid, do nothing - state is already correct
               })
               .catch(() => {
                 // Network error — keep the stored auth state,
-                // the user might be offline. Mark hydrated so app isn't stuck.
-                useAuthStore.setState({ _hasHydrated: true });
+                // the user might be offline. App is already hydrated.
               });
-          } else {
-            // No stored auth — mark hydrated immediately
-            useAuthStore.setState({ _hasHydrated: true });
           }
         };
       },

@@ -14,33 +14,34 @@ export default function NurseLayout({ children }: NurseLayoutProps) {
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const isLoading = useAuthStore((s) => s.isLoading);
   const _hasHydrated = useAuthStore((s) => s._hasHydrated);
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   useEffect(() => {
     // Wait for hydration before checking auth to prevent redirect loops
     if (!_hasHydrated) return;
-    if (!isLoading && (!isAuthenticated || user?.role !== 'nurse')) {
+    if (!isAuthenticated || user?.role !== 'nurse') {
       router.replace('/?redirect=/nurse');
     }
-  }, [isAuthenticated, isLoading, user, router, _hasHydrated]);
+  }, [isAuthenticated, user, router, _hasHydrated]);
 
-  // Safety timeout: if loading takes more than 10 seconds, show retry option
+  // Safety timeout: if hydration takes more than 5 seconds, show retry option
   useEffect(() => {
-    if (_hasHydrated && !isLoading) return;
+    if (_hasHydrated) return;
     const timer = setTimeout(() => {
       setLoadingTimeout(true);
-    }, 10000);
+      // Force hydration to prevent permanent stuck state
+      useAuthStore.setState({ _hasHydrated: true });
+    }, 5000);
     return () => clearTimeout(timer);
-  }, [_hasHydrated, isLoading]);
+  }, [_hasHydrated]);
 
-  if (!_hasHydrated || isLoading) {
+  if (!_hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-nurse" dir="rtl" lang="ar">
         <div className="flex flex-col items-center gap-4">
           <div className="w-12 h-12 border-4 border-nurse/30 border-t-nurse rounded-full animate-spin" />
-          <p className="text-muted-foreground text-sm">جارٍ التحميل...</p>
+          <p className="text-muted-foreground text-sm">جاري التحميل...</p>
           {loadingTimeout && (
             <button
               onClick={() => {

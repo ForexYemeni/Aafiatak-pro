@@ -8,39 +8,41 @@ import { Loader2, RefreshCw } from 'lucide-react';
 
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
-  const { user, isAuthenticated, isLoading, _hasHydrated } = useAuthStore();
+  const { user, isAuthenticated, _hasHydrated } = useAuthStore();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   useEffect(() => {
     // Wait for hydration before checking auth to prevent redirect loops
     if (!_hasHydrated) return;
-    if (!isLoading && !isAuthenticated) {
+    if (!isAuthenticated) {
       router.replace('/?redirect=/admin');
       return;
     }
-    if (!isLoading && isAuthenticated && user) {
+    if (isAuthenticated && user) {
       if (user.role !== 'admin' && user.role !== 'subadmin') {
         router.replace('/?redirect=/admin');
       }
     }
-  }, [isLoading, isAuthenticated, user, router, _hasHydrated]);
+  }, [isAuthenticated, user, router, _hasHydrated]);
 
-  // Safety timeout: if loading takes more than 10 seconds, show retry option
+  // Safety timeout: if hydration takes more than 5 seconds, show retry option
   useEffect(() => {
-    if (_hasHydrated && !isLoading) return;
+    if (_hasHydrated) return;
     const timer = setTimeout(() => {
       setLoadingTimeout(true);
-    }, 10000);
+      // Force hydration to prevent permanent stuck state
+      useAuthStore.setState({ _hasHydrated: true });
+    }, 5000);
     return () => clearTimeout(timer);
-  }, [_hasHydrated, isLoading]);
+  }, [_hasHydrated]);
 
   // Only show loading spinner during initial hydration
-  if (!_hasHydrated || isLoading) {
+  if (!_hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center" dir="rtl">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 animate-spin text-admin" />
-          <p className="text-muted-foreground text-sm">جارٍ التحميل...</p>
+          <p className="text-muted-foreground text-sm">جاري التحميل...</p>
           {loadingTimeout && (
             <button
               onClick={() => {

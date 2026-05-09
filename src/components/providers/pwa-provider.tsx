@@ -8,6 +8,7 @@ import { markSoundPlayed, clearPlayedSounds } from '@/lib/notifications/sound-de
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useNotificationStore } from '@/lib/stores/notification-store';
 import { socketService } from '@/lib/socket';
+import { getActiveChatId } from '@/components/providers/socket-provider';
 
 const OfflineWrapper = dynamic(
   () => import('@/components/common/offline-wrapper').then(mod => mod.OfflineWrapper),
@@ -250,31 +251,8 @@ function ServiceWorkerRegistrar() {
 
       navigator.serviceWorker.addEventListener('message', handleSWMessage);
 
-      // Listen for incoming chat messages via Socket
-      // Play chat sound when user is NOT viewing the specific chat page
-      const unsubChatMessage = socketService.onMessage((data) => {
-        const currentUserId = useAuthStore.getState().user?.id;
-        // Don't play sound for own messages
-        if (data.message.senderId === currentUserId) return;
-
-        // Check if user is currently viewing this chat page
-        const pathname = window.location.pathname;
-        const isViewingChat = pathname.includes(`/chat/${data.chatId}`);
-
-        // Only play sound if NOT viewing this specific chat
-        // (the useChat hook handles sound when user IS in the chat page)
-        if (!isViewingChat) {
-          const soundId = `chat-bg-${data.message.id}`;
-          if (!markSoundPlayed(soundId)) {
-            soundManager.forceUserInteracted();
-            soundManager.playChat();
-          }
-        }
-      });
-
       return () => {
         navigator.serviceWorker.removeEventListener('message', handleSWMessage);
-        unsubChatMessage();
       };
     }
 
@@ -386,10 +364,58 @@ function urlBase64ToUint8Array(base64String: string): Uint8Array {
 // PWA Initializer - Main Export
 // ============================================================================
 
+// ============================================================================
+// Global Chat Message Sound Player
+// Plays chat sound when a new message arrives and the user is NOT
+// currently viewing that specific chat page.
+// Uses socketService (the actual socket used by chat pages).
+// ============================================================================
+
+function ChatSoundPlayer() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
+
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated) return;
+
+    const unsubMessage = socketService.onMessage((data) => {
+      try {
+        const currentUserId = useAuthStore.getState().user?.id;
+        // Don't play sound for own messages
+        if (data.message.senderId === currentUserId) return;
+
+        // If user is currently viewing THIS chat, don't play sound
+        // (the chat page handles its own feedback)
+        const activeChatId = getActiveChatId();
+        if (activeChatId === data.chatId) return;
+
+        // Use dedup to prevent duplicate sounds from multiple sources
+        const soundId = `chat-global-${data.message.id}`;
+        if (markSoundPlayed(soundId)) return; // Already played
+
+        // Play the chat notification sound
+        soundManager.forceUserInteracted();
+        soundManager.playChat();
+      } catch {
+        // Silently fail
+      }
+    });
+
+    return unsubMessage;
+  }, [hasHydrated, isAuthenticated]);
+
+  return null;
+}
+
+// ============================================================================
+// PWA Initializer - Main Export
+// ============================================================================
+
 export function PWAInitializer() {
   return (
     <>
       <ServiceWorkerRegistrar />
+      <ChatSoundPlayer />
       <NotificationPoller />
       <WelcomeBackPlayer />
       <PushSubscriptionManager />

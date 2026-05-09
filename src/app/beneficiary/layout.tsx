@@ -8,27 +8,29 @@ import { RefreshCw } from 'lucide-react';
 
 export default function BeneficiaryLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
-  const { isAuthenticated, user, isLoading, _hasHydrated } = useAuthStore();
+  const { isAuthenticated, user, _hasHydrated } = useAuthStore();
   const [loadingTimeout, setLoadingTimeout] = useState(false);
 
   useEffect(() => {
     // Wait for hydration before checking auth to prevent redirect loops
     if (!_hasHydrated) return;
-    if (!isLoading && (!isAuthenticated || user?.role !== 'beneficiary')) {
+    if (!isAuthenticated || user?.role !== 'beneficiary') {
       router.replace('/?redirect=/beneficiary');
     }
-  }, [isAuthenticated, isLoading, user, router, _hasHydrated]);
+  }, [isAuthenticated, user, router, _hasHydrated]);
 
-  // Safety timeout: if loading takes more than 10 seconds, show retry option
+  // Safety timeout: if hydration takes more than 5 seconds, show retry option
   useEffect(() => {
-    if (_hasHydrated && !isLoading) return;
+    if (_hasHydrated) return;
     const timer = setTimeout(() => {
       setLoadingTimeout(true);
-    }, 10000);
+      // Force hydration to prevent permanent stuck state
+      useAuthStore.setState({ _hasHydrated: true });
+    }, 5000);
     return () => clearTimeout(timer);
-  }, [_hasHydrated, isLoading]);
+  }, [_hasHydrated]);
 
-  if (!_hasHydrated || isLoading) {
+  if (!_hasHydrated) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-beneficiary" dir="rtl" lang="ar">
         <div className="flex flex-col items-center gap-4">
