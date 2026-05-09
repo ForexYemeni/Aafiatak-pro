@@ -1042,19 +1042,33 @@ function LoginPageContent() {
   const [nurseNameShake, setNurseNameShake] = useState(false);
   const [nurseNameWarning, setNurseNameWarning] = useState(false);
 
+  // Track whether this is a fresh login (clicked login button)
+  // vs returning to the app with an existing session
+  const [isFreshLogin, setIsFreshLogin] = useState(false);
+
   // Handle post-login redirect with loading screen
   const justLoggedOut = searchParams.get('logout') === 'true';
 
   useEffect(() => {
     if (!_hasHydrated) return;
 
-    if (isAuthenticated && user && !justLoggedOut && !showLoadingScreen) {
+    // If user is already authenticated (returning to app with saved session)
+    // redirect IMMEDIATELY without the 5-second loading screen
+    if (isAuthenticated && user && !justLoggedOut && !isFreshLogin) {
+      const destination = redirectPath ?? getDashboardPath(user.role);
+      router.replace(destination);
+      return;
+    }
+
+    // If this is a fresh login, show the animated loading screen
+    if (isAuthenticated && user && isFreshLogin && !showLoadingScreen) {
       setShowLoadingScreen(true);
     }
+
     if (justLoggedOut && !isAuthenticated) {
       router.replace('/');
     }
-  }, [isAuthenticated, user, justLoggedOut, showLoadingScreen, _hasHydrated]);
+  }, [isAuthenticated, user, justLoggedOut, showLoadingScreen, isFreshLogin, redirectPath, router, _hasHydrated]);
 
   const handleLoadingComplete = useCallback(() => {
     if (user) {
@@ -1074,10 +1088,11 @@ function LoginPageContent() {
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     clearError();
+    setIsFreshLogin(true); // Mark as fresh login to show loading screen
     try {
       await login(data.phone, data.password);
     } catch {
-      // Error handled in store
+      setIsFreshLogin(false); // Reset on failure
     }
   };
 
@@ -1120,6 +1135,7 @@ function LoginPageContent() {
         address: data.address,
         governorate: data.governorate as never,
       });
+      setIsFreshLogin(true); // Show loading screen after registration
     } catch {
       // Error handled in store
     }
@@ -1148,6 +1164,7 @@ function LoginPageContent() {
         governorate: data.governorate as never,
         referralCode: data.referralCode || undefined,
       });
+      setIsFreshLogin(true); // Show loading screen after registration
     } catch {
       // Error handled in store
     }

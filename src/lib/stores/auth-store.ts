@@ -347,11 +347,16 @@ export const useAuthStore = create<AuthState>()(
             try {
               localStorage.removeItem('aafiatak-auth-storage');
             } catch {}
+
+            // Set hydrated immediately on error
+            useAuthStore.setState({ _hasHydrated: true });
+            return;
           }
 
           // Validate the stored token if the user appears authenticated
-          if (!error && state?.isAuthenticated && state?.token) {
-            // Validate token with the server in the background
+          if (state?.isAuthenticated && state?.token) {
+            // Validate token with the server BEFORE setting hydrated
+            // This prevents redirect loops (auth → dashboard → invalid → login → auth)
             fetch('/api/auth/me', {
               headers: { 'Authorization': `Bearer ${state.token}` },
             })
@@ -364,22 +369,25 @@ export const useAuthStore = create<AuthState>()(
                     token: null,
                     refreshToken: null,
                     isAuthenticated: false,
+                    _hasHydrated: true,
                   });
                   try {
                     localStorage.removeItem('aafiatak-auth-storage');
                   } catch {}
+                } else {
+                  // Token is valid — mark as hydrated
+                  useAuthStore.setState({ _hasHydrated: true });
                 }
               })
               .catch(() => {
                 // Network error — keep the stored auth state,
-                // the user might be offline
+                // the user might be offline. Mark hydrated so app isn't stuck.
+                useAuthStore.setState({ _hasHydrated: true });
               });
-          }
-
-          // Use setTimeout to ensure the store is fully initialized before setting
-          setTimeout(() => {
+          } else {
+            // No stored auth — mark hydrated immediately
             useAuthStore.setState({ _hasHydrated: true });
-          }, 0);
+          }
         };
       },
     }
