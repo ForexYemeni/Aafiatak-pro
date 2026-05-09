@@ -19,6 +19,7 @@ import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { formatTimeOnly } from '@/components/common/date-formatter';
+import { setActiveChatId } from '@/components/providers/socket-provider';
 import Link from 'next/link';
 
 interface ChatMessage {
@@ -55,6 +56,14 @@ export default function AdminChatDetailPage({ params }: { params: Promise<{ id: 
   useEffect(() => {
     params.then((p) => setChatId(p.id));
   }, [params]);
+
+  // Set active chat ID for global sound dedup
+  useEffect(() => {
+    if (chatId) {
+      setActiveChatId(chatId);
+      return () => setActiveChatId(null);
+    }
+  }, [chatId]);
 
   // Fetch chat info
   useEffect(() => {

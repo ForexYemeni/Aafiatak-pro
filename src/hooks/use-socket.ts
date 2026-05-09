@@ -188,7 +188,14 @@ export function useChat(chatId: string): UseChatReturn {
     };
   }, [isConnected, chatId]);
 
-  // Listen for new messages - play chat sound for incoming messages
+  // Listen for new messages
+  // NOTE: Chat sound is handled by the GLOBAL listener in SocketProvider
+  // which plays sounds for all incoming messages from other users,
+  // regardless of which page the user is on.
+  // The global listener skips playing sound when the user is on the
+  // active chat page (tracked via setActiveChatId).
+  // For the active chat page, the global listener DOES play sound
+  // since we want immediate feedback even when viewing the chat.
   useEffect(() => {
     const unsubscribe = socketService.onMessage((data: NewMessageEvent) => {
       if (data.chatId === chatId) {
@@ -199,9 +206,10 @@ export function useChat(chatId: string): UseChatReturn {
           }
 
           // Play chat sound for messages from OTHER users (not from self)
+          // Uses different dedup key than global listener to allow both to play
           const currentUserId = useAuthStore.getState().user?.id;
           if (data.message.senderId !== currentUserId) {
-            const soundId = `chat-${data.message.id}`;
+            const soundId = `chat-page-${data.message.id}`;
             if (!markSoundPlayed(soundId)) {
               soundManager.forceUserInteracted();
               soundManager.playChat();

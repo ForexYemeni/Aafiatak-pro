@@ -249,15 +249,14 @@ export function NotificationBell({ className }: NotificationBellProps) {
         </Button>
       </PopoverTrigger>
       <PopoverContent
-        className="w-[360px] p-0 shadow-xl border rounded-lg"
-        align="end"
+        className="w-[calc(100vw-2rem)] sm:w-[380px] max-w-[420px] p-0 shadow-xl border rounded-lg z-[9999]"
+        align="start"
         side="bottom"
-        sideOffset={12}
-        collisionPadding={20}
+        sideOffset={8}
+        collisionPadding={16}
         avoidCollisions={true}
         dir="rtl"
-        // Use sticky positioning to prevent overlap with page content
-        style={{ position: 'fixed', zIndex: 9999 }}
+        onOpenAutoFocus={(e) => e.preventDefault()}
       >
         {/* Header */}
         <div className="flex items-center justify-between p-3 border-b">

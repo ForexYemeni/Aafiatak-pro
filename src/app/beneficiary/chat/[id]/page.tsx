@@ -21,6 +21,7 @@ import { GlassCard } from '@/components/common/glass-card';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { useSocket } from '@/hooks/use-socket';
+import { setActiveChatId } from '@/components/providers/socket-provider';
 import { toast } from 'sonner';
 
 interface ChatInfo {
@@ -68,6 +69,14 @@ export default function ChatDetailPage() {
 
   const { isConnected, service } = useSocket();
   const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Set active chat ID for global sound dedup
+  useEffect(() => {
+    if (chatId) {
+      setActiveChatId(chatId);
+      return () => setActiveChatId(null);
+    }
+  }, [chatId]);
 
   // The param could be a chatId or a nurseId - we need to resolve it
   useEffect(() => {
