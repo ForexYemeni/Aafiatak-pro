@@ -1060,8 +1060,16 @@ function LoginPageContent() {
     if (!_hasHydrated) return;
     if (hasRedirectedRef.current) return; // Prevent redirect loop
 
-    // If user just logged out, clear the flag and stay on the login page
-    if (justLoggedOut) return;
+    // If user just logged out, stay on the login page
+    // BUT clean the URL so a subsequent login isn't blocked by stale ?logout=true
+    if (justLoggedOut) {
+      // Remove ?logout=true from URL without page reload
+      // so the next login attempt can proceed normally
+      if (typeof window !== 'undefined' && window.location.search.includes('logout')) {
+        window.history.replaceState({}, '', '/');
+      }
+      return;
+    }
 
     // If user is already authenticated (returning to app with saved session)
     // Validate the token with the server BEFORE redirecting.
