@@ -44,18 +44,21 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
       return createErrorResponse('لا يمكن التعامل مع هذا الطلب في حالته الحالية', 400, 'INVALID_STATUS');
     }
 
+    const nurse = await Nurse.findById(user.userId).select('name').lean();
+    const nurseName = nurse?.name || 'الممرض/ـة';
+
     if (action === 'accept') {
       order.status = 'accepted';
       await order.save();
 
-      // Notify beneficiary with action URL to view order details
+      // ── Notifications for ALL parties ──
       try {
-        const nurse = await Nurse.findById(user.userId).select('name').lean();
+        // 1️⃣ Notify BENEFICIARY: Your request has been accepted
         await Notification.create({
           userId: order.beneficiaryId,
           userRole: 'beneficiary',
           titleAr: 'تم قبول طلبك',
-          bodyAr: `تم قبول طلبك من ${nurse?.name || 'الممرض/ـة'} وسيقوم بالوصول قريباً`,
+          bodyAr: `تم قبول طلبك من ${nurseName} وسيقوم بالوصول قريباً`,
           type: 'status_change',
           priority: 'high',
           data: { requestId: id, status: 'accepted', nurseId: user.userId },
@@ -63,16 +66,42 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
           voiceEnabled: true,
         });
 
-        // Send push notification to beneficiary
         sendPushToUser(order.beneficiaryId.toString(), {
           title: 'تم قبول طلبك',
-          body: `تم قبول طلبك من ${nurse?.name || 'الممرض/ـة'} وسيقوم بالوصول قريباً`,
+          body: `تم قبول طلبك من ${nurseName} وسيقوم بالوصول قريباً`,
           type: 'service_accepted',
           priority: 'high',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
           data: { requestId: id, status: 'accepted' },
-        }).catch(() => {}); // Non-blocking
+        }).catch(() => {});
+
+        // 2️⃣ Notify ADMIN: Nurse accepted the order
+        const { User } = await import('@/models/mongoose');
+        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        for (const admin of admins) {
+          await Notification.create({
+            userId: admin._id,
+            userRole: 'admin',
+            titleAr: 'قبول الممرض للطلب',
+            bodyAr: `قبل ${nurseName} الطلب #${id.slice(-6)} وسيبدأ التنفيذ قريباً`,
+            type: 'status_change',
+            priority: 'medium',
+            data: { requestId: id, status: 'accepted', nurseId: user.userId },
+            actionUrl: '/admin/orders',
+            read: false,
+          });
+
+          sendPushToUser(admin._id.toString(), {
+            title: 'قبول الممرض للطلب',
+            body: `قبل ${nurseName} الطلب #${id.slice(-6)} وسيبدأ التنفيذ قريباً`,
+            type: 'service_accepted',
+            priority: 'medium',
+            url: '/admin/orders',
+            userRole: 'admin',
+            data: { requestId: id, status: 'accepted' },
+          }).catch(() => {});
+        }
       } catch {
         // Non-critical
       }
@@ -87,26 +116,51 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
       order.nurseId = undefined;
       await order.save();
 
-      // Notify admin about rejection
+      // ── Notifications for ALL parties ──
       try {
-        const nurse = await Nurse.findById(user.userId).select('name').lean();
+        // 1️⃣ Notify BENEFICIARY: Nurse rejected, looking for another
         await Notification.create({
-          userRole: 'admin',
-          titleAr: 'رفض ممرض طلباً',
-          bodyAr: `رفض الممرض ${nurse?.name || 'غير معروف'} الطلب الموكل إليه`,
+          userId: order.beneficiaryId,
+          userRole: 'beneficiary',
+          titleAr: 'جاري البحث عن ممرض بديل',
+          bodyAr: `الممرض المعين لم يتمكن من تنفيذ طلبك. جاري البحث عن ممرض بديل`,
           type: 'status_change',
-          priority: 'high',
-          data: { requestId: id, status: 'rejected', nurseId: user.userId },
-          voiceEnabled: false,
+          priority: 'medium',
+          data: { requestId: id, status: 'pending' },
+          actionUrl: `/beneficiary/orders/${id}`,
+          voiceEnabled: true,
         });
 
-        // Send push notification to admins
+        sendPushToUser(order.beneficiaryId.toString(), {
+          title: 'جاري البحث عن ممرض بديل',
+          body: 'الممرض المعين لم يتمكن من تنفيذ طلبك. جاري البحث عن بديل',
+          type: 'status_change',
+          priority: 'medium',
+          url: `/beneficiary/orders/${id}`,
+          userRole: 'beneficiary',
+          data: { requestId: id, status: 'pending' },
+        }).catch(() => {});
+
+        // 2️⃣ Notify ADMIN: Nurse rejected the assignment
         const { User } = await import('@/models/mongoose');
         const admins = await User.find({ role: 'admin' }).select('_id').lean();
         for (const admin of admins) {
+          await Notification.create({
+            userId: admin._id,
+            userRole: 'admin',
+            titleAr: 'رفض ممرض طلباً',
+            bodyAr: `رفض الممرض ${nurseName} الطلب #${id.slice(-6)} - يرجى تعيين ممرض بديل`,
+            type: 'status_change',
+            priority: 'high',
+            data: { requestId: id, status: 'rejected', nurseId: user.userId },
+            actionUrl: '/admin/orders',
+            voiceEnabled: true,
+            read: false,
+          });
+
           sendPushToUser(admin._id.toString(), {
             title: 'رفض ممرض طلباً',
-            body: `رفض الممرض ${nurse?.name || 'غير معروف'} الطلب الموكل إليه`,
+            body: `رفض الممرض ${nurseName} الطلب #${id.slice(-6)} - يرجى تعيين بديل`,
             type: 'service_cancelled',
             priority: 'high',
             url: '/admin/orders',

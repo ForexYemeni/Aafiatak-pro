@@ -208,14 +208,45 @@ export async function POST(request: NextRequest) {
     // Update beneficiary order count
     await Beneficiary.findByIdAndUpdate(user.userId, { $inc: { orderCount: 1 } });
 
-    // Create notification for admin about new order
+    // ── Notifications for ALL parties ──
     try {
       const beneficiary = await Beneficiary.findById(user.userId).select('name phone').lean();
-      const adminMsg = isCashPayment
-        ? `طلب خدمة جديد: ${service.nameAr} من ${beneficiary?.name || 'مستفيد'} - ${pricing.totalPrice} ر.ي`
-        : `طلب خدمة جديد بانتظار تأكيد الدفع: ${service.nameAr} من ${beneficiary?.name || 'مستفيد'} - ${pricing.totalPrice} ر.ي`;
+      const beneficiaryName = beneficiary?.name || 'مستفيد';
+      const serviceName = service.nameAr;
+      const orderId = order._id.toString();
 
-      // Find admin users to notify
+      // 1️⃣ Notify BENEFICIARY: Confirmation that their order was created
+      await Notification.create({
+        userId: user.userId,
+        userRole: 'beneficiary',
+        titleAr: isEmergency ? 'تم استلام طلب الطوارئ' : 'تم استلام طلبك',
+        bodyAr: isEmergency
+          ? `تم استلام طلب الطوارئ لخدمة ${serviceName} وسيتم التعامل معه بأولوية عالية`
+          : `تم استلام طلبك لخدمة ${serviceName} بنجاح${isCashPayment ? '' : ' - يرجى إرسال إثبات الدفع'}`,
+        type: isEmergency ? 'emergency' : 'system',
+        priority: isEmergency ? 'urgent' : 'medium',
+        data: { orderId, serviceId },
+        actionUrl: `/beneficiary/orders/${orderId}`,
+        read: false,
+      });
+
+      sendPushToUser(user.userId, {
+        title: isEmergency ? 'تم استلام طلب الطوارئ' : 'تم استلام طلبك',
+        body: isEmergency
+          ? `تم استلام طلب الطوارئ لخدمة ${serviceName} وسيتم التعامل معه بأولوية عالية`
+          : `تم استلام طلبك لخدمة ${serviceName} بنجاح`,
+        type: isEmergency ? 'emergency' : 'system',
+        priority: isEmergency ? 'urgent' : 'medium',
+        url: `/beneficiary/orders/${orderId}`,
+        userRole: 'beneficiary',
+        data: { orderId, serviceId },
+      }).catch(() => {});
+
+      // 2️⃣ Notify ADMIN: New order received
+      const adminMsg = isCashPayment
+        ? `طلب خدمة جديد: ${serviceName} من ${beneficiaryName} - ${pricing.totalPrice} ر.ي`
+        : `طلب جديد بانتظار تأكيد الدفع: ${serviceName} من ${beneficiaryName} - ${pricing.totalPrice} ر.ي`;
+
       const { User } = await import('@/models/mongoose');
       const admins = await User.find({ role: 'admin' }).select('_id').lean();
       for (const admin of admins) {
@@ -226,11 +257,11 @@ export async function POST(request: NextRequest) {
           bodyAr: adminMsg,
           type: isEmergency ? 'emergency' : 'assignment',
           priority: isEmergency ? 'urgent' : 'high',
-          data: { orderId: order._id.toString(), serviceId },
+          data: { orderId, serviceId },
+          actionUrl: '/admin/orders',
           read: false,
         });
 
-        // Send push notification to admin
         sendPushToUser(admin._id.toString(), {
           title: isCashPayment ? 'طلب خدمة جديد' : 'طلب جديد بانتظار تأكيد الدفع',
           body: adminMsg,
@@ -238,8 +269,8 @@ export async function POST(request: NextRequest) {
           priority: isEmergency ? 'urgent' : 'high',
           url: '/admin/orders',
           userRole: 'admin',
-          data: { orderId: order._id.toString(), serviceId },
-        }).catch(() => {}); // Non-blocking
+          data: { orderId, serviceId },
+        }).catch(() => {});
       }
     } catch {
       // Notification creation should not block order creation

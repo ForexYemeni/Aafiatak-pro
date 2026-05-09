@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Beneficiary, Nurse, Service, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -108,22 +109,86 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     order.cancelReason = body.cancelReason || 'إلغاء بواسطة المستفيد';
     await order.save();
 
-    // Notify nurse if assigned
-    if (order.nurseId) {
-      try {
+    const cancelReason = body.cancelReason || 'إلغاء بواسطة المستفيد';
+
+    // ── Notifications for ALL parties ──
+    try {
+      // 1️⃣ Notify BENEFICIARY: Order cancelled successfully
+      await Notification.create({
+        userId: user.userId,
+        userRole: 'beneficiary',
+        titleAr: 'تم إلغاء الطلب',
+        bodyAr: `تم إلغاء طلبك بنجاح${cancelReason !== 'إلغاء بواسطة المستفيد' ? ` - السبب: ${cancelReason}` : ''}`,
+        type: 'status_change',
+        priority: 'medium',
+        data: { requestId: id, status: 'cancelled' },
+        actionUrl: '/beneficiary/orders',
+        voiceEnabled: true,
+      });
+
+      sendPushToUser(user.userId, {
+        title: 'تم إلغاء الطلب',
+        body: 'تم إلغاء طلبك بنجاح',
+        type: 'service_cancelled',
+        priority: 'medium',
+        url: '/beneficiary/orders',
+        userRole: 'beneficiary',
+        data: { requestId: id, status: 'cancelled' },
+      }).catch(() => {});
+
+      // 2️⃣ Notify NURSE if assigned: Order has been cancelled
+      if (order.nurseId) {
         await Notification.create({
           userId: order.nurseId,
           userRole: 'nurse',
           titleAr: 'تم إلغاء الطلب',
-          bodyAr: `تم إلغاء الطلب المُعيَّن لك`,
+          bodyAr: 'تم إلغاء الطلب المُعيَّن لك من قبل المستفيد',
+          type: 'status_change',
+          priority: 'high',
+          data: { requestId: id, status: 'cancelled' },
+          actionUrl: '/nurse',
+          voiceEnabled: true,
+        });
+
+        sendPushToUser(order.nurseId.toString(), {
+          title: 'تم إلغاء الطلب',
+          body: 'تم إلغاء الطلب المُعيَّن لك من قبل المستفيد',
+          type: 'service_cancelled',
+          priority: 'high',
+          url: '/nurse',
+          userRole: 'nurse',
+          data: { requestId: id, status: 'cancelled' },
+        }).catch(() => {});
+      }
+
+      // 3️⃣ Notify ADMIN: Order cancelled by beneficiary
+      const { User } = await import('@/models/mongoose');
+      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      for (const admin of admins) {
+        await Notification.create({
+          userId: admin._id,
+          userRole: 'admin',
+          titleAr: 'إلغاء طلب بواسطة المستفيد',
+          bodyAr: `تم إلغاء الطلب #${id.slice(-6)} بواسطة المستفيد`,
           type: 'status_change',
           priority: 'medium',
           data: { requestId: id, status: 'cancelled' },
-          voiceEnabled: true,
+          actionUrl: '/admin/orders',
+          read: false,
         });
-      } catch {
-        // Non-critical
+
+        sendPushToUser(admin._id.toString(), {
+          title: 'إلغاء طلب بواسطة المستفيد',
+          body: `تم إلغاء الطلب #${id.slice(-6)} بواسطة المستفيد`,
+          type: 'service_cancelled',
+          priority: 'medium',
+          url: '/admin/orders',
+          userRole: 'admin',
+          data: { requestId: id, status: 'cancelled' },
+        }).catch(() => {});
       }
+    } catch {
+      // Non-critical
     }
 
     return Response.json({

@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
+import { ServiceRequest, Nurse, Service, Beneficiary, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
@@ -36,13 +36,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     ).lean();
     if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
-    // Create notification for the nurse with action URL
+    const nurseName = nurse.name || 'الممرض/ـة';
+    const orderId = order._id.toString();
+
+    // ── Notifications for ALL parties ──
     try {
+      // 1️⃣ Notify NURSE: You have been assigned a new service request
       await Notification.create({
         userId: nurseId,
         userRole: 'nurse',
         titleAr: 'طلب خدمة جديد',
-        bodyAr: `تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول`,
+        bodyAr: 'تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول',
         type: 'assignment',
         priority: 'high',
         data: { requestId: id, assignmentType: 'service' },
@@ -50,7 +54,6 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         voiceEnabled: true,
       });
 
-      // Send push notification to the assigned nurse
       sendPushToUser(nurseId, {
         title: 'طلب خدمة جديد',
         body: 'تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول',
@@ -59,7 +62,65 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         url: '/nurse',
         userRole: 'nurse',
         data: { requestId: id, assignmentType: 'service' },
-      }).catch(() => {}); // Non-blocking
+      }).catch(() => {});
+
+      // 2️⃣ Notify BENEFICIARY: A nurse has been assigned to your order
+      if (order.beneficiaryId) {
+        const service = await Service.findById(order.serviceId).select('nameAr').lean();
+        const serviceName = service?.nameAr || 'خدمة طبية';
+
+        await Notification.create({
+          userId: order.beneficiaryId,
+          userRole: 'beneficiary',
+          titleAr: 'تم تعيين ممرض لطلبك',
+          bodyAr: `تم تعيين ${nurseName} لتنفيذ طلبك لخدمة ${serviceName}. سيتم التواصل معك قريباً`,
+          type: 'status_change',
+          priority: 'high',
+          data: { requestId: id, status: 'assigned', nurseId: nurseId.toString() },
+          actionUrl: `/beneficiary/orders/${id}`,
+          voiceEnabled: true,
+        });
+
+        sendPushToUser(order.beneficiaryId.toString(), {
+          title: 'تم تعيين ممرض لطلبك',
+          body: `تم تعيين ${nurseName} لتنفيذ طلبك. سيتم التواصل معك قريباً`,
+          type: 'service_assigned',
+          priority: 'high',
+          url: `/beneficiary/orders/${id}`,
+          userRole: 'beneficiary',
+          data: { requestId: id, status: 'assigned' },
+        }).catch(() => {});
+      }
+
+      // 3️⃣ Notify ADMIN (confirmation): Assignment successful
+      const { User } = await import('@/models/mongoose');
+      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      for (const admin of admins) {
+        // Don't notify the admin who performed the action
+        if (admin._id.toString() === user!.userId) continue;
+
+        await Notification.create({
+          userId: admin._id,
+          userRole: 'admin',
+          titleAr: 'تم تعيين ممرض',
+          bodyAr: `تم تعيين ${nurseName} للطلب #${id.slice(-6)}`,
+          type: 'system',
+          priority: 'low',
+          data: { requestId: id, nurseId: nurseId.toString() },
+          actionUrl: '/admin/orders',
+          read: false,
+        });
+
+        sendPushToUser(admin._id.toString(), {
+          title: 'تم تعيين ممرض',
+          body: `تم تعيين ${nurseName} للطلب #${id.slice(-6)}`,
+          type: 'system',
+          priority: 'low',
+          url: '/admin/orders',
+          userRole: 'admin',
+          data: { requestId: id },
+        }).catch(() => {});
+      }
     } catch {
       // Non-critical
     }
@@ -70,13 +131,13 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       action: 'assign_nurse',
       entity: 'ServiceRequest',
       entityId: id,
-      details: `تعيين الممرض ${nurse.name} للطلب`,
+      details: `تعيين الممرض ${nurseName} للطلب`,
       request,
     });
 
     return Response.json({
       success: true,
-      data: { ...order, id: order._id.toString() },
+      data: { ...order, id: orderId },
       message: 'تم تعيين الممرض للطلب بنجاح',
     });
   } catch (error) {

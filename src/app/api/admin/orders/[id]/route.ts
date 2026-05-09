@@ -3,9 +3,10 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { ServiceRequest } from '@/models/mongoose';
+import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity, creditNurseEarnings } from '@/lib/api/helpers';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -70,6 +71,58 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         });
       }
 
+      // ── Notify ALL parties about completion ──
+      try {
+        const nurse = order.nurseId ? await Nurse.findById(order.nurseId).select('name').lean() : null;
+        const nurseName = nurse?.name || 'الممرض/ـة';
+
+        // Notify beneficiary
+        await Notification.create({
+          userId: order.beneficiaryId,
+          userRole: 'beneficiary',
+          titleAr: 'تم إكمال طلبك',
+          bodyAr: 'تم إكمال طلب الخدمة بنجاح. يرجى تقييم الخدمة',
+          type: 'status_change',
+          priority: 'high',
+          data: { requestId: id, status: 'completed' },
+          actionUrl: `/beneficiary/orders/${id}`,
+          voiceEnabled: true,
+        });
+        sendPushToUser(order.beneficiaryId.toString(), {
+          title: 'تم إكمال طلبك',
+          body: 'تم إكمال طلب الخدمة بنجاح. يرجى تقييم الخدمة',
+          type: 'service_completed',
+          priority: 'high',
+          url: `/beneficiary/orders/${id}`,
+          userRole: 'beneficiary',
+        }).catch(() => {});
+
+        // Notify nurse
+        if (order.nurseId) {
+          await Notification.create({
+            userId: order.nurseId,
+            userRole: 'nurse',
+            titleAr: 'تم إكمال الطلب وإضافة أرباحك',
+            bodyAr: `تم إكمال الطلب #${id.slice(-6)} وتمت إضافة ${order.nursePayout || 0} ر.ي إلى رصيدك`,
+            type: 'payment',
+            priority: 'medium',
+            data: { requestId: id, status: 'completed', earnings: order.nursePayout },
+            actionUrl: '/nurse/earnings',
+            voiceEnabled: true,
+          });
+          sendPushToUser(order.nurseId.toString(), {
+            title: 'تم إكمال الطلب وإضافة أرباحك',
+            body: `تمت إضافة ${order.nursePayout || 0} ر.ي إلى رصيدك`,
+            type: 'payment',
+            priority: 'medium',
+            url: '/nurse/earnings',
+            userRole: 'nurse',
+          }).catch(() => {});
+        }
+      } catch {
+        // Non-critical
+      }
+
       await logActivity({
         userId: user!.userId,
         userRole: user!.role,
@@ -81,6 +134,81 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       });
 
       return Response.json({ success: true, data: { ...order.toObject(), id: order._id.toString() }, message: 'تم تحديث الطلب بنجاح' });
+    }
+
+    // For cancellation by admin
+    if (body.status === 'cancelled') {
+      const order = await ServiceRequest.findById(id);
+      if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
+
+      order.status = 'cancelled';
+      order.cancelledAt = new Date();
+      order.cancelReason = body.cancelReason || 'إلغاء بواسطة الإدارة';
+      if (body.notes) order.notes = body.notes;
+      await order.save();
+
+      const cancelReason = body.cancelReason || 'إلغاء بواسطة الإدارة';
+
+      // ── Notify ALL parties about cancellation ──
+      try {
+        // Notify beneficiary
+        await Notification.create({
+          userId: order.beneficiaryId,
+          userRole: 'beneficiary',
+          titleAr: 'تم إلغاء طلبك',
+          bodyAr: `تم إلغاء طلبك - السبب: ${cancelReason}`,
+          type: 'status_change',
+          priority: 'high',
+          data: { requestId: id, status: 'cancelled' },
+          actionUrl: `/beneficiary/orders/${id}`,
+          voiceEnabled: true,
+        });
+        sendPushToUser(order.beneficiaryId.toString(), {
+          title: 'تم إلغاء طلبك',
+          body: `تم إلغاء طلبك - السبب: ${cancelReason}`,
+          type: 'service_cancelled',
+          priority: 'high',
+          url: `/beneficiary/orders/${id}`,
+          userRole: 'beneficiary',
+        }).catch(() => {});
+
+        // Notify nurse if assigned
+        if (order.nurseId) {
+          await Notification.create({
+            userId: order.nurseId,
+            userRole: 'nurse',
+            titleAr: 'تم إلغاء الطلب',
+            bodyAr: `تم إلغاء الطلب المُعيَّن لك - السبب: ${cancelReason}`,
+            type: 'status_change',
+            priority: 'high',
+            data: { requestId: id, status: 'cancelled' },
+            actionUrl: '/nurse',
+            voiceEnabled: true,
+          });
+          sendPushToUser(order.nurseId.toString(), {
+            title: 'تم إلغاء الطلب',
+            body: `تم إلغاء الطلب المُعيَّن لك - السبب: ${cancelReason}`,
+            type: 'service_cancelled',
+            priority: 'high',
+            url: '/nurse',
+            userRole: 'nurse',
+          }).catch(() => {});
+        }
+      } catch {
+        // Non-critical
+      }
+
+      await logActivity({
+        userId: user!.userId,
+        userRole: user!.role,
+        action: 'cancel_order',
+        entity: 'ServiceRequest',
+        entityId: id,
+        details: `إلغاء الطلب - السبب: ${cancelReason}`,
+        request,
+      });
+
+      return Response.json({ success: true, data: { ...order.toObject(), id: order._id.toString() }, message: 'تم إلغاء الطلب بنجاح' });
     }
 
     // For other status changes, use simple update

@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { ServiceRequest, Notification } from '@/models/mongoose';
+import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { creditNurseEarnings } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
@@ -28,6 +28,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return createErrorResponse('هذا الطلب غير معين لك', 403, 'FORBIDDEN');
     }
 
+    const nurse = await Nurse.findById(user.userId).select('name').lean();
+    const nurseName = nurse?.name || 'الممرض/ـة';
+
     if (action === 'start') {
       // Start the service: accepted → in_progress
       if (order.status !== 'accepted') {
@@ -37,29 +40,57 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       order.startedAt = new Date();
       await order.save();
 
-      // Notify beneficiary
+      // ── Notifications for ALL parties ──
       try {
+        // 1️⃣ Notify BENEFICIARY: Service has started
         await Notification.create({
           userId: order.beneficiaryId,
           userRole: 'beneficiary',
           titleAr: 'بدأ تنفيذ طلبك',
-          bodyAr: 'بدأ الممرض بتنفيذ طلب الخدمة الخاص بك',
+          bodyAr: `بدأ ${nurseName} بتنفيذ طلب الخدمة الخاص بك`,
           type: 'status_change',
-          priority: 'medium',
+          priority: 'high',
           data: { requestId: id, status: 'in_progress' },
+          actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,
         });
 
-        // Send push notification to beneficiary
         sendPushToUser(order.beneficiaryId.toString(), {
           title: 'بدأ تنفيذ طلبك',
-          body: 'بدأ الممرض بتنفيذ طلب الخدمة الخاص بك',
+          body: `بدأ ${nurseName} بتنفيذ طلب الخدمة الخاص بك`,
           type: 'service_started',
-          priority: 'medium',
+          priority: 'high',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
           data: { requestId: id, status: 'in_progress' },
-        }).catch(() => {}); // Non-blocking
+        }).catch(() => {});
+
+        // 2️⃣ Notify ADMIN: Nurse started the service
+        const { User } = await import('@/models/mongoose');
+        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        for (const admin of admins) {
+          await Notification.create({
+            userId: admin._id,
+            userRole: 'admin',
+            titleAr: 'بدأ تنفيذ الطلب',
+            bodyAr: `بدأ ${nurseName} تنفيذ الطلب #${id.slice(-6)}`,
+            type: 'status_change',
+            priority: 'medium',
+            data: { requestId: id, status: 'in_progress' },
+            actionUrl: '/admin/orders',
+            read: false,
+          });
+
+          sendPushToUser(admin._id.toString(), {
+            title: 'بدأ تنفيذ الطلب',
+            body: `بدأ ${nurseName} تنفيذ الطلب #${id.slice(-6)}`,
+            type: 'service_started',
+            priority: 'medium',
+            url: '/admin/orders',
+            userRole: 'admin',
+            data: { requestId: id, status: 'in_progress' },
+          }).catch(() => {});
+        }
       } catch {
         // Non-critical
       }
@@ -93,8 +124,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         });
       }
 
-      // Notify beneficiary
+      // ── Notifications for ALL parties ──
       try {
+        // 1️⃣ Notify BENEFICIARY: Service completed, please rate
         await Notification.create({
           userId: order.beneficiaryId,
           userRole: 'beneficiary',
@@ -103,10 +135,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           type: 'status_change',
           priority: 'high',
           data: { requestId: id, status: 'completed' },
+          actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,
         });
 
-        // Send push notification to beneficiary
         sendPushToUser(order.beneficiaryId.toString(), {
           title: 'تم إكمال طلبك',
           body: 'تم إكمال طلب الخدمة بنجاح. يرجى تقييم الخدمة',
@@ -115,7 +147,57 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
           data: { requestId: id, status: 'completed' },
-        }).catch(() => {}); // Non-blocking
+        }).catch(() => {});
+
+        // 2️⃣ Notify NURSE: Service completed, earnings credited
+        await Notification.create({
+          userId: user.userId,
+          userRole: 'nurse',
+          titleAr: 'تم إكمال الطلب وإضافة أرباحك',
+          bodyAr: `تم إكمال الطلب #${id.slice(-6)} بنجاح وتمت إضافة ${order.nursePayout || 0} ر.ي إلى رصيدك`,
+          type: 'payment',
+          priority: 'medium',
+          data: { requestId: id, status: 'completed', earnings: order.nursePayout },
+          actionUrl: '/nurse/earnings',
+          voiceEnabled: true,
+        });
+
+        sendPushToUser(user.userId, {
+          title: 'تم إكمال الطلب وإضافة أرباحك',
+          body: `تم إضافة ${order.nursePayout || 0} ر.ي إلى رصيدك`,
+          type: 'payment',
+          priority: 'medium',
+          url: '/nurse/earnings',
+          userRole: 'nurse',
+          data: { requestId: id, earnings: order.nursePayout },
+        }).catch(() => {});
+
+        // 3️⃣ Notify ADMIN: Order completed
+        const { User } = await import('@/models/mongoose');
+        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        for (const admin of admins) {
+          await Notification.create({
+            userId: admin._id,
+            userRole: 'admin',
+            titleAr: 'تم إكمال الطلب',
+            bodyAr: `أكمل ${nurseName} الطلب #${id.slice(-6)} بنجاح`,
+            type: 'status_change',
+            priority: 'medium',
+            data: { requestId: id, status: 'completed' },
+            actionUrl: '/admin/orders',
+            read: false,
+          });
+
+          sendPushToUser(admin._id.toString(), {
+            title: 'تم إكمال الطلب',
+            body: `أكمل ${nurseName} الطلب #${id.slice(-6)} بنجاح`,
+            type: 'service_completed',
+            priority: 'medium',
+            url: '/admin/orders',
+            userRole: 'admin',
+            data: { requestId: id, status: 'completed' },
+          }).catch(() => {});
+        }
       } catch {
         // Non-critical
       }

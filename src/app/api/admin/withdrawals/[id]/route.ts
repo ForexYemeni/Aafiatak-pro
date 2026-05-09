@@ -4,8 +4,9 @@
 import { NextRequest } from 'next/server';
 import mongoose from 'mongoose';
 import { connectDB } from '@/lib/mongodb';
-import { WithdrawalRequest, Nurse } from '@/models/mongoose';
+import { WithdrawalRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function PATCH(
   request: NextRequest,
@@ -56,7 +57,6 @@ export async function PATCH(
         }
       } catch (nurseError) {
         console.error('[WITHDRAWAL REJECT - NURSE UPDATE ERROR]', nurseError);
-        // Continue with the rejection even if nurse update fails
       }
     }
 
@@ -73,6 +73,61 @@ export async function PATCH(
     } catch (saveError) {
       console.error('[WITHDRAWAL SAVE ERROR]', saveError);
       return createErrorResponse('حدث خطأ أثناء حفظ تحديث طلب السحب', 500, 'SAVE_ERROR');
+    }
+
+    // ── Notify NURSE about withdrawal status ──
+    try {
+      const nurse = await Nurse.findById(withdrawal.nurseId).select('name').lean();
+      const nurseName = nurse?.name || 'الممرض/ـة';
+      const amount = withdrawal.amount || 0;
+
+      if (status === 'approved' || status === 'processed') {
+        await Notification.create({
+          userId: withdrawal.nurseId,
+          userRole: 'nurse',
+          titleAr: 'تمت الموافقة على طلب السحب',
+          bodyAr: `تمت الموافقة على طلب سحب ${amount} ر.ي وسيتم التحويل قريباً`,
+          type: 'withdrawal_approved',
+          priority: 'high',
+          data: { withdrawalId: id, status, amount },
+          actionUrl: '/nurse/earnings',
+          voiceEnabled: true,
+        });
+
+        sendPushToUser(withdrawal.nurseId.toString(), {
+          title: 'تمت الموافقة على طلب السحب',
+          body: `تمت الموافقة على سحب ${amount} ر.ي وسيتم التحويل قريباً`,
+          type: 'withdrawal_approved',
+          priority: 'high',
+          url: '/nurse/earnings',
+          userRole: 'nurse',
+          data: { withdrawalId: id, amount },
+        }).catch(() => {});
+      } else if (status === 'rejected') {
+        await Notification.create({
+          userId: withdrawal.nurseId,
+          userRole: 'nurse',
+          titleAr: 'تم رفض طلب السحب',
+          bodyAr: `تم رفض طلب سحب ${amount} ر.ي${rejectedReason ? ` - السبب: ${rejectedReason}` : ''}. تم إرجاع المبلغ إلى رصيدك`,
+          type: 'withdrawal_rejected',
+          priority: 'high',
+          data: { withdrawalId: id, status: 'rejected', amount },
+          actionUrl: '/nurse/earnings',
+          voiceEnabled: true,
+        });
+
+        sendPushToUser(withdrawal.nurseId.toString(), {
+          title: 'تم رفض طلب السحب',
+          body: `تم رفض سحب ${amount} ر.ي${rejectedReason ? ` - السبب: ${rejectedReason}` : ''}. تم إرجاع المبلغ`,
+          type: 'withdrawal_rejected',
+          priority: 'high',
+          url: '/nurse/earnings',
+          userRole: 'nurse',
+          data: { withdrawalId: id, amount },
+        }).catch(() => {});
+      }
+    } catch {
+      // Non-critical
     }
 
     return Response.json({
