@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { RefreshCw } from 'lucide-react';
 
@@ -10,6 +11,8 @@ import { RefreshCw } from 'lucide-react';
 // Robust loading guard that doesn't rely solely on Zustand's _hasHydrated.
 // Reads directly from localStorage as a fallback to prevent the app from
 // being permanently stuck on "جاري التحميل...".
+// Uses router.replace() instead of window.location.href to avoid
+// hard navigation redirect loops.
 // ============================================================================
 
 interface AuthHydrationGuardProps {
@@ -63,6 +66,7 @@ export function AuthHydrationGuard({
   gradientClass,
   spinnerColorClass,
 }: AuthHydrationGuardProps) {
+  const router = useRouter();
   const zustandHydrated = useAuthStore((s) => s._hasHydrated);
   const zustandAuth = useAuthStore((s) => s.isAuthenticated);
   const zustandUser = useAuthStore((s) => s.user);
@@ -70,6 +74,7 @@ export function AuthHydrationGuard({
   const [isReady, setIsReady] = useState(false);
   const [localAuth, setLocalAuth] = useState<LocalAuthState | null>(null);
   const [showRetry, setShowRetry] = useState(false);
+  const [redirectAttempted, setRedirectAttempted] = useState(false);
 
   // Phase 1: Try to read from localStorage immediately (synchronous)
   useEffect(() => {
@@ -107,26 +112,29 @@ export function AuthHydrationGuard({
     };
   }, [zustandHydrated]);
 
-  // Phase 3: Auth check and redirect
+  // Phase 3: Auth check and redirect (using router.replace to avoid hard navigation loops)
   useEffect(() => {
-    if (!isReady) return;
+    if (!isReady || redirectAttempted) return;
 
     // Use Zustand state as primary, localStorage as fallback
     const isAuthenticated = zustandAuth || localAuth?.isAuthenticated || false;
     const user = zustandUser || localAuth?.user || null;
 
     if (!isAuthenticated || !user) {
-      // Not authenticated - redirect to login
-      window.location.href = redirectPath;
+      // Not authenticated - use router.replace instead of window.location.href
+      // to prevent hard navigation redirect loops
+      setRedirectAttempted(true);
+      router.replace(redirectPath);
       return;
     }
 
     if (!requiredRoles.includes(user.role)) {
-      // Wrong role - redirect to login
-      window.location.href = redirectPath;
+      // Wrong role - use router.replace instead of window.location.href
+      setRedirectAttempted(true);
+      router.replace(redirectPath);
       return;
     }
-  }, [isReady, zustandAuth, zustandUser, localAuth, requiredRoles, redirectPath]);
+  }, [isReady, zustandAuth, zustandUser, localAuth, requiredRoles, redirectPath, router, redirectAttempted]);
 
   // Show loading spinner while not ready
   if (!isReady) {

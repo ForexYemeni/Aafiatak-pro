@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { jwtVerify } from 'jose';
 import type { UserRole } from '@/types';
-import { applySecurityHeaders } from '@/lib/security/headers';
-import { checkRateLimit, rateLimitConfig, getClientIP } from '@/lib/security';
 
 // ---- Route Protection Configuration ----
 
@@ -16,11 +14,6 @@ const PROTECTED_ROUTES: RouteProtection[] = [
   { pathPrefix: '/nurse', allowedRoles: ['nurse'] },
   { pathPrefix: '/beneficiary', allowedRoles: ['beneficiary'] },
 ];
-
-// Paths that should redirect away from login if already authenticated
-// IMPORTANT: Use exact match for '/' to avoid matching ALL paths (every path starts with '/')
-const AUTH_PATHS_EXACT = ['/']; // Exact match only
-const AUTH_PATHS_PREFIX = ['/login', '/register']; // Prefix match
 
 // ---- JWT Secret (Edge-compatible) ----
 
@@ -83,26 +76,78 @@ function getDashboardPath(role: UserRole): string {
   }
 }
 
+// ---- Simple Rate Limiting (Edge-compatible) ----
+
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>();
+
+interface RateLimitConfig {
+  windowMs: number;
+  max: number;
+  authMax: number;
+  authWindowMs: number;
+  uploadMax: number;
+  uploadWindowMs: number;
+}
+
+const rateLimitConfig: RateLimitConfig = {
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  authMax: 20,
+  authWindowMs: 15 * 60 * 1000,
+  uploadMax: 30,
+  uploadWindowMs: 15 * 60 * 1000,
+};
+
+function checkRateLimit(key: string, limit: number, windowMs: number): boolean {
+  const now = Date.now();
+  const record = rateLimitStore.get(key);
+
+  if (!record || now > record.resetTime) {
+    rateLimitStore.set(key, { count: 1, resetTime: now + windowMs });
+    return true;
+  }
+
+  if (record.count >= limit) {
+    return false;
+  }
+
+  record.count += 1;
+  return true;
+}
+
+function getClientIP(request: NextRequest): string {
+  const forwardedFor = request.headers.get('x-forwarded-for');
+  if (forwardedFor) {
+    const firstIP = forwardedFor.split(',')[0]?.trim();
+    if (firstIP) return firstIP;
+  }
+  const realIP = request.headers.get('x-real-ip');
+  if (realIP) return realIP.trim();
+  return 'unknown';
+}
+
 // ---- Middleware ----
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // ============================================================
   // Skip middleware for static files and Next.js internals
+  // ============================================================
   if (
     pathname.startsWith('/_next/') ||
     pathname.startsWith('/favicon') ||
     pathname.includes('.')
   ) {
-    const response = NextResponse.next();
-    return applySecurityHeaders(request, response);
+    return NextResponse.next();
   }
 
-  // ---- Rate Limiting for API routes ----
+  // ============================================================
+  // Rate Limiting & CORS for API routes
+  // ============================================================
   if (pathname.startsWith('/api/')) {
     const clientIP = getClientIP(request);
 
-    // Stricter rate limiting for auth endpoints
     const isAuthEndpoint = pathname.startsWith('/api/auth/login') ||
       pathname.startsWith('/api/auth/register');
     const isUploadEndpoint = pathname.startsWith('/api/upload');
@@ -122,53 +167,56 @@ export async function middleware(request: NextRequest) {
     const isAllowed = checkRateLimit(rateLimitKey, limit, windowMs);
 
     if (!isAllowed) {
-      const response = NextResponse.json(
+      return NextResponse.json(
         { success: false, message: 'طلبات كثيرة جداً. يرجى المحاولة بعد قليل' },
         { status: 429 }
       );
-      response.headers.set('Retry-After', String(Math.ceil(windowMs / 1000)));
-      return applySecurityHeaders(request, response);
     }
 
     // Handle CORS preflight requests
     if (request.method === 'OPTIONS') {
       const response = new NextResponse(null, { status: 204 });
-      return applySecurityHeaders(request, response);
+      response.headers.set('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+      response.headers.set('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-CSRF-Token');
+      response.headers.set('Access-Control-Max-Age', '86400');
+      return response;
     }
 
     const response = NextResponse.next();
-    return applySecurityHeaders(request, response);
+
+    // Add CORS headers for allowed origins
+    const origin = request.headers.get('origin') ?? '';
+    const allowedOrigins = [
+      'https://aafiatak.com',
+      'https://www.aafiatak.com',
+      'https://app.aafiatak.com',
+      'capacitor://localhost',
+    ];
+    const isAllowedOrigin = allowedOrigins.some((allowed) => origin.startsWith(allowed)) ||
+      (process.env.NODE_ENV === 'development' && origin.includes('localhost'));
+    if (isAllowedOrigin && origin) {
+      response.headers.set('Access-Control-Allow-Origin', origin);
+      response.headers.set('Access-Control-Allow-Credentials', 'true');
+    }
+
+    return response;
   }
+
+  // ============================================================
+  // Auth pages: '/', '/login', '/register'
+  // Do NOT redirect authenticated users here — let the client handle it.
+  // The client has better context about the auth state and can avoid
+  // the redirect loop that occurs when middleware redirects but
+  // the cookie is expired/invalid while localStorage has stale auth data.
+  // ============================================================
 
   const token = extractToken(request);
 
   // ---- Handle logout parameter ----
-  // If user just logged out, clear any remaining cookie and show login page
   if (pathname === '/' && request.nextUrl.searchParams.get('logout') === 'true') {
     const response = NextResponse.next();
     response.cookies.delete('auth_token');
-    return applySecurityHeaders(request, response);
-  }
-
-  // ---- Handle authenticated users on auth pages ----
-  // Check exact match first (for '/' path), then prefix match (for '/login', '/register')
-  const isAuthPage = AUTH_PATHS_EXACT.includes(pathname) || AUTH_PATHS_PREFIX.some((p) => pathname.startsWith(p));
-  
-  if (isAuthPage) {
-    if (token) {
-      const role = await getUserRoleFromToken(token);
-      if (role) {
-        // Redirect to role-specific dashboard
-        const dashboardPath = getDashboardPath(role);
-        // Prevent redirect loop: only redirect if not already on the target
-        if (pathname !== dashboardPath) {
-          const response = NextResponse.redirect(new URL(dashboardPath, request.url));
-          return applySecurityHeaders(request, response);
-        }
-      }
-    }
-    const response = NextResponse.next();
-    return applySecurityHeaders(request, response);
+    return response;
   }
 
   // ---- Check if current path is protected ----
@@ -176,18 +224,16 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith(protection.pathPrefix)
   );
 
-  // Not a protected route, allow through with security headers
+  // Not a protected route, allow through
   if (!matchingProtection) {
-    const response = NextResponse.next();
-    return applySecurityHeaders(request, response);
+    return NextResponse.next();
   }
 
   // ---- No token found, redirect to login ----
   if (!token) {
     const loginUrl = new URL('/', request.url);
     loginUrl.searchParams.set('redirect', pathname);
-    const response = NextResponse.redirect(loginUrl);
-    return applySecurityHeaders(request, response);
+    return NextResponse.redirect(loginUrl);
   }
 
   // ---- Verify token and check role ----
@@ -199,20 +245,22 @@ export async function middleware(request: NextRequest) {
     loginUrl.searchParams.set('redirect', pathname);
     const response = NextResponse.redirect(loginUrl);
     response.cookies.delete('auth_token');
-    return applySecurityHeaders(request, response);
+    return response;
   }
 
   // ---- Check role authorization ----
   if (!matchingProtection.allowedRoles.includes(userRole)) {
     // User doesn't have the right role, redirect to their own dashboard
     const dashboardPath = getDashboardPath(userRole);
-    const response = NextResponse.redirect(new URL(dashboardPath, request.url));
-    return applySecurityHeaders(request, response);
+    // Prevent redirect loop: don't redirect to the same path
+    if (pathname === dashboardPath) {
+      return NextResponse.next();
+    }
+    return NextResponse.redirect(new URL(dashboardPath, request.url));
   }
 
-  // ---- Authorized, allow through with security headers ----
-  const response = NextResponse.next();
-  return applySecurityHeaders(request, response);
+  // ---- Authorized, allow through ----
+  return NextResponse.next();
 }
 
 // ---- Matcher Configuration ----

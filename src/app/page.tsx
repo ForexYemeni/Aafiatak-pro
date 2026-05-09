@@ -1049,19 +1049,61 @@ function LoginPageContent() {
   // vs returning to the app with an existing session
   const [isFreshLogin, setIsFreshLogin] = useState(false);
 
+  // Track if we've already attempted a redirect to prevent infinite loops
+  const [hasRedirected, setHasRedirected] = useState(false);
+
   // Handle post-login redirect with loading screen
   const justLoggedOut = searchParams.get('logout') === 'true';
 
   useEffect(() => {
     if (!_hasHydrated) return;
+    if (hasRedirected) return; // Prevent redirect loop
 
     // If user is already authenticated (returning to app with saved session)
-    // redirect using router.replace to avoid middleware redirect loop
-    // (window.location.href causes a hard navigation that triggers middleware,
-    //  which can cause infinite redirect loops when cookie is missing/invalid)
+    // Validate the token with the server BEFORE redirecting to avoid
+    // the common loop: client thinks authenticated → redirects to dashboard →
+    // middleware says not authenticated → redirects back to login → repeat
     if (isAuthenticated && user && !justLoggedOut && !isFreshLogin) {
-      const destination = redirectPath ?? getDashboardPath(user.role);
-      router.replace(destination);
+      // Validate the stored token with the server first
+      const token = useAuthStore.getState().token;
+      if (token) {
+        setHasRedirected(true); // Mark as redirected to prevent re-triggering
+        fetch('/api/auth/me', {
+          headers: { 'Authorization': `Bearer ${token}` },
+        })
+          .then(res => {
+            if (res.ok) {
+              // Token is valid, proceed with redirect
+              const destination = redirectPath ?? getDashboardPath(user.role);
+              router.replace(destination);
+            } else {
+              // Token is invalid, clear auth state and stay on login page
+              useAuthStore.setState({
+                user: null,
+                token: null,
+                refreshToken: null,
+                isAuthenticated: false,
+              });
+              try { localStorage.removeItem('aafiatak-auth-storage'); } catch {}
+              setHasRedirected(false);
+            }
+          })
+          .catch(() => {
+            // Network error — assume offline, allow redirect
+            const destination = redirectPath ?? getDashboardPath(user.role);
+            router.replace(destination);
+          });
+      } else {
+        // No token in store but isAuthenticated is true — corrupted state, clear it
+        useAuthStore.setState({
+          user: null,
+          token: null,
+          refreshToken: null,
+          isAuthenticated: false,
+        });
+        try { localStorage.removeItem('aafiatak-auth-storage'); } catch {}
+        setHasRedirected(false);
+      }
       return;
     }
 
@@ -1069,18 +1111,16 @@ function LoginPageContent() {
     if (isAuthenticated && user && isFreshLogin && !showLoadingScreen) {
       setShowLoadingScreen(true);
     }
-
-    if (justLoggedOut && !isAuthenticated) {
-      router.replace('/');
-    }
-  }, [isAuthenticated, user, justLoggedOut, showLoadingScreen, isFreshLogin, redirectPath, router, _hasHydrated]);
+  }, [isAuthenticated, user, justLoggedOut, showLoadingScreen, isFreshLogin, redirectPath, router, _hasHydrated, hasRedirected]);
 
   const handleLoadingComplete = useCallback(() => {
     if (user) {
       const destination = redirectPath ?? getDashboardPath(user.role);
-      window.location.href = destination;
+      // Use router.replace for client-side navigation (no hard refresh)
+      // This avoids the middleware redirect loop that window.location.href causes
+      router.replace(destination);
     }
-  }, [user, redirectPath]);
+  }, [user, redirectPath, router]);
 
   // ============================================================================
   // Login Form
