@@ -53,7 +53,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         bodyAr: 'تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول في أقرب وقت',
         type: 'assignment',
         priority: 'high',
-        data: { requestId: id, assignmentType: 'service' },
+        data: { requestId: id, assignmentType: 'service', voiceAlert: 'true', voiceText: 'تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول في أقرب وقت' },
         actionUrl: '/nurse',
         voiceEnabled: true,
       });
@@ -94,6 +94,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
             nursePhone,
             nurseSpecialty,
             nurseRating: nurseRating ? String(nurseRating) : undefined,
+            voiceAlert: 'true',
+            voiceText: `تم تعيين ${nurseName} لتنفيذ طلبك. سيقوم بالتواصل معك قريباً`,
           },
           actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,

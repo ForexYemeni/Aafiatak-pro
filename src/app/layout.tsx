@@ -5,6 +5,7 @@ import { AppProvider } from "@/components/providers/app-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { PWAInitializer } from "@/components/providers/pwa-provider";
 import { SafeProvider } from "@/components/providers/safe-provider";
+import { NotificationToastListener } from "@/components/common/notification-toast";
 
 const notoArabic = Noto_Sans_Arabic({
   variable: "--font-noto-arabic",
@@ -52,6 +53,7 @@ export default function RootLayout({
         <AppProvider>
           <SafeProvider>
             <PWAInitializer />
+            <NotificationToastListener />
           </SafeProvider>
           {children}
         </AppProvider>

@@ -78,6 +78,8 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
             nursePhone,
             nurseSpecialty,
             nurseRating: nurseRating ? String(nurseRating) : undefined,
+            voiceAlert: 'true',
+            voiceText: `تم قبول طلبك من ${nurseName}. سيقوم بالوصول إليك قريباً`,
           },
           actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,
@@ -113,8 +115,9 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
             bodyAr: `قبل ${nurseName} الطلب #${id.slice(-6)} وسيبدأ التنفيذ قريباً`,
             type: 'status_change',
             priority: 'medium',
-            data: { requestId: id, status: 'accepted', nurseId: user.userId },
+            data: { requestId: id, status: 'accepted', nurseId: user.userId, voiceAlert: 'true', voiceText: `قبل ${nurseName} الطلب وسيبدأ التنفيذ قريباً` },
             actionUrl: '/admin/orders',
+            voiceEnabled: true,
             read: false,
           });
 
@@ -152,7 +155,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
           bodyAr: `الممرض المعين لم يتمكن من تنفيذ طلبك. جاري البحث عن ممرض بديل`,
           type: 'status_change',
           priority: 'medium',
-          data: { requestId: id, status: 'pending' },
+          data: { requestId: id, status: 'pending', voiceAlert: 'true', voiceText: 'الممرض المعين لم يتمكن من تنفيذ طلبك. جاري البحث عن ممرض بديل' },
           actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,
         });
@@ -178,7 +181,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
             bodyAr: `رفض الممرض ${nurseName} الطلب #${id.slice(-6)} - يرجى تعيين ممرض بديل`,
             type: 'status_change',
             priority: 'high',
-            data: { requestId: id, status: 'rejected', nurseId: user.userId },
+            data: { requestId: id, status: 'rejected', nurseId: user.userId, voiceAlert: 'true', voiceText: `رفض الممرض ${nurseName} الطلب. يرجى تعيين ممرض بديل` },
             actionUrl: '/admin/orders',
             voiceEnabled: true,
             read: false,

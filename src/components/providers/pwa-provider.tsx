@@ -221,6 +221,7 @@ function VoiceNotificationPoller() {
             type: notif.type,
             priority: notif.priority,
             data: notif.data,
+            clickAction: notif.actionUrl,
           },
         }));
       }
