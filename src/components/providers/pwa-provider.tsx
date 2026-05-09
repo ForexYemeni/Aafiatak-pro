@@ -3,6 +3,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { soundManager } from '@/lib/notifications/sound-manager';
+import { voiceManager } from '@/lib/notifications/voice-manager';
 import { notificationManager } from '@/lib/notifications/notification-manager';
 import { markSoundPlayed, clearPlayedSounds } from '@/lib/notifications/sound-dedup';
 import { useAuthStore } from '@/lib/stores/auth-store';
@@ -61,8 +62,8 @@ function playNotificationSound(type: string, priority: string, notifId: string):
     repeat: isUrgent ? 2 : 1,
   });
 
-  // For emergency, repeat after delay
-  if (isUrgent && type === 'emergency') {
+  // For emergency types, repeat after delay for maximum attention
+  if (isUrgent && (type === 'emergency' || type === 'emergency_assigned')) {
     setTimeout(() => {
       soundManager.playEmergency();
     }, 1500);
@@ -194,9 +195,10 @@ function ServiceWorkerRegistrar() {
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    // Initialize sound and notification systems
+    // Initialize sound, voice, and notification systems
     notificationManager.init();
     soundManager.init();
+    voiceManager.init(); // Pre-load voices so TTS is ready immediately
 
     if (document.hasFocus()) {
       soundManager.forceUserInteracted();
@@ -229,18 +231,15 @@ function ServiceWorkerRegistrar() {
               if (payload.data?.voiceAlert && payload.data?.voiceText) {
                 const voiceId = `voice-${notifId}`;
                 if (!markSoundPlayed(voiceId)) {
-                  import('@/lib/notifications/voice-manager').then(({ voiceManager }) => {
-                    const { ttsEnabled } = useNotificationStore.getState();
-                    if (!ttsEnabled) return; // Respect user preference
+                  const { ttsEnabled } = useNotificationStore.getState();
+                  if (ttsEnabled) {
                     voiceManager.init();
                     voiceManager.speak(payload.data.voiceText, {
                       priority: payload.priority === 'urgent' ? 'urgent' : payload.priority === 'high' ? 'high' : 'medium',
                       rate: 1.1,
                       volume: 1.0,
                     });
-                  }).catch(() => {
-                    // TTS not available
-                  });
+                  }
                 }
               }
             }
@@ -431,10 +430,141 @@ function ChatSoundPlayer() {
 // PWA Initializer - Main Export
 // ============================================================================
 
+// ============================================================================
+// Emergency Sound Player - Listens for Socket.IO emergency events
+// and triggers sound + TTS for emergency_dispatched and emergency_alert events.
+// This ensures nurses get audible + voice notifications even if push
+// notifications fail (no subscription, expired, network issues).
+// ============================================================================
+
+function EmergencySoundPlayer() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
+
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated) return;
+
+    // Listen for emergency dispatched events (admin assigned nurse)
+    const unsubDispatched = socketService.onEmergencyDispatched((data) => {
+      try {
+        const notifId = `socket-dispatched-${data.emergencyRequestId}`;
+
+        // Play emergency sound with dedup
+        playNotificationSound('emergency_assigned', 'urgent', notifId);
+
+        // TTS voice alert
+        const voiceId = `voice-${notifId}`;
+        if (!markSoundPlayed(voiceId)) {
+          const { ttsEnabled } = useNotificationStore.getState();
+          if (ttsEnabled) {
+            voiceManager.init();
+            voiceManager.speak(
+              `تم تعيينك لحالة طوارئ، الممرض ${data.nurseName || ''}`,
+              { priority: 'urgent', rate: 1.1, volume: 1.0 }
+            );
+          }
+        }
+
+        // Also update notification store for UI
+        useNotificationStore.getState().fetchNotifications();
+      } catch {
+        // Silently fail
+      }
+    });
+
+    // Listen for emergency alert events (new emergency created)
+    const unsubAlert = socketService.onEmergencyAlert((data) => {
+      try {
+        const notifId = `socket-alert-${data.emergencyRequestId}`;
+
+        // Play emergency sound with dedup
+        playNotificationSound('emergency', 'urgent', notifId);
+
+        // TTS voice alert
+        const voiceId = `voice-${notifId}`;
+        if (!markSoundPlayed(voiceId)) {
+          const { ttsEnabled } = useNotificationStore.getState();
+          if (ttsEnabled) {
+            voiceManager.init();
+            voiceManager.speak(
+              `حالة طوارئ جديدة`,
+              { priority: 'urgent', rate: 1.1, volume: 1.0 }
+            );
+          }
+        }
+      } catch {
+        // Silently fail
+      }
+    });
+
+    // Listen for emergency created events
+    const unsubCreated = socketService.onEmergencyCreated((data) => {
+      try {
+        const notifId = `socket-created-${data.emergencyRequestId}`;
+        playNotificationSound('emergency', 'urgent', notifId);
+
+        const voiceId = `voice-${notifId}`;
+        if (!markSoundPlayed(voiceId)) {
+          const { ttsEnabled } = useNotificationStore.getState();
+          if (ttsEnabled) {
+            voiceManager.init();
+            voiceManager.speak(
+              `حالة طوارئ جديدة من ${data.beneficiaryName}`,
+              { priority: 'urgent', rate: 1.1, volume: 1.0 }
+            );
+          }
+        }
+      } catch {
+        // Silently fail
+      }
+    });
+
+    // Listen for general socket notifications (fallback)
+    const unsubNotification = socketService.onNotification((data) => {
+      try {
+        // Only process if it has emergency-related type
+        const emergencyTypes = ['emergency', 'emergency_assigned'];
+        if (!emergencyTypes.includes(data.type)) return;
+
+        const notifId = `socket-notif-${data.id}`;
+        playNotificationSound(data.type, data.priority, notifId);
+
+        // TTS for emergency_assigned notifications to nurse
+        if (data.type === 'emergency_assigned' && data.data?.voiceText) {
+          const voiceId = `voice-${notifId}`;
+          if (!markSoundPlayed(voiceId)) {
+            const { ttsEnabled } = useNotificationStore.getState();
+            if (ttsEnabled) {
+              voiceManager.init();
+              voiceManager.speak(data.data.voiceText, {
+                priority: data.priority === 'urgent' ? 'urgent' : 'high',
+                rate: 1.1,
+                volume: 1.0,
+              });
+            }
+          }
+        }
+      } catch {
+        // Silently fail
+      }
+    });
+
+    return () => {
+      unsubDispatched();
+      unsubAlert();
+      unsubCreated();
+      unsubNotification();
+    };
+  }, [hasHydrated, isAuthenticated]);
+
+  return null;
+}
+
 export function PWAInitializer() {
   return (
     <>
       <ServiceWorkerRegistrar />
+      <EmergencySoundPlayer />
       <ChatSoundPlayer />
       <NotificationPoller />
       <WelcomeBackPlayer />

@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import { toArabicNum } from '@/components/common/date-formatter';
+import { socketService } from '@/lib/socket';
 
 /* ─────────────── Types ─────────────── */
 interface EmergencyItem {
@@ -241,6 +242,18 @@ export default function AdminEmergenciesPage() {
       });
       const json = await res.json();
       if (json.success) {
+        // Emit socket event so nurse receives real-time notification with sound + voice
+        try {
+          socketService.emitEmergencyDispatched({
+            emergencyRequestId: assignTarget.id,
+            nurseId: selectedNurse,
+            nurseName: assignTarget.nurseName || '',
+            estimatedArrivalMinutes: null,
+            dispatchedAt: new Date().toISOString(),
+          });
+        } catch {
+          // Socket not connected - push notification already sent by API
+        }
         toast.success('تم إرسال الممرض/ـة للطوارئ بنجاح');
         void fetchEmergencies();
       } else {
