@@ -68,7 +68,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           sound: true,
           url: '/beneficiary/emergency',
           userRole: 'beneficiary',
-          data: { emergencyRequestId: id, status: 'accepted' },
+          data: { emergencyRequestId: id, status: 'accepted', voiceAlert: true, voiceText: `قبل ${nurseName} حالة الطوارئ الخاصة بك وسيصل إليك قريباً` },
         })
       );
 
@@ -96,7 +96,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               priority: 'high',
               url: '/admin/emergencies',
               userRole: 'admin',
-              data: { emergencyRequestId: id, status: 'accepted' },
+              data: { emergencyRequestId: id, status: 'accepted', voiceAlert: true, voiceText: `قبل ${nurseName} حالة الطوارئ وسيصل للموقع قريباً` },
             })
           );
         }
@@ -154,7 +154,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           sound: true,
           url: '/beneficiary/emergency',
           userRole: 'beneficiary',
-          data: { emergencyRequestId: id, status: 'in_progress' },
+          data: { emergencyRequestId: id, status: 'in_progress', voiceAlert: true, voiceText: `وصل ${nurseName} إلى موقعك وبدأ التعامل مع حالة الطوارئ` },
         })
       );
 
@@ -182,7 +182,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               priority: 'high',
               url: '/admin/emergencies',
               userRole: 'admin',
-              data: { emergencyRequestId: id, status: 'in_progress' },
+              data: { emergencyRequestId: id, status: 'in_progress', voiceAlert: true, voiceText: `وصل ${nurseName} للموقع وبدأ التعامل مع حالة الطوارئ` },
             })
           );
         }
@@ -271,7 +271,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           priority: 'high',
           url: '/beneficiary/emergency',
           userRole: 'beneficiary',
-          data: { emergencyRequestId: id, status: 'resolved', outcome },
+          data: { emergencyRequestId: id, status: 'resolved', outcome, voiceAlert: true, voiceText: `تم التعامل مع حالة الطوارئ بنجاح. ${outcomeLabels[outcome] || ''}` },
         }).catch(() => {});
 
         // Notify nurse about earnings
@@ -294,7 +294,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           priority: 'medium',
           url: '/nurse/earnings',
           userRole: 'nurse',
-          data: { emergencyRequestId: id, earnings: emergencyPayout },
+          data: { emergencyRequestId: id, earnings: emergencyPayout, voiceAlert: true, voiceText: `تم إكمال حالة الطوارئ وإضافة ${emergencyPayout} ريال إلى رصيدك` },
         }).catch(() => {});
 
         // Notify admins
@@ -320,7 +320,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             priority: 'medium',
             url: '/admin/emergencies',
             userRole: 'admin',
-            data: { emergencyRequestId: id, status: 'resolved', outcome },
+            data: { emergencyRequestId: id, status: 'resolved', outcome, voiceAlert: true, voiceText: `أكمل ${nurseName} حالة الطوارئ بنجاح` },
           }).catch(() => {});
         }
       } catch {
@@ -365,7 +365,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           priority: 'high',
           url: '/beneficiary/emergency',
           userRole: 'beneficiary',
-          data: { emergencyRequestId: id, status: 'pending' },
+          data: { emergencyRequestId: id, status: 'pending', voiceAlert: true, voiceText: 'الممرض المعين لم يتمكن من الاستجابة. جاري البحث عن ممرض بديل' },
         }).catch(() => {});
 
         // Notify admins - high priority to reassign
@@ -392,7 +392,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             priority: 'high',
             url: '/admin/emergencies',
             userRole: 'admin',
-            data: { emergencyRequestId: id, status: 'rejected' },
+            data: { emergencyRequestId: id, status: 'rejected', voiceAlert: true, voiceText: `رفض الممرض ${nurseName} حالة الطوارئ. يرجى تعيين ممرض بديل` },
           }).catch(() => {});
         }
       } catch {

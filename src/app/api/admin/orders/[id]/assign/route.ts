@@ -65,7 +65,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         priority: 'high',
         url: '/nurse',
         userRole: 'nurse',
-        data: { requestId: id, assignmentType: 'service' },
+        sound: true,
+        data: { requestId: id, assignmentType: 'service', voiceAlert: true, voiceText: 'تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول في أقرب وقت' },
       }).catch(() => {});
 
       // 2️⃣ Notify BENEFICIARY: A nurse has been assigned with FULL details
@@ -105,12 +106,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           priority: 'high',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
+          sound: true,
           data: {
             requestId: id,
             status: 'assigned',
             nurseId: nurseId.toString(),
             nurseName,
             nursePhone,
+            voiceAlert: true,
+            voiceText: `تم تعيين ${nurseName} لتنفيذ طلبك. سيقوم بالتواصل معك قريباً`,
           },
         }).catch(() => {});
       }

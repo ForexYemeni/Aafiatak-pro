@@ -90,12 +90,15 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
           priority: 'high',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
+          sound: true,
           data: {
             requestId: id,
             status: 'accepted',
             nurseId: user.userId,
             nurseName,
             nursePhone,
+            voiceAlert: true,
+            voiceText: `تم قبول طلبك من ${nurseName}. سيقوم بالوصول إليك قريباً`,
           },
         }).catch(() => {});
 
@@ -122,7 +125,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
             priority: 'medium',
             url: '/admin/orders',
             userRole: 'admin',
-            data: { requestId: id, status: 'accepted' },
+            data: { requestId: id, status: 'accepted', voiceAlert: true, voiceText: `قبل ${nurseName} الطلب وسيبدأ التنفيذ قريباً` },
           }).catch(() => {});
         }
       } catch {
@@ -161,7 +164,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
           priority: 'medium',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
-          data: { requestId: id, status: 'pending' },
+          data: { requestId: id, status: 'pending', voiceAlert: true, voiceText: 'الممرض المعين لم يتمكن من تنفيذ طلبك. جاري البحث عن ممرض بديل' },
         }).catch(() => {});
 
         // 2️⃣ Notify ADMIN: Nurse rejected the assignment
@@ -188,7 +191,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
             priority: 'high',
             url: '/admin/orders',
             userRole: 'admin',
-            data: { requestId: id, status: 'rejected' },
+            data: { requestId: id, status: 'rejected', voiceAlert: true, voiceText: `رفض الممرض ${nurseName} الطلب. يرجى تعيين ممرض بديل` },
           }).catch(() => {});
         }
       } catch {

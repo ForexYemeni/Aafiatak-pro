@@ -152,6 +152,20 @@ export function useNotifications(): UseNotificationsReturn {
         data.id
       );
 
+      // Voice alert for socket notifications (TTS) - critical fix
+      // This ensures voice works even when push notification fails
+      if (data.data?.voiceAlert && data.data?.voiceText) {
+        const voiceId = `voice-${data.id}`;
+        if (!markSoundPlayed(voiceId)) {
+          voiceManager.init();
+          voiceManager.speak(data.data.voiceText, {
+            priority: (data.priority === 'urgent' ? 'urgent' : data.priority === 'high' ? 'high' : 'medium') as any,
+            rate: 1.1,
+            volume: 1.0,
+          });
+        }
+      }
+
       // Add to store (UI update only, no sound)
       addNotification(notification);
     });

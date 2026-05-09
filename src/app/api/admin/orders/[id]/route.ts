@@ -95,6 +95,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           priority: 'high',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
+          sound: true,
+          data: { requestId: id, status: 'completed', voiceAlert: true, voiceText: 'تم إكمال طلب الخدمة بنجاح. يرجى تقييم الخدمة' },
         }).catch(() => {});
 
         // Notify nurse
@@ -117,6 +119,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             priority: 'medium',
             url: '/nurse/earnings',
             userRole: 'nurse',
+            sound: true,
+            data: { requestId: id, status: 'completed', earnings: order.nursePayout, voiceAlert: true, voiceText: `تم إكمال الطلب وإضافة ${order.nursePayout || 0} ريال إلى رصيدك` },
           }).catch(() => {});
         }
       } catch {
@@ -170,6 +174,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           priority: 'high',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
+          sound: true,
+          data: { requestId: id, status: 'cancelled', voiceAlert: true, voiceText: `تم إلغاء طلبك. السبب: ${cancelReason}` },
         }).catch(() => {});
 
         // Notify nurse if assigned
@@ -192,6 +198,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             priority: 'high',
             url: '/nurse',
             userRole: 'nurse',
+            sound: true,
+            data: { requestId: id, status: 'cancelled', voiceAlert: true, voiceText: `تم إلغاء الطلب المعين لك. السبب: ${cancelReason}` },
           }).catch(() => {});
         }
       } catch {
@@ -260,7 +268,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             priority: 'high',
             url: `/beneficiary/orders/${id}`,
             userRole: 'beneficiary',
-            data: { requestId: id, status: body.status, paymentConfirmed: isPaymentConfirmation || undefined },
+            sound: true,
+            data: { requestId: id, status: body.status, paymentConfirmed: isPaymentConfirmation || undefined, voiceAlert: true, voiceText: isPaymentConfirmation ? 'تم تأكيد الدفع بنجاح. جاري البحث عن ممرض مناسب' : `تم تحديث حالة طلبك إلى: ${statusLabel}` },
           }).catch(() => {});
         }
 
@@ -284,7 +293,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             priority: 'high',
             url: '/nurse',
             userRole: 'nurse',
-            data: { requestId: id, status: body.status },
+            sound: true,
+            data: { requestId: id, status: body.status, voiceAlert: true, voiceText: `تم تحديث حالة الطلب إلى: ${statusLabel}` },
           }).catch(() => {});
         }
       } catch {
