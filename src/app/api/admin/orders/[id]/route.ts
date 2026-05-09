@@ -211,9 +211,74 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       return Response.json({ success: true, data: { ...order.toObject(), id: order._id.toString() }, message: 'تم إلغاء الطلب بنجاح' });
     }
 
-    // For other status changes, use simple update
+    // For other status changes, use simple update and notify all parties
     const order = await ServiceRequest.findByIdAndUpdate(id, updateData, { new: true }).lean();
     if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
+
+    // ── Notify ALL parties about status change (e.g., payment confirmation) ──
+    if (body.status) {
+      try {
+        const statusLabels: Record<string, string> = {
+          pending: 'قيد الانتظار',
+          assigned: 'تم التعيين',
+          accepted: 'مقبول',
+          in_progress: 'قيد التنفيذ',
+          awaiting_payment: 'بانتظار الدفع',
+          paid: 'تم الدفع',
+        };
+        const statusLabel = statusLabels[body.status] || body.status;
+
+        // Notify beneficiary about status change
+        if (order.beneficiaryId) {
+          await Notification.create({
+            userId: order.beneficiaryId,
+            userRole: 'beneficiary',
+            titleAr: 'تحديث على طلبك',
+            bodyAr: `تم تحديث حالة طلبك إلى: ${statusLabel}`,
+            type: 'status_change',
+            priority: 'high',
+            data: { requestId: id, status: body.status },
+            actionUrl: `/beneficiary/orders/${id}`,
+            voiceEnabled: true,
+          });
+          sendPushToUser(order.beneficiaryId.toString(), {
+            title: 'تحديث على طلبك',
+            body: `تم تحديث حالة طلبك إلى: ${statusLabel}`,
+            type: 'status_change',
+            priority: 'high',
+            url: `/beneficiary/orders/${id}`,
+            userRole: 'beneficiary',
+            data: { requestId: id, status: body.status },
+          }).catch(() => {});
+        }
+
+        // Notify nurse if assigned
+        if (order.nurseId) {
+          await Notification.create({
+            userId: order.nurseId,
+            userRole: 'nurse',
+            titleAr: 'تحديث على الطلب',
+            bodyAr: `تم تحديث حالة الطلب إلى: ${statusLabel}`,
+            type: 'status_change',
+            priority: 'high',
+            data: { requestId: id, status: body.status },
+            actionUrl: '/nurse',
+            voiceEnabled: true,
+          });
+          sendPushToUser(order.nurseId.toString(), {
+            title: 'تحديث على الطلب',
+            body: `تم تحديث حالة الطلب إلى: ${statusLabel}`,
+            type: 'status_change',
+            priority: 'high',
+            url: '/nurse',
+            userRole: 'nurse',
+            data: { requestId: id, status: body.status },
+          }).catch(() => {});
+        }
+      } catch {
+        // Non-critical
+      }
+    }
 
     await logActivity({
       userId: user!.userId,

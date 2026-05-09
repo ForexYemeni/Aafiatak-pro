@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { EmergencyRequest, Notification, Nurse, AdminSettings } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -137,6 +138,48 @@ export async function POST(request: NextRequest) {
             data: { emergencyRequestId: emergency._id.toString(), type: type || 'medical', distance: nurse.distance },
             voiceEnabled: true,
           });
+
+          // Send push notification to nearby nurse
+          sendPushToUser(nurse._id.toString(), {
+            title: '🚨 حالة طوارئ!',
+            body: `حالة طوارئ جديدة على بُعد ${nurse.distance} كم منك`,
+            type: 'emergency',
+            priority: 'urgent',
+            url: '/nurse',
+            userRole: 'nurse',
+            data: { emergencyRequestId: emergency._id.toString(), distance: nurse.distance },
+          }).catch(() => {});
+        }
+
+        // Also notify all admins about the emergency
+        try {
+          const { User } = await import('@/models/mongoose');
+          const admins = await User.find({ role: 'admin' }).select('_id').lean();
+          for (const admin of admins) {
+            await Notification.create({
+              userId: admin._id,
+              userRole: 'admin',
+              titleAr: '🚨 حالة طوارئ جديدة',
+              bodyAr: `طلب طوارئ جديد من مستفيد: ${description.substring(0, 80)}`,
+              type: 'emergency',
+              priority: 'urgent',
+              data: { emergencyRequestId: emergency._id.toString(), beneficiaryId: user.userId },
+              actionUrl: '/admin/emergencies',
+              voiceEnabled: true,
+            });
+
+            sendPushToUser(admin._id.toString(), {
+              title: '🚨 حالة طوارئ جديدة',
+              body: `طلب طوارئ جديد من مستفيد`,
+              type: 'emergency',
+              priority: 'urgent',
+              url: '/admin/emergencies',
+              userRole: 'admin',
+              data: { emergencyRequestId: emergency._id.toString() },
+            }).catch(() => {});
+          }
+        } catch {
+          // Non-critical
         }
       }
     } catch {

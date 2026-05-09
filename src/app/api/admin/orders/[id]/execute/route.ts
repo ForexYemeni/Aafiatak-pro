@@ -7,6 +7,7 @@ import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity, creditNurseEarnings } from '@/lib/api/helpers';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -53,11 +54,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         userRole: 'beneficiary',
         titleAr: 'تم إكمال طلبك',
         bodyAr: 'تم تنفيذ طلب الخدمة مباشرة من قبل الإدارة',
-        type: 'status_change',
-        priority: 'medium',
+        type: 'service_completed',
+        priority: 'high',
         data: { requestId: id, status: 'completed', executedBy: 'admin' },
         voiceEnabled: true,
       });
+
+      // Send push notification to beneficiary
+      sendPushToUser(order.beneficiaryId.toString(), {
+        title: 'تم إكمال طلبك',
+        body: 'تم تنفيذ طلب الخدمة مباشرة من قبل الإدارة',
+        type: 'service_completed',
+        priority: 'high',
+        url: `/beneficiary/orders/${id}`,
+        userRole: 'beneficiary',
+        data: { requestId: id, status: 'completed', executedBy: 'admin' },
+      }).catch(() => {});
     } catch {
       // Non-critical
     }
@@ -70,11 +82,22 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           userRole: 'nurse',
           titleAr: 'تم إكمال الطلب المعين لك',
           bodyAr: 'تم إكمال الطلب وتم إضافة أرباحك إلى رصيدك المتاح',
-          type: 'status_change',
-          priority: 'medium',
+          type: 'payment',
+          priority: 'high',
           data: { requestId: id, status: 'completed', executedBy: 'admin' },
           voiceEnabled: true,
         });
+
+        // Send push notification to nurse
+        sendPushToUser(order.nurseId.toString(), {
+          title: 'تم إكمال الطلب وإضافة أرباحك',
+          body: `تمت إضافة ${order.nursePayout || 0} ر.ي إلى رصيدك المتاح`,
+          type: 'payment',
+          priority: 'high',
+          url: '/nurse/earnings',
+          userRole: 'nurse',
+          data: { requestId: id, status: 'completed', earnings: order.nursePayout },
+        }).catch(() => {});
       } catch {
         // Non-critical
       }

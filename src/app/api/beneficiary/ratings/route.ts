@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Rating, ServiceRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -114,10 +115,21 @@ export async function POST(request: NextRequest) {
         titleAr: 'تقييم جديد',
         bodyAr: `حصلت على تقييم ${score} من 5${comment ? `: "${comment.substring(0, 50)}"` : ''}`,
         type: 'rating',
-        priority: 'low',
-        data: { ratingId: rating._id.toString(), score },
-        voiceEnabled: false,
+        priority: 'medium',
+        data: { ratingId: rating._id.toString(), score: String(score) },
+        voiceEnabled: true,
       });
+
+      // Send push notification to nurse about new rating
+      sendPushToUser(order.nurseId.toString(), {
+        title: 'تقييم جديد',
+        body: `حصلت على تقييم ${score} من 5`,
+        type: 'rating',
+        priority: 'medium',
+        url: '/nurse/ratings',
+        userRole: 'nurse',
+        data: { ratingId: rating._id.toString(), score: String(score) },
+      }).catch(() => {});
     } catch {
       // Non-critical
     }

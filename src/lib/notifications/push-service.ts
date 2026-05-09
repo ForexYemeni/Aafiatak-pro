@@ -12,8 +12,10 @@ import { Notification } from '@/models/mongoose';
 
 // ── VAPID Configuration ────────────────────────────────────────────
 
-const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || '';
-const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '';
+// VAPID keys - fallback to hardcoded keys if env vars not set
+// This ensures push notifications work even without Vercel env configuration
+const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY || 'BN36yGFOlkT2JcWmoW_vDsUBxD9icwAisjLwRZ9imYkWfExWulyeGjd0ANwWP7uZOr26p6trG3RjhJ1CxNGVtrU';
+const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY || '8lU09hjwDsqQo6gl8LJcbZVCrSAap0WFRoQH3DXjUxI';
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:support@aafiatak.com';
 
 if (VAPID_PUBLIC_KEY && VAPID_PRIVATE_KEY) {

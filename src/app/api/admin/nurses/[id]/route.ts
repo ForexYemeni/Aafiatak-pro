@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Nurse, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -68,9 +69,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             : 'تم إلغاء حظر حسابك. يمكنك الآن استخدام المنصة بشكل طبيعي',
           type: 'system',
           priority: 'high',
-          data: { isBlocked },
+          data: { isBlocked: String(isBlocked) },
           voiceEnabled: true,
         });
+
+        // Send push notification to nurse about block/unblock
+        sendPushToUser(id, {
+          title: isBlocked ? 'تم حظر حسابك' : 'تم إلغاء حظر حسابك',
+          body: isBlocked
+            ? `تم حظر حسابك${blockedReason ? `: ${blockedReason}` : ''}`
+            : 'تم إلغاء حظر حسابك. يمكنك الآن استخدام المنصة',
+          type: 'system',
+          priority: 'high',
+          url: '/nurse/profile',
+          userRole: 'nurse',
+          data: { isBlocked: String(isBlocked) },
+        }).catch(() => {});
       } catch {
         // Don't block main operation for notification failure
       }

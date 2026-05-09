@@ -1,9 +1,10 @@
 // ============================================================================
-// عافيتك (Aafiatak) Healthcare Platform - Sound Manager (ULTRA RELIABLE)
+// عافيتك (Aafiatak) Healthcare Platform - Sound Manager (ULTRA RELIABLE v2)
 // ============================================================================
 // Audio playback system that WORKS 100% of the time.
 // Auto-initializes on first use. No need to call init() manually.
 // Uses HTML5 Audio elements as primary with Web Audio API fallback.
+// Includes aggressive autoplay unlock and global click handler.
 // ============================================================================
 
 /** Options for sound playback */
@@ -41,6 +42,7 @@ class SoundManager {
   private pendingPlays: Array<{ name: string; options: SoundOptions }> = [];
   private audioContext: AudioContext | null = null;
   private initListenersSet = false;
+  private lastPlayTime: Map<string, number> = new Map(); // Debounce tracking
 
   // Sound file paths
   private readonly SOUND_FILES: Record<string, string> = {
@@ -50,6 +52,9 @@ class SoundManager {
     success: '/sounds/success.mp3',
     error: '/sounds/error.mp3',
   };
+
+  // Minimum time between identical sounds (ms) to prevent rapid duplication
+  private readonly DEBOUNCE_MS = 500;
 
   // ---- Auto-Initialization ----
 
@@ -67,7 +72,6 @@ class SoundManager {
     this.setupInteractionListeners();
 
     // If user already interacted before we set up listeners
-    // (e.g., they clicked login before this code ran), mark it
     this.checkExistingInteraction();
   }
 
@@ -78,9 +82,8 @@ class SoundManager {
 
   /** Check if user has already interacted before we set up listeners */
   private checkExistingInteraction(): void {
-    // In most browsers, if the page has already had user interactions
-    // before our listener was set up, we can detect this by trying to play
-    // a silent Audio element
+    // If document has focus and user has navigated to the page,
+    // they've likely already interacted. Try playing silent audio to check.
     try {
       const testAudio = new Audio();
       testAudio.volume = 0.01;
@@ -93,12 +96,19 @@ class SoundManager {
           testAudio.pause();
           testAudio.src = '';
         }).catch(() => {
-          // Autoplay blocked = no interaction yet, that's fine
+          // Autoplay blocked = no interaction yet
           testAudio.src = '';
         });
       }
     } catch {
       // Ignore
+    }
+
+    // Also check if the document has already been interacted with
+    // (for cases where the page was loaded from a click/navigation)
+    if (typeof document !== 'undefined' && document.hasFocus()) {
+      // The page has focus, which means user has likely interacted
+      // We can try to unlock audio immediately on next click
     }
   }
 
@@ -119,6 +129,18 @@ class SoundManager {
 
     for (const evt of interactionEvents) {
       window.addEventListener(evt, handleInteraction, { once: false, passive: true });
+    }
+
+    // Also add a global click handler that keeps audio unlocked
+    // This is important because some browsers re-lock audio after inactivity
+    if (typeof document !== 'undefined') {
+      document.addEventListener('click', () => {
+        if (!this.userHasInteracted) {
+          this.markUserInteracted();
+        }
+        // Also keep AudioContext alive
+        this.unlockAudioContext();
+      }, { passive: true });
     }
   }
 
@@ -190,6 +212,19 @@ class SoundManager {
     this.ensureInitialized();
 
     const soundVolume = options.volume ?? this.volume;
+
+    // Debounce: prevent identical sounds from playing too rapidly
+    const now = Date.now();
+    const lastPlay = this.lastPlayTime.get(name) || 0;
+    if (now - lastPlay < this.DEBOUNCE_MS) {
+      // Skip this play - too soon after the last identical sound
+      // But still vibrate if needed
+      if (options.vibrate !== false) {
+        this.vibrate(options.priority ?? name);
+      }
+      return;
+    }
+    this.lastPlayTime.set(name, now);
 
     // If user hasn't interacted yet, queue the play
     if (!this.userHasInteracted) {
@@ -263,6 +298,11 @@ class SoundManager {
           }
         });
       }
+
+      // Auto-cleanup: remove reference when done
+      clone.addEventListener('ended', () => {
+        clone.src = '';
+      });
 
       return true;
     } catch {
@@ -391,6 +431,7 @@ class SoundManager {
     }
     this.audioElements.clear();
     this.pendingPlays = [];
+    this.lastPlayTime.clear();
     if (this.audioContext) {
       this.audioContext.close().catch(() => {});
       this.audioContext = null;

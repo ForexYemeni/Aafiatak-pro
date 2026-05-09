@@ -4,8 +4,9 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { Nurse, Transaction, WithdrawalRequest, AdminSettings } from '@/models/mongoose';
+import { Nurse, Transaction, WithdrawalRequest, AdminSettings, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function GET(request: NextRequest) {
   try {
@@ -193,6 +194,37 @@ export async function POST(request: NextRequest) {
       walletHolderName,
       status: 'pending',
     });
+
+    // ── Notify admins about new withdrawal request ──
+    try {
+      const { User } = await import('@/models/mongoose');
+      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      for (const admin of admins) {
+        await Notification.create({
+          userId: admin._id,
+          userRole: 'admin',
+          titleAr: 'طلب سحب جديد',
+          bodyAr: `طلب سحب ${amount} ر.ي من ${nurse.name}`,
+          type: 'withdrawal',
+          priority: 'high',
+          data: { withdrawalId: withdrawalRequest._id.toString(), nurseId: user.userId, amount: String(amount) },
+          actionUrl: '/admin/withdrawals',
+          read: false,
+        });
+
+        sendPushToUser(admin._id.toString(), {
+          title: 'طلب سحب جديد',
+          body: `طلب سحب ${amount} ر.ي من ${nurse.name}`,
+          type: 'withdrawal',
+          priority: 'high',
+          url: '/admin/withdrawals',
+          userRole: 'admin',
+          data: { withdrawalId: withdrawalRequest._id.toString(), nurseId: user.userId, amount: String(amount) },
+        }).catch(() => {});
+      }
+    } catch {
+      // Non-critical
+    }
 
     return Response.json({
       success: true,

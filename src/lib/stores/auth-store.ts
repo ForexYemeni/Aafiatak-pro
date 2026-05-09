@@ -109,6 +109,18 @@ export const useAuthStore = create<AuthState>()(
             });
             // Unlock audio playback - user clicked login button
             soundManager.forceUserInteracted();
+
+            // Check if this is a welcome-back login (user had previously logged out)
+            if (typeof window !== 'undefined') {
+              const wasLoggedOut = sessionStorage.getItem('aafiatak-logged-out');
+              if (wasLoggedOut) {
+                sessionStorage.removeItem('aafiatak-logged-out');
+                // Play welcome back sound after a short delay
+                setTimeout(() => {
+                  soundManager.play('success', { priority: 'medium', volume: 0.7 });
+                }, 800);
+              }
+            }
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'فشل تسجيل الدخول';
@@ -198,6 +210,15 @@ export const useAuthStore = create<AuthState>()(
 
       // ---- Logout ----
       logout: () => {
+        // Mark that user logged out (for "welcome back" sound on next login)
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem('aafiatak-logged-out', 'true');
+          } catch {
+            // Ignore storage errors
+          }
+        }
+
         // Clear local state immediately
         set({
           user: null,

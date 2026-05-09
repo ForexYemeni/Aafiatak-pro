@@ -5,9 +5,9 @@
 // Pure Web Push Protocol — NO Firebase dependency.
 // ============================================================================
 
-const CACHE_NAME = 'aafiatak-v4';
-const STATIC_CACHE = 'aafiatak-static-v4';
-const API_CACHE_NAME = 'aafiatak-api-v4';
+const CACHE_NAME = 'aafiatak-v5';
+const STATIC_CACHE = 'aafiatak-static-v5';
+const API_CACHE_NAME = 'aafiatak-api-v5';
 const API_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Assets to pre-cache
