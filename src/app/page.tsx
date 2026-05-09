@@ -228,14 +228,14 @@ function getDashboardPath(role: UserRole): string {
 // ============================================================================
 
 function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; role: string }; onComplete: () => void }) {
-  const [countdown, setCountdown] = useState(5);
+  const [countdown, setCountdown] = useState(2);
   const [progress, setProgress] = useState(0);
   const config = roleConfig[user.role] || roleConfig.beneficiary;
   const RoleIcon = config.icon;
 
   useEffect(() => {
     const startTime = Date.now();
-    const duration = 5000;
+    const duration = 2000;
 
     const interval = setInterval(() => {
       const elapsed = Date.now() - startTime;

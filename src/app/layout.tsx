@@ -4,6 +4,7 @@ import "./globals.css";
 import { AppProvider } from "@/components/providers/app-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { PWAInitializer } from "@/components/providers/pwa-provider";
+import { SafeProvider } from "@/components/providers/safe-provider";
 
 const notoArabic = Noto_Sans_Arabic({
   variable: "--font-noto-arabic",
@@ -49,7 +50,9 @@ export default function RootLayout({
         className={`${notoArabic.variable} antialiased bg-background text-foreground font-sans`}
       >
         <AppProvider>
-          <PWAInitializer />
+          <SafeProvider>
+            <PWAInitializer />
+          </SafeProvider>
           {children}
         </AppProvider>
         <Toaster

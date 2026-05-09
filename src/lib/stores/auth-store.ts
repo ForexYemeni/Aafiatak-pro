@@ -339,48 +339,54 @@ export const useAuthStore = create<AuthState>()(
       }),
       onRehydrateStorage: () => {
         return (state, error) => {
-          // ALWAYS set _hasHydrated to true IMMEDIATELY.
-          // This prevents the app from being stuck on the loading screen forever.
-          // Token validation happens in the background - if invalid, we redirect later.
-          if (error) {
-            console.error('[AuthStore] Rehydration error:', error);
-            // Clear corrupted state so the user can start fresh
-            try {
-              localStorage.removeItem('aafiatak-auth-storage');
-            } catch {}
-            useAuthStore.setState({ _hasHydrated: true, isAuthenticated: false, user: null, token: null, refreshToken: null });
-            return;
-          }
+          // Skip on server (SSR) - hydration only matters on client
+          if (typeof window === 'undefined') return;
 
-          // Set hydrated IMMEDIATELY so the app can render
-          useAuthStore.setState({ _hasHydrated: true });
+          // Use setTimeout(0) to defer setState until after the store
+          // is fully initialized. Without this, we get:
+          // "Cannot access 'k' before initialization" (minified reference error)
+          // because onRehydrateStorage fires during store creation.
+          setTimeout(() => {
+            if (error) {
+              console.error('[AuthStore] Rehydration error:', error);
+              // Clear corrupted state so the user can start fresh
+              try {
+                localStorage.removeItem('aafiatak-auth-storage');
+              } catch {}
+              useAuthStore.setState({ _hasHydrated: true, isAuthenticated: false, user: null, token: null, refreshToken: null });
+              return;
+            }
 
-          // Then validate the stored token in the background (non-blocking)
-          if (state?.isAuthenticated && state?.token) {
-            fetch('/api/auth/me', {
-              headers: { 'Authorization': `Bearer ${state.token}` },
-            })
-              .then(res => {
-                if (!res.ok) {
-                  // Token is invalid — clear auth state
-                  console.warn('[AuthStore] Stored token is invalid, clearing auth state');
-                  useAuthStore.setState({
-                    user: null,
-                    token: null,
-                    refreshToken: null,
-                    isAuthenticated: false,
-                  });
-                  try {
-                    localStorage.removeItem('aafiatak-auth-storage');
-                  } catch {}
-                }
-                // If valid, do nothing - state is already correct
+            // Set hydrated so the app can render
+            useAuthStore.setState({ _hasHydrated: true });
+
+            // Then validate the stored token in the background (non-blocking)
+            if (state?.isAuthenticated && state?.token) {
+              fetch('/api/auth/me', {
+                headers: { 'Authorization': `Bearer ${state.token}` },
               })
-              .catch(() => {
-                // Network error — keep the stored auth state,
-                // the user might be offline. App is already hydrated.
-              });
-          }
+                .then(res => {
+                  if (!res.ok) {
+                    // Token is invalid — clear auth state
+                    console.warn('[AuthStore] Stored token is invalid, clearing auth state');
+                    useAuthStore.setState({
+                      user: null,
+                      token: null,
+                      refreshToken: null,
+                      isAuthenticated: false,
+                    });
+                    try {
+                      localStorage.removeItem('aafiatak-auth-storage');
+                    } catch {}
+                  }
+                  // If valid, do nothing - state is already correct
+                })
+                .catch(() => {
+                  // Network error — keep the stored auth state,
+                  // the user might be offline. App is already hydrated.
+                });
+            }
+          }, 0);
         };
       },
     }
