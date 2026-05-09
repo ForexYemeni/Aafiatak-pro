@@ -50,7 +50,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           : `تم رفض توثيق حسابك. السبب: ${rejectedReason || 'لم يتم تحديد سبب'}`,
         type: 'system',
         priority: status === 'verified' ? 'medium' : 'high',
-        data: { verificationStatus: status },
+        data: { verificationStatus: status, voiceAlert: true, voiceText: status === 'verified' ? 'تهانينا! تم توثيق حسابك بنجاح. يمكنك الآن استقبال الطلبات' : `تم رفض توثيق حسابك${rejectedReason ? `. السبب: ${rejectedReason}` : ''}` },
         voiceEnabled: true,
       });
 
@@ -64,7 +64,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         priority: status === 'verified' ? 'medium' : 'high',
         url: '/nurse/profile',
         userRole: 'nurse',
-        data: { verificationStatus: status },
+        data: { verificationStatus: status, voiceAlert: true, voiceText: status === 'verified' ? 'تهانينا! تم توثيق حسابك بنجاح. يمكنك الآن استقبال الطلبات' : `تم رفض توثيق حسابك${rejectedReason ? `. السبب: ${rejectedReason}` : ''}` },
       }).catch(() => {}); // Non-blocking
     } catch {
       // Notification creation should not block the main operation

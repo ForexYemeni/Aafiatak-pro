@@ -154,9 +154,12 @@ export function useNotifications(): UseNotificationsReturn {
 
       // Voice alert for socket notifications (TTS) - critical fix
       // This ensures voice works even when push notification fails
+      // Dedup: prevents duplicate speech when both push and socket deliver
       if (data.data?.voiceAlert && data.data?.voiceText) {
         const voiceId = `voice-${data.id}`;
         if (!markSoundPlayed(voiceId)) {
+          const { ttsEnabled } = useNotificationStore.getState();
+          if (!ttsEnabled) return; // Respect user TTS preference
           voiceManager.init();
           voiceManager.speak(data.data.voiceText, {
             priority: (data.priority === 'urgent' ? 'urgent' : data.priority === 'high' ? 'high' : 'medium') as any,

@@ -89,7 +89,7 @@ export async function PATCH(
           bodyAr: `تمت الموافقة على طلب سحب ${amount} ر.ي وسيتم التحويل قريباً`,
           type: 'withdrawal_approved',
           priority: 'high',
-          data: { withdrawalId: id, status, amount },
+          data: { withdrawalId: id, status, amount, voiceAlert: true, voiceText: `تمت الموافقة على طلب سحب ${amount} ريال وسيتم التحويل قريباً` },
           actionUrl: '/nurse/earnings',
           voiceEnabled: true,
         });
@@ -101,7 +101,7 @@ export async function PATCH(
           priority: 'high',
           url: '/nurse/earnings',
           userRole: 'nurse',
-          data: { withdrawalId: id, amount },
+          data: { withdrawalId: id, amount, voiceAlert: true, voiceText: `تمت الموافقة على طلب سحب ${amount} ريال وسيتم التحويل قريباً` },
         }).catch(() => {});
       } else if (status === 'rejected') {
         await Notification.create({
@@ -111,7 +111,7 @@ export async function PATCH(
           bodyAr: `تم رفض طلب سحب ${amount} ر.ي${rejectedReason ? ` - السبب: ${rejectedReason}` : ''}. تم إرجاع المبلغ إلى رصيدك`,
           type: 'withdrawal_rejected',
           priority: 'high',
-          data: { withdrawalId: id, status: 'rejected', amount },
+          data: { withdrawalId: id, status: 'rejected', amount, voiceAlert: true, voiceText: `تم رفض طلب سحب ${amount} ريال${rejectedReason ? `. السبب: ${rejectedReason}` : ''}. تم إرجاع المبلغ إلى رصيدك` },
           actionUrl: '/nurse/earnings',
           voiceEnabled: true,
         });
@@ -123,7 +123,7 @@ export async function PATCH(
           priority: 'high',
           url: '/nurse/earnings',
           userRole: 'nurse',
-          data: { withdrawalId: id, amount },
+          data: { withdrawalId: id, amount, voiceAlert: true, voiceText: `تم رفض طلب سحب ${amount} ريال${rejectedReason ? `. السبب: ${rejectedReason}` : ''}. تم إرجاع المبلغ إلى رصيدك` },
         }).catch(() => {});
       }
     } catch {

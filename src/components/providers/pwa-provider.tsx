@@ -225,17 +225,23 @@ function ServiceWorkerRegistrar() {
               );
 
               // Voice alert for emergency notifications (TTS)
+              // Check ttsEnabled preference AND dedup to prevent duplicate speech
               if (payload.data?.voiceAlert && payload.data?.voiceText) {
-                import('@/lib/notifications/voice-manager').then(({ voiceManager }) => {
-                  voiceManager.init();
-                  voiceManager.speak(payload.data.voiceText, {
-                    priority: 'urgent',
-                    rate: 1.1,
-                    volume: 1.0,
+                const voiceId = `voice-${notifId}`;
+                if (!markSoundPlayed(voiceId)) {
+                  import('@/lib/notifications/voice-manager').then(({ voiceManager }) => {
+                    const { ttsEnabled } = useNotificationStore.getState();
+                    if (!ttsEnabled) return; // Respect user preference
+                    voiceManager.init();
+                    voiceManager.speak(payload.data.voiceText, {
+                      priority: payload.priority === 'urgent' ? 'urgent' : payload.priority === 'high' ? 'high' : 'medium',
+                      rate: 1.1,
+                      volume: 1.0,
+                    });
+                  }).catch(() => {
+                    // TTS not available
                   });
-                }).catch(() => {
-                  // TTS not available
-                });
+                }
               }
             }
 

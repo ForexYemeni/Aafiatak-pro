@@ -151,7 +151,7 @@ export async function POST(request: NextRequest) {
         type: 'rating',
         priority: 'medium',
         actionUrl: '/nurse/ratings',
-        data: { ratingId: rating._id.toString(), score: String(score), ratingType: isEmergencyRating ? 'emergency' : 'service' },
+        data: { ratingId: rating._id.toString(), score: String(score), ratingType: isEmergencyRating ? 'emergency' : 'service', voiceAlert: true, voiceText: `حصلت على تقييم ${score} من 5${isEmergencyRating ? ' لحالة طوارئ' : ''}` },
         voiceEnabled: true,
       });
 
@@ -163,7 +163,7 @@ export async function POST(request: NextRequest) {
         priority: 'medium',
         url: '/nurse/ratings',
         userRole: 'nurse',
-        data: { ratingId: rating._id.toString(), score: String(score) },
+        data: { ratingId: rating._id.toString(), score: String(score), voiceAlert: true, voiceText: `حصلت على تقييم ${score} من 5${isEmergencyRating ? ' لحالة طوارئ' : ''}` },
       }).catch(() => {});
     } catch {
       // Non-critical

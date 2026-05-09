@@ -266,7 +266,7 @@ export async function POST(request: NextRequest) {
           : `تم استلام طلبك لخدمة ${serviceNames} بنجاح${isCashPayment ? '' : ' - يرجى إرسال إثبات الدفع'}`,
         type: isEmergency ? 'emergency' : 'system',
         priority: isEmergency ? 'urgent' : 'medium',
-        data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '' },
+        data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: true, voiceText: isEmergency ? 'تم استلام طلب الطوارئ وسيتم التعامل معه بأولوية عالية' : `تم استلام طلبك لخدمة ${serviceNames} بنجاح` },
         actionUrl: `/beneficiary/orders/${firstOrderId}`,
         read: false,
       });
@@ -280,7 +280,7 @@ export async function POST(request: NextRequest) {
         priority: isEmergency ? 'urgent' : 'medium',
         url: `/beneficiary/orders/${firstOrderId}`,
         userRole: 'beneficiary',
-        data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '' },
+        data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: true, voiceText: isEmergency ? 'تم استلام طلب الطوارئ وسيتم التعامل معه بأولوية عالية' : `تم استلام طلبك لخدمة ${serviceNames} بنجاح` },
       }).catch(() => {});
 
       // 2️⃣ Notify ADMIN
@@ -298,7 +298,7 @@ export async function POST(request: NextRequest) {
           bodyAr: adminMsg,
           type: isEmergency ? 'emergency' : 'assignment',
           priority: isEmergency ? 'urgent' : 'high',
-          data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '' },
+          data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: true, voiceText: isEmergency ? `طلب طوارئ من ${beneficiaryName}` : `طلب خدمة جديد من ${beneficiaryName} - ${totalAmount} ريال` },
           actionUrl: '/admin/orders',
           read: false,
         });
@@ -310,7 +310,7 @@ export async function POST(request: NextRequest) {
           priority: isEmergency ? 'urgent' : 'high',
           url: '/admin/orders',
           userRole: 'admin',
-          data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '' },
+          data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: true, voiceText: isEmergency ? `طلب طوارئ من ${beneficiaryName}` : `طلب خدمة جديد من ${beneficiaryName} - ${totalAmount} ريال` },
         }).catch(() => {});
       }
     } catch {

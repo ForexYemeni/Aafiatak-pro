@@ -50,7 +50,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           bodyAr: `بدأ ${nurseName} بتنفيذ طلب الخدمة الخاص بك`,
           type: 'status_change',
           priority: 'high',
-          data: { requestId: id, status: 'in_progress' },
+          data: { requestId: id, status: 'in_progress', voiceAlert: true, voiceText: `بدأ ${nurseName} بتنفيذ طلب الخدمة الخاص بك` },
           actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,
         });
@@ -62,7 +62,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           priority: 'high',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
-          data: { requestId: id, status: 'in_progress' },
+          data: { requestId: id, status: 'in_progress', voiceAlert: true, voiceText: `بدأ ${nurseName} بتنفيذ طلب الخدمة الخاص بك` },
         }).catch(() => {});
 
         // 2️⃣ Notify ADMIN: Nurse started the service
@@ -76,7 +76,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             bodyAr: `بدأ ${nurseName} تنفيذ الطلب #${id.slice(-6)}`,
             type: 'status_change',
             priority: 'medium',
-            data: { requestId: id, status: 'in_progress' },
+            data: { requestId: id, status: 'in_progress', voiceAlert: true, voiceText: `بدأ ${nurseName} تنفيذ طلب الخدمة` },
             actionUrl: '/admin/orders',
             read: false,
           });
@@ -88,7 +88,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             priority: 'medium',
             url: '/admin/orders',
             userRole: 'admin',
-            data: { requestId: id, status: 'in_progress' },
+            data: { requestId: id, status: 'in_progress', voiceAlert: true, voiceText: `بدأ ${nurseName} تنفيذ طلب الخدمة` },
           }).catch(() => {});
         }
       } catch {
@@ -134,7 +134,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           bodyAr: 'تم إكمال طلب الخدمة بنجاح. يرجى تقييم الخدمة',
           type: 'status_change',
           priority: 'high',
-          data: { requestId: id, status: 'completed' },
+          data: { requestId: id, status: 'completed', voiceAlert: true, voiceText: 'تم إكمال طلب الخدمة بنجاح. يرجى تقييم الخدمة' },
           actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,
         });
@@ -146,7 +146,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           priority: 'high',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
-          data: { requestId: id, status: 'completed' },
+          data: { requestId: id, status: 'completed', voiceAlert: true, voiceText: 'تم إكمال طلب الخدمة بنجاح. يرجى تقييم الخدمة' },
         }).catch(() => {});
 
         // 2️⃣ Notify NURSE: Service completed, earnings credited
@@ -157,7 +157,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           bodyAr: `تم إكمال الطلب #${id.slice(-6)} بنجاح وتمت إضافة ${order.nursePayout || 0} ر.ي إلى رصيدك`,
           type: 'payment',
           priority: 'medium',
-          data: { requestId: id, status: 'completed', earnings: order.nursePayout },
+          data: { requestId: id, status: 'completed', earnings: order.nursePayout, voiceAlert: true, voiceText: `تم إكمال الطلب وإضافة ${order.nursePayout || 0} ريال إلى رصيدك` },
           actionUrl: '/nurse/earnings',
           voiceEnabled: true,
         });
@@ -169,7 +169,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           priority: 'medium',
           url: '/nurse/earnings',
           userRole: 'nurse',
-          data: { requestId: id, earnings: order.nursePayout },
+          data: { requestId: id, earnings: order.nursePayout, voiceAlert: true, voiceText: `تم إكمال الطلب وإضافة ${order.nursePayout || 0} ريال إلى رصيدك` },
         }).catch(() => {});
 
         // 3️⃣ Notify ADMIN: Order completed
@@ -183,7 +183,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             bodyAr: `أكمل ${nurseName} الطلب #${id.slice(-6)} بنجاح`,
             type: 'status_change',
             priority: 'medium',
-            data: { requestId: id, status: 'completed' },
+            data: { requestId: id, status: 'completed', voiceAlert: true, voiceText: `أكمل ${nurseName} طلب الخدمة بنجاح` },
             actionUrl: '/admin/orders',
             read: false,
           });
@@ -195,7 +195,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             priority: 'medium',
             url: '/admin/orders',
             userRole: 'admin',
-            data: { requestId: id, status: 'completed' },
+            data: { requestId: id, status: 'completed', voiceAlert: true, voiceText: `أكمل ${nurseName} طلب الخدمة بنجاح` },
           }).catch(() => {});
         }
       } catch {

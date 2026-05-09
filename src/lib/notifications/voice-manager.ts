@@ -94,8 +94,8 @@ class VoiceManager {
     // Attempt to find a voice matching the requested gender
     // Note: Voice names often contain gender hints like "Male", "Female", "رجل", "امرأة"
     const genderKeywords: Record<'male' | 'female', string[]> = {
-      male: ['male', 'رجل', 'mohammad', 'hisham', 'ali'],
-      female: ['female', 'امرأة', 'laila', 'maha', 'naayf', 'zira', 'layla'],
+      male: ['male', 'رجل', 'mohammad', 'hisham', 'ali', 'naayf'],
+      female: ['female', 'امرأة', 'laila', 'maha', 'zira', 'layla'],
     };
 
     const keywords = genderKeywords[gender];
@@ -246,7 +246,7 @@ class VoiceManager {
       const arabicVoices = voices.filter((v) => v.lang.startsWith('ar'));
 
       const genderKeywords: Record<'male' | 'female', string[]> = {
-        male: ['male', 'رجل', 'mohammad', 'hisham', 'ali'],
+        male: ['male', 'رجل', 'mohammad', 'hisham', 'ali', 'naayf'],
         female: ['female', 'امرأة', 'laila', 'maha', 'zira', 'layla'],
       };
 
@@ -280,7 +280,8 @@ class VoiceManager {
     };
 
     utterance.onpause = () => {
-      this.isSpeaking = false;
+      // Do NOT set isSpeaking = false on pause — speech is not done yet.
+      // Only onend/onerror should mark speech as complete.
     };
 
     utterance.onresume = () => {

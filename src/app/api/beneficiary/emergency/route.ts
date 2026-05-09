@@ -174,7 +174,7 @@ export async function POST(request: NextRequest) {
         }).sort((a, b) => a.distance - b.distance);
 
         for (const nurse of nursesWithDistance) {
-          // All nurse notifications in parallel too
+          // All nurse notifications in parallel too — with TTS voice alert
           notificationPromises.push(
             Notification.create({
               userId: nurse._id,
@@ -183,7 +183,7 @@ export async function POST(request: NextRequest) {
               bodyAr: `حالة طوارئ جديدة على بُعد ${nurse.distance} كم منك: ${description.substring(0, 100)}`,
               type: 'emergency',
               priority: 'urgent',
-              data: { emergencyRequestId: emergency._id.toString(), type: type || 'medical', distance: nurse.distance },
+              data: { emergencyRequestId: emergency._id.toString(), type: type || 'medical', distance: nurse.distance, voiceAlert: true, voiceText: `حالة طوارئ جديدة على بُعد ${nurse.distance} كيلومتر منك. ${type === 'medical' ? 'طبية عامة' : type === 'injury' ? 'إصابة' : type === 'breathing' ? 'صعوبة تنفس' : type === 'cardiac' ? 'أزمة قلبية' : 'حالة طوارئ'}` },
               voiceEnabled: true,
             }),
             sendPushToUser(nurse._id.toString(), {
@@ -194,7 +194,7 @@ export async function POST(request: NextRequest) {
               sound: true,
               url: '/nurse',
               userRole: 'nurse',
-              data: { emergencyRequestId: emergency._id.toString(), distance: nurse.distance },
+              data: { emergencyRequestId: emergency._id.toString(), distance: nurse.distance, voiceAlert: true, voiceText: `حالة طوارئ جديدة على بُعد ${nurse.distance} كيلومتر منك. ${type === 'medical' ? 'طبية عامة' : type === 'injury' ? 'إصابة' : type === 'breathing' ? 'صعوبة تنفس' : type === 'cardiac' ? 'أزمة قلبية' : 'حالة طوارئ'}` },
             })
           );
         }
