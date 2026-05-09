@@ -310,13 +310,48 @@ export const useAuthStore = create<AuthState>()(
         isAuthenticated: state.isAuthenticated,
       }),
       onRehydrateStorage: () => {
-        return (_state, error) => {
-          // Use setTimeout to ensure the store is fully initialized before setting
-          if (!error) {
-            setTimeout(() => {
-              useAuthStore.setState({ _hasHydrated: true });
-            }, 0);
+        return (state, error) => {
+          // ALWAYS set _hasHydrated to true, even if there was an error.
+          // This prevents the app from being stuck on the loading screen forever.
+          if (error) {
+            console.error('[AuthStore] Rehydration error:', error);
+            // Clear corrupted state so the user can start fresh
+            try {
+              localStorage.removeItem('aafiatak-auth-storage');
+            } catch {}
           }
+
+          // Validate the stored token if the user appears authenticated
+          if (!error && state?.isAuthenticated && state?.token) {
+            // Validate token with the server in the background
+            fetch('/api/auth/me', {
+              headers: { 'Authorization': `Bearer ${state.token}` },
+            })
+              .then(res => {
+                if (!res.ok) {
+                  // Token is invalid — clear auth state
+                  console.warn('[AuthStore] Stored token is invalid, clearing auth state');
+                  useAuthStore.setState({
+                    user: null,
+                    token: null,
+                    refreshToken: null,
+                    isAuthenticated: false,
+                  });
+                  try {
+                    localStorage.removeItem('aafiatak-auth-storage');
+                  } catch {}
+                }
+              })
+              .catch(() => {
+                // Network error — keep the stored auth state,
+                // the user might be offline
+              });
+          }
+
+          // Use setTimeout to ensure the store is fully initialized before setting
+          setTimeout(() => {
+            useAuthStore.setState({ _hasHydrated: true });
+          }, 0);
         };
       },
     }
