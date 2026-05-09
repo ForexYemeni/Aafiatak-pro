@@ -59,3 +59,30 @@ Stage Summary:
 - Welcome back sound plays when user logs in after logout
 - VAPID keys hardcoded as fallback so push works without Vercel env vars
 - 14 files changed, 720 insertions
+---
+Task ID: 2
+Agent: Main Agent
+Task: Fix notification bell UI overlap (hidden in RTL), confirm Delete All button, add chat message sounds
+
+Work Log:
+- Analyzed notification-bell.tsx PopoverContent positioning issue
+- Root cause: `align="end"` in RTL layout positions popover off-screen to the left
+- Root cause: `style={{ position: 'fixed', zIndex: 9999 }}` conflicted with Radix's Portal positioning
+- Fixed: Changed `align="end"` to `align="start"` for RTL (aligns right edge with trigger)
+- Fixed: Removed inline style override, added z-index via className
+- Fixed: Added responsive width for mobile screens
+- Confirmed: Delete All button (حذف الكل) already exists in the component
+- Added global chat message sound listener in SocketProvider
+  - Listens for `new_message` socket events
+  - Plays chat sound for messages from other users on ALL pages
+  - Skips sound when user is actively viewing the same chat page (tracked via activeChatId)
+- Added setActiveChatId/getActiveChatId exports to SocketProvider
+- Updated all 3 chat detail pages (beneficiary, nurse, admin) to register active chat ID
+- Updated useChat hook to use different dedup key (chat-page-) to avoid conflict with global listener
+- Build succeeded, pushed to GitHub
+
+Stage Summary:
+- Notification bell popover now visible and properly positioned in RTL layout
+- Chat sound notifications work globally (not just when viewing chat page)
+- Delete All button was already present
+- 6 files changed
