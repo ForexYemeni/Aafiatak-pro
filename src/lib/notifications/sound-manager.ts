@@ -54,7 +54,7 @@ class SoundManager {
   };
 
   // Minimum time between identical sounds (ms) to prevent rapid duplication
-  private readonly DEBOUNCE_MS = 500;
+  private readonly DEBOUNCE_MS = 3000; // 3 seconds - prevent same sound repeating too fast
 
   // ---- Auto-Initialization ----
 

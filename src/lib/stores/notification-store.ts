@@ -135,10 +135,15 @@ export const useNotificationStore = create<NotificationState>()(
           };
         });
 
-        // Trigger notification manager (sound, TTS, browser notification)
-        const state = get();
-        if (state.soundEnabled || state.ttsEnabled || state.browserNotificationsEnabled) {
-          notificationManager.notify(notification);
+        // NOTE: We do NOT play sound here anymore.
+        // Sound playing is handled ONLY by the PWA provider (poller + push handler)
+        // to prevent the same notification from playing sound multiple times.
+        // This just dispatches the event for UI updates (toast, badge, etc.)
+        const event = new CustomEvent('app-notification', {
+          detail: notification,
+        });
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(event);
         }
       },
 
@@ -220,6 +225,8 @@ export const useNotificationStore = create<NotificationState>()(
       },
 
       // ---- Fetch Notifications from API ----
+      // NOTE: This method ONLY updates the store state. It does NOT play sounds.
+      // Sound playing is handled exclusively by the PWA provider (poller + push).
       fetchNotifications: async () => {
         set({ isLoading: true, error: null });
         try {
@@ -253,60 +260,6 @@ export const useNotificationStore = create<NotificationState>()(
                 createdAt: n.createdAt,
               };
             });
-
-            // Detect NEW notifications that weren't in our local state before
-            const currentState = get();
-            const existingIds = new Set(currentState.notifications.map(n => n.id));
-            const newNotifications = mapped.filter(n => !existingIds.has(n.id) && !n.read);
-
-            // Play sound for new notifications (limit to 3 to avoid sound spam)
-            if (newNotifications.length > 0 && currentState.soundEnabled) {
-              const { soundManager } = await import('@/lib/notifications/sound-manager');
-              soundManager.forceUserInteracted();
-
-              const toPlay = newNotifications.slice(0, 3);
-              for (const n of toPlay) {
-                const SOUND_MAP: Record<string, string> = {
-                  assignment: 'notification',
-                  service_request: 'notification',
-                  service_assigned: 'notification',
-                  service_accepted: 'success',
-                  service_started: 'notification',
-                  service_completed: 'success',
-                  service_cancelled: 'error',
-                  status_change: 'notification',
-                  emergency: 'emergency',
-                  emergency_assigned: 'emergency',
-                  payment: 'success',
-                  withdrawal: 'notification',
-                  withdrawal_approved: 'success',
-                  withdrawal_rejected: 'error',
-                  chat: 'chat',
-                  rating: 'success',
-                  verification: 'notification',
-                  system: 'notification',
-                  loyalty: 'success',
-                  referral: 'notification',
-                  promotion: 'notification',
-                };
-
-                const soundName = SOUND_MAP[n.type] || 'notification';
-                const isUrgent = n.priority === 'urgent';
-                const isHigh = n.priority === 'high';
-
-                soundManager.play(soundName, {
-                  priority: n.priority,
-                  volume: isUrgent ? 1.0 : isHigh ? 0.9 : 0.8,
-                  vibrate: isUrgent || isHigh,
-                  repeat: isUrgent ? 2 : 1,
-                });
-
-                // Small delay between multiple sounds
-                if (toPlay.indexOf(n) < toPlay.length - 1) {
-                  await new Promise(r => setTimeout(r, 300));
-                }
-              }
-            }
 
             set({
               notifications: mapped,
