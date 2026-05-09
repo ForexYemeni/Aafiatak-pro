@@ -13,7 +13,7 @@ import {
   MessageCircle,
   Wallet,
   Bell,
-  MapPin,
+  Heart,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
@@ -27,9 +27,9 @@ interface BottomNavItem {
 
 const adminBottomItems: BottomNavItem[] = [
   { label: 'الرئيسية', href: '/admin', icon: Home },
-  { label: 'الممرضون', href: '/admin/nurses', icon: Stethoscope },
+  { label: 'الخدمات', href: '/admin/services', icon: Heart },
   { label: 'الطلبات', href: '/admin/orders', icon: ClipboardList },
-  { label: 'الخريطة', href: '/admin/map', icon: MapPin },
+  { label: 'الطوارئ', href: '/admin/emergencies', icon: AlertTriangle },
   { label: 'المزيد', href: '/admin/settings', icon: MoreHorizontal },
 ];
 
