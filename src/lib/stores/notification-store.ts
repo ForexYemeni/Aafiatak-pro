@@ -122,11 +122,14 @@ export const useNotificationStore = create<NotificationState>()(
           createdAt: new Date().toISOString(),
         };
 
+        let isNew = false;
+
         set((state) => {
           // Check for duplicate by ID
           const exists = state.notifications.some((n) => n.id === item.id);
-          if (exists) return state;
+          if (exists) return state; // Duplicate - no state change, no event
 
+          isNew = true;
           const newNotifications = [item, ...state.notifications].slice(0, 100); // Cap at 100
 
           return {
@@ -135,15 +138,15 @@ export const useNotificationStore = create<NotificationState>()(
           };
         });
 
-        // NOTE: We do NOT play sound here anymore.
-        // Sound playing is handled ONLY by the PWA provider (poller + push handler)
-        // to prevent the same notification from playing sound multiple times.
-        // This just dispatches the event for UI updates (toast, badge, etc.)
-        const event = new CustomEvent('app-notification', {
-          detail: notification,
-        });
-        if (typeof window !== 'undefined') {
-          window.dispatchEvent(event);
+        // Only dispatch event for NEW notifications (prevents infinite loop)
+        // Sound playing is NOT done here - sounds come from push/Socket events only
+        if (isNew) {
+          const event = new CustomEvent('app-notification', {
+            detail: notification,
+          });
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(event);
+          }
         }
       },
 

@@ -13,7 +13,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { soundManager } from '@/lib/notifications/sound-manager';
 import type { NotificationType } from '@/types';
 
 // ============================================================================
@@ -90,6 +89,8 @@ function getRelativeTimeString(dateStr: string): string {
 
 // ============================================================================
 // Notification Bell Component
+// *** Does NOT play sounds. Sounds are ONLY from Push/Socket events. ***
+// This component only updates UI state (badge count, notification list).
 // ============================================================================
 
 interface NotificationBellProps {
@@ -114,12 +115,11 @@ export function NotificationBell({ className }: NotificationBellProps) {
       if (data.success && data.data) {
         const notifs = data.data.notifications || [];
         const newUnreadCount = data.data.unreadCount || 0;
-        
-        // Play notification sound if new unread notifications appeared
-        if (newUnreadCount > unreadCount && unreadCount > 0) {
-          soundManager.playNotification();
-        }
-        
+
+        // *** NO SOUND PLAYING HERE ***
+        // Sounds are handled ONLY by the PWA provider (push/Socket events)
+        // This component ONLY updates UI state
+
         setNotifications(notifs);
         setUnreadCount(newUnreadCount);
       }
@@ -128,12 +128,12 @@ export function NotificationBell({ className }: NotificationBellProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [token, unreadCount]);
+  }, [token]); // Removed unreadCount from deps to prevent re-render loop
 
-  // Fetch on mount and periodically
+  // Fetch on mount and periodically (UI-only, no sounds)
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000); // poll every 30s
+    const interval = setInterval(fetchNotifications, 30000); // poll every 30s for UI updates
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 

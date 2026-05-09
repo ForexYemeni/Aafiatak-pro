@@ -3,6 +3,7 @@
 // ============================================================================
 // React hooks for notification management, permissions, sounds, and TTS.
 // Integrates with the notification store, manager, and socket service.
+// Sound playing: ONLY from real-time events (Push + Socket), not from polling.
 // ============================================================================
 
 'use client';
@@ -12,10 +13,63 @@ import { useNotificationStore, type NotificationItem } from '@/lib/stores/notifi
 import { notificationManager, type AppNotification } from '@/lib/notifications/notification-manager';
 import { voiceManager } from '@/lib/notifications/voice-manager';
 import { soundManager } from '@/lib/notifications/sound-manager';
+import { markSoundPlayed } from '@/lib/notifications/sound-dedup';
 import { usePushNotifications } from '@/hooks/use-push-notifications';
 import { socketService } from '@/lib/socket';
 import type { NotificationEvent, NotificationType, NotificationPriority } from '@/types';
 import { useAuthStore } from '@/lib/stores/auth-store';
+
+// ============================================================================
+// Sound mapping (same as pwa-provider, for socket-triggered sounds)
+// ============================================================================
+
+const SOUND_MAP: Record<string, string> = {
+  assignment: 'notification',
+  service_request: 'notification',
+  service_assigned: 'notification',
+  service_accepted: 'success',
+  service_started: 'notification',
+  service_completed: 'success',
+  service_cancelled: 'error',
+  status_change: 'notification',
+  emergency: 'emergency',
+  emergency_assigned: 'emergency',
+  payment: 'success',
+  withdrawal: 'notification',
+  withdrawal_approved: 'success',
+  withdrawal_rejected: 'error',
+  chat: 'chat',
+  rating: 'success',
+  verification: 'notification',
+  system: 'notification',
+  loyalty: 'success',
+  referral: 'notification',
+  promotion: 'notification',
+};
+
+/** Play sound for a socket notification - uses shared dedup with push events */
+function playSocketNotificationSound(type: string, priority: string, notifId: string): void {
+  // Dedup: if push notification already played sound for this ID, skip
+  if (markSoundPlayed(notifId)) return;
+
+  const soundName = SOUND_MAP[type] || 'notification';
+  const isUrgent = priority === 'urgent';
+  const isHigh = priority === 'high';
+
+  soundManager.forceUserInteracted();
+  soundManager.play(soundName, {
+    priority: priority || 'medium',
+    volume: isUrgent ? 1.0 : isHigh ? 0.9 : 0.8,
+    vibrate: isUrgent || isHigh,
+    repeat: isUrgent ? 2 : 1,
+  });
+
+  if (isUrgent && type === 'emergency') {
+    setTimeout(() => {
+      soundManager.playEmergency();
+    }, 1500);
+  }
+}
 
 // ============================================================================
 // useNotifications - Main hook for notification management
@@ -69,14 +123,16 @@ export function useNotifications(): UseNotificationsReturn {
     if (isInitialized.current) return;
     isInitialized.current = true;
 
-    // Initialize managers - sounds are pre-loaded automatically in init()
+    // Initialize managers
     notificationManager.init();
 
-    // Fetch initial notifications
+    // Fetch initial notifications (no sounds)
     fetchNotifications();
   }, [fetchNotifications]);
 
   // Listen for socket notification events
+  // Socket events are a real-time source and SHOULD play sounds
+  // But use shared dedup to prevent duplicate sounds when push also fires
   useEffect(() => {
     const unsubscribe = socketService.onNotification((data: NotificationEvent) => {
       const notification: AppNotification = {
@@ -89,15 +145,23 @@ export function useNotifications(): UseNotificationsReturn {
         clickAction: data.actionUrl,
       };
 
+      // Play sound for socket event (with dedup against push)
+      playSocketNotificationSound(
+        data.type || 'system',
+        data.priority || 'medium',
+        data.id
+      );
+
+      // Add to store (UI update only, no sound)
       addNotification(notification);
-      // Play sound via notification manager
-      notificationManager.notify(notification);
     });
 
     return unsubscribe;
   }, [addNotification]);
 
   // Listen for in-app notification custom events
+  // These are UI-only events dispatched by push handler and others
+  // NO sounds here - sounds are already played by the source (push/socket)
   useEffect(() => {
     const handleAppNotification = (event: Event) => {
       const customEvent = event as CustomEvent<AppNotification>;

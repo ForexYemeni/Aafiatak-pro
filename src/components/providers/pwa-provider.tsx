@@ -4,6 +4,7 @@ import { useEffect, useRef, useCallback } from 'react';
 import dynamic from 'next/dynamic';
 import { soundManager } from '@/lib/notifications/sound-manager';
 import { notificationManager } from '@/lib/notifications/notification-manager';
+import { markSoundPlayed, clearPlayedSounds } from '@/lib/notifications/sound-dedup';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useNotificationStore } from '@/lib/stores/notification-store';
 
@@ -12,7 +13,10 @@ const OfflineWrapper = dynamic(
   { ssr: false }
 );
 
+// ============================================================================
 // Sound mapping for notification types
+// ============================================================================
+
 const SOUND_MAP: Record<string, string> = {
   assignment: 'notification',
   service_request: 'notification',
@@ -38,24 +42,11 @@ const SOUND_MAP: Record<string, string> = {
   welcome_back: 'success',
 };
 
-// ============================================================================
-// GLOBAL: Track which notification IDs have already had sounds played
-// This prevents the SAME notification from playing sound multiple times
-// from different sources (push, poll, store, etc.)
-// ============================================================================
+/** Play sound for a notification - uses shared dedup to prevent duplicates */
+function playNotificationSound(type: string, priority: string, notifId: string): void {
+  // Dedup: if this notification already played sound, skip
+  if (markSoundPlayed(notifId)) return;
 
-// Use a module-level Set that persists across component re-renders
-const playedSoundIds = new Set<string>();
-
-/** Check if a notification has already had its sound played, and mark it as played */
-function markSoundPlayed(id: string): boolean {
-  if (playedSoundIds.has(id)) return true; // already played
-  playedSoundIds.add(id);
-  return false; // first time
-}
-
-/** Play sound for a notification type - SINGLE ENTRY POINT for all sounds */
-function playNotificationSound(type: string, priority: string): void {
   const soundName = SOUND_MAP[type] || 'notification';
   const isUrgent = priority === 'urgent';
   const isHigh = priority === 'high';
@@ -78,21 +69,19 @@ function playNotificationSound(type: string, priority: string): void {
 
 // ============================================================================
 // Notification Poller - Polls for new notifications every N seconds
-// ONLY updates the store, does NOT play sounds directly.
-// The store's addNotification will handle sounds for truly new ones.
+// *** ONLY updates the store (UI). Does NOT play sounds. ***
+// Sounds are ONLY triggered by real-time events: Push + Socket.
 // ============================================================================
 
-const POLL_INTERVAL = 10000; // 10 seconds
+const POLL_INTERVAL = 15000; // 15 seconds - only for UI updates
 const POLL_URL = '/api/notifications?limit=5&unread=true';
 
 function NotificationPoller() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
-  const lastSeenIdRef = useRef<string | null>(null);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isPollingRef = useRef(false);
-  const isFirstPollRef = useRef(true);
 
   const pollForNotifications = useCallback(async () => {
     if (!isAuthenticated || !token || isPollingRef.current) return;
@@ -117,48 +106,13 @@ function NotificationPoller() {
         return;
       }
 
-      const notifications = data.data.notifications;
-
-      if (notifications.length > 0) {
-        const latestId = notifications[0]?.id || notifications[0]?._id?.toString();
-
-        // Only play sounds if this is NOT the first poll (first poll just sets baseline)
-        if (!isFirstPollRef.current && lastSeenIdRef.current && latestId && latestId !== lastSeenIdRef.current) {
-          // Find truly new notifications since last seen
-          const newNotifications = [];
-          for (const n of notifications) {
-            const nId = n.id || n._id?.toString();
-            if (nId === lastSeenIdRef.current) break;
-            newNotifications.push(n);
-          }
-
-          // Play sound for ONLY the FIRST new notification (avoid spam)
-          // Mark each as played so other sources don't repeat
-          for (const n of newNotifications) {
-            const nId = n.id || n._id?.toString();
-            if (nId && !markSoundPlayed(nId)) {
-              // First notification gets sound
-              playNotificationSound(n.type || 'system', n.priority || 'medium');
-              break; // Only play ONE sound per poll cycle
-            }
-          }
-        }
-
-        // Update last seen ID
-        if (latestId) {
-          lastSeenIdRef.current = latestId;
-        }
-      }
-
-      // Mark first poll as done
-      isFirstPollRef.current = false;
-
-      // Silently update the store (no sounds) if unread count changed
+      // Silently update the store if unread count changed
+      // This ONLY updates the UI (bell badge, notification list)
+      // It does NOT play any sounds
       if (typeof data.data.unreadCount === 'number') {
         const store = useNotificationStore.getState();
         if (store.unreadCount !== data.data.unreadCount) {
-          // Refresh the list silently (fetchNotifications won't play sounds anymore)
-          store.fetchNotifications();
+          store.fetchNotifications(); // Silent refresh - no sounds
         }
       }
     } catch {
@@ -172,17 +126,11 @@ function NotificationPoller() {
     if (!hasHydrated) return;
 
     if (isAuthenticated && token) {
-      // Initial fetch - just set baseline, NO sounds
+      // Initial fetch - just populate the store, NO sounds
       const store = useNotificationStore.getState();
-      store.fetchNotifications().then(() => {
-        const currentNotifs = useNotificationStore.getState().notifications;
-        if (currentNotifs.length > 0) {
-          lastSeenIdRef.current = currentNotifs[0].id;
-        }
-        isFirstPollRef.current = false;
-      });
+      store.fetchNotifications();
 
-      // Start polling
+      // Start polling (UI-only, no sounds)
       intervalRef.current = setInterval(pollForNotifications, POLL_INTERVAL);
     }
 
@@ -225,7 +173,7 @@ function WelcomeBackPlayer() {
     if (!isAuthenticated && prevAuthRef.current) {
       sessionStorage.setItem('aafiatak-logged-out', 'true');
       // Clear played sound tracking on logout
-      playedSoundIds.clear();
+      clearPlayedSounds();
     }
 
     prevAuthRef.current = isAuthenticated;
@@ -236,6 +184,8 @@ function WelcomeBackPlayer() {
 
 // ============================================================================
 // Service Worker Registrar
+// - Registers SW and listens for push notifications
+// - Push notifications are the PRIMARY source for sound playing
 // ============================================================================
 
 function ServiceWorkerRegistrar() {
@@ -255,27 +205,29 @@ function ServiceWorkerRegistrar() {
       navigator.serviceWorker.register('/sw.js').catch(() => {});
 
       // Listen for push notifications from Service Worker
+      // This is one of TWO places where sounds are triggered (the other is socket events)
       const handleSWMessage = (event: MessageEvent) => {
         try {
           if (event.data?.type === 'PUSH_NOTIFICATION_RECEIVED') {
             const payload = event.data.payload;
 
             if (payload.sound !== false) {
-              // Use a unique ID to prevent duplicate sounds
+              // Use the notification's real ID for dedup, or generate one
               const notifId = payload.data?.notificationId || `push-${payload.type}-${Date.now()}`;
 
-              if (!markSoundPlayed(notifId)) {
-                playNotificationSound(
-                  payload.type || 'system',
-                  payload.priority || 'medium'
-                );
-              }
+              // Play sound with shared dedup - prevents duplicate with socket
+              playNotificationSound(
+                payload.type || 'system',
+                payload.priority || 'medium',
+                notifId
+              );
             }
 
             // Dispatch custom event for UI (notification bell, toasts, etc.)
+            // NO sound playing from listeners of this event!
             window.dispatchEvent(new CustomEvent('app-notification', {
               detail: {
-                id: `push-${Date.now()}`,
+                id: payload.data?.notificationId || `push-${Date.now()}`,
                 title: payload.title,
                 body: payload.body,
                 type: payload.type,
