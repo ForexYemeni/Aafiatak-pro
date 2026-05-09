@@ -14,6 +14,7 @@ import {
   Wallet,
   Bell,
   Heart,
+  Star,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
@@ -43,7 +44,7 @@ const subadminBottomItems: BottomNavItem[] = [
 
 const nurseBottomItems: BottomNavItem[] = [
   { label: 'المهام', href: '/nurse', icon: ClipboardList },
-  { label: 'المحادثة', href: '/nurse/chat', icon: MessageCircle },
+  { label: 'التقييمات', href: '/nurse/ratings', icon: Star },
   { label: 'الأرباح', href: '/nurse/earnings', icon: Wallet },
   { label: 'الإشعارات', href: '/nurse/notifications', icon: Bell },
   { label: 'المزيد', href: '/nurse/profile', icon: MoreHorizontal },

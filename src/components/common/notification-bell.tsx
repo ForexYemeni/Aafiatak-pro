@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import { Bell, Check, MessageSquare, CreditCard, AlertTriangle, Calendar, Star, Settings, Loader2, Trash2, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -102,7 +103,9 @@ interface NotificationBellProps {
 }
 
 export function NotificationBell({ className }: NotificationBellProps) {
+  const router = useRouter();
   const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoading, setIsLoading] = useState(false);
@@ -335,6 +338,45 @@ export function NotificationBell({ className }: NotificationBellProps) {
                     className="flex-1 min-w-0 cursor-pointer"
                     onClick={() => {
                       if (!notification.read) markAsRead(notification.id);
+                      // Navigate based on notification type and actionUrl
+                      if (notification.actionUrl) {
+                        router.push(notification.actionUrl);
+                        setIsOpen(false);
+                      } else if (notification.type === 'rating') {
+                        const role = user?.role;
+                        if (role === 'nurse') {
+                          router.push('/nurse/ratings');
+                        } else if (role === 'admin') {
+                          router.push('/admin/ratings');
+                        }
+                        setIsOpen(false);
+                      } else if (notification.type === 'emergency' || notification.type === 'emergency_assigned') {
+                        const role = user?.role;
+                        if (role === 'nurse') {
+                          router.push('/nurse');
+                        } else if (role === 'admin') {
+                          router.push('/admin/emergencies');
+                        } else if (role === 'beneficiary') {
+                          router.push('/beneficiary/emergency');
+                        }
+                        setIsOpen(false);
+                      } else if (notification.type === 'assignment' || notification.type === 'service_assigned') {
+                        const role = user?.role;
+                        if (role === 'nurse') {
+                          router.push('/nurse');
+                        } else if (role === 'admin') {
+                          router.push('/admin/orders');
+                        }
+                        setIsOpen(false);
+                      } else if (notification.type === 'payment' || notification.type === 'service_completed') {
+                        const role = user?.role;
+                        if (role === 'nurse') {
+                          router.push('/nurse/earnings');
+                        } else if (role === 'beneficiary') {
+                          router.push('/beneficiary/orders');
+                        }
+                        setIsOpen(false);
+                      }
                     }}
                   >
                     <p className={cn(

@@ -47,9 +47,8 @@ export function GpsLocationButton({
     if (result) {
       setDetected(true);
       onLocationDetected(result);
-      
-      // Keep success state for 5 seconds
-      setTimeout(() => setDetected(false), 5000);
+      // Keep detected state persistent - don't reset after timeout
+      // Location should remain visible until user navigates away
     }
   }, [detectLocation, onLocationDetected, clearError]);
 
@@ -131,8 +130,8 @@ export function GpsLocationButton({
         </motion.button>
       </div>
 
-      {/* Map link */}
-      {location && detected && (
+      {/* Map link - show whenever location is available */}
+      {location && (
         <a
           href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
           target="_blank"

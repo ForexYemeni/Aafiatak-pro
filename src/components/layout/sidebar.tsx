@@ -66,6 +66,7 @@ const nurseNavItems: NavItem[] = [
   { label: 'لوحة التحكم', href: '/nurse', icon: LayoutDashboard },
   { label: 'الطلبات المتاحة', href: '/nurse/requests', icon: ClipboardList },
   { label: 'طلباتي', href: '/nurse/my-requests', icon: Stethoscope },
+  { label: 'التقييمات', href: '/nurse/ratings', icon: Star },
   { label: 'المحادثات', href: '/nurse/chat', icon: MessageSquare },
   { label: 'الأرباح', href: '/nurse/earnings', icon: CreditCard },
   { label: 'الملف الشخصي', href: '/nurse/profile', icon: Users },

@@ -58,7 +58,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { type, description, lat, lng, address } = body;
+    const { type, description, lat, lng, address, paymentMethod, paymentMethodId, hasPaymentProof, paymentProofData } = body;
 
     if (!description) {
       return createErrorResponse('وصف الحالة الطارئة مطلوب', 400, 'VALIDATION_ERROR');
@@ -95,9 +95,55 @@ export async function POST(request: NextRequest) {
       status: 'pending',
       priority: 'high',
       emergencyFee,
+      paymentMethod: paymentMethod || 'cash',
+      paymentMethodId: paymentMethodId || undefined,
+      hasPaymentProof: hasPaymentProof || false,
+      paymentProofData: paymentProofData || undefined,
+      paymentStatus: paymentMethod === 'cash' ? 'pending' : 'pending',
     });
 
-    // Notify nearby available nurses (best effort) - with geospatial search
+    // ═══ NOTIFY INSTANTLY: Admins first (voice alert), then nurses ═══
+    // Run all notifications in parallel for maximum speed
+    const notificationPromises: Promise<any>[] = [];
+
+    // 1. Notify admins IMMEDIATELY with voice alert (highest priority)
+    try {
+      const { User, Beneficiary: BeneficiaryModel } = await import('@/models/mongoose');
+      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      const beneficiaryDoc = await BeneficiaryModel.findById(user.userId).select('name phone').lean();
+      const beneficiaryName = beneficiaryDoc?.name || 'مستفيد';
+
+      for (const admin of admins) {
+        // Create DB notification + push in parallel
+        notificationPromises.push(
+          Notification.create({
+            userId: admin._id,
+            userRole: 'admin',
+            titleAr: '🚨 حالة طوارئ جديدة - تنبيه عاجل!',
+            bodyAr: `طلب طوارئ عاجل من ${beneficiaryName}: ${description.substring(0, 80)}. نوع الطوارئ: ${type || 'طبية'}`,
+            type: 'emergency',
+            priority: 'urgent',
+            data: { emergencyRequestId: emergency._id.toString(), beneficiaryId: user.userId, type: type || 'medical' },
+            actionUrl: '/admin/emergencies',
+            voiceEnabled: true,
+          }),
+          sendPushToUser(admin._id.toString(), {
+            title: '🚨 حالة طوارئ جديدة - تنبيه عاجل!',
+            body: `طلب طوارئ عاجل من ${beneficiaryName}`,
+            type: 'emergency',
+            priority: 'urgent',
+            sound: true,
+            url: '/admin/emergencies',
+            userRole: 'admin',
+            data: { emergencyRequestId: emergency._id.toString() },
+          })
+        );
+      }
+    } catch {
+      // Non-critical
+    }
+
+    // 2. Notify nearby available nurses with geospatial search
     try {
       if (lat && lng) {
         const maxDistanceKm = 20;
@@ -128,63 +174,37 @@ export async function POST(request: NextRequest) {
         }).sort((a, b) => a.distance - b.distance);
 
         for (const nurse of nursesWithDistance) {
-          await Notification.create({
-            userId: nurse._id,
-            userRole: 'nurse',
-            titleAr: '🚨 حالة طوارئ!',
-            bodyAr: `حالة طوارئ جديدة على بُعد ${nurse.distance} كم منك: ${description.substring(0, 100)}`,
-            type: 'emergency',
-            priority: 'urgent',
-            data: { emergencyRequestId: emergency._id.toString(), type: type || 'medical', distance: nurse.distance },
-            voiceEnabled: true,
-          });
-
-          // Send push notification to nearby nurse
-          sendPushToUser(nurse._id.toString(), {
-            title: '🚨 حالة طوارئ!',
-            body: `حالة طوارئ جديدة على بُعد ${nurse.distance} كم منك`,
-            type: 'emergency',
-            priority: 'urgent',
-            url: '/nurse',
-            userRole: 'nurse',
-            data: { emergencyRequestId: emergency._id.toString(), distance: nurse.distance },
-          }).catch(() => {});
-        }
-
-        // Also notify all admins about the emergency
-        try {
-          const { User } = await import('@/models/mongoose');
-          const admins = await User.find({ role: 'admin' }).select('_id').lean();
-          for (const admin of admins) {
-            await Notification.create({
-              userId: admin._id,
-              userRole: 'admin',
-              titleAr: '🚨 حالة طوارئ جديدة',
-              bodyAr: `طلب طوارئ جديد من مستفيد: ${description.substring(0, 80)}`,
+          // All nurse notifications in parallel too
+          notificationPromises.push(
+            Notification.create({
+              userId: nurse._id,
+              userRole: 'nurse',
+              titleAr: '🚨 حالة طوارئ!',
+              bodyAr: `حالة طوارئ جديدة على بُعد ${nurse.distance} كم منك: ${description.substring(0, 100)}`,
               type: 'emergency',
               priority: 'urgent',
-              data: { emergencyRequestId: emergency._id.toString(), beneficiaryId: user.userId },
-              actionUrl: '/admin/emergencies',
+              data: { emergencyRequestId: emergency._id.toString(), type: type || 'medical', distance: nurse.distance },
               voiceEnabled: true,
-            });
-
-            sendPushToUser(admin._id.toString(), {
-              title: '🚨 حالة طوارئ جديدة',
-              body: `طلب طوارئ جديد من مستفيد`,
+            }),
+            sendPushToUser(nurse._id.toString(), {
+              title: '🚨 حالة طوارئ!',
+              body: `حالة طوارئ جديدة على بُعد ${nurse.distance} كم منك`,
               type: 'emergency',
               priority: 'urgent',
-              url: '/admin/emergencies',
-              userRole: 'admin',
-              data: { emergencyRequestId: emergency._id.toString() },
-            }).catch(() => {});
-          }
-        } catch {
-          // Non-critical
+              sound: true,
+              url: '/nurse',
+              userRole: 'nurse',
+              data: { emergencyRequestId: emergency._id.toString(), distance: nurse.distance },
+            })
+          );
         }
       }
     } catch {
       // Non-critical notification
     }
+
+    // Fire ALL notifications in parallel for maximum speed
+    await Promise.allSettled(notificationPromises);
 
     return Response.json({
       success: true,

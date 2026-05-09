@@ -24,6 +24,12 @@ import {
   ShieldCheck,
   ShieldX,
   Hourglass,
+  Building2,
+  Home,
+  Ban,
+  HelpCircle,
+  FileText,
+  Star,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -41,6 +47,13 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOrderUpdates } from '@/hooks/use-socket';
 import { formatDateOnly, formatTimeOnly, toArabicNum } from '@/components/common/date-formatter';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
 
 // ---- Types ----
 
@@ -70,6 +83,8 @@ interface AssignmentRequest {
   nursePayout: number;
   totalPrice: number;
   isEmergency: boolean;
+  emergencyType?: string;
+  emergencyDescription?: string;
   service: ServiceInfo;
   beneficiary: BeneficiaryInfo;
 }
@@ -82,10 +97,22 @@ interface Assignment {
   assignedAt: string;
   respondedAt: string | null;
   estimatedArrivalMinutes: number | null;
+  assignmentType?: 'service' | 'emergency';
+  outcome?: string | null;
+  resolvedNotes?: string | null;
   request: AssignmentRequest;
 }
 
 type TabType = 'new' | 'active' | 'completed';
+
+// ---- Outcome Labels & Icons ----
+
+const outcomeConfig: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
+  treated_on_site: { label: 'تم العلاج في الموقع', icon: Home, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800' },
+  transferred_to_hospital: { label: 'تم النقل للمستشفى', icon: Building2, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800' },
+  refused_treatment: { label: 'رفض المريض العلاج', icon: Ban, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800' },
+  other: { label: 'أخرى', icon: HelpCircle, color: 'text-gray-600 dark:text-gray-400', bg: 'bg-gray-50 dark:bg-gray-900/20 border-gray-200 dark:border-gray-800' },
+};
 
 // ---- Verification Status Config ----
 
@@ -167,9 +194,16 @@ export default function NurseTasksPage() {
   const [counts, setCounts] = useState({ new: 0, active: 0, completed: 0 });
   const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
   const [profileCompleteness, setProfileCompleteness] = useState(0);
+  const [ratingSummary, setRatingSummary] = useState<{ averageRating: number; reviewCount: number; completedJobs: number } | null>(null);
   const authFetch = useAuthFetch();
   const user = useAuthStore((s) => s.user);
   const orderUpdates = useOrderUpdates();
+
+  // ── Resolve Emergency Dialog State ──
+  const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
+  const [resolvingEmergency, setResolvingEmergency] = useState<Assignment | null>(null);
+  const [selectedOutcome, setSelectedOutcome] = useState<string>('');
+  const [resolveNotes, setResolveNotes] = useState('');
 
   // Fetch nurse verification status from profile API
   const fetchVerificationStatus = useCallback(async () => {
@@ -253,6 +287,8 @@ export default function NurseTasksPage() {
     await fetchAssignments();
   };
 
+  // ── Service Assignment Actions ──
+
   const handleAccept = async (assignmentId: string) => {
     setActionLoading(assignmentId);
     try {
@@ -271,6 +307,7 @@ export default function NurseTasksPage() {
       toast.error('حدث خطأ أثناء قبول الطلب');
     } finally {
       setActionLoading(null);
+      fetchCounts();
     }
   };
 
@@ -292,6 +329,7 @@ export default function NurseTasksPage() {
       toast.error('حدث خطأ أثناء رفض الطلب');
     } finally {
       setActionLoading(null);
+      fetchCounts();
     }
   };
 
@@ -305,7 +343,6 @@ export default function NurseTasksPage() {
       const data = await res.json();
       if (data.success) {
         toast.success('تم بدء تنفيذ الخدمة');
-        // Update the assignment status locally
         setAssignments((prev) =>
           prev.map((a) => (a.id === assignmentId ? { ...a, status: 'in_progress' } : a))
         );
@@ -337,8 +374,133 @@ export default function NurseTasksPage() {
       toast.error('حدث خطأ');
     } finally {
       setActionLoading(null);
+      fetchCounts();
     }
   };
+
+  // ── Emergency Assignment Actions ──
+
+  const handleEmergencyAccept = async (assignmentId: string) => {
+    setActionLoading(assignmentId);
+    try {
+      const res = await authFetch(`/api/nurse/emergencies/${assignmentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'accept' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('تم قبول حالة الطوارئ - انطلق فوراً');
+        setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
+      } else {
+        toast.error(data.message || 'فشل قبول حالة الطوارئ');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء قبول حالة الطوارئ');
+    } finally {
+      setActionLoading(null);
+      fetchCounts();
+    }
+  };
+
+  const handleEmergencyReject = async (assignmentId: string) => {
+    setActionLoading(assignmentId);
+    try {
+      const res = await authFetch(`/api/nurse/emergencies/${assignmentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'reject' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('تم رفض حالة الطوارئ');
+        setAssignments((prev) => prev.filter((a) => a.id !== assignmentId));
+      } else {
+        toast.error(data.message || 'فشل رفض حالة الطوارئ');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء رفض حالة الطوارئ');
+    } finally {
+      setActionLoading(null);
+      fetchCounts();
+    }
+  };
+
+  const handleEmergencyArrive = async (assignmentId: string) => {
+    setActionLoading(assignmentId);
+    try {
+      const res = await authFetch(`/api/nurse/emergencies/${assignmentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'arrive' }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('تم تسجيل الوصول - بدء التعامل مع الحالة');
+        setAssignments((prev) =>
+          prev.map((a) => (a.id === assignmentId ? { ...a, status: 'in_progress' } : a))
+        );
+      } else {
+        toast.error(data.message || 'فشل تسجيل الوصول');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleOpenResolveDialog = (assignment: Assignment) => {
+    setResolvingEmergency(assignment);
+    setSelectedOutcome('');
+    setResolveNotes('');
+    setResolveDialogOpen(true);
+  };
+
+  const handleEmergencyResolve = async () => {
+    if (!resolvingEmergency || !selectedOutcome) {
+      toast.error('يجب تحديد نتيجة الحالة');
+      return;
+    }
+
+    setActionLoading(resolvingEmergency.id);
+    try {
+      const res = await authFetch(`/api/nurse/emergencies/${resolvingEmergency.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ action: 'resolve', outcome: selectedOutcome, resolvedNotes: resolveNotes }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success('تم إنهاء حالة الطوارئ بنجاح');
+        setAssignments((prev) => prev.filter((a) => a.id !== resolvingEmergency.id));
+        setResolveDialogOpen(false);
+        setResolvingEmergency(null);
+      } else {
+        toast.error(data.message || 'فشل إنهاء حالة الطوارئ');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء إنهاء حالة الطوارئ');
+    } finally {
+      setActionLoading(null);
+      fetchCounts();
+    }
+  };
+
+  const isEmergency = (a: Assignment) => a.assignmentType === 'emergency' || a.request?.isEmergency;
+
+  // Fetch rating summary
+  const fetchRatingSummary = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/nurse/ratings?limit=1');
+      const data = await res.json();
+      if (data.success && data.data?.summary) {
+        setRatingSummary(data.data.summary);
+      }
+    } catch {
+      // silently handle
+    }
+  }, [authFetch]);
+
+  useEffect(() => {
+    fetchRatingSummary();
+  }, [fetchRatingSummary]);
 
   // Get verification config for current status
   const vConfig = verificationStatus ? verificationConfig[verificationStatus] : null;
@@ -399,6 +561,41 @@ export default function NurseTasksPage() {
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Rating Summary Card */}
+      <Link href="/nurse/ratings" className="block">
+        <GlassCard variant="nurse" className="p-4 cursor-pointer hover:shadow-md transition-all duration-300 border-amber-200/50 dark:border-amber-800/30 bg-gradient-to-l from-amber-50/60 to-yellow-50/40 dark:from-amber-900/10 dark:to-yellow-900/5">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+              <Star className="w-6 h-6 text-amber-500 fill-amber-400" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1">
+                <h3 className="font-bold text-sm">تقييماتي</h3>
+                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-2xl font-bold text-amber-600">{toArabicNum(ratingSummary?.averageRating?.toFixed(1) ?? '0.0')}</span>
+                <div className="flex items-center gap-0.5">
+                  {[1, 2, 3, 4, 5].map((s) => (
+                    <Star
+                      key={s}
+                      className={`w-4 h-4 ${s <= Math.round(ratingSummary?.averageRating ?? 0) ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`}
+                    />
+                  ))}
+                </div>
+                <span className="text-xs text-muted-foreground">
+                  {toArabicNum(ratingSummary?.reviewCount ?? 0)} تقييم
+                </span>
+              </div>
+            </div>
+            <div className="text-left">
+              <p className="text-[10px] text-muted-foreground">خدمة مكتملة</p>
+              <p className="text-lg font-bold text-nurse">{toArabicNum(ratingSummary?.completedJobs ?? 0)}</p>
+            </div>
+          </div>
+        </GlassCard>
+      </Link>
 
       {/* Verified Badge (shown when verified) */}
       <AnimatePresence>
@@ -493,29 +690,48 @@ export default function NurseTasksPage() {
                       exit={{ opacity: 0, x: -100, transition: { duration: 0.2 } }}
                       layout
                     >
-                      <GlassCard variant="nurse" className="p-4">
+                      <GlassCard
+                        variant="nurse"
+                        className={`p-4 ${isEmergency(assignment) ? 'border-red-200 dark:border-red-900/40 ring-1 ring-red-100 dark:ring-red-900/20' : ''}`}
+                      >
                         {/* Service & Status Row */}
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
-                            <div className="w-10 h-10 rounded-xl bg-nurse/10 text-nurse flex items-center justify-center">
-                              {assignment.request?.service
-                                ? getServiceIcon(assignment.request.service.category)
-                                : <ClipboardList className="w-5 h-5" />}
+                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                              isEmergency(assignment)
+                                ? assignment.status === 'assigned'
+                                  ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse'
+                                  : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                : 'bg-nurse/10 text-nurse'
+                            }`}>
+                              {isEmergency(assignment)
+                                ? <AlertTriangle className="w-5 h-5" />
+                                : assignment.request?.service
+                                  ? getServiceIcon(assignment.request.service.category)
+                                  : <ClipboardList className="w-5 h-5" />}
                             </div>
                             <div>
                               <h3 className="font-semibold text-sm">
                                 {assignment.request?.service?.nameAr || 'طلب خدمة'}
                               </h3>
                               <p className="text-xs text-muted-foreground">
-                                {assignment.request?.service?.duration
-                                  ? `${toArabicNum(assignment.request.service.duration)} دقيقة`
-                                  : ''}
+                                {isEmergency(assignment)
+                                  ? assignment.status === 'assigned'
+                                    ? 'بانتظار قبولك - حالة عاجلة'
+                                    : assignment.status === 'accepted'
+                                      ? 'تم القبول - انطلق الآن'
+                                      : assignment.status === 'in_progress'
+                                        ? 'جاري التنفيذ - في الموقع'
+                                        : 'حالة طوارئ'
+                                  : assignment.request?.service?.duration
+                                    ? `${toArabicNum(assignment.request.service.duration)} دقيقة`
+                                    : ''}
                               </p>
                             </div>
                           </div>
                           <div className="flex items-center gap-2">
-                            {assignment.request?.isEmergency && (
-                              <Badge variant="destructive" className="text-[10px] gap-1">
+                            {isEmergency(assignment) && (
+                              <Badge variant="destructive" className={`text-[10px] gap-1 ${assignment.status === 'assigned' ? 'animate-pulse' : ''}`}>
                                 <AlertTriangle className="w-3 h-3" />
                                 طوارئ
                               </Badge>
@@ -523,6 +739,37 @@ export default function NurseTasksPage() {
                             <BadgeStatus status={assignment.status || 'pending'} />
                           </div>
                         </div>
+
+                        {/* Emergency Description */}
+                        {isEmergency(assignment) && assignment.request?.emergencyDescription && (
+                          <div className="mb-3 p-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30">
+                            <p className="text-[10px] text-red-500 font-medium mb-0.5">وصف الطوارئ</p>
+                            <p className="text-xs text-foreground leading-relaxed">{assignment.request.emergencyDescription}</p>
+                          </div>
+                        )}
+
+                        {/* Outcome Display for completed emergencies */}
+                        {isEmergency(assignment) && assignment.outcome && (
+                          <div className={`mb-3 p-2.5 rounded-xl border ${outcomeConfig[assignment.outcome]?.bg || 'bg-muted'}`}>
+                            <div className="flex items-center gap-2">
+                              {(() => {
+                                const oc = outcomeConfig[assignment.outcome!];
+                                if (!oc) return null;
+                                const IconComp = oc.icon;
+                                return <IconComp className={`w-4 h-4 ${oc.color}`} />;
+                              })()}
+                              <span className="text-xs font-medium">
+                                {outcomeConfig[assignment.outcome]?.label || assignment.outcome}
+                              </span>
+                            </div>
+                            {assignment.resolvedNotes && (
+                              <div className="flex items-start gap-1.5 mt-1.5">
+                                <FileText className="w-3 h-3 text-muted-foreground shrink-0 mt-0.5" />
+                                <p className="text-[11px] text-muted-foreground leading-relaxed">{assignment.resolvedNotes}</p>
+                              </div>
+                            )}
+                          </div>
+                        )}
 
                         {/* Beneficiary Info */}
                         <div className="space-y-2 mb-3">
@@ -566,106 +813,218 @@ export default function NurseTasksPage() {
                               <span>{formatTimeOnly(new Date(assignment.request.scheduledAt))}</span>
                             </div>
                           )}
+                          {isEmergency(assignment) && assignment.assignedAt && (
+                            <div className="flex items-center gap-1.5 text-muted-foreground">
+                              <Clock className="w-4 h-4" />
+                              <span>تم التعيين {formatDateOnly(new Date(assignment.assignedAt))}</span>
+                            </div>
+                          )}
                         </div>
 
                         {/* Price Row */}
                         <div className="flex items-center justify-between pt-3 border-t border-border">
                           <div className="flex items-center gap-1.5">
                             <DollarSign className="w-4 h-4 text-green-600" />
-                            <span className="text-xs text-muted-foreground">أرباحك:</span>
-                            <Currency amount={assignment.request?.nursePayout || 0} className="text-green-600" />
+                            <span className="text-xs text-muted-foreground">
+                              {isEmergency(assignment) ? 'رسوم الطوارئ:' : 'أرباحك:'}
+                            </span>
+                            <Currency amount={assignment.request?.nursePayout || assignment.request?.basePrice || 0} className="text-green-600" />
                           </div>
 
                           {/* Action Buttons */}
-                          {activeTab === 'new' && (
-                            <div className="flex items-center gap-2">
-                              <Button
-                                size="sm"
-                                variant="outline"
-                                className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8"
-                                disabled={actionLoading === assignment.id}
-                                onClick={() => handleReject(assignment.id)}
-                              >
-                                <XCircle className="w-4 h-4 me-1" />
-                                رفض
-                              </Button>
-                              <Button
-                                size="sm"
-                                className="bg-green-600 hover:bg-green-700 h-8"
-                                disabled={actionLoading === assignment.id}
-                                onClick={() => handleAccept(assignment.id)}
-                              >
-                                {actionLoading === assignment.id ? (
-                                  <RefreshCw className="w-4 h-4 animate-spin" />
-                                ) : (
-                                  <CheckCircle2 className="w-4 h-4 me-1" />
-                                )}
-                                قبول
-                              </Button>
-                            </div>
-                          )}
-
-                          {activeTab === 'active' && (
-                            <div className="flex items-center gap-2">
-                              {/* Navigate to beneficiary */}
-                              {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-8"
-                                  onClick={() => {
-                                    window.open(
-                                      `https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`,
-                                      '_blank'
-                                    );
-                                  }}
-                                >
-                                  <Navigation className="w-4 h-4 me-1" />
-                                  اتجاه
-                                </Button>
+                          {isEmergency(assignment) ? (
+                            <div className="flex items-center gap-2 flex-wrap justify-end">
+                              {/* NEW tab - dispatched (assigned) emergency */}
+                              {activeTab === 'new' && assignment.status === 'assigned' && (
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8"
+                                    disabled={actionLoading === assignment.id}
+                                    onClick={() => handleEmergencyReject(assignment.id)}
+                                  >
+                                    {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 me-1" />}
+                                    رفض
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="bg-red-600 hover:bg-red-700 h-8 text-white gap-1"
+                                    disabled={actionLoading === assignment.id}
+                                    onClick={() => handleEmergencyAccept(assignment.id)}
+                                  >
+                                    {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 me-1" />}
+                                    قبول
+                                  </Button>
+                                </>
                               )}
 
-                              {/* Start service button (status: accepted) */}
-                              {assignment.status === 'accepted' && (
-                                <Button
-                                  size="sm"
-                                  className="bg-sky-600 hover:bg-sky-700 h-8"
-                                  disabled={actionLoading === assignment.id}
-                                  onClick={() => handleStartService(assignment.id)}
-                                >
-                                  {actionLoading === assignment.id ? (
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <PlayCircle className="w-4 h-4 me-1" />
+                              {/* ACTIVE tab - accepted emergency (on the way) */}
+                              {activeTab === 'active' && assignment.status === 'accepted' && (
+                                <>
+                                  {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                                    <Button
+                                      size="sm"
+                                      className="bg-red-600 hover:bg-red-700 h-8 text-white gap-1"
+                                      onClick={() => {
+                                        window.open(
+                                          `https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`,
+                                          '_blank'
+                                        );
+                                      }}
+                                    >
+                                      <Navigation className="w-4 h-4" />
+                                      اذهب الآن
+                                    </Button>
                                   )}
-                                  بدء التنفيذ
-                                </Button>
+                                  {assignment.request?.beneficiary?.phone && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 gap-1"
+                                      onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}
+                                    >
+                                      <Phone className="w-4 h-4" />
+                                      اتصال
+                                    </Button>
+                                  )}
+                                  <Button
+                                    size="sm"
+                                    className="bg-sky-600 hover:bg-sky-700 h-8 gap-1"
+                                    disabled={actionLoading === assignment.id}
+                                    onClick={() => handleEmergencyArrive(assignment.id)}
+                                  >
+                                    {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4 me-1" />}
+                                    وصلت للموقع
+                                  </Button>
+                                </>
                               )}
 
-                              {/* Complete service button (status: in_progress) */}
-                              {assignment.status === 'in_progress' && (
-                                <Button
-                                  size="sm"
-                                  className="bg-green-600 hover:bg-green-700 h-8"
-                                  disabled={actionLoading === assignment.id}
-                                  onClick={() => handleCompleteService(assignment.id)}
-                                >
-                                  {actionLoading === assignment.id ? (
-                                    <RefreshCw className="w-4 h-4 animate-spin" />
-                                  ) : (
-                                    <CheckCircle2 className="w-4 h-4 me-1" />
+                              {/* ACTIVE tab - in_progress emergency */}
+                              {activeTab === 'active' && assignment.status === 'in_progress' && (
+                                <>
+                                  {assignment.request?.beneficiary?.phone && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8 gap-1"
+                                      onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}
+                                    >
+                                      <Phone className="w-4 h-4" />
+                                      اتصال
+                                    </Button>
                                   )}
-                                  إكمال
-                                </Button>
+                                  <Button
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700 h-8 gap-1"
+                                    disabled={actionLoading === assignment.id}
+                                    onClick={() => handleOpenResolveDialog(assignment)}
+                                  >
+                                    {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 me-1" />}
+                                    إنهاء الحالة
+                                  </Button>
+                                </>
+                              )}
+
+                              {/* COMPLETED tab */}
+                              {activeTab === 'completed' && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <CheckCircle2 className="w-3 h-3 me-1" />
+                                  مكتمل
+                                </Badge>
                               )}
                             </div>
-                          )}
+                          ) : (
+                            <>
+                              {/* Action Buttons - Service assignments */}
+                              {activeTab === 'new' && (
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8"
+                                    disabled={actionLoading === assignment.id}
+                                    onClick={() => handleReject(assignment.id)}
+                                  >
+                                    <XCircle className="w-4 h-4 me-1" />
+                                    رفض
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    className="bg-green-600 hover:bg-green-700 h-8"
+                                    disabled={actionLoading === assignment.id}
+                                    onClick={() => handleAccept(assignment.id)}
+                                  >
+                                    {actionLoading === assignment.id ? (
+                                      <RefreshCw className="w-4 h-4 animate-spin" />
+                                    ) : (
+                                      <CheckCircle2 className="w-4 h-4 me-1" />
+                                    )}
+                                    قبول
+                                  </Button>
+                                </div>
+                              )}
 
-                          {activeTab === 'completed' && (
-                            <Badge variant="secondary" className="text-xs">
-                              <CheckCircle2 className="w-3 h-3 me-1" />
-                              مكتمل
-                            </Badge>
+                              {activeTab === 'active' && (
+                                <div className="flex items-center gap-2">
+                                  {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      className="h-8"
+                                      onClick={() => {
+                                        window.open(
+                                          `https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`,
+                                          '_blank'
+                                        );
+                                      }}
+                                    >
+                                      <Navigation className="w-4 h-4 me-1" />
+                                      اتجاه
+                                    </Button>
+                                  )}
+
+                                  {assignment.status === 'accepted' && (
+                                    <Button
+                                      size="sm"
+                                      className="bg-sky-600 hover:bg-sky-700 h-8"
+                                      disabled={actionLoading === assignment.id}
+                                      onClick={() => handleStartService(assignment.id)}
+                                    >
+                                      {actionLoading === assignment.id ? (
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <PlayCircle className="w-4 h-4 me-1" />
+                                      )}
+                                      بدء التنفيذ
+                                    </Button>
+                                  )}
+
+                                  {assignment.status === 'in_progress' && (
+                                    <Button
+                                      size="sm"
+                                      className="bg-green-600 hover:bg-green-700 h-8"
+                                      disabled={actionLoading === assignment.id}
+                                      onClick={() => handleCompleteService(assignment.id)}
+                                    >
+                                      {actionLoading === assignment.id ? (
+                                        <RefreshCw className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <CheckCircle2 className="w-4 h-4 me-1" />
+                                      )}
+                                      إكمال
+                                    </Button>
+                                  )}
+                                </div>
+                              )}
+
+                              {activeTab === 'completed' && (
+                                <Badge variant="secondary" className="text-xs">
+                                  <CheckCircle2 className="w-3 h-3 me-1" />
+                                  مكتمل
+                                </Badge>
+                              )}
+                            </>
                           )}
                         </div>
                       </GlassCard>
@@ -677,6 +1036,76 @@ export default function NurseTasksPage() {
           </PullToRefresh>
         </TabsContent>
       </Tabs>
+
+      {/* ── Resolve Emergency Dialog ── */}
+      <Dialog open={resolveDialogOpen} onOpenChange={setResolveDialogOpen}>
+        <DialogContent dir="rtl" className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>إنهاء حالة الطوارئ</DialogTitle>
+            <DialogDescription>
+              ماذا حدث مع حالة الطوارئ؟ حدد النتيجة وأضف ملاحظاتك
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-2">
+            {/* Outcome Selection */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">نتيجة الحالة *</p>
+              <div className="space-y-2">
+                {Object.entries(outcomeConfig).map(([key, config]) => {
+                  const IconComp = config.icon;
+                  return (
+                    <button
+                      key={key}
+                      type="button"
+                      onClick={() => setSelectedOutcome(key)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-right ${
+                        selectedOutcome === key
+                          ? `${config.bg} border-current ${config.color}`
+                          : 'border-border hover:border-muted-foreground/30'
+                      }`}
+                    >
+                      <IconComp className={`w-5 h-5 shrink-0 ${selectedOutcome === key ? config.color : 'text-muted-foreground'}`} />
+                      <span className={`text-sm font-medium ${selectedOutcome === key ? config.color : ''}`}>
+                        {config.label}
+                      </span>
+                      {selectedOutcome === key && (
+                        <CheckCircle2 className={`w-4 h-4 mr-auto ${config.color}`} />
+                      )}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Notes */}
+            <div className="space-y-2">
+              <p className="text-sm font-medium">ملاحظات إضافية</p>
+              <textarea
+                value={resolveNotes}
+                onChange={(e) => setResolveNotes(e.target.value)}
+                placeholder="أضف ملاحظاتك حول الحالة..."
+                className="w-full min-h-[80px] p-3 rounded-xl border border-border bg-background text-sm resize-none focus:outline-none focus:ring-2 focus:ring-ring"
+                dir="rtl"
+              />
+            </div>
+
+            {/* Submit */}
+            <Button
+              className="w-full bg-green-600 hover:bg-green-700 h-11"
+              disabled={!selectedOutcome || actionLoading === resolvingEmergency?.id}
+              onClick={handleEmergencyResolve}
+            >
+              {actionLoading === resolvingEmergency?.id ? (
+                <RefreshCw className="w-4 h-4 animate-spin me-2" />
+              ) : (
+                <CheckCircle2 className="w-4 h-4 me-2" />
+              )}
+              تأكيد إنهاء الحالة
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

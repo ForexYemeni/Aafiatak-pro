@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Star, Eye, RefreshCw } from 'lucide-react';
+import { Star, Eye, RefreshCw, User, Stethoscope, AlertTriangle } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
@@ -10,6 +10,8 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { DateFormatter } from '@/components/common/date-formatter';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Dialog,
@@ -24,13 +26,18 @@ interface RatingItem {
   id: string;
   fromUserName: string;
   toUserName: string;
+  toUserSpecialization: string;
   fromRole: string;
   toRole: string;
+  ratingType: 'service' | 'emergency';
   score: number;
   comment: string | null;
   tags: string[];
   isAnonymous: boolean;
   serviceName: string | null;
+  emergencyType?: string | null;
+  emergencyOutcome?: string | null;
+  nurseRating: number;
   createdAt: string;
 }
 
@@ -47,6 +54,7 @@ const tagLabels: Record<string, string> = {
   unprofessional: 'غير محترف',
   unclean: 'غير نظيف',
   uncommunicative: 'غير متواصل',
+  skilled: 'ماهر',
 };
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -57,11 +65,15 @@ export default function AdminRatingsPage() {
   const [ratings, setRatings] = useState<RatingItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [scoreFilter, setScoreFilter] = useState('all');
+  const [typeFilter, setTypeFilter] = useState('all');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
   const [viewTarget, setViewTarget] = useState<RatingItem | null>(null);
   const [avgRating, setAvgRating] = useState(0);
+  const [totalCount, setTotalCount] = useState(0);
+  const [serviceCount, setServiceCount] = useState(0);
+  const [emergencyCount, setEmergencyCount] = useState(0);
 
   const fetchRatings = useCallback(async () => {
     setIsLoading(true);
@@ -70,21 +82,26 @@ export default function AdminRatingsPage() {
         page: String(page),
         limit: '10',
         ...(scoreFilter !== 'all' ? { score: scoreFilter } : {}),
+        ...(typeFilter !== 'all' ? { ratingType: typeFilter } : {}),
       });
-      const res = await authFetch(`/api/admin/orders?limit=200&page=1`);
+      const res = await authFetch(`/api/admin/ratings?${params.toString()}`);
       const json = await res.json();
       if (json.success && json.data) {
-        // Filter ratings from orders - we'll use a simpler approach
-        // Since we don't have a dedicated ratings API, let's use the data as-is
-        const ratingsData: RatingItem[] = [];
-        setRatings(ratingsData);
+        setRatings(json.data.ratings || []);
+        setTotalPages(json.data.pages || 1);
+        if (json.data.summary) {
+          setAvgRating(json.data.summary.averageRating || 0);
+          setTotalCount(json.data.summary.totalCount || 0);
+          setServiceCount(json.data.summary.serviceCount || 0);
+          setEmergencyCount(json.data.summary.emergencyCount || 0);
+        }
       }
     } catch {
       toast.error('فشل تحميل التقييمات');
     } finally {
       setIsLoading(false);
     }
-  }, [authFetch, page, scoreFilter]);
+  }, [authFetch, page, scoreFilter, typeFilter]);
 
   useEffect(() => {
     void fetchRatings();
@@ -106,21 +123,78 @@ export default function AdminRatingsPage() {
   const columns: ColumnDef<RatingItem, unknown>[] = [
     {
       accessorKey: 'fromUserName',
-      header: 'من',
+      header: 'من (المستفيد)',
       cell: ({ row }) => (
-        <span className="text-sm">
-          {row.original.isAnonymous ? 'مجهول' : row.original.fromUserName}
-        </span>
+        <div className="flex items-center gap-2">
+          <Avatar className="w-7 h-7">
+            <AvatarFallback className="text-[10px] bg-beneficiary/10 text-beneficiary">
+              {row.original.isAnonymous ? '?' : row.original.fromUserName?.slice(0, 2)}
+            </AvatarFallback>
+          </Avatar>
+          <span className="text-sm">
+            {row.original.isAnonymous ? 'مجهول' : row.original.fromUserName}
+          </span>
+        </div>
       ),
     },
     {
       accessorKey: 'toUserName',
-      header: 'إلى',
+      header: 'إلى (الممرض)',
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <Avatar className="w-7 h-7">
+            <AvatarFallback className="text-[10px] bg-nurse/10 text-nurse">
+              {row.original.toUserName?.slice(0, 2)}
+            </AvatarFallback>
+          </Avatar>
+          <div>
+            <span className="text-sm font-medium">{row.original.toUserName}</span>
+            {row.original.nurseRating > 0 && (
+              <div className="flex items-center gap-1">
+                <Star className="w-3 h-3 text-yellow-500 fill-yellow-500" />
+                <span className="text-[10px] text-muted-foreground">{row.original.nurseRating.toFixed(1)}</span>
+              </div>
+            )}
+          </div>
+        </div>
+      ),
     },
     {
       accessorKey: 'score',
       header: 'التقييم',
       cell: ({ row }) => renderStars(row.original.score),
+    },
+    {
+      accessorKey: 'ratingType',
+      header: 'النوع',
+      cell: ({ row }) => (
+        row.original.ratingType === 'emergency' ? (
+          <Badge variant="destructive" className="text-[10px] gap-1">
+            <AlertTriangle className="w-3 h-3" />
+            طوارئ
+          </Badge>
+        ) : (
+          <Badge variant="secondary" className="text-[10px]">
+            خدمة
+          </Badge>
+        )
+      ),
+    },
+    {
+      accessorKey: 'serviceName',
+      header: 'الخدمة',
+      cell: ({ row }) => (
+        <div className="max-w-[120px]">
+          <span className="text-xs text-muted-foreground line-clamp-1">
+            {row.original.serviceName || '—'}
+          </span>
+          {row.original.ratingType === 'emergency' && row.original.emergencyOutcome && (
+            <p className="text-[10px] text-green-600 dark:text-green-400 line-clamp-1">
+              {row.original.emergencyOutcome}
+            </p>
+          )}
+        </div>
+      ),
     },
     {
       accessorKey: 'comment',
@@ -148,22 +222,58 @@ export default function AdminRatingsPage() {
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       <motion.div variants={itemAnim}>
-        <PageHeader title="إدارة التقييمات" description="عرض وإدارة تقييمات الخدمات" />
+        <PageHeader title="إدارة التقييمات" description="عرض وإدارة تقييمات الخدمات والطوارئ" />
       </motion.div>
 
-      {/* Average Rating Card */}
-      <motion.div variants={itemAnim}>
-        <GlassCard variant="admin">
-          <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-full bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center">
-              <Star className="w-7 h-7 text-yellow-500 fill-yellow-500" />
+      {/* Stats Cards */}
+      <motion.div variants={itemAnim} className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+        <GlassCard variant="admin" className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-yellow-100 dark:bg-yellow-900/30 flex items-center justify-center shrink-0">
+              <Star className="w-6 h-6 text-yellow-500 fill-yellow-500" />
             </div>
             <div>
-              <p className="text-sm text-muted-foreground">متوسط التقييم العام</p>
+              <p className="text-xs text-muted-foreground">متوسط التقييم العام</p>
               <div className="flex items-center gap-2">
-                <p className="text-3xl font-bold">{avgRating > 0 ? avgRating.toFixed(1) : '—'}</p>
+                <p className="text-2xl font-bold">{avgRating > 0 ? avgRating.toFixed(1) : '—'}</p>
                 {avgRating > 0 && renderStars(Math.round(avgRating))}
               </div>
+            </div>
+          </div>
+        </GlassCard>
+
+        <GlassCard variant="admin" className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+              <Stethoscope className="w-6 h-6 text-blue-500" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">إجمالي التقييمات</p>
+              <p className="text-2xl font-bold">{totalCount}</p>
+            </div>
+          </div>
+        </GlassCard>
+
+        <GlassCard variant="admin" className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+              <Stethoscope className="w-6 h-6 text-green-500" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">تقييمات الخدمات</p>
+              <p className="text-2xl font-bold">{serviceCount}</p>
+            </div>
+          </div>
+        </GlassCard>
+
+        <GlassCard variant="admin" className="p-4">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-6 h-6 text-red-500" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">تقييمات الطوارئ</p>
+              <p className="text-2xl font-bold">{emergencyCount}</p>
             </div>
           </div>
         </GlassCard>
@@ -172,7 +282,17 @@ export default function AdminRatingsPage() {
       <motion.div variants={itemAnim}>
         <GlassCard variant="admin">
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <Select value={scoreFilter} onValueChange={setScoreFilter}>
+            <Select value={typeFilter} onValueChange={(v) => { setTypeFilter(v); setPage(1); }}>
+              <SelectTrigger className="w-full sm:w-40">
+                <SelectValue placeholder="النوع" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">الكل</SelectItem>
+                <SelectItem value="service">خدمات</SelectItem>
+                <SelectItem value="emergency">طوارئ</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={scoreFilter} onValueChange={(v) => { setScoreFilter(v); setPage(1); }}>
               <SelectTrigger className="w-full sm:w-40">
                 <SelectValue placeholder="التقييم" />
               </SelectTrigger>
@@ -217,17 +337,59 @@ export default function AdminRatingsPage() {
               <div className="flex items-center gap-4">
                 {renderStars(viewTarget.score)}
                 <span className="text-2xl font-bold">{viewTarget.score}/5</span>
+                {viewTarget.ratingType === 'emergency' && (
+                  <Badge variant="destructive" className="gap-1">
+                    <AlertTriangle className="w-3 h-3" />
+                    طوارئ
+                  </Badge>
+                )}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="glass rounded-xl p-3">
-                  <p className="text-xs text-muted-foreground">من</p>
-                  <p className="text-sm font-medium">{viewTarget.isAnonymous ? 'مجهول' : viewTarget.fromUserName}</p>
+                  <p className="text-xs text-muted-foreground">من (المستفيد)</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Avatar className="w-6 h-6">
+                      <AvatarFallback className="text-[8px] bg-beneficiary/10 text-beneficiary">
+                        {viewTarget.isAnonymous ? '?' : viewTarget.fromUserName?.slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <p className="text-sm font-medium">{viewTarget.isAnonymous ? 'مجهول' : viewTarget.fromUserName}</p>
+                  </div>
                 </div>
                 <div className="glass rounded-xl p-3">
-                  <p className="text-xs text-muted-foreground">إلى</p>
-                  <p className="text-sm font-medium">{viewTarget.toUserName}</p>
+                  <p className="text-xs text-muted-foreground">إلى (الممرض)</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <Avatar className="w-6 h-6">
+                      <AvatarFallback className="text-[8px] bg-nurse/10 text-nurse">
+                        {viewTarget.toUserName?.slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium">{viewTarget.toUserName}</p>
+                      {viewTarget.nurseRating > 0 && (
+                        <div className="flex items-center gap-1">
+                          <Star className="w-2.5 h-2.5 text-yellow-500 fill-yellow-500" />
+                          <span className="text-[10px] text-muted-foreground">{viewTarget.nurseRating.toFixed(1)}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
                 </div>
               </div>
+              {viewTarget.serviceName && (
+                <div className="glass rounded-xl p-3">
+                  <p className="text-xs text-muted-foreground">
+                    {viewTarget.ratingType === 'emergency' ? 'نوع الطوارئ' : 'الخدمة'}
+                  </p>
+                  <p className="text-sm font-medium">{viewTarget.serviceName}</p>
+                </div>
+              )}
+              {viewTarget.ratingType === 'emergency' && viewTarget.emergencyOutcome && (
+                <div className="glass rounded-xl p-3">
+                  <p className="text-xs text-muted-foreground">نتيجة الحالة</p>
+                  <p className="text-sm font-medium text-green-700 dark:text-green-400">{viewTarget.emergencyOutcome}</p>
+                </div>
+              )}
               {viewTarget.comment && (
                 <div className="glass rounded-xl p-3">
                   <p className="text-xs text-muted-foreground mb-1">التعليق</p>

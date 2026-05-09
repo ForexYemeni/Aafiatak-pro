@@ -1,10 +1,15 @@
-// GET /api/nurse/assignments - Get nurse assignments
+// GET /api/nurse/assignments - Get nurse assignments (service requests + emergency requests)
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, EmergencyRequest, Nurse, Beneficiary, Service } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+
+const emergencyTypeLabels: Record<string, string> = {
+  medical: 'طبي عام', injury: 'إصابة', breathing: 'تنفسي',
+  cardiac: 'قلبي', fall: 'سقوط', other: 'أخرى', general_medical: 'طبي عام',
+};
 
 export async function GET(request: NextRequest) {
   try {
@@ -35,14 +40,31 @@ export async function GET(request: NextRequest) {
           verificationRequired: true,
         });
       }
-      const [newCount, activeCount, completedCount] = await Promise.all([
+
+      // Count includes both service requests and emergency requests
+      const [
+        newServiceCount,
+        activeServiceCount,
+        completedServiceCount,
+        newEmergencyCount,
+        activeEmergencyCount,
+        completedEmergencyCount,
+      ] = await Promise.all([
         ServiceRequest.countDocuments({ nurseId: user.userId, status: 'assigned' }),
         ServiceRequest.countDocuments({ nurseId: user.userId, status: { $in: ['accepted', 'in_progress'] } }),
         ServiceRequest.countDocuments({ nurseId: user.userId, status: 'completed' }),
+        EmergencyRequest.countDocuments({ nurseId: user.userId, status: 'dispatched' }),
+        EmergencyRequest.countDocuments({ nurseId: user.userId, status: { $in: ['accepted', 'in_progress'] } }),
+        EmergencyRequest.countDocuments({ nurseId: user.userId, status: { $in: ['resolved', 'cancelled'] } }),
       ]);
+
       return Response.json({
         success: true,
-        data: { new: newCount, active: activeCount, completed: completedCount },
+        data: {
+          new: newServiceCount + newEmergencyCount,
+          active: activeServiceCount + activeEmergencyCount,
+          completed: completedServiceCount + completedEmergencyCount,
+        },
       });
     }
 
@@ -55,38 +77,38 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    const filter: any = { nurseId: user.userId };
+    // ── Fetch Service Request assignments ──
+    const serviceFilter: any = { nurseId: user.userId };
     if (status === 'active') {
-      filter.status = { $in: ['assigned', 'accepted', 'in_progress'] };
+      serviceFilter.status = { $in: ['assigned', 'accepted', 'in_progress'] };
     } else if (status === 'pending') {
-      // "pending" in the UI means assigned but not yet accepted by the nurse
-      filter.status = 'assigned';
+      serviceFilter.status = 'assigned';
     } else if (status === 'completed') {
-      filter.status = 'completed';
+      serviceFilter.status = 'completed';
     } else if (status === 'all') {
       // No status filter
     } else {
-      filter.status = status;
+      serviceFilter.status = status;
     }
 
-    const assignments = await ServiceRequest.find(filter).sort({ createdAt: -1 }).limit(50).lean();
+    const serviceAssignments = await ServiceRequest.find(serviceFilter).sort({ createdAt: -1 }).limit(50).lean();
 
-    // Populate service and beneficiary data
-    const serviceIds = [...new Set(assignments.map((a: any) => a.serviceId?.toString()).filter(Boolean))];
-    const beneficiaryIds = [...new Set(assignments.map((a: any) => a.beneficiaryId?.toString()).filter(Boolean))];
+    // Populate service and beneficiary data for service requests
+    const serviceIds = [...new Set(serviceAssignments.map((a: any) => a.serviceId?.toString()).filter(Boolean))];
+    const serviceBeneficiaryIds = [...new Set(serviceAssignments.map((a: any) => a.beneficiaryId?.toString()).filter(Boolean))];
 
-    const [services, beneficiaries] = await Promise.all([
+    const [services, serviceBeneficiaries] = await Promise.all([
       Service.find({ _id: { $in: serviceIds } }).lean(),
-      Beneficiary.find({ _id: { $in: beneficiaryIds } }).select('name phone').lean(),
+      Beneficiary.find({ _id: { $in: serviceBeneficiaryIds } }).select('name phone').lean(),
     ]);
 
     const serviceMap = new Map(services.map((s: any) => [s._id.toString(), s]));
-    const beneficiaryMap = new Map(beneficiaries.map((b: any) => [b._id.toString(), b]));
+    const serviceBeneficiaryMap = new Map(serviceBeneficiaries.map((b: any) => [b._id.toString(), b]));
 
-    // Transform to the format expected by the nurse UI
-    const populatedAssignments = assignments.map((a: any) => {
+    // Transform service requests
+    const populatedServiceAssignments = serviceAssignments.map((a: any) => {
       const service = serviceMap.get(a.serviceId?.toString());
-      const beneficiary = beneficiaryMap.get(a.beneficiaryId?.toString());
+      const beneficiary = serviceBeneficiaryMap.get(a.beneficiaryId?.toString());
 
       return {
         id: a._id.toString(),
@@ -96,6 +118,7 @@ export async function GET(request: NextRequest) {
         assignedAt: a.createdAt?.toISOString() || new Date().toISOString(),
         respondedAt: a.updatedAt?.toISOString() || null,
         estimatedArrivalMinutes: null,
+        assignmentType: 'service' as const,
         request: {
           id: a._id.toString(),
           status: a.status,
@@ -134,9 +157,93 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // ── Fetch Emergency Request assignments ──
+    const emergencyFilter: any = { nurseId: user.userId };
+    if (status === 'active') {
+      emergencyFilter.status = { $in: ['dispatched', 'accepted', 'in_progress'] };
+    } else if (status === 'pending') {
+      emergencyFilter.status = 'dispatched';
+    } else if (status === 'completed') {
+      emergencyFilter.status = { $in: ['resolved', 'cancelled'] };
+    } else if (status === 'all') {
+      // No status filter
+    }
+
+    const emergencyAssignments = await EmergencyRequest.find(emergencyFilter).sort({ createdAt: -1 }).limit(50).lean();
+
+    // Populate beneficiary data for emergency requests
+    const emergencyBeneficiaryIds = [...new Set(emergencyAssignments.map((e: any) => e.beneficiaryId?.toString()).filter(Boolean))];
+
+    const emergencyBeneficiaries = await Beneficiary.find({ _id: { $in: emergencyBeneficiaryIds } }).select('name phone').lean();
+    const emergencyBeneficiaryMap = new Map(emergencyBeneficiaries.map((b: any) => [b._id.toString(), b]));
+
+    // Transform emergency requests
+    const populatedEmergencyAssignments = emergencyAssignments.map((e: any) => {
+      const beneficiary = emergencyBeneficiaryMap.get(e.beneficiaryId?.toString());
+      const emergencyType = emergencyTypeLabels[e.type] || e.type || 'طوارئ';
+
+      // Map emergency status to service-like status for nurse UI compatibility
+      let mappedStatus = e.status;
+      if (e.status === 'dispatched') mappedStatus = 'assigned'; // New/unaccepted
+      else if (e.status === 'accepted') mappedStatus = 'accepted'; // Nurse accepted, on the way
+      else if (e.status === 'in_progress') mappedStatus = 'in_progress';
+      else if (e.status === 'resolved') mappedStatus = 'completed';
+      else if (e.status === 'cancelled') mappedStatus = 'completed';
+
+      const coordinates = e.location?.coordinates;
+
+      return {
+        id: e._id.toString(),
+        requestId: e._id.toString(),
+        nurseId: e.nurseId?.toString() || '',
+        status: mappedStatus,
+        assignedAt: e.dispatchedAt?.toISOString() || e.createdAt?.toISOString() || new Date().toISOString(),
+        respondedAt: e.updatedAt?.toISOString() || null,
+        estimatedArrivalMinutes: null,
+        assignmentType: 'emergency' as const,
+        outcome: e.outcome || null,
+        resolvedNotes: e.resolvedNotes || null,
+        request: {
+          id: e._id.toString(),
+          status: mappedStatus,
+          scheduledAt: null,
+          beneficiaryAddress: e.address || null,
+          beneficiaryLat: coordinates?.[1] || null,
+          beneficiaryLng: coordinates?.[0] || null,
+          basePrice: e.emergencyFee || 0,
+          nursePayout: 0,
+          totalPrice: e.emergencyFee || 0,
+          isEmergency: true,
+          emergencyType: e.type,
+          emergencyDescription: e.description,
+          service: {
+            id: '',
+            nameAr: `طوارئ - ${emergencyType}`,
+            category: 'emergency',
+            basePrice: e.emergencyFee || 0,
+            duration: 0,
+          },
+          beneficiary: beneficiary ? {
+            id: beneficiary._id.toString(),
+            name: beneficiary.name || 'غير معروف',
+            phone: beneficiary.phone || '',
+            address: e.address || undefined,
+          } : {
+            id: '',
+            name: 'غير معروف',
+            phone: '',
+          },
+        },
+      };
+    });
+
+    // Merge and sort by assignedAt (most recent first)
+    const allAssignments = [...populatedServiceAssignments, ...populatedEmergencyAssignments]
+      .sort((a, b) => new Date(b.assignedAt).getTime() - new Date(a.assignedAt).getTime());
+
     return Response.json({
       success: true,
-      data: populatedAssignments,
+      data: allAssignments,
     });
   } catch (error) {
     console.error('[NURSE ASSIGNMENTS ERROR]', error);

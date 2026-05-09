@@ -43,6 +43,7 @@ interface NotificationItem {
 function getNotificationIcon(type: string) {
   switch (type) {
     case 'assignment': return <ClipboardList className="w-5 h-5 text-sky-500" />;
+    case 'emergency_assigned': return <AlertTriangle className="w-5 h-5 text-red-500" />;
     case 'payment': return <DollarSign className="w-5 h-5 text-green-500" />;
     case 'emergency': return <AlertTriangle className="w-5 h-5 text-red-500" />;
     case 'chat': return <MessageSquare className="w-5 h-5 text-blue-500" />;
@@ -56,6 +57,7 @@ function getNotificationIcon(type: string) {
 function getNotificationBg(type: string): string {
   switch (type) {
     case 'assignment': return 'bg-sky-50 dark:bg-sky-900/20';
+    case 'emergency_assigned': return 'bg-red-50 dark:bg-red-900/20';
     case 'payment': return 'bg-green-50 dark:bg-green-900/20';
     case 'emergency': return 'bg-red-50 dark:bg-red-900/20';
     case 'chat': return 'bg-blue-50 dark:bg-blue-900/20';

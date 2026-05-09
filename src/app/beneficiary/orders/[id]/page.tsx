@@ -18,6 +18,10 @@ import {
   Calendar,
   User,
   AlertTriangle,
+  Send,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -38,6 +42,7 @@ interface OrderDetail extends ServiceRequest {
   nurseRating?: number;
   nurseSpecialization?: string;
   nurseIsOnline?: boolean;
+  hasRated?: boolean;
 }
 
 const statusTimelineLabels: Record<string, { label: string; icon: React.ElementType }> = {
@@ -52,6 +57,18 @@ const statusTimelineLabels: Record<string, { label: string; icon: React.ElementT
 
 const statusOrder = ['pending', 'assigned', 'accepted', 'in_progress', 'completed'];
 
+// Rating tags options
+const ratingTags = [
+  { id: 'punctual', label: 'ملتزم بالوقت', icon: Clock },
+  { id: 'professional', label: 'محترف', icon: Stethoscope },
+  { id: 'friendly', label: 'ودود', icon: ThumbsUp },
+  { id: 'clean', label: 'نظيف ومرتب', icon: CheckCircle2 },
+  { id: 'skilled', label: 'ماهر', icon: Star },
+  { id: 'patient', label: 'صبور', icon: ThumbsUp },
+  { id: 'late', label: 'متأخر', icon: Clock },
+  { id: 'unprofessional', label: 'غير محترف', icon: ThumbsDown },
+];
+
 export default function OrderDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -61,6 +78,15 @@ export default function OrderDetailPage() {
 
   const [order, setOrder] = useState<OrderDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+
+  // Rating state
+  const [ratingScore, setRatingScore] = useState(0);
+  const [hoveredStar, setHoveredStar] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  const [isAnonymous, setIsAnonymous] = useState(false);
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+  const [existingRating, setExistingRating] = useState<{ score: number; comment?: string; tags?: string[]; isAnonymous?: boolean } | null>(null);
 
   const fetchOrder = useCallback(async () => {
     if (!token || !orderId) return;
@@ -72,6 +98,29 @@ export default function OrderDetailPage() {
       const data: ApiResponse<OrderDetail> = await res.json();
       if (data.success && data.data) {
         setOrder(data.data);
+
+        // Check if already rated
+        if (data.data.status === 'completed' && data.data.nurseId) {
+          try {
+            const ratingRes = await fetch(`/api/beneficiary/ratings?limit=100`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const ratingData = await ratingRes.json();
+            if (ratingData.success && ratingData.data?.ratings) {
+              const found = ratingData.data.ratings.find((r: any) => r.requestId === orderId || r.requestId?.toString() === orderId);
+              if (found) {
+                setExistingRating({
+                  score: found.score,
+                  comment: found.comment,
+                  tags: found.tags,
+                  isAnonymous: found.isAnonymous,
+                });
+              }
+            }
+          } catch {
+            // Rating check failed, continue
+          }
+        }
       }
     } catch {
       // Error handled silently
@@ -105,6 +154,50 @@ export default function OrderDetailPage() {
     } catch {
       toast({ title: 'حدث خطأ', variant: 'destructive' });
     }
+  };
+
+  const submitRating = async () => {
+    if (!token || !order || ratingScore === 0) return;
+    setIsSubmittingRating(true);
+    try {
+      const res = await fetch('/api/beneficiary/ratings', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          requestId: order.id,
+          score: ratingScore,
+          comment: ratingComment || undefined,
+          tags: selectedTags.length > 0 ? selectedTags : undefined,
+          isAnonymous,
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: 'تم إرسال التقييم بنجاح' });
+        setExistingRating({ score: ratingScore, comment: ratingComment, tags: selectedTags, isAnonymous });
+        setRatingScore(0);
+        setRatingComment('');
+        setSelectedTags([]);
+      } else if (data.code === 'ALREADY_RATED') {
+        toast({ title: 'تم تقييم هذا الطلب بالفعل', variant: 'destructive' });
+        setExistingRating({ score: ratingScore });
+      } else {
+        toast({ title: data.message || 'فشل إرسال التقييم', variant: 'destructive' });
+      }
+    } catch {
+      toast({ title: 'حدث خطأ أثناء إرسال التقييم', variant: 'destructive' });
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
+  const toggleTag = (tagId: string) => {
+    setSelectedTags((prev) =>
+      prev.includes(tagId) ? prev.filter((t) => t !== tagId) : [...prev, tagId]
+    );
   };
 
   const formatDate = (dateStr: string | Date | null) => {
@@ -145,6 +238,7 @@ export default function OrderDetailPage() {
 
   const currentStatusIndex = statusOrder.indexOf(order.status);
   const isCancelledOrRejected = order.status === 'cancelled' || order.status === 'rejected';
+  const canRate = order.status === 'completed' && order.nurseId;
 
   return (
     <div className="space-y-6">
@@ -327,6 +421,168 @@ export default function OrderDetailPage() {
           <p className="text-sm text-muted-foreground mt-1">
             سيتم إشعارك فور تعيين ممرض/ـة لطلبك
           </p>
+        </GlassCard>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {/* ═══════════════ RATING SECTION ══════════════════════════ */}
+      {/* ═══════════════════════════════════════════════════════════ */}
+      {canRate && (
+        <GlassCard variant="beneficiary" className="space-y-5">
+          <h3 className="font-semibold text-sm flex items-center gap-2">
+            <Star className="w-4 h-4 text-yellow-500" />
+            تقييم الخدمة
+          </h3>
+
+          {existingRating ? (
+            /* ── Already rated ── */
+            <div className="text-center py-4 space-y-3">
+              <div className="flex items-center justify-center gap-1">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <Star
+                    key={star}
+                    className={`w-8 h-8 ${
+                      star <= existingRating.score
+                        ? 'fill-yellow-500 text-yellow-500'
+                        : 'text-gray-300 dark:text-gray-600'
+                    }`}
+                  />
+                ))}
+              </div>
+              <p className="text-sm text-muted-foreground">تم تقييم هذه الخدمة</p>
+              {existingRating.comment && (
+                <div className="p-3 rounded-xl bg-muted/40 text-sm text-right">
+                  {existingRating.comment}
+                </div>
+              )}
+              {existingRating.tags && existingRating.tags.length > 0 && (
+                <div className="flex flex-wrap gap-1.5 justify-center">
+                  {existingRating.tags.map((tag) => {
+                    const tagInfo = ratingTags.find((t) => t.id === tag);
+                    return tagInfo ? (
+                      <span
+                        key={tag}
+                        className="px-2.5 py-1 rounded-full text-[11px] font-medium bg-beneficiary/10 text-beneficiary"
+                      >
+                        {tagInfo.label}
+                      </span>
+                    ) : null;
+                  })}
+                </div>
+              )}
+              {existingRating.isAnonymous && (
+                <p className="text-xs text-muted-foreground">تم التقييم بشكل مجهول</p>
+              )}
+            </div>
+          ) : (
+            /* ── Rating form ── */
+            <div className="space-y-5">
+              {/* Star selector */}
+              <div className="text-center space-y-2">
+                <p className="text-sm text-muted-foreground">كيف تقيّم تجربتك مع {order.nurseName || 'الممرض/ـة'}؟</p>
+                <div className="flex items-center justify-center gap-2 py-2">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button
+                      key={star}
+                      type="button"
+                      className="transition-transform hover:scale-110 active:scale-95"
+                      onMouseEnter={() => setHoveredStar(star)}
+                      onMouseLeave={() => setHoveredStar(0)}
+                      onClick={() => setRatingScore(star)}
+                    >
+                      <Star
+                        className={`w-10 h-10 transition-colors ${
+                          star <= (hoveredStar || ratingScore)
+                            ? 'fill-yellow-500 text-yellow-500'
+                            : 'text-gray-300 dark:text-gray-600'
+                        }`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                {ratingScore > 0 && (
+                  <p className="text-xs text-muted-foreground">
+                    {ratingScore === 1 && 'سيء'}
+                    {ratingScore === 2 && 'ضعيف'}
+                    {ratingScore === 3 && 'مقبول'}
+                    {ratingScore === 4 && 'جيد'}
+                    {ratingScore === 5 && 'ممتاز'}
+                  </p>
+                )}
+              </div>
+
+              {/* Tags */}
+              {ratingScore > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium">اختر الصفات المناسبة (اختياري)</p>
+                  <div className="flex flex-wrap gap-2">
+                    {ratingTags.map((tag) => {
+                      const TagIcon = tag.icon;
+                      const isSelected = selectedTags.includes(tag.id);
+                      return (
+                        <button
+                          key={tag.id}
+                          type="button"
+                          onClick={() => toggleTag(tag.id)}
+                          className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+                            isSelected
+                              ? 'bg-beneficiary text-white shadow-sm'
+                              : 'bg-muted/60 text-muted-foreground hover:bg-muted'
+                          } ${tag.id === 'late' || tag.id === 'unprofessional' ? (isSelected ? 'bg-red-500 text-white' : 'text-red-400') : ''}`}
+                        >
+                          <TagIcon className="w-3 h-3" />
+                          {tag.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Comment */}
+              {ratingScore > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground font-medium">تعليقك (اختياري)</p>
+                  <textarea
+                    value={ratingComment}
+                    onChange={(e) => setRatingComment(e.target.value)}
+                    placeholder="شاركنا رأيك في التجربة..."
+                    rows={3}
+                    className="w-full rounded-xl border border-input bg-background px-4 py-3 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-beneficiary/30 focus:border-beneficiary"
+                  />
+                </div>
+              )}
+
+              {/* Anonymous toggle */}
+              {ratingScore > 0 && (
+                <label className="flex items-center gap-2.5 cursor-pointer">
+                  <div
+                    className={`w-10 h-6 rounded-full transition-colors relative ${isAnonymous ? 'bg-beneficiary' : 'bg-muted'}`}
+                    onClick={() => setIsAnonymous(!isAnonymous)}
+                  >
+                    <div className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${isAnonymous ? 'left-[18px]' : 'left-0.5'}`} />
+                  </div>
+                  <span className="text-xs text-muted-foreground">تقييم مجهول</span>
+                </label>
+              )}
+
+              {/* Submit button */}
+              {ratingScore > 0 && (
+                <Button
+                  className="w-full gap-2 bg-beneficiary hover:bg-beneficiary/90"
+                  onClick={submitRating}
+                  disabled={isSubmittingRating}
+                >
+                  {isSubmittingRating ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : (
+                    <Send className="w-4 h-4" />
+                  )}
+                  إرسال التقييم
+                </Button>
+              )}
+            </div>
+          )}
         </GlassCard>
       )}
 
