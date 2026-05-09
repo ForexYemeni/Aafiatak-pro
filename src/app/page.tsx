@@ -1053,21 +1053,36 @@ function LoginPageContent() {
   // Uses a ref so it survives re-renders without triggering the effect again
   const hasRedirectedRef = useRef(false);
 
-  // Handle post-login redirect with loading screen
-  const justLoggedOut = searchParams.get('logout') === 'true';
+  // Consumed-once guard: prevents auto-redirect when landing after logout,
+  // but does NOT block subsequent manual login attempts.
+  // We use a ref instead of deriving from URL searchParams because
+  // window.history.replaceState does NOT update Next.js internal router state,
+  // so searchParams.get('logout') stays 'true' even after URL cleanup,
+  // which permanently blocks navigation after re-login.
+  const logoutGuardConsumedRef = useRef(false);
 
+  // On mount: detect if we arrived after a logout, set the guard,
+  // and clean the URL using router.replace (which DOES update Next.js state).
+  useEffect(() => {
+    const isAfterLogout = searchParams.get('logout') === 'true';
+    if (isAfterLogout) {
+      logoutGuardConsumedRef.current = true;
+      // Clean URL using Next.js router so useSearchParams updates properly
+      router.replace('/', { scroll: false });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // Mount only
+
+  // Handle post-login redirect with loading screen
   useEffect(() => {
     if (!_hasHydrated) return;
     if (hasRedirectedRef.current) return; // Prevent redirect loop
 
-    // If user just logged out, stay on the login page
-    // BUT clean the URL so a subsequent login isn't blocked by stale ?logout=true
-    if (justLoggedOut) {
-      // Remove ?logout=true from URL without page reload
-      // so the next login attempt can proceed normally
-      if (typeof window !== 'undefined' && window.location.search.includes('logout')) {
-        window.history.replaceState({}, '', '/');
-      }
+    // If we just arrived after a logout, consume the guard ONCE and stay on login page.
+    // The guard only blocks the initial auto-redirect — it does NOT block
+    // a subsequent manual login, because the ref is consumed (set to false) here.
+    if (logoutGuardConsumedRef.current) {
+      logoutGuardConsumedRef.current = false;
       return;
     }
 
@@ -1120,7 +1135,7 @@ function LoginPageContent() {
     if (isAuthenticated && user && isFreshLogin && !showLoadingScreen) {
       setShowLoadingScreen(true);
     }
-  }, [isAuthenticated, user, justLoggedOut, showLoadingScreen, isFreshLogin, redirectPath, router, _hasHydrated]);
+  }, [isAuthenticated, user, showLoadingScreen, isFreshLogin, redirectPath, router, _hasHydrated]);
 
   const handleLoadingComplete = useCallback(() => {
     if (user) {
