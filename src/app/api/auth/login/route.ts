@@ -1,7 +1,7 @@
 // POST /api/auth/login - User login with phone and password
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
-import { NextRequest } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { User } from '@/models/mongoose/User';
 import {
@@ -10,7 +10,6 @@ import {
   generateRefreshToken,
   validateYemeniPhone,
   normalizeYemeniPhone,
-  createAuthCookie,
   createErrorResponse,
 } from '@/lib/auth';
 
@@ -72,12 +71,22 @@ export async function POST(request: NextRequest) {
       refreshToken,
     };
 
-    const response = Response.json(
+    const response = NextResponse.json(
       { success: true, data: responseData, message: 'تم تسجيل الدخول بنجاح' },
       { status: 200 }
     );
 
-    response.headers.set('Set-Cookie', createAuthCookie(token));
+    // Use NextResponse.cookies.set() for proper cookie handling on Vercel
+    // This ensures the cookie is properly set across all Vercel edge functions
+    const isProduction = process.env.NODE_ENV === 'production';
+    response.cookies.set('auth_token', token, {
+      httpOnly: true,
+      secure: isProduction,
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 7 * 24 * 60 * 60, // 7 days
+    });
+
     return response;
   } catch (error) {
     console.error('[AUTH LOGIN ERROR]', error);

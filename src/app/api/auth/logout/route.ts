@@ -1,8 +1,8 @@
 // POST /api/auth/logout - Logout user and clear cookie
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
-import { NextRequest } from 'next/server';
-import { createClearAuthCookie, createErrorResponse } from '@/lib/auth';
+import { NextRequest, NextResponse } from 'next/server';
+import { createErrorResponse } from '@/lib/auth';
 import { logActivity } from '@/lib/api/helpers';
 import { requireAuth } from '@/lib/auth/middleware';
 
@@ -21,12 +21,20 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const response = Response.json({
+    const response = NextResponse.json({
       success: true,
       message: 'تم تسجيل الخروج بنجاح',
     });
 
-    response.headers.set('Set-Cookie', createClearAuthCookie());
+    // Clear the auth cookie using NextResponse API
+    response.cookies.set('auth_token', '', {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      path: '/',
+      maxAge: 0,
+    });
+
     return response;
   } catch (error) {
     console.error('[AUTH LOGOUT ERROR]', error);

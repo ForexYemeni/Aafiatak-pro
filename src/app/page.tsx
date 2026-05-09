@@ -1056,10 +1056,12 @@ function LoginPageContent() {
     if (!_hasHydrated) return;
 
     // If user is already authenticated (returning to app with saved session)
-    // redirect IMMEDIATELY without the 5-second loading screen
+    // redirect using router.replace to avoid middleware redirect loop
+    // (window.location.href causes a hard navigation that triggers middleware,
+    //  which can cause infinite redirect loops when cookie is missing/invalid)
     if (isAuthenticated && user && !justLoggedOut && !isFreshLogin) {
       const destination = redirectPath ?? getDashboardPath(user.role);
-      window.location.href = destination;
+      router.replace(destination);
       return;
     }
 
