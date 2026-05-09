@@ -125,6 +125,10 @@ const nextConfig: NextConfig = {
       "framer-motion",
     ],
   },
+
+  turbopack: {
+    root: "/home/z/my-project/Aafiatak-v0.1",
+  },
 };
 
 export default nextConfig;

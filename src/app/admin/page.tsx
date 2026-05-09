@@ -17,29 +17,20 @@ import {
   Phone,
   MessageCircle,
   MapPin,
-  Clock,
   Calendar,
   User,
   Navigation,
   Zap,
-  XCircle,
+  ShieldAlert,
+  Clock,
   CheckCircle2,
+  Activity,
+  UserPlus,
+  Settings,
 } from 'lucide-react';
-import {
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  Legend,
-} from 'recharts';
 import { StatCard } from '@/components/common/stat-card';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
-import { CardSkeleton, ChartSkeleton } from '@/components/common/loading-skeleton';
+import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { Currency } from '@/components/common/currency';
 import { DateFormatter } from '@/components/common/date-formatter';
@@ -109,7 +100,7 @@ const container = {
   hidden: { opacity: 0 },
   show: {
     opacity: 1,
-    transition: { staggerChildren: 0.08 },
+    transition: { staggerChildren: 0.06 },
   },
 };
 
@@ -117,23 +108,6 @@ const item = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0 },
 };
-
-const arabicDayNames: Record<string, string> = {
-  Sun: 'الأحد',
-  Mon: 'الإثنين',
-  Tue: 'الثلاثاء',
-  Wed: 'الأربعاء',
-  Thu: 'الخميس',
-  Fri: 'الجمعة',
-  Sat: 'السبت',
-};
-
-function formatDateLabel(dateStr: string): string {
-  const date = new Date(dateStr);
-  const dayName = arabicDayNames[date.toLocaleDateString('en', { weekday: 'short' })] ?? dateStr;
-  const day = date.getDate();
-  return `${dayName} ${day}`;
-}
 
 export default function AdminDashboardPage() {
   const authFetch = useAuthFetch();
@@ -158,7 +132,6 @@ export default function AdminDashboardPage() {
     setIsLoading(true);
     setError(null);
     try {
-      // Dashboard stats - uses requireRole (works for both admin & subadmin)
       const res = await authFetch('/api/admin/dashboard');
       const json = await res.json();
       if (json.success && json.data) {
@@ -167,7 +140,6 @@ export default function AdminDashboardPage() {
         setError(json.message ?? 'فشل تحميل البيانات');
       }
 
-      // Recent orders - may fail with 403 for subadmins without manage_orders permission
       try {
         const ordersRes = await authFetch('/api/admin/orders?limit=5&page=1');
         if (ordersRes.ok) {
@@ -189,7 +161,6 @@ export default function AdminDashboardPage() {
         // Permission denied or network error - skip orders section
       }
 
-      // Recent nurses - may fail with 403 for subadmins without manage_nurses permission
       const nurses: RecentRegistration[] = [];
       try {
         const nursesRes = await authFetch('/api/admin/nurses?limit=3&page=1');
@@ -213,7 +184,6 @@ export default function AdminDashboardPage() {
         // Permission denied or network error - skip nurses section
       }
 
-      // Recent beneficiaries - may fail with 403 for subadmins without manage_beneficiaries permission
       const beneficiaries: RecentRegistration[] = [];
       try {
         const benRes = await authFetch('/api/admin/beneficiaries?limit=3&page=1');
@@ -297,10 +267,7 @@ export default function AdminDashboardPage() {
             <CardSkeleton key={i} />
           ))}
         </div>
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          <ChartSkeleton />
-          <ChartSkeleton />
-        </div>
+        <CardSkeleton />
         <CardSkeleton />
       </div>
     );
@@ -322,16 +289,6 @@ export default function AdminDashboardPage() {
 
   if (!dashboard) return null;
 
-  const revenueChartData = dashboard.revenueChartData.map((d) => ({
-    name: formatDateLabel(d.date),
-    revenue: d.revenue,
-  }));
-
-  const ordersChartData = dashboard.ordersChartData.map((d) => ({
-    name: formatDateLabel(d.date),
-    orders: d.orders,
-  }));
-
   return (
     <motion.div
       variants={container}
@@ -339,23 +296,28 @@ export default function AdminDashboardPage() {
       animate="show"
       className="space-y-6"
     >
-      {/* Page Header */}
+      {/* Page Header - Professional with gradient accent */}
       <motion.div variants={item} className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">لوحة التحكم</h1>
-          <p className="text-muted-foreground text-sm mt-1">نظرة عامة على منصة عافيتك</p>
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-admin/20 to-admin/5 flex items-center justify-center border border-admin/20">
+            <Activity className="w-6 h-6 text-admin" />
+          </div>
+          <div>
+            <h1 className="text-2xl font-bold">لوحة التحكم</h1>
+            <p className="text-muted-foreground text-sm mt-0.5">نظرة عامة على منصة عافيتك</p>
+          </div>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchDashboard} className="gap-2">
+        <Button variant="outline" size="sm" onClick={fetchDashboard} className="gap-2 border-admin/20 hover:bg-admin/5">
           <RefreshCw className="w-4 h-4" />
           تحديث
         </Button>
       </motion.div>
 
-      {/* Quick Search */}
+      {/* Quick Search - Redesigned */}
       <motion.div variants={item}>
         <GlassCard variant="admin" className="overflow-visible">
           <div className="space-y-4">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-xl bg-admin/10 flex items-center justify-center">
                 <Search className="w-5 h-5 text-admin" />
               </div>
@@ -376,8 +338,8 @@ export default function AdminDashboardPage() {
                       setSearchResults([]);
                     }
                   }}
-                  placeholder="أدخل رقم الطلب (مثل 72397E) أو اسم المستفيد أو رقم الهاتف..."
-                  className="pr-9 h-12 text-sm"
+                  placeholder="أدخل رقم الطلب أو اسم المستفيد أو رقم الهاتف..."
+                  className="pr-9 h-12 text-sm bg-background/50"
                   dir="rtl"
                 />
               </div>
@@ -460,182 +422,178 @@ export default function AdminDashboardPage() {
         </GlassCard>
       </motion.div>
 
-      {/* Stat Cards */}
-      <motion.div variants={item} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Link href="/admin/nurses">
-          <StatCard
-            icon={<Stethoscope className="w-6 h-6" />}
-            value={dashboard.totalNurses}
-            label="إجمالي الممرضين"
-            variant="admin"
-            trend={
-              dashboard.nurseGrowthRate !== 0
-                ? { value: Math.abs(dashboard.nurseGrowthRate), isPositive: dashboard.nurseGrowthRate >= 0 }
-                : undefined
-            }
-          />
+      {/* Stat Cards - Professional with hover effects */}
+      <motion.div variants={item} className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Link href="/admin/nurses" className="group">
+          <div className="glass rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] border border-transparent hover:border-admin/20">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <Stethoscope className="w-5 h-5 text-admin" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold tracking-tight">{dashboard.totalNurses}</p>
+                <p className="text-xs text-muted-foreground">إجمالي الممرضين</p>
+                {dashboard.nurseGrowthRate !== 0 && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <TrendingUp className="w-3 h-3 text-green-500" />
+                    <span className="text-[10px] text-green-600 font-medium">{dashboard.nurseGrowthRate}%</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </Link>
-        <Link href="/admin/beneficiaries">
-          <StatCard
-            icon={<Users className="w-6 h-6" />}
-            value={dashboard.totalBeneficiaries}
-            label="إجمالي المستفيدين"
-            variant="admin"
-            trend={
-              dashboard.beneficiaryGrowthRate !== 0
-                ? { value: Math.abs(dashboard.beneficiaryGrowthRate), isPositive: dashboard.beneficiaryGrowthRate >= 0 }
-                : undefined
-            }
-          />
+        <Link href="/admin/beneficiaries" className="group">
+          <div className="glass rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] border border-transparent hover:border-admin/20">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-violet-500/20 to-purple-500/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <Users className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold tracking-tight">{dashboard.totalBeneficiaries}</p>
+                <p className="text-xs text-muted-foreground">إجمالي المستفيدين</p>
+                {dashboard.beneficiaryGrowthRate !== 0 && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <TrendingUp className="w-3 h-3 text-green-500" />
+                    <span className="text-[10px] text-green-600 font-medium">{dashboard.beneficiaryGrowthRate}%</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </Link>
-        <Link href="/admin/orders">
-          <StatCard
-            icon={<ClipboardList className="w-6 h-6" />}
-            value={dashboard.todayOrders}
-            label="طلبات اليوم"
-            variant="admin"
-            trend={
-              dashboard.orderGrowthRate !== 0
-                ? { value: Math.abs(dashboard.orderGrowthRate), isPositive: dashboard.orderGrowthRate >= 0 }
-                : undefined
-            }
-          />
+        <Link href="/admin/orders" className="group">
+          <div className="glass rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] border border-transparent hover:border-admin/20">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-sky-500/20 to-blue-500/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <ClipboardList className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold tracking-tight">{dashboard.todayOrders}</p>
+                <p className="text-xs text-muted-foreground">طلبات اليوم</p>
+                {dashboard.orderGrowthRate !== 0 && (
+                  <div className="flex items-center gap-1 mt-0.5">
+                    <TrendingUp className="w-3 h-3 text-green-500" />
+                    <span className="text-[10px] text-green-600 font-medium">{dashboard.orderGrowthRate}%</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
         </Link>
-        <Link href="/admin/payments">
-          <StatCard
-            icon={<Banknote className="w-6 h-6" />}
-            value={<Currency amount={dashboard.todayRevenue} />}
-            label="إيرادات اليوم"
-            variant="admin"
-          />
+        <Link href="/admin/payments" className="group">
+          <div className="glass rounded-2xl p-4 sm:p-5 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] border border-transparent hover:border-admin/20">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-emerald-500/20 to-green-500/10 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                <Banknote className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-2xl sm:text-3xl font-bold tracking-tight"><Currency amount={dashboard.todayRevenue} /></p>
+                <p className="text-xs text-muted-foreground">إيرادات اليوم</p>
+              </div>
+            </div>
+          </div>
         </Link>
       </motion.div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Professional Card Grid */}
       <motion.div variants={item}>
-        <GlassCard variant="admin">
-          <GlassCardHeader>
-            <GlassCardTitle>إجراءات سريعة</GlassCardTitle>
-          </GlassCardHeader>
-          <GlassCardContent>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/admin/nurses">
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Stethoscope className="w-4 h-4" />
-                  الممرضون المعلقون
-                  {dashboard.pendingVerifications > 0 && (
-                    <Badge variant="destructive" className="mr-1">{dashboard.pendingVerifications}</Badge>
-                  )}
-                </Button>
-              </Link>
-              <Link href="/admin/emergencies">
-                <Button variant="outline" size="sm" className="gap-2">
+        <div className="flex items-center gap-2 mb-3">
+          <Zap className="w-5 h-5 text-admin" />
+          <h3 className="text-lg font-semibold">إجراءات سريعة</h3>
+        </div>
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+          <Link href="/admin/nurses" className="group">
+            <div className="glass rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] border border-transparent hover:border-sky-200 dark:hover:border-sky-900/50 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                <Stethoscope className="w-6 h-6 text-sky-600 dark:text-sky-400" />
+              </div>
+              <p className="text-sm font-semibold mb-1">الممرضون المعلقون</p>
+              {dashboard.pendingVerifications > 0 ? (
+                <Badge variant="destructive" className="text-[10px]">{dashboard.pendingVerifications} بانتظار المراجعة</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">لا يوجد معلقين</Badge>
+              )}
+            </div>
+          </Link>
+          <Link href="/admin/emergencies" className="group">
+            <div className="glass rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] border border-transparent hover:border-red-200 dark:hover:border-red-900/50 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                <ShieldAlert className="w-6 h-6 text-red-600 dark:text-red-400" />
+              </div>
+              <p className="text-sm font-semibold mb-1">حالات الطوارئ</p>
+              {dashboard.activeEmergencies > 0 ? (
+                <Badge variant="destructive" className="text-[10px] animate-pulse">{dashboard.activeEmergencies} حالة نشطة</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">لا توجد طوارئ</Badge>
+              )}
+            </div>
+          </Link>
+          <Link href="/admin/orders" className="group">
+            <div className="glass rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] border border-transparent hover:border-amber-200 dark:hover:border-amber-900/50 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                <Clock className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+              </div>
+              <p className="text-sm font-semibold mb-1">الطلبات المعلقة</p>
+              {dashboard.pendingOrders > 0 ? (
+                <Badge className="text-[10px] bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-400">{dashboard.pendingOrders} طلب معلق</Badge>
+              ) : (
+                <Badge variant="secondary" className="text-[10px]">لا توجد معلقات</Badge>
+              )}
+            </div>
+          </Link>
+          <Link href="/admin/services" className="group">
+            <div className="glass rounded-2xl p-4 transition-all duration-300 hover:shadow-lg hover:scale-[1.02] border border-transparent hover:border-emerald-200 dark:hover:border-emerald-900/50 text-center">
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-3 group-hover:scale-110 transition-transform">
+                <Plus className="w-6 h-6 text-emerald-600 dark:text-emerald-400" />
+              </div>
+              <p className="text-sm font-semibold mb-1">إضافة خدمة</p>
+              <Badge variant="secondary" className="text-[10px]">خدمة جديدة</Badge>
+            </div>
+          </Link>
+        </div>
+      </motion.div>
+
+      {/* Emergency Alerts - Enhanced */}
+      {dashboard.activeEmergencies > 0 && (
+        <motion.div variants={item}>
+          <div className="rounded-2xl border-2 border-red-300 dark:border-red-800/50 bg-gradient-to-l from-red-50 to-red-100/50 dark:from-red-950/30 dark:to-red-900/20 p-5">
+            <div className="flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-red-100 dark:bg-red-900/40 flex items-center justify-center animate-pulse shrink-0">
+                <AlertTriangle className="w-7 h-7 text-red-600 dark:text-red-400" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <h3 className="text-lg font-bold text-red-700 dark:text-red-400">تنبيهات الطوارئ</h3>
+                <p className="text-sm text-red-600/80 dark:text-red-400/80 mt-0.5">
+                  يوجد <span className="font-bold text-lg">{dashboard.activeEmergencies}</span> حالة طوارئ نشطة تتطلب اهتمامًا فوريًا
+                </p>
+              </div>
+              <Link href="/admin/emergencies" className="shrink-0">
+                <Button variant="destructive" size="sm" className="gap-2 shadow-lg shadow-red-500/20">
                   <AlertTriangle className="w-4 h-4" />
-                  حالات الطوارئ
-                  {dashboard.activeEmergencies > 0 && (
-                    <Badge variant="destructive" className="mr-1">{dashboard.activeEmergencies}</Badge>
-                  )}
-                </Button>
-              </Link>
-              <Link href="/admin/orders">
-                <Button variant="outline" size="sm" className="gap-2">
-                  <ClipboardList className="w-4 h-4" />
-                  الطلبات المعلقة
-                  {dashboard.pendingOrders > 0 && (
-                    <Badge variant="secondary" className="mr-1">{dashboard.pendingOrders}</Badge>
-                  )}
-                </Button>
-              </Link>
-              <Link href="/admin/services">
-                <Button variant="outline" size="sm" className="gap-2">
-                  <Plus className="w-4 h-4" />
-                  إضافة خدمة
+                  إدارة الطوارئ
                 </Button>
               </Link>
             </div>
-          </GlassCardContent>
-        </GlassCard>
-      </motion.div>
+          </div>
+        </motion.div>
+      )}
 
-      {/* Charts Row */}
-      <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <GlassCard variant="admin">
-          <GlassCardHeader>
-            <GlassCardTitle>الإيرادات - آخر ٧ أيام</GlassCardTitle>
-          </GlassCardHeader>
-          <GlassCardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={revenueChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                  <Tooltip
-                    contentStyle={{
-                      background: 'var(--popover)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      direction: 'rtl',
-                    }}
-                    formatter={(value: number) => [`${value.toLocaleString()} ر.ي`, 'الإيرادات']}
-                  />
-                  <Legend formatter={() => 'الإيرادات'} />
-                  <Line
-                    type="monotone"
-                    dataKey="revenue"
-                    stroke="oklch(0.7 0.17 70)"
-                    strokeWidth={2}
-                    dot={{ fill: 'oklch(0.7 0.17 70)', r: 4 }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          </GlassCardContent>
-        </GlassCard>
-
-        {/* Orders Chart */}
-        <GlassCard variant="admin">
-          <GlassCardHeader>
-            <GlassCardTitle>الطلبات - آخر ٧ أيام</GlassCardTitle>
-          </GlassCardHeader>
-          <GlassCardContent>
-            <div className="h-64">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={ordersChartData}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                  <XAxis dataKey="name" tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                  <YAxis tick={{ fontSize: 11 }} stroke="var(--muted-foreground)" />
-                  <Tooltip
-                    contentStyle={{
-                      background: 'var(--popover)',
-                      border: '1px solid var(--border)',
-                      borderRadius: '8px',
-                      direction: 'rtl',
-                    }}
-                    formatter={(value: number) => [value, 'الطلبات']}
-                  />
-                  <Legend formatter={() => 'الطلبات'} />
-                  <Bar
-                    dataKey="orders"
-                    fill="oklch(0.7 0.17 70)"
-                    radius={[4, 4, 0, 0]}
-                  />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-          </GlassCardContent>
-        </GlassCard>
-      </motion.div>
-
-      {/* Bottom Row */}
+      {/* Main Content Grid */}
       <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Orders */}
+        {/* Recent Orders - Enhanced */}
         <GlassCard variant="admin" className="lg:col-span-2" noPadding>
-          <div className="p-6 pb-0">
+          <div className="p-5 pb-0">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">آخر الطلبات</h3>
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center">
+                  <ClipboardList className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-semibold">آخر الطلبات</h3>
+                  <p className="text-xs text-muted-foreground">أحدث 5 طلبات على المنصة</p>
+                </div>
+              </div>
               <Link href="/admin/orders">
                 <Button variant="ghost" size="sm" className="gap-1 text-admin">
                   عرض الكل
@@ -647,12 +605,12 @@ export default function AdminDashboardPage() {
           <div className="overflow-x-auto custom-scrollbar">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-border">
-                  <th className="text-right text-xs font-medium text-muted-foreground px-6 py-3">المستفيد</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-6 py-3">الخدمة</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-6 py-3">الحالة</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-6 py-3">المبلغ</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-6 py-3">التاريخ</th>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">المستفيد</th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">الخدمة</th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">الحالة</th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">المبلغ</th>
+                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">التاريخ</th>
                 </tr>
               </thead>
               <tbody>
@@ -665,15 +623,15 @@ export default function AdminDashboardPage() {
                 ) : (
                   recentOrders.map((order) => (
                     <tr key={order.id} className="border-b border-border/50 hover:bg-accent/20 transition-colors cursor-pointer" onClick={() => setSelectedOrder(order)}>
-                      <td className="px-6 py-3 text-sm">{order.beneficiaryName}</td>
-                      <td className="px-6 py-3 text-sm">{order.serviceName}</td>
-                      <td className="px-6 py-3">
+                      <td className="px-5 py-3 text-sm font-medium">{order.beneficiaryName}</td>
+                      <td className="px-5 py-3 text-sm text-muted-foreground">{order.serviceName}</td>
+                      <td className="px-5 py-3">
                         <BadgeStatus status={order.status} size="sm" />
                       </td>
-                      <td className="px-6 py-3 text-sm">
+                      <td className="px-5 py-3 text-sm font-semibold">
                         <Currency amount={order.totalPrice} />
                       </td>
-                      <td className="px-6 py-3 text-sm text-muted-foreground">
+                      <td className="px-5 py-3 text-sm text-muted-foreground">
                         <DateFormatter date={order.createdAt} format="short" />
                       </td>
                     </tr>
@@ -684,25 +642,35 @@ export default function AdminDashboardPage() {
           </div>
         </GlassCard>
 
-        {/* Recent Registrations */}
+        {/* Recent Registrations - Enhanced */}
         <GlassCard variant="admin">
           <GlassCardHeader>
             <div className="flex items-center justify-between">
-              <GlassCardTitle>التسجيلات الحديثة</GlassCardTitle>
-              <TrendingUp className="w-5 h-5 text-admin" />
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-violet-100 dark:bg-violet-900/30 flex items-center justify-center">
+                  <UserPlus className="w-5 h-5 text-violet-600 dark:text-violet-400" />
+                </div>
+                <div>
+                  <GlassCardTitle>التسجيلات الحديثة</GlassCardTitle>
+                  <p className="text-xs text-muted-foreground mt-0.5">أحدث المستخدمين المسجلين</p>
+                </div>
+              </div>
             </div>
           </GlassCardHeader>
           <GlassCardContent>
-            <div className="space-y-4 max-h-72 overflow-y-auto custom-scrollbar">
+            <div className="space-y-3 max-h-72 overflow-y-auto custom-scrollbar">
               {recentRegistrations.length === 0 ? (
-                <p className="text-muted-foreground text-sm text-center py-8">لا توجد تسجيلات حديثة</p>
+                <div className="text-center py-8">
+                  <Users className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                  <p className="text-sm text-muted-foreground">لا توجد تسجيلات حديثة</p>
+                </div>
               ) : (
                 recentRegistrations.map((reg) => (
-                  <div key={`${reg.type}-${reg.id}`} className="flex items-center gap-3">
-                    <div className={`w-9 h-9 rounded-full flex items-center justify-center shrink-0 ${
-                      reg.type === 'nurse' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' : 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400'
+                  <div key={`${reg.type}-${reg.id}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent/20 transition-colors">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+                      reg.type === 'nurse' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
                     }`}>
-                      {reg.type === 'nurse' ? <Stethoscope className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                      {reg.type === 'nurse' ? <Stethoscope className="w-5 h-5" /> : <Users className="w-5 h-5" />}
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{reg.name}</p>
@@ -719,59 +687,38 @@ export default function AdminDashboardPage() {
         </GlassCard>
       </motion.div>
 
-      {/* Emergency Alerts */}
-      {dashboard.activeEmergencies > 0 && (
-        <motion.div variants={item}>
-          <GlassCard className="border-red-200 dark:border-red-900/50 bg-red-50/50 dark:bg-red-950/20">
-            <GlassCardHeader>
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 rounded-full bg-red-100 dark:bg-red-900/30 flex items-center justify-center animate-pulse">
-                  <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400" />
-                </div>
-                <div>
-                  <GlassCardTitle className="text-red-700 dark:text-red-400">تنبيهات الطوارئ</GlassCardTitle>
-                  <p className="text-sm text-red-600/80 dark:text-red-400/80">
-                    يوجد {dashboard.activeEmergencies} حالة طوارئ نشطة تتطلب اهتمامًا فوريًا
-                  </p>
-                </div>
-                <Link href="/admin/emergencies" className="mr-auto">
-                  <Button variant="destructive" size="sm" className="gap-2">
-                    <AlertTriangle className="w-4 h-4" />
-                    إدارة الطوارئ
-                  </Button>
-                </Link>
-              </div>
-            </GlassCardHeader>
-          </GlassCard>
-        </motion.div>
-      )}
-
-      {/* Summary Stats Row */}
-      <motion.div variants={item} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <GlassCard variant="admin">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-admin">{dashboard.totalCompletedRequests}</p>
+      {/* Summary Stats - Professional Bento Grid */}
+      <motion.div variants={item}>
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="glass rounded-2xl p-4 text-center hover:shadow-md transition-all duration-200 border border-transparent hover:border-green-200 dark:hover:border-green-900/50">
+            <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-2">
+              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <p className="text-2xl font-bold text-green-600 dark:text-green-400">{dashboard.totalCompletedRequests}</p>
             <p className="text-xs text-muted-foreground mt-1">طلبات مكتملة</p>
           </div>
-        </GlassCard>
-        <GlassCard variant="admin">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-admin">{dashboard.averageRating.toFixed(1)}</p>
+          <div className="glass rounded-2xl p-4 text-center hover:shadow-md transition-all duration-200 border border-transparent hover:border-amber-200 dark:hover:border-amber-900/50">
+            <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center mx-auto mb-2">
+              <TrendingUp className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <p className="text-2xl font-bold text-amber-600 dark:text-amber-400">{dashboard.averageRating.toFixed(1)}</p>
             <p className="text-xs text-muted-foreground mt-1">متوسط التقييم</p>
           </div>
-        </GlassCard>
-        <GlassCard variant="admin">
-          <div className="text-center">
+          <div className="glass rounded-2xl p-4 text-center hover:shadow-md transition-all duration-200 border border-transparent hover:border-emerald-200 dark:hover:border-emerald-900/50">
+            <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center mx-auto mb-2">
+              <Banknote className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+            </div>
             <p className="text-2xl font-bold"><Currency amount={dashboard.totalCommission} /></p>
             <p className="text-xs text-muted-foreground mt-1">إجمالي العمولة</p>
           </div>
-        </GlassCard>
-        <GlassCard variant="admin">
-          <div className="text-center">
-            <p className="text-2xl font-bold text-admin">{dashboard.totalReferrals}</p>
+          <div className="glass rounded-2xl p-4 text-center hover:shadow-md transition-all duration-200 border border-transparent hover:border-sky-200 dark:hover:border-sky-900/50">
+            <div className="w-10 h-10 rounded-xl bg-sky-100 dark:bg-sky-900/30 flex items-center justify-center mx-auto mb-2">
+              <Users className="w-5 h-5 text-sky-600 dark:text-sky-400" />
+            </div>
+            <p className="text-2xl font-bold text-sky-600 dark:text-sky-400">{dashboard.totalReferrals}</p>
             <p className="text-xs text-muted-foreground mt-1">إجمالي الإحالات</p>
           </div>
-        </GlassCard>
+        </div>
       </motion.div>
 
       {/* Order Detail Dialog */}
@@ -868,7 +815,7 @@ export default function AdminDashboardPage() {
                 </div>
               )}
 
-              {/* Action Button - Go to full order management */}
+              {/* Action Button */}
               <Button
                 onClick={() => router.push(`/admin/orders?search=${encodeURIComponent(selectedOrder.id.slice(-6))}`)}
                 className="w-full bg-admin hover:bg-admin/90 gap-2"
