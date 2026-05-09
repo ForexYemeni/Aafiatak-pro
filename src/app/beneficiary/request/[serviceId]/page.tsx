@@ -491,9 +491,35 @@ export default function ServiceRequestPage() {
                   <p className="text-sm text-muted-foreground">{service.descriptionAr}</p>
                 </div>
               </div>
-              <div className="glass rounded-xl p-4 text-center">
-                <Currency amount={service.basePrice} className="text-lg text-beneficiary" />
-                <p className="text-xs text-muted-foreground mt-1">السعر الأساسي</p>
+              {/* Full Price Breakdown - shown from the start */}
+              <div className="glass rounded-xl p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">السعر الأساسي</span>
+                  <Currency amount={service.basePrice} className="text-sm" />
+                </div>
+                {pricing && pricing.nightFee > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-orange-600">رسوم الخدمة الليلية ({nightFeePercent}%)</span>
+                    <Currency amount={pricing.nightFee} className="text-xs text-orange-600" />
+                  </div>
+                )}
+                {pricing && pricing.fridayFee > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-orange-600">رسوم خدمة الجمعة ({fridayFeePercent}%)</span>
+                    <Currency amount={pricing.fridayFee} className="text-xs text-orange-600" />
+                  </div>
+                )}
+                {isEmergency && pricing && pricing.emergencyFee > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-red-600">رسوم الطوارئ</span>
+                    <Currency amount={pricing.emergencyFee} className="text-xs text-red-600" />
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-2 border-t border-border/50">
+                  <span className="font-bold text-base">المبلغ الإجمالي</span>
+                  <Currency amount={pricing?.totalPrice || service.basePrice} className="text-lg text-beneficiary font-bold" />
+                </div>
+                <p className="text-[10px] text-muted-foreground text-center">يشمل جميع الرسوم والخدمات</p>
               </div>
               {service.isEmergency && (
                 <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400">

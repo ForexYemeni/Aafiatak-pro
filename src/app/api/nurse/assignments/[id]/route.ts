@@ -44,8 +44,11 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
       return createErrorResponse('لا يمكن التعامل مع هذا الطلب في حالته الحالية', 400, 'INVALID_STATUS');
     }
 
-    const nurse = await Nurse.findById(user.userId).select('name').lean();
+    const nurse = await Nurse.findById(user.userId).select('name phone whatsappNumber specialty specialization rating averageRating profileImage avatar').lean();
     const nurseName = nurse?.name || 'الممرض/ـة';
+    const nursePhone = nurse?.phone || nurse?.whatsappNumber || '';
+    const nurseSpecialty = nurse?.specialty || nurse?.specialization || '';
+    const nurseRating = nurse?.rating || nurse?.averageRating || 0;
 
     if (action === 'accept') {
       order.status = 'accepted';
@@ -53,27 +56,47 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
 
       // ── Notifications for ALL parties ──
       try {
-        // 1️⃣ Notify BENEFICIARY: Your request has been accepted
+        // 1️⃣ Notify BENEFICIARY: Nurse accepted with FULL contact details
+        // Build detailed message with nurse info for the beneficiary
+        let acceptBody = `تم قبول طلبك من ${nurseName}`;
+        if (nurseSpecialty) acceptBody += `\nالتخصص: ${nurseSpecialty}`;
+        if (nursePhone) acceptBody += `\nرقم التواصل: ${nursePhone}`;
+        acceptBody += '\nسيقوم بالوصول إليك قريباً';
+
         await Notification.create({
           userId: order.beneficiaryId,
           userRole: 'beneficiary',
-          titleAr: 'تم قبول طلبك',
-          bodyAr: `تم قبول طلبك من ${nurseName} وسيقوم بالوصول قريباً`,
-          type: 'status_change',
+          titleAr: '✅ تم قبول طلبك - الممرض في الطريق',
+          bodyAr: acceptBody,
+          type: 'service_accepted',
           priority: 'high',
-          data: { requestId: id, status: 'accepted', nurseId: user.userId },
+          data: {
+            requestId: id,
+            status: 'accepted',
+            nurseId: user.userId,
+            nurseName,
+            nursePhone,
+            nurseSpecialty,
+            nurseRating: nurseRating ? String(nurseRating) : undefined,
+          },
           actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,
         });
 
         sendPushToUser(order.beneficiaryId.toString(), {
-          title: 'تم قبول طلبك',
-          body: `تم قبول طلبك من ${nurseName} وسيقوم بالوصول قريباً`,
+          title: 'تم قبول طلبك - الممرض في الطريق',
+          body: `تم قبول طلبك من ${nurseName}${nurseSpecialty ? ` (${nurseSpecialty})` : ''}${nursePhone ? `. رقم التواصل: ${nursePhone}` : ''}. سيقوم بالوصول إليك قريباً`,
           type: 'service_accepted',
           priority: 'high',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
-          data: { requestId: id, status: 'accepted' },
+          data: {
+            requestId: id,
+            status: 'accepted',
+            nurseId: user.userId,
+            nurseName,
+            nursePhone,
+          },
         }).catch(() => {});
 
         // 2️⃣ Notify ADMIN: Nurse accepted the order

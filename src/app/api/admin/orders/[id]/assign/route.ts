@@ -37,6 +37,10 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
     const nurseName = nurse.name || 'الممرض/ـة';
+    const nursePhone = nurse.phone || nurse.whatsappNumber || '';
+    const nurseSpecialty = nurse.specialty || nurse.specialization || '';
+    const nurseRating = nurse.rating || nurse.averageRating || 0;
+    const nurseAvatar = nurse.profileImage || nurse.avatar || '';
     const orderId = order._id.toString();
 
     // ── Notifications for ALL parties ──
@@ -45,8 +49,8 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       await Notification.create({
         userId: nurseId,
         userRole: 'nurse',
-        titleAr: 'طلب خدمة جديد',
-        bodyAr: 'تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول',
+        titleAr: '🩺 طلب خدمة جديد - تم تعيينك',
+        bodyAr: 'تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول في أقرب وقت',
         type: 'assignment',
         priority: 'high',
         data: { requestId: id, assignmentType: 'service' },
@@ -55,7 +59,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       });
 
       sendPushToUser(nurseId, {
-        title: 'طلب خدمة جديد',
+        title: 'طلب خدمة جديد - تم تعيينك',
         body: 'تم تعيينك لطلب خدمة جديد. يرجى المراجعة والقبول',
         type: 'service_assigned',
         priority: 'high',
@@ -64,31 +68,50 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
         data: { requestId: id, assignmentType: 'service' },
       }).catch(() => {});
 
-      // 2️⃣ Notify BENEFICIARY: A nurse has been assigned to your order
+      // 2️⃣ Notify BENEFICIARY: A nurse has been assigned with FULL details
       if (order.beneficiaryId) {
         const service = await Service.findById(order.serviceId).select('nameAr').lean();
         const serviceName = service?.nameAr || 'خدمة طبية';
 
+        // Build detailed notification body with nurse info
+        let nurseInfoBody = `تم تعيين ${nurseName} لتنفيذ طلبك لخدمة ${serviceName}`;
+        if (nurseSpecialty) nurseInfoBody += `\nالتخصص: ${nurseSpecialty}`;
+        if (nursePhone) nurseInfoBody += `\nرقم التواصل: ${nursePhone}`;
+
         await Notification.create({
           userId: order.beneficiaryId,
           userRole: 'beneficiary',
-          titleAr: 'تم تعيين ممرض لطلبك',
-          bodyAr: `تم تعيين ${nurseName} لتنفيذ طلبك لخدمة ${serviceName}. سيتم التواصل معك قريباً`,
-          type: 'status_change',
+          titleAr: '👨‍⚕️ تم تعيين ممرض لطلبك',
+          bodyAr: nurseInfoBody,
+          type: 'service_assigned',
           priority: 'high',
-          data: { requestId: id, status: 'assigned', nurseId: nurseId.toString() },
+          data: {
+            requestId: id,
+            status: 'assigned',
+            nurseId: nurseId.toString(),
+            nurseName,
+            nursePhone,
+            nurseSpecialty,
+            nurseRating: nurseRating ? String(nurseRating) : undefined,
+          },
           actionUrl: `/beneficiary/orders/${id}`,
           voiceEnabled: true,
         });
 
         sendPushToUser(order.beneficiaryId.toString(), {
           title: 'تم تعيين ممرض لطلبك',
-          body: `تم تعيين ${nurseName} لتنفيذ طلبك. سيتم التواصل معك قريباً`,
+          body: `تم تعيين ${nurseName}${nurseSpecialty ? ` (${nurseSpecialty})` : ''} لتنفيذ طلبك${nursePhone ? `. رقم التواصل: ${nursePhone}` : ''}`,
           type: 'service_assigned',
           priority: 'high',
           url: `/beneficiary/orders/${id}`,
           userRole: 'beneficiary',
-          data: { requestId: id, status: 'assigned' },
+          data: {
+            requestId: id,
+            status: 'assigned',
+            nurseId: nurseId.toString(),
+            nurseName,
+            nursePhone,
+          },
         }).catch(() => {});
       }
 

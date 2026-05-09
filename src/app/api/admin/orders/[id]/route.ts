@@ -228,27 +228,39 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         };
         const statusLabel = statusLabels[body.status] || body.status;
 
+        // ── Special handling for PAYMENT CONFIRMATION ──
+        // When admin confirms payment (paymentStatus: 'completed' + status: 'pending')
+        // Notify beneficiary with clear message about what happens next
+        const isPaymentConfirmation = body.paymentStatus === 'completed' && body.status === 'pending';
+
         // Notify beneficiary about status change
         if (order.beneficiaryId) {
+          const beneficiaryTitle = isPaymentConfirmation
+            ? 'تم تأكيد الدفع ✓'
+            : 'تحديث على طلبك';
+          const beneficiaryBody = isPaymentConfirmation
+            ? 'تم تأكيد الدفع بنجاح. جاري البحث عن ممرض/ـة مناسب لتنفيذ طلبك وسيتم إشعارك فوراً عند التعيين'
+            : `تم تحديث حالة طلبك إلى: ${statusLabel}`;
+
           await Notification.create({
             userId: order.beneficiaryId,
             userRole: 'beneficiary',
-            titleAr: 'تحديث على طلبك',
-            bodyAr: `تم تحديث حالة طلبك إلى: ${statusLabel}`,
-            type: 'status_change',
+            titleAr: beneficiaryTitle,
+            bodyAr: beneficiaryBody,
+            type: isPaymentConfirmation ? 'payment' : 'status_change',
             priority: 'high',
-            data: { requestId: id, status: body.status },
+            data: { requestId: id, status: body.status, paymentConfirmed: isPaymentConfirmation || undefined },
             actionUrl: `/beneficiary/orders/${id}`,
             voiceEnabled: true,
           });
           sendPushToUser(order.beneficiaryId.toString(), {
-            title: 'تحديث على طلبك',
-            body: `تم تحديث حالة طلبك إلى: ${statusLabel}`,
-            type: 'status_change',
+            title: beneficiaryTitle,
+            body: beneficiaryBody,
+            type: isPaymentConfirmation ? 'payment' : 'status_change',
             priority: 'high',
             url: `/beneficiary/orders/${id}`,
             userRole: 'beneficiary',
-            data: { requestId: id, status: body.status },
+            data: { requestId: id, status: body.status, paymentConfirmed: isPaymentConfirmation || undefined },
           }).catch(() => {});
         }
 
