@@ -4,6 +4,7 @@ export interface IServiceRequest extends Document {
   serviceId: Types.ObjectId;
   beneficiaryId: Types.ObjectId;
   nurseId?: Types.ObjectId;
+  groupId?: string;
   status: 'pending' | 'assigned' | 'accepted' | 'in_progress' | 'completed' | 'cancelled' | 'awaiting_payment';
   basePrice: number;
   nightFee: number;
@@ -37,6 +38,7 @@ const ServiceRequestSchema = new Schema<IServiceRequest>({
   serviceId: { type: Schema.Types.ObjectId, ref: 'Service', required: true },
   beneficiaryId: { type: Schema.Types.ObjectId, ref: 'Beneficiary', required: true },
   nurseId: { type: Schema.Types.ObjectId, ref: 'Nurse' },
+  groupId: { type: String },
   status: { type: String, enum: ['pending', 'assigned', 'accepted', 'in_progress', 'completed', 'cancelled', 'awaiting_payment'], default: 'pending' },
   basePrice: { type: Number, default: 0 },
   nightFee: { type: Number, default: 0 },
@@ -69,5 +71,6 @@ const ServiceRequestSchema = new Schema<IServiceRequest>({
 ServiceRequestSchema.index({ beneficiaryId: 1 });
 ServiceRequestSchema.index({ nurseId: 1 });
 ServiceRequestSchema.index({ status: 1 });
+ServiceRequestSchema.index({ groupId: 1 });
 
 export const ServiceRequest = mongoose.models.ServiceRequest || mongoose.model<IServiceRequest>('ServiceRequest', ServiceRequestSchema);

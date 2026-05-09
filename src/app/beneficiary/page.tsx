@@ -19,11 +19,15 @@ import {
   Thermometer,
   Eye,
   Loader2,
+  CheckCircle2,
+  ShoppingCart,
+  X,
+  Star,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { GlassCard } from '@/components/common/glass-card';
-import { Currency } from '@/components/common/currency';
+import { Currency, formatYemeniRial } from '@/components/common/currency';
 import { EmptyState } from '@/components/common/empty-state';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { SearchInput } from '@/components/common/search-input';
@@ -53,6 +57,39 @@ const categoryLabels: Record<string, string> = {
   emergency: 'طوارئ',
 };
 
+const categoryColors: Record<string, string> = {
+  medical: 'from-blue-500 to-blue-600',
+  nursing: 'from-rose-500 to-rose-600',
+  physiotherapy: 'from-emerald-500 to-emerald-600',
+  elderly_care: 'from-amber-500 to-amber-600',
+  pediatric: 'from-violet-500 to-violet-600',
+  post_surgery: 'from-orange-500 to-orange-600',
+  lab: 'from-cyan-500 to-cyan-600',
+  emergency: 'from-red-600 to-red-700',
+};
+
+const categoryIconBg: Record<string, string> = {
+  medical: 'bg-blue-100 dark:bg-blue-900/30',
+  nursing: 'bg-rose-100 dark:bg-rose-900/30',
+  physiotherapy: 'bg-emerald-100 dark:bg-emerald-900/30',
+  elderly_care: 'bg-amber-100 dark:bg-amber-900/30',
+  pediatric: 'bg-violet-100 dark:bg-violet-900/30',
+  post_surgery: 'bg-orange-100 dark:bg-orange-900/30',
+  lab: 'bg-cyan-100 dark:bg-cyan-900/30',
+  emergency: 'bg-red-100 dark:bg-red-900/30',
+};
+
+const categoryIconColor: Record<string, string> = {
+  medical: 'text-blue-600 dark:text-blue-400',
+  nursing: 'text-rose-600 dark:text-rose-400',
+  physiotherapy: 'text-emerald-600 dark:text-emerald-400',
+  elderly_care: 'text-amber-600 dark:text-amber-400',
+  pediatric: 'text-violet-600 dark:text-violet-400',
+  post_surgery: 'text-orange-600 dark:text-orange-400',
+  lab: 'text-cyan-600 dark:text-cyan-400',
+  emergency: 'text-red-600 dark:text-red-400',
+};
+
 const serviceIconMap: Record<string, React.ElementType> = {
   Stethoscope,
   Heart,
@@ -69,12 +106,14 @@ const serviceIconMap: Record<string, React.ElementType> = {
 export default function BeneficiaryHomePage() {
   const router = useRouter();
   const token = useAuthStore((s) => s.token);
+  const user = useAuthStore((s) => s.user);
   const [services, setServices] = useState<Service[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [activeCategory, setActiveCategory] = useState<string>('all');
   const [activeOrdersCount, setActiveOrdersCount] = useState(0);
   const [activeCoupons, setActiveCoupons] = useState<Array<{code: string; discountPercent: number; maxDiscountAmount?: number}>>([]);
+  const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
 
   const fetchServices = useCallback(async () => {
     if (!token) return;
@@ -135,12 +174,13 @@ export default function BeneficiaryHomePage() {
     fetchCoupons();
   }, []);
 
-  const categories: { key: string; label: string; icon: React.ElementType }[] = [
-    { key: 'all', label: 'الكل', icon: Sparkles },
+  const categories: { key: string; label: string; icon: React.ElementType; color: string }[] = [
+    { key: 'all', label: 'الكل', icon: Sparkles, color: 'from-gray-400 to-gray-500' },
     ...Object.entries(categoryLabels).map(([key, label]) => ({
       key,
       label,
       icon: categoryIcons[key] ?? Stethoscope,
+      color: categoryColors[key] ?? 'from-gray-400 to-gray-500',
     })),
   ];
 
@@ -148,30 +188,59 @@ export default function BeneficiaryHomePage() {
     return serviceIconMap[iconName] ?? Stethoscope;
   };
 
+  const toggleService = (serviceId: string) => {
+    setSelectedServices(prev => {
+      const next = new Set(prev);
+      if (next.has(serviceId)) {
+        next.delete(serviceId);
+      } else {
+        next.add(serviceId);
+      }
+      return next;
+    });
+  };
+
+  const clearSelection = () => setSelectedServices(new Set());
+
+  const selectedServicesList = services.filter(s => selectedServices.has(s.id));
+  const totalPrice = selectedServicesList.reduce((sum, s) => sum + s.basePrice, 0);
+
+  // Popular services (first 4 from each category or just top ones)
+  const popularServices = services.filter(s => s.sortOrder <= 4).slice(0, 8);
+
   return (
     <div className="space-y-6">
-      {/* Header with greeting */}
+      {/* Hero Section */}
       <motion.div
-        initial={{ opacity: 0, y: -10 }}
+        initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex items-center justify-between"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-beneficiary to-teal-600 p-6 text-beneficiary-foreground"
       >
-        <div>
-          <h1 className="text-2xl font-bold text-beneficiary">عافيتك</h1>
-          <p className="text-sm text-muted-foreground">خدمات الرعاية الصحية المنزلية</p>
+        <div className="relative z-10">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h1 className="text-2xl font-bold">مرحباً {user?.name?.split(' ')[0] || ''} 👋</h1>
+              <p className="text-sm opacity-90 mt-1">خدمات الرعاية الصحية المنزلية</p>
+            </div>
+            {activeOrdersCount > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="gap-2 shrink-0"
+                onClick={() => router.push('/beneficiary/orders')}
+              >
+                <Clock className="w-4 h-4" />
+                طلبات نشطة
+                <Badge variant="destructive" className="mr-1">{toArabicNum(activeOrdersCount)}</Badge>
+              </Button>
+            )}
+          </div>
+          <p className="text-xs opacity-80">اختر الخدمات التي تحتاجها وأكمل طلبك في خطوات بسيطة</p>
         </div>
-        {activeOrdersCount > 0 && (
-          <Button
-            variant="outline"
-            size="sm"
-            className="gap-2 border-beneficiary/30 text-beneficiary"
-            onClick={() => router.push('/beneficiary/orders')}
-          >
-            <Clock className="w-4 h-4" />
-            طلبات نشطة
-            <Badge variant="destructive" className="mr-1">{activeOrdersCount}</Badge>
-          </Button>
-        )}
+        {/* Decorative circles */}
+        <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full bg-white/10" />
+        <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-white/10" />
+        <div className="absolute top-1/2 left-1/2 w-16 h-16 rounded-full bg-white/5" />
       </motion.div>
 
       {/* Search Bar */}
@@ -214,7 +283,7 @@ export default function BeneficiaryHomePage() {
 
       {/* Service Categories Horizontal Scroll */}
       <div className="relative">
-        <div className="flex gap-3 overflow-x-auto scrollbar-none pb-2">
+        <div className="flex gap-2 overflow-x-auto scrollbar-none pb-2 px-1">
           {categories.map((cat) => {
             const Icon = cat.icon;
             const isActive = activeCategory === cat.key;
@@ -223,21 +292,74 @@ export default function BeneficiaryHomePage() {
                 key={cat.key}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setActiveCategory(cat.key)}
-                className={`flex flex-col items-center gap-1.5 px-4 py-3 rounded-2xl min-w-[72px] transition-all shrink-0 ${
+                className={`flex items-center gap-2 px-4 py-2.5 rounded-2xl text-sm font-medium transition-all shrink-0 whitespace-nowrap ${
                   isActive
-                    ? 'bg-beneficiary text-beneficiary-foreground shadow-md'
-                    : 'glass hover:bg-beneficiary/10'
+                    ? 'bg-gradient-to-l text-white shadow-md ' + cat.color
+                    : 'glass hover:bg-muted/50'
                 }`}
               >
-                <Icon className="w-5 h-5" />
-                <span className="text-xs font-medium whitespace-nowrap">{cat.label}</span>
+                <Icon className="w-4 h-4" />
+                <span>{cat.label}</span>
               </motion.button>
             );
           })}
         </div>
       </div>
 
-      {/* Services Grid */}
+      {/* Popular Services Section */}
+      {activeCategory === 'all' && !searchQuery && popularServices.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.15 }}
+        >
+          <div className="flex items-center gap-2 mb-3">
+            <Star className="w-5 h-5 text-amber-500" />
+            <h2 className="text-lg font-bold">خدمات مميزة</h2>
+          </div>
+          <div className="flex gap-3 overflow-x-auto scrollbar-none pb-2">
+            {popularServices.map((service) => {
+              const ServiceIcon = getServiceIcon(service.icon);
+              const isSelected = selectedServices.has(service.id);
+              const catColor = categoryIconBg[service.category] || 'bg-beneficiary/10';
+              const iconColor = categoryIconColor[service.category] || 'text-beneficiary';
+              return (
+                <motion.div
+                  key={service.id}
+                  whileTap={{ scale: 0.97 }}
+                  className={`shrink-0 w-44 rounded-2xl border-2 transition-all cursor-pointer ${
+                    isSelected ? 'border-beneficiary bg-beneficiary/5' : 'border-transparent bg-card shadow-sm hover:shadow-md'
+                  }`}
+                  onClick={() => toggleService(service.id)}
+                >
+                  <div className="p-4 space-y-3">
+                    <div className={`w-12 h-12 rounded-xl ${catColor} flex items-center justify-center`}>
+                      <ServiceIcon className={`w-6 h-6 ${iconColor}`} />
+                    </div>
+                    <div>
+                      <h3 className="font-semibold text-sm leading-tight line-clamp-2">{service.nameAr}</h3>
+                      <div className="flex items-center gap-1 mt-1">
+                        <Clock className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">{service.duration ? `${toArabicNum(service.duration)} دقيقة` : ''}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Currency amount={service.basePrice} className="text-sm font-bold" />
+                      {isSelected ? (
+                        <CheckCircle2 className="w-5 h-5 text-beneficiary" />
+                      ) : (
+                        <div className="w-5 h-5 rounded-full border-2 border-muted-foreground/30" />
+                      )}
+                    </div>
+                  </div>
+                </motion.div>
+              );
+            })}
+          </div>
+        </motion.div>
+      )}
+
+      {/* All Services Grid */}
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -258,10 +380,13 @@ export default function BeneficiaryHomePage() {
           }}
         />
       ) : (
-        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           <AnimatePresence mode="popLayout">
             {services.map((service, index) => {
               const ServiceIcon = getServiceIcon(service.icon);
+              const isSelected = selectedServices.has(service.id);
+              const catColor = categoryIconBg[service.category] || 'bg-beneficiary/10';
+              const iconColor = categoryIconColor[service.category] || 'text-beneficiary';
               return (
                 <motion.div
                   key={service.id}
@@ -269,36 +394,45 @@ export default function BeneficiaryHomePage() {
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, scale: 0.9 }}
-                  transition={{ delay: index * 0.05 }}
+                  transition={{ delay: index * 0.03 }}
                 >
                   <GlassCard
                     variant="beneficiary"
-                    className="flex flex-col items-center text-center gap-3 h-full cursor-pointer hover:shadow-lg transition-shadow group"
-                    onClick={() => router.push(`/beneficiary/request/${service.id}`)}
+                    className={`flex flex-col items-center text-center gap-3 h-full cursor-pointer transition-all group relative ${
+                      isSelected ? 'ring-2 ring-beneficiary bg-beneficiary/5' : 'hover:shadow-lg'
+                    }`}
+                    onClick={() => toggleService(service.id)}
                   >
-                    <div className="w-14 h-14 rounded-2xl bg-beneficiary/10 flex items-center justify-center group-hover:bg-beneficiary/20 transition-colors">
-                      <ServiceIcon className="w-7 h-7 text-beneficiary" />
+                    {/* Selection indicator */}
+                    <div className={`absolute top-2 left-2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
+                      isSelected ? 'border-beneficiary bg-beneficiary' : 'border-muted-foreground/30'
+                    }`}>
+                      {isSelected && <CheckCircle2 className="w-3.5 h-3.5 text-beneficiary-foreground" />}
+                    </div>
+
+                    <div className={`w-14 h-14 rounded-2xl ${catColor} flex items-center justify-center group-hover:scale-110 transition-transform`}>
+                      <ServiceIcon className={`w-7 h-7 ${iconColor}`} />
                     </div>
                     <div className="flex-1 min-w-0">
                       <h3 className="font-semibold text-sm leading-tight mb-1 line-clamp-2">
                         {service.nameAr}
                       </h3>
-                      <p className="text-xs text-muted-foreground line-clamp-1">
-                        {service.duration ? `${service.duration} دقيقة` : ''}
-                      </p>
+                      <div className="flex items-center justify-center gap-1">
+                        <Clock className="w-3 h-3 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">
+                          {service.duration ? `${toArabicNum(service.duration)} دقيقة` : ''}
+                        </span>
+                      </div>
                     </div>
-                    <div className="flex items-center justify-between w-full gap-2">
-                      <Currency amount={service.basePrice} className="text-sm text-beneficiary" />
-                      <Button
-                        size="sm"
-                        className="bg-beneficiary/90 hover:bg-beneficiary text-beneficiary-foreground text-xs h-8 px-3"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          router.push(`/beneficiary/request/${service.id}`);
-                        }}
-                      >
-                        طلب
-                      </Button>
+                    <div className="flex items-center justify-between w-full gap-2 pt-2 border-t border-border/30">
+                      <Currency amount={service.basePrice} className="text-sm font-bold" />
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full ${
+                        isSelected
+                          ? 'bg-beneficiary text-beneficiary-foreground'
+                          : 'bg-muted text-muted-foreground'
+                      }`}>
+                        {isSelected ? 'محدد ✓' : 'اختر'}
+                      </span>
                     </div>
                   </GlassCard>
                 </motion.div>
@@ -307,6 +441,61 @@ export default function BeneficiaryHomePage() {
           </AnimatePresence>
         </div>
       )}
+
+      {/* Floating Bottom Bar for Selected Services */}
+      <AnimatePresence>
+        {selectedServices.size > 0 && (
+          <motion.div
+            initial={{ y: 100, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ y: 100, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border shadow-2xl"
+          >
+            <div className="max-w-2xl mx-auto px-4 py-3">
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-beneficiary flex items-center justify-center text-beneficiary-foreground text-sm font-bold">
+                      {toArabicNum(selectedServices.size)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold">
+                        {selectedServices.size === 1 ? 'خدمة واحدة' : `${toArabicNum(selectedServices.size)} خدمات`}
+                      </p>
+                      <Currency amount={totalPrice} className="text-lg text-beneficiary font-bold -mt-0.5" />
+                    </div>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={clearSelection}
+                    className="gap-1 text-muted-foreground"
+                  >
+                    <X className="w-4 h-4" />
+                    إلغاء
+                  </Button>
+                  <Button
+                    className="bg-beneficiary hover:bg-beneficiary/90 text-beneficiary-foreground gap-2"
+                    onClick={() => {
+                      if (selectedServices.size === 1) {
+                        router.push(`/beneficiary/request/${Array.from(selectedServices)[0]}`);
+                      } else {
+                        router.push(`/beneficiary/request?ids=${Array.from(selectedServices).join(',')}`);
+                      }
+                    }}
+                  >
+                    <ShoppingCart className="w-4 h-4" />
+                    إكمال الطلب
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Emergency Floating Button */}
       <motion.button

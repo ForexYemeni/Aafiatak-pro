@@ -1,7 +1,7 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ArrowRight,
@@ -20,10 +20,17 @@ import {
   HandCoins,
   Copy,
   Check,
-  MessageCircle,
   Upload,
   Image as ImageIcon,
   X,
+  Heart,
+  Baby,
+  Activity,
+  Brain,
+  Pill,
+  Syringe,
+  Ambulance,
+  Trash2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -44,14 +51,39 @@ interface StepInfo {
 }
 
 const steps: StepInfo[] = [
-  { number: 1, title: 'تفاصيل الخدمة', icon: Stethoscope },
+  { number: 1, title: 'تفاصيل الخدمات', icon: Stethoscope },
   { number: 2, title: 'الموعد والوقت', icon: Calendar },
   { number: 3, title: 'العنوان', icon: MapPin },
   { number: 4, title: 'الدفع', icon: CreditCard },
   { number: 5, title: 'تأكيد الطلب', icon: CheckCircle2 },
 ];
 
-// Payment method from API
+const serviceIconMap: Record<string, React.ElementType> = {
+  Stethoscope, Heart, Activity, Baby, Syringe, Pill, Ambulance, Brain,
+};
+
+const categoryIconBg: Record<string, string> = {
+  medical: 'bg-blue-100 dark:bg-blue-900/30',
+  nursing: 'bg-rose-100 dark:bg-rose-900/30',
+  physiotherapy: 'bg-emerald-100 dark:bg-emerald-900/30',
+  elderly_care: 'bg-amber-100 dark:bg-amber-900/30',
+  pediatric: 'bg-violet-100 dark:bg-violet-900/30',
+  post_surgery: 'bg-orange-100 dark:bg-orange-900/30',
+  lab: 'bg-cyan-100 dark:bg-cyan-900/30',
+  emergency: 'bg-red-100 dark:bg-red-900/30',
+};
+
+const categoryIconColor: Record<string, string> = {
+  medical: 'text-blue-600 dark:text-blue-400',
+  nursing: 'text-rose-600 dark:text-rose-400',
+  physiotherapy: 'text-emerald-600 dark:text-emerald-400',
+  elderly_care: 'text-amber-600 dark:text-amber-400',
+  pediatric: 'text-violet-600 dark:text-violet-400',
+  post_surgery: 'text-orange-600 dark:text-orange-400',
+  lab: 'text-cyan-600 dark:text-cyan-400',
+  emergency: 'text-red-600 dark:text-red-400',
+};
+
 interface PaymentMethodItem {
   id: string;
   nameAr: string;
@@ -67,7 +99,6 @@ interface PaymentMethodItem {
   accountNumber: string;
 }
 
-// Copy button helper
 function CopyBtn({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
@@ -82,15 +113,17 @@ function CopyBtn({ text }: { text: string }) {
   );
 }
 
-export default function ServiceRequestPage() {
+export default function MultiServiceRequestPage() {
   const router = useRouter();
-  const params = useParams();
-  const serviceId = params.serviceId as string;
+  const searchParams = useSearchParams();
+  const idsParam = searchParams.get('ids') || '';
+  const serviceIds = idsParam.split(',').filter(Boolean);
   const token = useAuthStore((s) => s.token);
   const { toast } = useToast();
 
-  const [service, setService] = useState<Service | null>(null);
-  const [isLoadingService, setIsLoadingService] = useState(true);
+  const [allServices, setAllServices] = useState<Service[]>([]);
+  const [selectedServices, setSelectedServices] = useState<Service[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentStep, setCurrentStep] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -105,16 +138,15 @@ export default function ServiceRequestPage() {
   const [couponCode, setCouponCode] = useState('');
   const [couponDiscount, setCouponDiscount] = useState(0);
   const [isEmergency, setIsEmergency] = useState(false);
-  const [pricing, setPricing] = useState<ServicePricing | null>(null);
 
-  // Payment methods from API
+  // Payment methods
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>([]);
   const [emergencyFee, setEmergencyFee] = useState(5000);
   const [supportWhatsApp, setSupportWhatsApp] = useState('+967123456789');
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
 
-  // Pricing settings from API
+  // Pricing settings
   const [commissionRate, setCommissionRate] = useState(15);
   const [nightFeeEnabled, setNightFeeEnabled] = useState(false);
   const [nightFeePercent, setNightFeePercent] = useState(0);
@@ -123,34 +155,62 @@ export default function ServiceRequestPage() {
   const [fridayFeeEnabled, setFridayFeeEnabled] = useState(false);
   const [fridayFeePercent, setFridayFeePercent] = useState(0);
 
-  // Loyalty points
+  // Loyalty
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
   const [loyaltyRedemptionRate, setLoyaltyRedemptionRate] = useState(0);
   const [loyaltyRedemptionThreshold, setLoyaltyRedemptionThreshold] = useState(100);
   const [useLoyaltyPoints, setUseLoyaltyPoints] = useState(false);
 
-  // Get selected payment method details
   const selectedPaymentMethod = paymentMethods.find(pm => pm.id === selectedPaymentMethodId);
   const isCashPayment = selectedPaymentMethod?.type === 'cash';
 
-  const fetchService = useCallback(async () => {
-    if (!token || !serviceId) return;
-    setIsLoadingService(true);
+  // Calculate total pricing
+  const totalBasePrice = selectedServices.reduce((sum, s) => sum + s.basePrice, 0);
+  const loyaltyDiscount = (useLoyaltyPoints && loyaltyRedemptionRate > 0 && loyaltyPoints >= loyaltyRedemptionThreshold)
+    ? Math.round(loyaltyPoints / loyaltyRedemptionRate) : 0;
+
+  // Calculate night/friday fee for combined total
+  let totalNightFee = 0;
+  if (nightFeeEnabled && scheduledTime) {
+    const hour = parseInt(scheduledTime.split(':')[0]);
+    const isNight = nightStartHour > nightEndHour
+      ? (hour >= nightStartHour || hour < nightEndHour)
+      : (hour >= nightStartHour && hour < nightEndHour);
+    if (isNight) {
+      totalNightFee = Math.round(totalBasePrice * (nightFeePercent / 100));
+    }
+  }
+
+  let totalFridayFee = 0;
+  if (fridayFeeEnabled && scheduledDate) {
+    const dayOfWeek = new Date(scheduledDate).getDay();
+    if (dayOfWeek === 5) {
+      totalFridayFee = Math.round(totalBasePrice * (fridayFeePercent / 100));
+    }
+  }
+
+  const totalEmergencyFee = isEmergency ? emergencyFee : 0;
+  const grandTotal = Math.max(0, totalBasePrice + totalNightFee + totalFridayFee + totalEmergencyFee - couponDiscount - loyaltyDiscount);
+
+  const fetchServices = useCallback(async () => {
+    if (!token || serviceIds.length === 0) return;
+    setIsLoading(true);
     try {
       const res = await fetch(`/api/beneficiary/services?search=&category=`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data: ApiResponse<Service[]> = await res.json();
       if (data.success && data.data) {
-        const found = data.data.find((s) => s.id === serviceId);
-        if (found) setService(found);
+        setAllServices(data.data);
+        const found = data.data.filter((s) => serviceIds.includes(s.id));
+        setSelectedServices(found);
       }
     } catch {
-      // Error handled silently
+      // silent
     } finally {
-      setIsLoadingService(false);
+      setIsLoading(false);
     }
-  }, [token, serviceId]);
+  }, [token]);
 
   const fetchPaymentMethods = useCallback(async () => {
     try {
@@ -159,13 +219,10 @@ export default function ServiceRequestPage() {
       if (data.success && data.data) {
         const methods = Array.isArray(data.data) ? data.data : [];
         setPaymentMethods(methods);
-        // Auto-select cash if available
         const cashMethod = methods.find((m: PaymentMethodItem) => m.type === 'cash');
         if (cashMethod) setSelectedPaymentMethodId(cashMethod.id);
       }
-    } catch {
-      // silent
-    }
+    } catch { /* silent */ }
   }, []);
 
   const fetchSettings = useCallback(async () => {
@@ -192,12 +249,9 @@ export default function ServiceRequestPage() {
         const wa = supportData.data.supportWhatsAppNumbers?.[0] || supportData.data.supportWhatsApp || '+967123456789';
         setSupportWhatsApp(wa);
       }
-    } catch {
-      // silent
-    }
+    } catch { /* silent */ }
   }, []);
 
-  // Fetch loyalty points
   const fetchLoyalty = useCallback(async () => {
     if (!token) return;
     try {
@@ -212,64 +266,14 @@ export default function ServiceRequestPage() {
   }, [token]);
 
   useEffect(() => {
-    fetchService();
+    fetchServices();
     fetchPaymentMethods();
     fetchSettings();
     fetchLoyalty();
-  }, [fetchService, fetchPaymentMethods, fetchSettings, fetchLoyalty]);
-
-  // Calculate pricing when relevant fields change
-  useEffect(() => {
-    if (!service) return;
-    const basePrice = service.basePrice;
-
-    // Calculate night fee
-    let nightFee = 0;
-    if (nightFeeEnabled && scheduledTime) {
-      const hour = parseInt(scheduledTime.split(':')[0]);
-      const isNight = nightStartHour > nightEndHour
-        ? (hour >= nightStartHour || hour < nightEndHour)
-        : (hour >= nightStartHour && hour < nightEndHour);
-      if (isNight) {
-        nightFee = Math.round(basePrice * (nightFeePercent / 100));
-      }
-    }
-
-    // Calculate Friday fee
-    let fridayFee = 0;
-    if (fridayFeeEnabled && scheduledDate) {
-      const dayOfWeek = new Date(scheduledDate).getDay();
-      if (dayOfWeek === 5) { // Friday
-        fridayFee = Math.round(basePrice * (fridayFeePercent / 100));
-      }
-    }
-
-    const emergencyFeeAmount = isEmergency ? emergencyFee : 0;
-    const loyaltyDiscount = (useLoyaltyPoints && loyaltyRedemptionRate > 0 && loyaltyPoints >= loyaltyRedemptionThreshold)
-      ? Math.round(loyaltyPoints / loyaltyRedemptionRate)
-      : 0;
-    const subtotal = basePrice + nightFee + fridayFee + emergencyFeeAmount;
-    const discount = couponDiscount;
-    const totalPrice = Math.max(0, subtotal - discount - loyaltyDiscount);
-    const commission = Math.round(totalPrice * (commissionRate / 100));
-    const nursePayout = totalPrice - commission;
-
-    setPricing({
-      basePrice,
-      nightFee,
-      fridayFee,
-      emergencyFee: emergencyFeeAmount,
-      discount,
-      loyaltyDiscount,
-      couponDiscount: couponDiscount,
-      totalPrice,
-      commission,
-      nursePayout,
-    });
-  }, [service, isEmergency, couponDiscount, emergencyFee, commissionRate, nightFeeEnabled, nightFeePercent, nightStartHour, nightEndHour, fridayFeeEnabled, fridayFeePercent, scheduledDate, scheduledTime, useLoyaltyPoints, loyaltyPoints, loyaltyRedemptionRate, loyaltyRedemptionThreshold]);
+  }, [fetchServices, fetchPaymentMethods, fetchSettings, fetchLoyalty]);
 
   const validateCoupon = async () => {
-    if (!token || !couponCode || !service) return;
+    if (!token || !couponCode || selectedServices.length === 0) return;
     try {
       const res = await fetch('/api/beneficiary/coupons/validate', {
         method: 'POST',
@@ -277,7 +281,7 @@ export default function ServiceRequestPage() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ code: couponCode, serviceId: service.id, orderAmount: service.basePrice }),
+        body: JSON.stringify({ code: couponCode, serviceId: selectedServices[0].id, orderAmount: totalBasePrice }),
       });
       const data = await res.json();
       if (data.success && data.data) {
@@ -302,8 +306,15 @@ export default function ServiceRequestPage() {
     }
   };
 
+  const removeService = (serviceId: string) => {
+    setSelectedServices(prev => prev.filter(s => s.id !== serviceId));
+    if (selectedServices.length <= 1) {
+      router.push('/beneficiary');
+    }
+  };
+
   const handleSubmit = async () => {
-    if (!token || !service || !pricing || !selectedPaymentMethod) return;
+    if (!token || selectedServices.length === 0 || !selectedPaymentMethod) return;
     setIsSubmitting(true);
     try {
       const res = await fetch('/api/beneficiary/orders', {
@@ -313,7 +324,7 @@ export default function ServiceRequestPage() {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          serviceId: service.id,
+          serviceIds: selectedServices.map(s => s.id),
           scheduledAt: scheduledDate && scheduledTime ? new Date(`${scheduledDate}T${scheduledTime}`).toISOString() : undefined,
           address: address || `${lat}, ${lng}`,
           lat: lat || 15.3694,
@@ -329,16 +340,25 @@ export default function ServiceRequestPage() {
       });
       const data = await res.json();
       if (data.success) {
-        const orderId = data.data?.id || data.data?._id?.toString() || '';
-
-        // If non-cash payment, open WhatsApp with professional message
         if (!isCashPayment) {
-          const msg = buildWhatsAppMessage(orderId, service, pricing);
+          const orderId = data.data?.id || '';
+          const serviceNames = selectedServices.map(s => s.nameAr).join('، ');
+          const msg = [
+            '🏥 *عافيتك - طلب خدمات متعددة*',
+            '━━━━━━━━━━━━━━━━━━',
+            `📋 *رقم الطلب:* \`#${orderId.slice(-6).toUpperCase()}\``,
+            `🩺 *الخدمات:* ${serviceNames}`,
+            `💰 *المبلغ الإجمالي:* ${formatYemeniRial(grandTotal)}`,
+            `👤 *المستفيد:* ${useAuthStore.getState().user?.name || 'غير محدد'}`,
+            `📱 *رقم المستفيد:* ${useAuthStore.getState().user?.phone || 'غير محدد'}`,
+            '━━━━━━━━━━━━━━━━━━',
+            '📎 إثبات الدفع مرفق',
+          ].join('\n');
           const waUrl = `https://wa.me/${supportWhatsApp.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(msg)}`;
           window.open(waUrl, '_blank');
         }
 
-        toast({ title: isCashPayment ? 'تم إنشاء الطلب بنجاح' : 'تم إنشاء الطلب - يرجى إرسال إثبات الدفع عبر الواتساب' });
+        toast({ title: isCashPayment ? 'تم إنشاء الطلبات بنجاح' : 'تم إنشاء الطلبات - يرجى إرسال إثبات الدفع عبر الواتساب' });
         router.push('/beneficiary/orders');
       } else {
         toast({ title: data.message ?? 'فشل إنشاء الطلب', variant: 'destructive' });
@@ -350,32 +370,9 @@ export default function ServiceRequestPage() {
     }
   };
 
-  const buildWhatsAppMessage = (orderId: string, svc: Service, prc: ServicePricing) => {
-    const lines = [
-      '🏥 *عافيتك - طلب خدمة جديدة*',
-      '━━━━━━━━━━━━━━━━━━',
-      `📋 *رقم الطلب:* \`#${orderId.slice(-6).toUpperCase()}\``,
-      `🆔 *معرف الطلب:* \`${orderId}\``,
-      `🩺 *الخدمة:* ${svc.nameAr}`,
-      `💰 *المبلغ:* ${formatYemeniRial(prc.totalPrice)}`,
-    ];
-    if (prc.emergencyFee > 0) {
-      lines.push(`🚨 *رسوم الطوارئ:* ${formatYemeniRial(prc.emergencyFee)}`);
-    }
-    lines.push(`👤 *المستفيد:* ${useAuthStore.getState().user?.name || 'غير محدد'}`);
-    lines.push(`📱 *رقم المستفيد:* ${useAuthStore.getState().user?.phone || 'غير محدد'}`);
-    if (address) lines.push(`📍 *العنوان:* ${address}`);
-    if (selectedPaymentMethod) {
-      lines.push(`💳 *طريقة الدفع:* ${selectedPaymentMethod.nameAr}`);
-    }
-    lines.push('━━━━━━━━━━━━━━━━━━');
-    lines.push('📎 إثبات الدفع مرفق');
-    return lines.join('\n');
-  };
-
   const canProceed = (): boolean => {
     switch (currentStep) {
-      case 0: return !!service;
+      case 0: return selectedServices.length > 0;
       case 1: return true;
       case 2: return lat !== 0 && lng !== 0;
       case 3: return !!selectedPaymentMethodId;
@@ -384,65 +381,32 @@ export default function ServiceRequestPage() {
     }
   };
 
-  if (isLoadingService) {
+  if (isLoading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
           <Loader2 className="w-10 h-10 text-beneficiary animate-spin" />
-          <p className="text-muted-foreground">جاري تحميل تفاصيل الخدمة...</p>
+          <p className="text-muted-foreground">جاري تحميل تفاصيل الخدمات...</p>
         </div>
       </div>
     );
   }
 
-  if (!service) {
+  if (selectedServices.length === 0) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="flex flex-col items-center gap-4">
           <AlertCircle className="w-12 h-12 text-muted-foreground" />
-          <p className="text-muted-foreground">لم يتم العثور على الخدمة</p>
+          <p className="text-muted-foreground">لم يتم تحديد خدمات</p>
           <Button onClick={() => router.push('/beneficiary')}>العودة للرئيسية</Button>
         </div>
       </div>
     );
   }
 
-  // Group payment methods by type
   const walletMethods = paymentMethods.filter(pm => pm.type === 'wallet_deposit');
   const bankMethods = paymentMethods.filter(pm => pm.type === 'bank_transfer');
   const cashMethods = paymentMethods.filter(pm => pm.type === 'cash');
-
-  const getTypeIcon = (type: string) => {
-    switch (type) {
-      case 'wallet_deposit': return <Smartphone className="w-5 h-5" />;
-      case 'bank_transfer': return <Building2 className="w-5 h-5" />;
-      case 'cash': return <HandCoins className="w-5 h-5" />;
-      default: return <CreditCard className="w-5 h-5" />;
-    }
-  };
-
-  const getTypeColor = (type: string) => {
-    switch (type) {
-      case 'wallet_deposit': return 'bg-purple-50 border-purple-200 dark:bg-purple-900/20 dark:border-purple-800';
-      case 'bank_transfer': return 'bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800';
-      case 'cash': return 'bg-green-50 border-green-200 dark:bg-green-900/20 dark:border-green-800';
-      default: return 'bg-muted border-border';
-    }
-  };
-
-  const getTypeLabel = (type: string) => {
-    switch (type) {
-      case 'wallet_deposit': return 'إيداع محفظة';
-      case 'bank_transfer': return 'تحويل بنكي';
-      case 'cash': return 'نقدي عند الوصول';
-      default: return type;
-    }
-  };
-
-  // Calculate loyalty discount for display
-  const loyaltyDiscount = (useLoyaltyPoints && loyaltyRedemptionRate > 0 && loyaltyPoints >= loyaltyRedemptionThreshold)
-    ? Math.round(loyaltyPoints / loyaltyRedemptionRate)
-    : 0;
 
   return (
     <div className="space-y-6 pb-24">
@@ -452,8 +416,8 @@ export default function ServiceRequestPage() {
           <ArrowRight className="w-5 h-5" />
         </Button>
         <div>
-          <h1 className="text-xl font-bold">طلب خدمة</h1>
-          <p className="text-sm text-muted-foreground">{service.nameAr}</p>
+          <h1 className="text-xl font-bold">طلب خدمات متعددة</h1>
+          <p className="text-sm text-muted-foreground">{toArabicNum(selectedServices.length)} خدمات مختارة</p>
         </div>
       </motion.div>
 
@@ -486,76 +450,99 @@ export default function ServiceRequestPage() {
         <motion.div key={currentStep} initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} exit={{ opacity: 0, x: 20 }} transition={{ duration: 0.2 }}>
           {/* Step 1: Service Details */}
           {currentStep === 0 && (
-            <GlassCard variant="beneficiary" className="space-y-6">
-              <div className="flex items-center gap-4">
-                <div className="w-16 h-16 rounded-2xl bg-beneficiary/10 flex items-center justify-center">
-                  <Stethoscope className="w-8 h-8 text-beneficiary" />
-                </div>
-                <div>
-                  <h2 className="text-lg font-bold">{service.nameAr}</h2>
-                  <p className="text-sm text-muted-foreground">{service.descriptionAr}</p>
-                </div>
+            <GlassCard variant="beneficiary" className="space-y-4">
+              <h2 className="text-lg font-bold flex items-center gap-2">
+                <Stethoscope className="w-5 h-5 text-beneficiary" />
+                الخدمات المختارة
+              </h2>
+
+              {/* Services List */}
+              <div className="space-y-2">
+                {selectedServices.map((service) => {
+                  const ServiceIcon = serviceIconMap[service.icon] || Stethoscope;
+                  const catBg = categoryIconBg[service.category] || 'bg-beneficiary/10';
+                  const iconClr = categoryIconColor[service.category] || 'text-beneficiary';
+                  return (
+                    <div key={service.id} className="flex items-center gap-3 p-3 rounded-xl glass">
+                      <div className={`w-10 h-10 rounded-xl ${catBg} flex items-center justify-center shrink-0`}>
+                        <ServiceIcon className={`w-5 h-5 ${iconClr}`} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h3 className="font-medium text-sm">{service.nameAr}</h3>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Clock className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-xs text-muted-foreground">{service.duration ? `${toArabicNum(service.duration)} دقيقة` : ''}</span>
+                        </div>
+                      </div>
+                      <Currency amount={service.basePrice} className="text-sm font-bold shrink-0" />
+                      <button onClick={() => removeService(service.id)} className="shrink-0 p-1.5 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 text-muted-foreground hover:text-red-600 transition-colors">
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  );
+                })}
               </div>
-              {/* Full Price Breakdown - shown from the start */}
+
+              {/* Price Summary */}
               <div className="glass rounded-xl p-4 space-y-2">
                 <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">السعر الأساسي</span>
-                  <Currency amount={service.basePrice} className="text-sm" />
+                  <span className="text-sm text-muted-foreground">مجموع الأسعار الأساسية ({toArabicNum(selectedServices.length)} خدمات)</span>
+                  <Currency amount={totalBasePrice} className="text-sm" />
                 </div>
-                {pricing && pricing.nightFee > 0 && (
+                {totalNightFee > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-orange-600">رسوم الخدمة الليلية ({nightFeePercent}%)</span>
-                    <Currency amount={pricing.nightFee} className="text-xs text-orange-600" />
+                    <Currency amount={totalNightFee} className="text-xs text-orange-600" />
                   </div>
                 )}
-                {pricing && pricing.fridayFee > 0 && (
+                {totalFridayFee > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-orange-600">رسوم خدمة الجمعة ({fridayFeePercent}%)</span>
-                    <Currency amount={pricing.fridayFee} className="text-xs text-orange-600" />
+                    <Currency amount={totalFridayFee} className="text-xs text-orange-600" />
                   </div>
                 )}
-                {isEmergency && pricing && pricing.emergencyFee > 0 && (
+                {isEmergency && totalEmergencyFee > 0 && (
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-red-600">رسوم الطوارئ</span>
-                    <Currency amount={pricing.emergencyFee} className="text-xs text-red-600" />
+                    <Currency amount={totalEmergencyFee} className="text-xs text-red-600" />
+                  </div>
+                )}
+                {couponDiscount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-green-600">خصم الكوبون</span>
+                    <Currency amount={couponDiscount} className="text-xs text-green-600" />
+                  </div>
+                )}
+                {loyaltyDiscount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-green-600">خصم نقاط الولاء</span>
+                    <Currency amount={loyaltyDiscount} className="text-xs text-green-600" />
                   </div>
                 )}
                 <div className="flex justify-between items-center pt-2 border-t border-border/50">
                   <span className="font-bold text-base">المبلغ الإجمالي</span>
-                  <Currency amount={pricing?.totalPrice || service.basePrice} className="text-lg text-beneficiary font-bold" />
+                  <Currency amount={grandTotal} className="text-lg text-beneficiary font-bold" />
                 </div>
-                <p className="text-[10px] text-muted-foreground text-center">يشمل جميع الرسوم والخدمات</p>
               </div>
-              {service.isEmergency && (
-                <div className="flex items-center gap-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400">
-                  <AlertCircle className="w-5 h-5 shrink-0" />
-                  <span className="text-sm">هذه خدمة طوارئ - سيتم تطبيق رسوم إضافية</span>
-                </div>
-              )}
-              <div className="space-y-3">
-                <Label>ملاحظات إضافية</Label>
-                <Textarea placeholder="أضف أي ملاحظات للخدمة..." value={notes} onChange={(e) => setNotes(e.target.value)} dir="rtl" />
-              </div>
+
+              {/* Emergency toggle */}
               <div className="flex items-center gap-3 p-3 rounded-xl glass">
                 <input
                   type="checkbox"
-                  id="emergency-check"
+                  id="emergency-check-multi"
                   checked={isEmergency}
                   onChange={(e) => setIsEmergency(e.target.checked)}
                   className="w-5 h-5 rounded border-2 border-beneficiary text-beneficiary focus:ring-beneficiary"
                 />
-                <Label htmlFor="emergency-check" className="cursor-pointer">
+                <Label htmlFor="emergency-check-multi" className="cursor-pointer">
                   طلب طوارئ (رسوم إضافية {formatYemeniRial(emergencyFee)})
                 </Label>
               </div>
-              {isEmergency && pricing && pricing.emergencyFee > 0 && (
-                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800">
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm text-red-700 dark:text-red-400 font-medium">السعر بعد رسوم الطوارئ</span>
-                    <Currency amount={pricing.totalPrice} className="text-lg text-red-600 dark:text-red-400 font-bold" />
-                  </div>
-                </motion.div>
-              )}
+
+              <div className="space-y-3">
+                <Label>ملاحظات إضافية</Label>
+                <Textarea placeholder="أضف أي ملاحظات للخدمات..." value={notes} onChange={(e) => setNotes(e.target.value)} dir="rtl" />
+              </div>
             </GlassCard>
           )}
 
@@ -608,7 +595,6 @@ export default function ServiceRequestPage() {
                   <span className="text-xs text-muted-foreground font-normal">(اختياري)</span>
                 </Label>
                 <Textarea id="address" placeholder="مثال: بجوار مستشفى الثورة، الطابق الثالث..." value={address} onChange={(e) => setAddress(e.target.value)} dir="rtl" rows={2} />
-                <p className="text-xs text-muted-foreground">أضف أي تفاصيل تساعد الممرض/ـة في الوصول إليك</p>
               </div>
             </GlassCard>
           )}
@@ -628,7 +614,6 @@ export default function ServiceRequestPage() {
                 </div>
               ) : (
                 <div className="space-y-4">
-                  {/* Cash Methods */}
                   {cashMethods.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-green-700 dark:text-green-400 flex items-center gap-2">
@@ -648,7 +633,6 @@ export default function ServiceRequestPage() {
                     </div>
                   )}
 
-                  {/* Wallet Methods */}
                   {walletMethods.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-purple-700 dark:text-purple-400 flex items-center gap-2">
@@ -689,7 +673,6 @@ export default function ServiceRequestPage() {
                     </div>
                   )}
 
-                  {/* Bank/Exchange Methods */}
                   {bankMethods.length > 0 && (
                     <div className="space-y-2">
                       <p className="text-sm font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-2">
@@ -730,7 +713,6 @@ export default function ServiceRequestPage() {
                     </div>
                   )}
 
-                  {/* Payment Proof Upload for non-cash */}
                   {selectedPaymentMethod && !isCashPayment && (
                     <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-3 pt-4 border-t border-border">
                       <Label className="flex items-center gap-2 font-semibold">
@@ -775,18 +757,16 @@ export default function ServiceRequestPage() {
                     خصم الكوبون: {formatYemeniRial(couponDiscount)}
                   </p>
                 )}
-
-                {/* Loyalty Points Toggle */}
                 {loyaltyPoints >= loyaltyRedemptionThreshold && loyaltyRedemptionRate > 0 && (
                   <div className="flex items-center gap-3 p-3 rounded-xl glass">
                     <input
                       type="checkbox"
-                      id="loyalty-check"
+                      id="loyalty-check-multi"
                       checked={useLoyaltyPoints}
                       onChange={(e) => setUseLoyaltyPoints(e.target.checked)}
                       className="w-5 h-5 rounded border-2 border-beneficiary text-beneficiary focus:ring-beneficiary"
                     />
-                    <Label htmlFor="loyalty-check" className="cursor-pointer">
+                    <Label htmlFor="loyalty-check-multi" className="cursor-pointer">
                       استخدام {toArabicNum(loyaltyPoints)} نقطة ولاء (خصم {formatYemeniRial(Math.round(loyaltyPoints / loyaltyRedemptionRate))})
                     </Label>
                   </div>
@@ -796,103 +776,85 @@ export default function ServiceRequestPage() {
           )}
 
           {/* Step 5: Summary */}
-          {currentStep === 4 && pricing && (
+          {currentStep === 4 && (
             <GlassCard variant="beneficiary" className="space-y-5">
               <h2 className="text-lg font-bold flex items-center gap-2">
                 <CheckCircle2 className="w-5 h-5 text-beneficiary" />
                 ملخص الطلب
               </h2>
 
-              {/* Service Info */}
-              <div className="glass rounded-xl p-4 space-y-2">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground text-sm">الخدمة</span>
-                  <span className="font-medium text-sm">{service.nameAr}</span>
-                </div>
-                {scheduledDate && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground text-sm">الموعد</span>
-                    <span className="font-medium text-sm">{scheduledDate} {scheduledTime}</span>
+              {/* Services List */}
+              <div className="glass rounded-xl p-4 space-y-3">
+                <p className="text-sm font-semibold">الخدمات ({toArabicNum(selectedServices.length)})</p>
+                {selectedServices.map((service) => (
+                  <div key={service.id} className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">{service.nameAr}</span>
+                    <Currency amount={service.basePrice} className="text-sm" />
                   </div>
-                )}
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground text-sm">العنوان</span>
-                  <span className="font-medium text-sm max-w-[60%] text-left truncate">{address}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground text-sm">طريقة الدفع</span>
-                  <span className="font-medium text-sm">{selectedPaymentMethod?.nameAr || 'غير محدد'}</span>
-                </div>
-                {!isCashPayment && (
-                  <div className="flex justify-between">
-                    <span className="text-muted-foreground text-sm">إثبات الدفع</span>
-                    <span className="font-medium text-sm">{paymentProofFile ? '✓ مرفق' : 'سيتم إرساله عبر الواتساب'}</span>
+                ))}
+                <div className="border-t border-border/50 pt-2 space-y-1">
+                  {scheduledDate && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">الموعد</span>
+                      <span className="font-medium">{scheduledDate} {scheduledTime}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">العنوان</span>
+                    <span className="font-medium max-w-[60%] text-left truncate">{address}</span>
                   </div>
-                )}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-muted-foreground">طريقة الدفع</span>
+                    <span className="font-medium">{selectedPaymentMethod?.nameAr || 'غير محدد'}</span>
+                  </div>
+                  {!isCashPayment && (
+                    <div className="flex justify-between text-sm">
+                      <span className="text-muted-foreground">إثبات الدفع</span>
+                      <span className="font-medium">{paymentProofFile ? '✓ مرفق' : 'سيتم إرساله عبر الواتساب'}</span>
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Payment Details for non-cash */}
-              {selectedPaymentMethod && !isCashPayment && (
-                <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 space-y-2">
-                  <p className="text-sm font-semibold text-blue-700 dark:text-blue-400">تفاصيل التحويل</p>
-                  {selectedPaymentMethod.accountName && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">الاسم:</span>
-                      <span className="text-sm font-medium">{selectedPaymentMethod.accountName}</span>
-                    </div>
-                  )}
-                  {selectedPaymentMethod.accountNumber && (
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-muted-foreground">{selectedPaymentMethod.type === 'wallet_deposit' ? 'الرقم:' : 'الهاتف:'}</span>
-                      <span className="text-sm font-mono font-bold" dir="ltr">{selectedPaymentMethod.accountNumber}</span>
-                    </div>
-                  )}
-                  <p className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1 mt-2">
-                    <MessageCircle className="w-3.5 h-3.5" />
-                    بعد التأكيد سيتم فتح الواتساب لإرسال إثبات الدفع
-                  </p>
+              {/* Pricing breakdown */}
+              <div className="glass rounded-xl p-4 space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm text-muted-foreground">مجموع الأسعار الأساسية</span>
+                  <Currency amount={totalBasePrice} className="text-sm" />
                 </div>
-              )}
-
-              {/* Pricing Breakdown */}
-              <div className="space-y-3 pt-4 border-t border-border">
-                <div className="flex justify-between">
-                  <span className="text-sm">السعر الأساسي</span>
-                  <Currency amount={pricing.basePrice} className="text-sm" />
-                </div>
-                {pricing.nightFee > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-orange-600">رسوم الخدمة الليلية</span>
-                    <Currency amount={pricing.nightFee} className="text-sm text-orange-600" />
+                {totalNightFee > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-orange-600">رسوم ليلية</span>
+                    <Currency amount={totalNightFee} className="text-xs text-orange-600" />
                   </div>
                 )}
-                {pricing.fridayFee > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-orange-600">رسوم خدمة الجمعة</span>
-                    <Currency amount={pricing.fridayFee} className="text-sm text-orange-600" />
+                {totalFridayFee > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-orange-600">رسوم الجمعة</span>
+                    <Currency amount={totalFridayFee} className="text-xs text-orange-600" />
                   </div>
                 )}
-                {pricing.emergencyFee > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-red-600">رسوم الطوارئ</span>
-                    <Currency amount={pricing.emergencyFee} className="text-sm text-red-600" />
+                {totalEmergencyFee > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-red-600">رسوم الطوارئ</span>
+                    <Currency amount={totalEmergencyFee} className="text-xs text-red-600" />
                   </div>
                 )}
-                {pricing.couponDiscount > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-green-600">خصم الكوبون</span>
-                    <Currency amount={-pricing.couponDiscount} className="text-sm text-green-600" />
+                {couponDiscount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-green-600">خصم الكوبون</span>
+                    <Currency amount={couponDiscount} className="text-xs text-green-600" />
                   </div>
                 )}
-                {pricing.loyaltyDiscount > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-sm text-green-600">خصم نقاط الولاء</span>
-                    <Currency amount={-pricing.loyaltyDiscount} className="text-sm text-green-600" />
+                {loyaltyDiscount > 0 && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-xs text-green-600">خصم نقاط الولاء</span>
+                    <Currency amount={loyaltyDiscount} className="text-xs text-green-600" />
                   </div>
                 )}
-                <div className="flex justify-between pt-3 border-t border-border">
-                  <span className="font-bold text-lg">الإجمالي</span>
-                  <Currency amount={pricing.totalPrice} className="text-lg text-beneficiary font-bold" />
+                <div className="flex justify-between items-center pt-2 border-t border-border/50">
+                  <span className="font-bold text-base">المبلغ الإجمالي</span>
+                  <Currency amount={grandTotal} className="text-lg text-beneficiary font-bold" />
                 </div>
               </div>
             </GlassCard>
@@ -927,43 +889,40 @@ export default function ServiceRequestPage() {
       </div>
 
       {/* Sticky Pricing Summary Bar */}
-      {pricing && (
-        <motion.div
-          initial={{ y: 100, opacity: 0 }}
-          animate={{ y: 0, opacity: 1 }}
-          className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border shadow-lg"
-        >
-          <div className="max-w-2xl mx-auto px-4 py-3">
-            {/* Compact pricing summary */}
-            <div className="flex items-center justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs text-muted-foreground">الأساسي: {formatYemeniRial(pricing.basePrice)}</span>
-                  {pricing.nightFee > 0 && (
-                    <span className="text-xs text-orange-600">+ ليلي: {formatYemeniRial(pricing.nightFee)}</span>
-                  )}
-                  {pricing.fridayFee > 0 && (
-                    <span className="text-xs text-orange-600">+ جمعة: {formatYemeniRial(pricing.fridayFee)}</span>
-                  )}
-                  {pricing.emergencyFee > 0 && (
-                    <span className="text-xs text-red-600">+ طوارئ: {formatYemeniRial(pricing.emergencyFee)}</span>
-                  )}
-                  {couponDiscount > 0 && (
-                    <span className="text-xs text-green-600">- كوبون: {formatYemeniRial(couponDiscount)}</span>
-                  )}
-                  {loyaltyDiscount > 0 && (
-                    <span className="text-xs text-green-600">- ولاء: {formatYemeniRial(loyaltyDiscount)}</span>
-                  )}
-                </div>
-              </div>
-              <div className="shrink-0 text-left">
-                <p className="text-[10px] text-muted-foreground">الإجمالي</p>
-                <Currency amount={pricing.totalPrice} className="text-lg text-beneficiary font-bold" />
+      <motion.div
+        initial={{ y: 100, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border shadow-lg"
+      >
+        <div className="max-w-2xl mx-auto px-4 py-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground">{toArabicNum(selectedServices.length)} خدمات: {formatYemeniRial(totalBasePrice)}</span>
+                {totalNightFee > 0 && (
+                  <span className="text-xs text-orange-600">+ ليلي: {formatYemeniRial(totalNightFee)}</span>
+                )}
+                {totalFridayFee > 0 && (
+                  <span className="text-xs text-orange-600">+ جمعة: {formatYemeniRial(totalFridayFee)}</span>
+                )}
+                {totalEmergencyFee > 0 && (
+                  <span className="text-xs text-red-600">+ طوارئ: {formatYemeniRial(totalEmergencyFee)}</span>
+                )}
+                {couponDiscount > 0 && (
+                  <span className="text-xs text-green-600">- كوبون: {formatYemeniRial(couponDiscount)}</span>
+                )}
+                {loyaltyDiscount > 0 && (
+                  <span className="text-xs text-green-600">- ولاء: {formatYemeniRial(loyaltyDiscount)}</span>
+                )}
               </div>
             </div>
+            <div className="shrink-0 text-left">
+              <p className="text-[10px] text-muted-foreground">الإجمالي</p>
+              <Currency amount={grandTotal} className="text-lg text-beneficiary font-bold" />
+            </div>
           </div>
-        </motion.div>
-      )}
+        </div>
+      </motion.div>
     </div>
   );
 }
