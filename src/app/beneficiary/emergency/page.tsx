@@ -504,30 +504,36 @@ export default function EmergencyPage() {
             </div>
           )}
 
-          {/* Emergency fee */}
-          <div className="flex items-center justify-between p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
-            <div className="flex items-center gap-2">
-              <Wallet className="w-4 h-4 text-red-600" />
-              <span className="text-sm font-medium text-red-700 dark:text-red-400">رسوم خدمة الطوارئ</span>
-            </div>
-            <span className="font-bold text-red-600 text-lg">{(activeEmergency.emergencyFee || emergencyFee || 5000).toLocaleString('ar-YE')} ر.ي</span>
-          </div>
-
-          {/* Payment method display for resolved */}
-          {activeEmergency.paymentMethod && (
-            <div className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
-              <div className="flex items-center gap-2">
-                <CreditCard className="w-4 h-4 text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">طريقة الدفع</span>
+          {/* Payment & Fee - Combined Card */}
+          <div className="p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30 space-y-3">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                  activeEmergency.paymentMethod === 'cash' ? 'bg-green-100 dark:bg-green-900/30' :
+                  activeEmergency.paymentMethod === 'wallet_deposit' ? 'bg-purple-100 dark:bg-purple-900/30' :
+                  activeEmergency.paymentMethod === 'bank_transfer' ? 'bg-blue-100 dark:bg-blue-900/30' :
+                  'bg-red-100 dark:bg-red-900/30'
+                }`}>
+                  {activeEmergency.paymentMethod === 'cash' ? <HandCoins className="w-5 h-5 text-green-600" /> :
+                   activeEmergency.paymentMethod === 'wallet_deposit' ? <Smartphone className="w-5 h-5 text-purple-600" /> :
+                   activeEmergency.paymentMethod === 'bank_transfer' ? <Building2 className="w-5 h-5 text-blue-600" /> :
+                   <Wallet className="w-5 h-5 text-red-600" />}
+                </div>
+                <div>
+                  <p className="font-bold text-sm">
+                    {activeEmergency.paymentMethod === 'cash' ? 'نقدي عند الوصول' :
+                     activeEmergency.paymentMethod === 'wallet_deposit' ? 'محفظة إلكترونية' :
+                     activeEmergency.paymentMethod === 'bank_transfer' ? 'تحويل بنكي / صرافة' :
+                     'رسوم الطوارئ'}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground">طريقة الدفع</p>
+                </div>
               </div>
-              <span className="text-sm font-medium">
-                {activeEmergency.paymentMethod === 'cash' ? 'نقدي عند الوصول' :
-                 activeEmergency.paymentMethod === 'wallet_deposit' ? 'محفظة إلكترونية' :
-                 activeEmergency.paymentMethod === 'bank_transfer' ? 'تحويل بنكي / صرافة' :
-                 activeEmergency.paymentMethod}
-              </span>
+              <div className="text-left">
+                <span className="font-bold text-red-600 text-lg">{(activeEmergency.emergencyFee || emergencyFee || 5000).toLocaleString('ar-YE')} ر.ي</span>
+              </div>
             </div>
-          )}
+          </div>
 
           {/* ═══════════════════════════════════════════════════════════ */}
           {/* ═══════════════ RATING SECTION ══════════════════════════ */}
@@ -879,8 +885,12 @@ export default function EmergencyPage() {
           onLocationDetected={(loc) => {
             setLat(loc.latitude);
             setLng(loc.longitude);
-            if (loc.address && loc.address !== `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`) {
+            if (loc.address) {
+              // Always update the address if available from detection
               setAddress(loc.address);
+            } else if (!address) {
+              // If no address returned and no address set yet, show coordinates as placeholder
+              setAddress(`${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`);
             }
           }}
           value={address}

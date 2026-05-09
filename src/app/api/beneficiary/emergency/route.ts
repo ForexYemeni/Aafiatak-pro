@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
             bodyAr: `طلب طوارئ عاجل من ${beneficiaryName}: ${description.substring(0, 80)}. نوع الطوارئ: ${type || 'طبية'}`,
             type: 'emergency',
             priority: 'urgent',
-            data: { emergencyRequestId: emergency._id.toString(), beneficiaryId: user.userId, type: type || 'medical' },
+            data: { emergencyRequestId: emergency._id.toString(), beneficiaryId: user.userId, type: type || 'medical', voiceAlert: true, voiceText: `حالة طوارئ جديدة من ${beneficiaryName}` },
             actionUrl: '/admin/emergencies',
             voiceEnabled: true,
           }),
@@ -135,7 +135,7 @@ export async function POST(request: NextRequest) {
             sound: true,
             url: '/admin/emergencies',
             userRole: 'admin',
-            data: { emergencyRequestId: emergency._id.toString() },
+            data: { emergencyRequestId: emergency._id.toString(), voiceAlert: true, voiceText: `حالة طوارئ جديدة من ${beneficiaryName}` },
           })
         );
       }

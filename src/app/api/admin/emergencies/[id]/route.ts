@@ -49,7 +49,10 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     if (!emergency) return createErrorResponse('طلب الطوارئ غير موجود', 404, 'NOT_FOUND');
 
     // ── Notify beneficiary and nurse about emergency status change ──
+    // ALL notifications in PARALLEL for maximum speed
     try {
+      const notificationPromises: Promise<any>[] = [];
+
       const statusMessages: Record<string, { titleAr: string; bodyAr: string; type: string }> = {
         dispatched: {
           titleAr: 'تم إرسال مساعدة',
@@ -75,34 +78,37 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       const msg = statusMessages[body.status];
       if (msg && emergency.beneficiaryId) {
-        // Notify beneficiary
-        await Notification.create({
-          userId: emergency.beneficiaryId,
-          userRole: 'beneficiary',
-          titleAr: msg.titleAr,
-          bodyAr: msg.bodyAr,
-          type: msg.type,
-          priority: body.status === 'dispatched' ? 'urgent' : 'high',
-          data: { emergencyRequestId: id, status: body.status },
-          actionUrl: '/beneficiary/emergency',
-          voiceEnabled: true,
-        });
-
-        sendPushToUser(emergency.beneficiaryId.toString(), {
-          title: msg.titleAr,
-          body: msg.bodyAr,
-          type: msg.type,
-          priority: body.status === 'dispatched' ? 'urgent' : 'high',
-          url: '/beneficiary/emergency',
-          userRole: 'beneficiary',
-          data: { emergencyRequestId: id, status: body.status },
-        }).catch(() => {});
+        // Notify beneficiary - create notification + push IN PARALLEL
+        notificationPromises.push(
+          Notification.create({
+            userId: emergency.beneficiaryId,
+            userRole: 'beneficiary',
+            titleAr: msg.titleAr,
+            bodyAr: msg.bodyAr,
+            type: msg.type,
+            priority: body.status === 'dispatched' ? 'urgent' : 'high',
+            data: { emergencyRequestId: id, status: body.status, voiceAlert: body.status === 'dispatched', voiceText: body.status === 'dispatched' ? 'تم إرسال مساعدة، الممرض في الطريق إليك' : undefined },
+            actionUrl: '/beneficiary/emergency',
+            voiceEnabled: true,
+          })
+        );
+        notificationPromises.push(
+          sendPushToUser(emergency.beneficiaryId.toString(), {
+            title: msg.titleAr,
+            body: msg.bodyAr,
+            type: msg.type,
+            priority: body.status === 'dispatched' ? 'urgent' : 'high',
+            url: '/beneficiary/emergency',
+            userRole: 'beneficiary',
+            sound: true,
+            data: { emergencyRequestId: id, status: body.status, voiceAlert: body.status === 'dispatched', voiceText: body.status === 'dispatched' ? 'تم إرسال مساعدة، الممرض في الطريق إليك' : undefined },
+          })
+        );
       }
 
       // ── Notify NURSE about emergency assignment / status change ──
       if (emergency.nurseId) {
         if (body.status === 'dispatched') {
-          // Nurse was JUST assigned to an emergency - send detailed notification with case info
           const [nurseInfo, beneficiaryInfo] = await Promise.all([
             Nurse.findById(emergency.nurseId).select('name').lean(),
             Beneficiary.findById(emergency.beneficiaryId).select('name phone').lean(),
@@ -122,119 +128,139 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           if (emergency.address) nurseBody += `\nالعنوان: ${emergency.address}`;
           if (emergency.description) nurseBody += `\nالوصف: ${emergency.description}`;
 
-          // In-app notification with full details
-          await Notification.create({
-            userId: emergency.nurseId,
-            userRole: 'nurse',
-            titleAr: '🚨 حالة طوارئ جديدة - تم تعيينك',
-            bodyAr: nurseBody,
-            type: 'emergency_assigned',
-            priority: 'urgent',
-            data: {
-              emergencyRequestId: id,
-              status: 'dispatched',
-              emergencyType: emergency.type,
-              beneficiaryName,
-              beneficiaryPhone,
-              address: emergency.address,
-              lat: emergency.location?.coordinates?.[1],
-              lng: emergency.location?.coordinates?.[0],
-            },
-            actionUrl: '/nurse',
-            voiceEnabled: true,
-          });
+          // Nurse notifications IN PARALLEL
+          notificationPromises.push(
+            Notification.create({
+              userId: emergency.nurseId,
+              userRole: 'nurse',
+              titleAr: '🚨 حالة طوارئ جديدة - تم تعيينك',
+              bodyAr: nurseBody,
+              type: 'emergency_assigned',
+              priority: 'urgent',
+              data: {
+                emergencyRequestId: id,
+                status: 'dispatched',
+                emergencyType: emergency.type,
+                beneficiaryName,
+                beneficiaryPhone,
+                address: emergency.address,
+                lat: emergency.location?.coordinates?.[1],
+                lng: emergency.location?.coordinates?.[0],
+                voiceAlert: true,
+                voiceText: `تم تعيينك لحالة طوارئ ${emergencyType}، المستفيد ${beneficiaryName}`,
+              },
+              actionUrl: '/nurse',
+              voiceEnabled: true,
+            })
+          );
 
-          // Push notification (shorter for mobile)
           let pushBody = `حالة طوارئ ${emergencyType} - المستفيد: ${beneficiaryName}`;
           if (emergency.address) pushBody += ` - ${emergency.address}`;
 
-          sendPushToUser(emergency.nurseId.toString(), {
-            title: '🚨 حالة طوارئ جديدة - تم تعيينك',
-            body: pushBody,
-            type: 'emergency_assigned',
-            priority: 'urgent',
-            url: '/nurse',
-            userRole: 'nurse',
-            data: {
-              emergencyRequestId: id,
-              status: 'dispatched',
-              emergencyType: emergency.type,
-              beneficiaryName,
-              beneficiaryPhone,
-              address: emergency.address,
-            },
-          }).catch(() => {});
+          notificationPromises.push(
+            sendPushToUser(emergency.nurseId.toString(), {
+              title: '🚨 حالة طوارئ جديدة - تم تعيينك',
+              body: pushBody,
+              type: 'emergency_assigned',
+              priority: 'urgent',
+              url: '/nurse',
+              userRole: 'nurse',
+              sound: true,
+              data: {
+                emergencyRequestId: id,
+                status: 'dispatched',
+                emergencyType: emergency.type,
+                beneficiaryName,
+                beneficiaryPhone,
+                address: emergency.address,
+                voiceAlert: true,
+                voiceText: `تم تعيينك لحالة طوارئ ${emergencyType}، المستفيد ${beneficiaryName}`,
+              },
+            })
+          );
 
         } else if (body.status === 'in_progress') {
-          await Notification.create({
-            userId: emergency.nurseId,
-            userRole: 'nurse',
-            titleAr: 'جاري التعامل مع حالة الطوارئ',
-            bodyAr: 'تم تحديث حالة الطوارئ إلى قيد التنفيذ',
-            type: 'status_change',
-            priority: 'high',
-            data: { emergencyRequestId: id, status: body.status },
-            actionUrl: '/nurse',
-            voiceEnabled: true,
-          });
-
-          sendPushToUser(emergency.nurseId.toString(), {
-            title: 'تحديث حالة الطوارئ',
-            body: 'تم تحديث حالة الطوارئ إلى قيد التنفيذ',
-            type: 'status_change',
-            priority: 'high',
-            url: '/nurse',
-            userRole: 'nurse',
-            data: { emergencyRequestId: id, status: body.status },
-          }).catch(() => {});
+          notificationPromises.push(
+            Notification.create({
+              userId: emergency.nurseId,
+              userRole: 'nurse',
+              titleAr: 'جاري التعامل مع حالة الطوارئ',
+              bodyAr: 'تم تحديث حالة الطوارئ إلى قيد التنفيذ',
+              type: 'status_change',
+              priority: 'high',
+              data: { emergencyRequestId: id, status: body.status },
+              actionUrl: '/nurse',
+              voiceEnabled: true,
+            })
+          );
+          notificationPromises.push(
+            sendPushToUser(emergency.nurseId.toString(), {
+              title: 'تحديث حالة الطوارئ',
+              body: 'تم تحديث حالة الطوارئ إلى قيد التنفيذ',
+              type: 'status_change',
+              priority: 'high',
+              url: '/nurse',
+              userRole: 'nurse',
+              data: { emergencyRequestId: id, status: body.status },
+            })
+          );
 
         } else if (body.status === 'resolved') {
-          await Notification.create({
-            userId: emergency.nurseId,
-            userRole: 'nurse',
-            titleAr: 'تم حل حالة الطوارئ',
-            bodyAr: 'شكراً لاستجابتك السريعة',
-            type: 'status_change',
-            priority: 'high',
-            data: { emergencyRequestId: id, status: body.status },
-            actionUrl: '/nurse',
-            voiceEnabled: true,
-          });
-
-          sendPushToUser(emergency.nurseId.toString(), {
-            title: 'تم حل حالة الطوارئ',
-            body: 'شكراً لاستجابتك السريعة',
-            type: 'status_change',
-            priority: 'high',
-            url: '/nurse',
-            userRole: 'nurse',
-            data: { emergencyRequestId: id, status: body.status },
-          }).catch(() => {});
+          notificationPromises.push(
+            Notification.create({
+              userId: emergency.nurseId,
+              userRole: 'nurse',
+              titleAr: 'تم حل حالة الطوارئ',
+              bodyAr: 'شكراً لاستجابتك السريعة',
+              type: 'status_change',
+              priority: 'high',
+              data: { emergencyRequestId: id, status: body.status },
+              actionUrl: '/nurse',
+              voiceEnabled: true,
+            })
+          );
+          notificationPromises.push(
+            sendPushToUser(emergency.nurseId.toString(), {
+              title: 'تم حل حالة الطوارئ',
+              body: 'شكراً لاستجابتك السريعة',
+              type: 'status_change',
+              priority: 'high',
+              url: '/nurse',
+              userRole: 'nurse',
+              data: { emergencyRequestId: id, status: body.status },
+            })
+          );
 
         } else if (body.status === 'cancelled') {
-          await Notification.create({
-            userId: emergency.nurseId,
-            userRole: 'nurse',
-            titleAr: 'تم إلغاء حالة الطوارئ',
-            bodyAr: 'تم إلغاء طلب الطوارئ',
-            type: 'status_change',
-            priority: 'high',
-            data: { emergencyRequestId: id, status: body.status },
-            actionUrl: '/nurse',
-            voiceEnabled: true,
-          });
-
-          sendPushToUser(emergency.nurseId.toString(), {
-            title: 'تم إلغاء حالة الطوارئ',
-            body: 'تم إلغاء طلب الطوارئ',
-            type: 'status_change',
-            priority: 'high',
-            url: '/nurse',
-            userRole: 'nurse',
-            data: { emergencyRequestId: id, status: body.status },
-          }).catch(() => {});
+          notificationPromises.push(
+            Notification.create({
+              userId: emergency.nurseId,
+              userRole: 'nurse',
+              titleAr: 'تم إلغاء حالة الطوارئ',
+              bodyAr: 'تم إلغاء طلب الطوارئ',
+              type: 'status_change',
+              priority: 'high',
+              data: { emergencyRequestId: id, status: body.status },
+              actionUrl: '/nurse',
+              voiceEnabled: true,
+            })
+          );
+          notificationPromises.push(
+            sendPushToUser(emergency.nurseId.toString(), {
+              title: 'تم إلغاء حالة الطوارئ',
+              body: 'تم إلغاء طلب الطوارئ',
+              type: 'status_change',
+              priority: 'high',
+              url: '/nurse',
+              userRole: 'nurse',
+              data: { emergencyRequestId: id, status: body.status },
+            })
+          );
         }
       }
+
+      // Fire ALL notifications in PARALLEL for maximum speed
+      await Promise.allSettled(notificationPromises);
     } catch {
       // Non-critical
     }
