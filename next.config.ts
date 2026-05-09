@@ -126,9 +126,7 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  turbopack: {
-    root: "/home/z/my-project/Aafiatak-v0.1",
-  },
+
 };
 
 export default nextConfig;
