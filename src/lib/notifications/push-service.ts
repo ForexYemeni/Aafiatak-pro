@@ -74,6 +74,8 @@ export async function sendPushToUser(
     if (!tokens.length) return { sent: 0, failed: 0 };
 
     // Build the push payload
+    // IMPORTANT: Include targetUserId so the Service Worker can filter
+    // notifications by the currently logged-in user (multi-user device support)
     const pushPayload = JSON.stringify({
       title: payload.title,
       body: payload.body,
@@ -85,7 +87,10 @@ export async function sendPushToUser(
       priority: payload.priority || 'medium',
       sound: payload.sound !== false,
       tag: payload.tag,
-      data: payload.data || {},
+      data: {
+        ...(payload.data || {}),
+        targetUserId: userId,  // Critical for multi-user device filtering in SW
+      },
       userRole: payload.userRole,
       timestamp: Date.now(),
     });

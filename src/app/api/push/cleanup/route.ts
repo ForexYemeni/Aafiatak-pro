@@ -1,5 +1,7 @@
 // POST /api/push/cleanup - Clean up old inactive push subscriptions
 // Called when a user logs in to ensure their subscriptions are active
+// IMPORTANT: Only cleans up subscriptions for the CURRENT user.
+// Does NOT touch subscriptions belonging to other users (multi-user device support).
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
@@ -14,7 +16,6 @@ export async function POST(request: NextRequest) {
 
     const userId = user!.userId;
 
-    // Deactivate all old subscriptions for this user except the current device
     const body = await request.json().catch(() => ({}));
     const { keepDeviceId } = body;
 
@@ -26,13 +27,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Count active and inactive subscriptions
+    // Count active and inactive subscriptions for THIS USER ONLY
     const [activeCount, inactiveCount] = await Promise.all([
       FCMToken.countDocuments({ userId, isActive: true }),
       FCMToken.countDocuments({ userId, isActive: false }),
     ]);
 
-    // Clean up very old inactive subscriptions (older than 30 days)
+    // Clean up very old inactive subscriptions (older than 30 days) for THIS USER ONLY
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
     const deleteResult = await FCMToken.deleteMany({
       userId,

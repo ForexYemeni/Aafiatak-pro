@@ -256,7 +256,9 @@ export async function POST(request: NextRequest) {
       const firstOrderId = createdOrders[0]._id.toString();
       const totalAmount = createdOrders.reduce((sum: number, o: any) => sum + o.totalPrice, 0);
 
-      // 1️⃣ Notify BENEFICIARY
+      // 1️⃣ Notify BENEFICIARY (confirmation only — low priority, no loud voice alert)
+      //    The beneficiary doesn't need a loud voice alert for their own action.
+      //    They just get a quiet confirmation that the order was received.
       await Notification.create({
         userId: user.userId,
         userRole: 'beneficiary',
@@ -265,10 +267,10 @@ export async function POST(request: NextRequest) {
           ? `تم استلام طلب الطوارئ لخدمة ${serviceNames} وسيتم التعامل معه بأولوية عالية`
           : `تم استلام طلبك لخدمة ${serviceNames} بنجاح${isCashPayment ? '' : ' - يرجى إرسال إثبات الدفع'}`,
         type: isEmergency ? 'emergency' : 'system',
-        priority: isEmergency ? 'urgent' : 'medium',
-        data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: 'true', voiceText: isEmergency ? 'تم استلام طلب الطوارئ وسيتم التعامل معه بأولوية عالية' : `تم استلام طلبك لخدمة ${serviceNames} بنجاح` },
+        priority: isEmergency ? 'medium' : 'low',  // Low priority for beneficiary (just confirmation)
+        data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: isEmergency ? 'true' : 'false', voiceText: isEmergency ? 'تم استلام طلب الطوارئ وسيتم التعامل معه بأولوية عالية' : '' },
         actionUrl: `/beneficiary/orders/${firstOrderId}`,
-        voiceEnabled: true,
+        voiceEnabled: isEmergency ? true : false,  // Only voice for emergency, not for regular orders
         read: false,
       });
 
@@ -278,10 +280,10 @@ export async function POST(request: NextRequest) {
           ? `تم استلام طلب الطوارئ لخدمة ${serviceNames} وسيتم التعامل معه بأولوية عالية`
           : `تم استلام طلبك لخدمة ${serviceNames} بنجاح`,
         type: isEmergency ? 'emergency' : 'system',
-        priority: isEmergency ? 'urgent' : 'medium',
+        priority: isEmergency ? 'medium' : 'low',  // Low priority — beneficiary doesn't need alert
         url: `/beneficiary/orders/${firstOrderId}`,
         userRole: 'beneficiary',
-        data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: true, voiceText: isEmergency ? 'تم استلام طلب الطوارئ وسيتم التعامل معه بأولوية عالية' : `تم استلام طلبك لخدمة ${serviceNames} بنجاح` },
+        data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: isEmergency ? true : false, voiceText: isEmergency ? 'تم استلام طلب الطوارئ وسيتم التعامل معه بأولوية عالية' : '' },
       }).catch(() => {});
 
       // 2️⃣ Notify ADMIN

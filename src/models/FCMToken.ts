@@ -71,11 +71,12 @@ const fcmTokenSchema = new Schema<IFCMToken>(
 );
 
 // ── Indexes ─────────────────────────────────────────────────────────
-// Compound index: one active subscription per device per user
-fcmTokenSchema.index({ userId: 1, deviceId: 1 }, { unique: true });
 // Index for cleanup of expired subscriptions
 fcmTokenSchema.index({ endpoint: 1 });
 fcmTokenSchema.index({ userId: 1, isActive: 1 });
+// Compound index for fast lookup per user per device (NOT unique — same device
+// can have push subscriptions for multiple users on the same browser)
+fcmTokenSchema.index({ userId: 1, deviceId: 1 });
 
 // ── Model ───────────────────────────────────────────────────────────
 const FCMToken: Model<IFCMToken> =

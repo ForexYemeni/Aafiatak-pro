@@ -1,5 +1,11 @@
 // POST /api/push/subscribe - Register a Web Push subscription
 // DELETE /api/push/subscribe - Unregister a Web Push subscription
+//
+// MULTI-USER DEVICE SUPPORT:
+// The same push subscription (endpoint) can be registered for multiple users
+// on the same device. When User A logs in and registers, then User B logs in
+// on the same device, we register the SAME subscription for User B too.
+// This way, both users can receive push notifications on this device.
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
@@ -23,8 +29,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Upsert: update if exists, create if not
-    const filter = { userId: user!.userId, deviceId: deviceId || 'default' };
+    const userId = user!.userId;
+    const effectiveDeviceId = deviceId || 'default';
+
+    // Upsert: update if exists for THIS user and device, create if not
+    // This allows the same endpoint to be registered for multiple users
+    const filter = { userId, deviceId: effectiveDeviceId };
     const update = {
       endpoint,
       p256dh: keys.p256dh,

@@ -516,6 +516,7 @@ function PushSubscriptionManager() {
         const registration = await navigator.serviceWorker.ready;
 
         // 2. Send auth data to SW so it can re-subscribe on pushsubscriptionchange
+        //    Also stores the CURRENT user ID so the SW can filter push notifications
         if (registration.active) {
           let deviceId = localStorage.getItem('aafiatak-device-id');
           if (!deviceId) {
@@ -524,7 +525,7 @@ function PushSubscriptionManager() {
           }
           registration.active.postMessage({
             type: 'STORE_AUTH_DATA',
-            payload: { token, userId: user.id, deviceId },
+            payload: { token, userId: user.id, deviceId, userRole: user.role },
           });
         }
 
@@ -544,7 +545,12 @@ function PushSubscriptionManager() {
         let subscription = await registration.pushManager.getSubscription();
 
         // 5. Validate subscription with server — check if it's still active
+        //    CRITICAL: We check for BOTH the current user AND any other user.
+        //    If the subscription belongs to another user (e.g., Admin logged in
+        //    before Beneficiary on the same device), we must NOT destroy it.
+        //    Instead, we register the SAME subscription for the current user too.
         let needsResubscribe = false;
+        let belongsToOtherUser = false;
 
         if (subscription) {
           // Check if this subscription is registered on the server
@@ -558,8 +564,22 @@ function PushSubscriptionManager() {
               body: JSON.stringify({ endpoint: subscription.endpoint }),
             });
             const checkData = await checkResponse.json();
-            if (!checkData.success || !checkData.data?.isActive) {
-              needsResubscribe = true;
+            if (checkData.success && checkData.data) {
+              if (checkData.data.isActive) {
+                // Subscription is active for current user — perfect, no action needed
+                needsResubscribe = false;
+              } else if (checkData.data.belongsToOtherUser) {
+                // Subscription exists for ANOTHER user on this device!
+                // DO NOT unsubscribe it — just register it for the current user too
+                belongsToOtherUser = true;
+                needsResubscribe = false;
+              } else {
+                // Subscription not found for any user — create new one
+                needsResubscribe = true;
+              }
+            } else {
+              // API check failed — assume subscription is OK
+              needsResubscribe = false;
             }
           } catch {
             // If check fails, assume subscription is OK (don't unnecessarily re-subscribe)
@@ -569,8 +589,9 @@ function PushSubscriptionManager() {
         }
 
         // 6. If no valid subscription, create one
+        //    ONLY unsubscribe if the subscription doesn't belong to anyone
         if (needsResubscribe) {
-          // Unsubscribe old one if exists
+          // Unsubscribe old one if exists and doesn't belong to another user
           if (subscription) {
             try { await subscription.unsubscribe(); } catch {}
           }
@@ -592,9 +613,12 @@ function PushSubscriptionManager() {
           });
 
           console.log('[PUSH] New push subscription created');
+        } else if (belongsToOtherUser) {
+          console.log('[PUSH] Reusing existing subscription from another user (multi-user device)');
         }
 
         // 7. Always register/update the subscription on the server
+        //    This ensures the current user has a FCMToken record for this endpoint
         let deviceId = localStorage.getItem('aafiatak-device-id');
         if (!deviceId) {
           deviceId = `device-${Date.now()}-${Math.random().toString(36).slice(2)}`;

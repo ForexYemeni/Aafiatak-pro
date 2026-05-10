@@ -5,9 +5,9 @@
 // Pure Web Push Protocol — NO Firebase dependency.
 // ============================================================================
 
-const CACHE_NAME = 'aafiatak-v6';
-const STATIC_CACHE = 'aafiatak-static-v6';
-const API_CACHE_NAME = 'aafiatak-api-v6';
+const CACHE_NAME = 'aafiatak-v7';
+const STATIC_CACHE = 'aafiatak-static-v7';
+const API_CACHE_NAME = 'aafiatak-api-v7';
 const API_CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 
 // Assets to pre-cache
@@ -206,6 +206,14 @@ function getNotificationActions(type, priority) {
  * Push event handler — fires even when the app is closed (background push).
  * IMPORTANT: This shows the browser notification AND sends a message to
  * any open app windows so they can play the notification sound.
+ *
+ * MULTI-USER DEVICE SUPPORT:
+ * When multiple users share the same browser (e.g., Admin logs out, Beneficiary
+ * logs in), the same push subscription may be registered for multiple users.
+ * We need to:
+ * 1. Always show the browser notification (so the user sees it even when logged out)
+ * 2. Only send foreground sound/TTS to the app if the notification is for the
+ *    CURRENTLY logged-in user (to avoid playing sounds for wrong user)
  */
 self.addEventListener('push', (event) => {
   let payload = {
@@ -232,30 +240,48 @@ self.addEventListener('push', (event) => {
   const priority = payload.priority || 'medium';
   const vibrate = VIBRATIONS[priority] || VIBRATIONS.medium;
 
-  // ── KEY FIX: Send message to ALL open app windows ──
-  // This allows the foreground app to play the notification sound
   event.waitUntil(
     (async () => {
+      // ── MULTI-USER FILTERING ──
+      // Determine if this push notification is for the currently logged-in user.
+      // The auth data is stored by PushSubscriptionManager via STORE_AUTH_DATA message.
+      const authData = self._authData || null;
+      const currentUserId = authData?.userId || null;
+      const notificationTargetUserId = payload.data?.targetUserId || null;
+
+      // If we know who's logged in AND the notification has a target user,
+      // check if they match. If they don't match, this notification is for
+      // a user who logged out (or a different user on this device).
+      const isForCurrentUser = !notificationTargetUserId || !currentUserId || notificationTargetUserId === currentUserId;
+
       // 1. Send message to all open windows so they can play sound
-      const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
-      for (const client of allClients) {
-        client.postMessage({
-          type: 'PUSH_NOTIFICATION_RECEIVED',
-          payload: {
-            title: payload.title,
-            body: payload.body,
-            type: payload.type,
-            priority: priority,
-            sound: payload.sound !== false,
-            data: payload.data,
-          },
-        });
+      //    BUT only if this notification is for the currently logged-in user
+      if (isForCurrentUser) {
+        const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+        for (const client of allClients) {
+          client.postMessage({
+            type: 'PUSH_NOTIFICATION_RECEIVED',
+            payload: {
+              title: payload.title,
+              body: payload.body,
+              type: payload.type,
+              priority: priority,
+              sound: payload.sound !== false,
+              data: payload.data,
+            },
+          });
+        }
       }
 
-      // 2. Show browser notification (this handles the case when app is in background/closed)
-      //    With silent: false, the OS will play its default notification sound
+      // 2. ALWAYS show browser notification — even if it's for a different user.
+      //    This is crucial for the case where the Admin is logged out but
+      //    still needs to see notifications on this device.
+      //    When a different user is logged in, we add a visual indicator.
+      const displayTitle = isForCurrentUser ? payload.title : `[${payload.title}]`;
+      const displayBody = isForCurrentUser ? payload.body : `إشعار لحساب آخر - ${payload.body}`;
+
       const options = {
-        body: payload.body,
+        body: displayBody,
         icon: payload.icon,
         badge: payload.badge,
         image: payload.image,
@@ -267,6 +293,8 @@ self.addEventListener('push', (event) => {
           priority,
           url: getNotificationUrl(payload.data || {}),
           userRole: payload.data?.userRole || payload.userRole,
+          targetUserId: notificationTargetUserId,
+          isForCurrentUser,
           timestamp: Date.now(),
         },
         dir: 'rtl',
@@ -276,7 +304,7 @@ self.addEventListener('push', (event) => {
         actions: getNotificationActions(payload.type, priority),
       };
 
-      await self.registration.showNotification(payload.title, options);
+      await self.registration.showNotification(displayTitle, options);
     })()
   );
 });
