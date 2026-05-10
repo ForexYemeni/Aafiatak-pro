@@ -237,17 +237,10 @@ export const useAuthStore = create<AuthState>()(
           }
         }
 
-        // Clear local state immediately
-        set({
-          user: null,
-          token: null,
-          refreshToken: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null,
-        });
+        // Save token before clearing state (for API call)
+        const currentToken = get().token;
 
-        // Clear persisted storage immediately
+        // Clear persisted storage immediately (before state change to prevent re-render)
         if (typeof window !== 'undefined') {
           try {
             localStorage.removeItem('aafiatak-auth-storage');
@@ -256,28 +249,36 @@ export const useAuthStore = create<AuthState>()(
           }
         }
 
-        // Await the logout API call to ensure the HttpOnly cookie is cleared,
-        // THEN navigate. Use a timeout fallback to prevent hanging.
-        const navigateHome = () => {
-          if (typeof window !== 'undefined') {
-            window.location.href = '/?logout=true';
-          }
-        };
+        // IMPORTANT: Navigate FIRST before clearing state
+        // This prevents components from re-rendering with user=null
+        // which causes errors (e.g., user.name throws TypeError)
+        if (typeof window !== 'undefined') {
+          // Fire-and-forget the logout API call with the saved token
+          // This clears the HttpOnly cookie on the server side
+          fetch('/api/auth/logout', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: currentToken ? { 'Authorization': `Bearer ${currentToken}` } : {},
+          }).catch(() => {
+            // Ignore API errors — cookie will expire naturally
+          });
 
-        // Try to call the logout API with a 3-second timeout
-        const logoutPromise = fetch('/api/auth/logout', {
-          method: 'POST',
-          credentials: 'same-origin',
-        }).catch(() => {
-          // Ignore API errors
+          // Navigate IMMEDIATELY — don't wait for API response
+          // Using window.location.href for a full page reload ensures
+          // all state is cleanly reset and no stale renders occur
+          window.location.href = '/?logout=true';
+        }
+
+        // Clear local state after navigation is initiated
+        // (these changes won't trigger re-renders since the page is unloading)
+        set({
+          user: null,
+          token: null,
+          refreshToken: null,
+          isAuthenticated: false,
+          isLoading: false,
+          error: null,
         });
-
-        // Race: if API doesn't respond in 3 seconds, navigate anyway
-        const timeoutPromise = new Promise<void>((resolve) => {
-          setTimeout(resolve, 3000);
-        });
-
-        Promise.race([logoutPromise, timeoutPromise]).then(navigateHome);
       },
 
       // ---- Refresh Token ----
