@@ -28,13 +28,15 @@ import {
   UserPlus,
   Settings,
   Briefcase,
+  Hash,
+  Circle,
 } from 'lucide-react';
 import { StatCard } from '@/components/common/stat-card';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { Currency } from '@/components/common/currency';
-import { DateFormatter } from '@/components/common/date-formatter';
+import { DateFormatter, toArabicNum } from '@/components/common/date-formatter';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -595,7 +597,7 @@ export default function AdminDashboardPage() {
 
       {/* Main Content Grid */}
       <motion.div variants={item} className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Recent Orders - Enhanced */}
+        {/* Recent Orders - Enhanced Card-Based */}
         <GlassCard variant="admin" className="lg:col-span-2" noPadding>
           <div className="p-5 pb-0">
             <div className="flex items-center justify-between mb-4">
@@ -616,47 +618,85 @@ export default function AdminDashboardPage() {
               </Link>
             </div>
           </div>
-          <div className="overflow-x-auto custom-scrollbar">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">المستفيد</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">الخدمة</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">الحالة</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">المبلغ</th>
-                  <th className="text-right text-xs font-medium text-muted-foreground px-5 py-3">التاريخ</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentOrders.length === 0 ? (
-                  <tr>
-                    <td colSpan={5} className="text-center py-8 text-muted-foreground">
-                      لا توجد طلبات حديثة
-                    </td>
-                  </tr>
-                ) : (
-                  recentOrders.map((order) => (
-                    <tr key={order.id} className="border-b border-border/50 hover:bg-accent/20 transition-colors cursor-pointer" onClick={() => setSelectedOrder(order)}>
-                      <td className="px-5 py-3 text-sm font-medium">{order.beneficiaryName}</td>
-                      <td className="px-5 py-3 text-sm text-muted-foreground">{order.serviceName}</td>
-                      <td className="px-5 py-3">
-                        <BadgeStatus status={order.status} size="sm" />
-                      </td>
-                      <td className="px-5 py-3 text-sm font-semibold">
-                        <Currency amount={order.totalPrice} />
-                      </td>
-                      <td className="px-5 py-3 text-sm text-muted-foreground">
-                        <DateFormatter date={order.createdAt} format="short" />
-                      </td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+          <div className="px-4 pb-4 space-y-2">
+            {recentOrders.length === 0 ? (
+              <div className="text-center py-8">
+                <ClipboardList className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">لا توجد طلبات حديثة</p>
+              </div>
+            ) : (
+              recentOrders.map((order, idx) => {
+                const statusColorMap: Record<string, string> = {
+                  pending: 'bg-amber-500',
+                  confirmed: 'bg-sky-500',
+                  assigned: 'bg-teal-500',
+                  in_progress: 'bg-orange-500',
+                  completed: 'bg-emerald-500',
+                  cancelled: 'bg-red-500',
+                };
+                const avatarColor = statusColorMap[order.status] || 'bg-gray-500';
+                const firstLetter = order.beneficiaryName?.charAt(0) || '؟';
+                const now = Date.now();
+                const then = new Date(order.createdAt).getTime();
+                const diffSec = Math.floor((now - then) / 1000);
+                let timeAgo = '';
+                if (diffSec < 60) timeAgo = `منذ ${toArabicNum(diffSec)} ثانية`;
+                else if (diffSec < 3600) timeAgo = `منذ ${toArabicNum(Math.floor(diffSec / 60))} دقيقة`;
+                else if (diffSec < 86400) timeAgo = `منذ ${toArabicNum(Math.floor(diffSec / 3600))} ساعة`;
+                else timeAgo = `منذ ${toArabicNum(Math.floor(diffSec / 86400))} يوم`;
+
+                return (
+                  <motion.div
+                    key={order.id}
+                    whileHover={{ scale: 1.01, boxShadow: '0 4px 12px rgba(0,0,0,0.08)' }}
+                    whileTap={{ scale: 0.99 }}
+                    onClick={() => setSelectedOrder(order)}
+                    className={`flex items-center gap-3 p-3 rounded-xl cursor-pointer transition-colors ${
+                      idx % 2 === 0 ? 'bg-muted/20' : 'bg-transparent'
+                    } hover:bg-admin/5 border border-transparent hover:border-admin/10`}
+                  >
+                    {/* Avatar with first letter */}
+                    <div className={`w-10 h-10 rounded-full ${avatarColor} flex items-center justify-center shrink-0 text-white font-bold text-sm`}>
+                      {firstLetter}
+                    </div>
+
+                    {/* Beneficiary name + phone */}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-bold truncate">{order.beneficiaryName}</p>
+                      <p className="text-[10px] text-muted-foreground">{order.id.slice(-6).toUpperCase()}</p>
+                    </div>
+
+                    {/* Service name pill */}
+                    <span className="text-[10px] px-2.5 py-1 rounded-full bg-muted/60 text-muted-foreground font-medium truncate max-w-[100px]">
+                      {order.serviceName}
+                    </span>
+
+                    {/* Status badge */}
+                    <BadgeStatus status={order.status} size="sm" />
+
+                    {/* Amount */}
+                    <div className="text-left shrink-0">
+                      <div className="flex items-center gap-1">
+                        <Banknote className="w-3.5 h-3.5 text-emerald-500" />
+                        <span className="text-sm font-bold text-emerald-600 dark:text-emerald-400">
+                          <Currency amount={order.totalPrice} />
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Time since */}
+                    <span className="text-[10px] text-muted-foreground shrink-0 whitespace-nowrap flex items-center gap-1">
+                      <Clock className="w-3 h-3" />
+                      {timeAgo}
+                    </span>
+                  </motion.div>
+                );
+              })
+            )}
           </div>
         </GlassCard>
 
-        {/* Recent Registrations - Enhanced */}
+        {/* Recent Registrations - Timeline Design */}
         <GlassCard variant="admin">
           <GlassCardHeader>
             <div className="flex items-center justify-between">
@@ -672,29 +712,63 @@ export default function AdminDashboardPage() {
             </div>
           </GlassCardHeader>
           <GlassCardContent>
-            <div className="space-y-3 max-h-72 overflow-y-auto custom-scrollbar">
+            <div className="space-y-0 max-h-80 overflow-y-auto custom-scrollbar">
               {recentRegistrations.length === 0 ? (
                 <div className="text-center py-8">
                   <Users className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
                   <p className="text-sm text-muted-foreground">لا توجد تسجيلات حديثة</p>
                 </div>
               ) : (
-                recentRegistrations.map((reg) => (
-                  <div key={`${reg.type}-${reg.id}`} className="flex items-center gap-3 p-2 rounded-xl hover:bg-accent/20 transition-colors">
-                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
-                      reg.type === 'nurse' ? 'bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-400' : 'bg-violet-100 text-violet-700 dark:bg-violet-900/30 dark:text-violet-400'
-                    }`}>
-                      {reg.type === 'nurse' ? <Stethoscope className="w-5 h-5" /> : <Users className="w-5 h-5" />}
+                recentRegistrations.map((reg, idx) => {
+                  const isLast = idx === recentRegistrations.length - 1;
+                  const now = Date.now();
+                  const then = new Date(reg.createdAt).getTime();
+                  const diffSec = Math.floor((now - then) / 1000);
+                  let timeAgo = '';
+                  if (diffSec < 60) timeAgo = `منذ ${toArabicNum(diffSec)} ثانية`;
+                  else if (diffSec < 3600) timeAgo = `منذ ${toArabicNum(Math.floor(diffSec / 60))} دقيقة`;
+                  else if (diffSec < 86400) timeAgo = `منذ ${toArabicNum(Math.floor(diffSec / 3600))} ساعة`;
+                  else timeAgo = `منذ ${toArabicNum(Math.floor(diffSec / 86400))} يوم`;
+
+                  return (
+                    <div key={`${reg.type}-${reg.id}`} className="relative flex gap-3">
+                      {/* Timeline connector line */}
+                      {!isLast && (
+                        <div className="absolute right-[19px] top-10 bottom-0 w-0.5 bg-muted/50" />
+                      )}
+
+                      {/* Colored icon circle */}
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 z-10 ${
+                        reg.type === 'nurse'
+                          ? 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400'
+                          : 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400'
+                      }`}>
+                        {reg.type === 'nurse' ? <Stethoscope className="w-4 h-4" /> : <Users className="w-4 h-4" />}
+                      </div>
+
+                      {/* Content */}
+                      <div className={`flex-1 min-w-0 pb-4 ${isLast ? 'pb-0' : ''}`}>
+                        <div className="flex items-center justify-between gap-2">
+                          <div className="flex items-center gap-2 min-w-0">
+                            <p className="text-sm font-bold truncate">{reg.name}</p>
+                            <span className={`text-[9px] px-1.5 py-0.5 rounded-full font-medium shrink-0 ${
+                              reg.type === 'nurse'
+                                ? 'bg-sky-100 text-sky-600 dark:bg-sky-900/30 dark:text-sky-400'
+                                : 'bg-violet-100 text-violet-600 dark:bg-violet-900/30 dark:text-violet-400'
+                            }`}>
+                              {reg.type === 'nurse' ? 'ممرض/ـة' : 'مستفيد/ـة'}
+                            </span>
+                          </div>
+                          <BadgeStatus status={reg.status} size="sm" />
+                        </div>
+                        <div className="flex items-center gap-1 mt-1">
+                          <Clock className="w-3 h-3 text-muted-foreground" />
+                          <span className="text-[10px] text-muted-foreground">{timeAgo}</span>
+                        </div>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{reg.name}</p>
-                      <p className="text-xs text-muted-foreground">
-                        {reg.type === 'nurse' ? 'ممرض/ـة' : 'مستفيد/ـة'}
-                      </p>
-                    </div>
-                    <BadgeStatus status={reg.status} size="sm" />
-                  </div>
-                ))
+                  );
+                })
               )}
             </div>
           </GlassCardContent>

@@ -7,7 +7,8 @@ import {
   MapPin, Navigation, Siren, CheckCircle2, X, Loader2, Zap, Timer,
   User, Star, ShieldAlert, Ambulance, Search, Filter, ChevronDown,
   Radio, CircleDot, Activity, Stethoscope, Heart, Flame, TrendingUp,
-  Users, Wifi, WifiOff, Sparkles, ArrowUpRight, XCircle, CircleCheck
+  Users, Wifi, WifiOff, Sparkles, ArrowUpRight, XCircle, CircleCheck,
+  Banknote
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -99,12 +100,20 @@ const statusConfig: Record<string, { label: string; color: string; dotColor: str
   cancelled:   { label: 'ملغي',         color: 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',         dotColor: 'bg-gray-500' },
 };
 
-const priorityConfig: Record<string, { label: string; color: string; glow: string }> = {
-  low:    { label: 'منخفض', color: 'border-green-400 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300', glow: '' },
-  medium: { label: 'متوسط', color: 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300', glow: '' },
-  high:   { label: 'مرتفع', color: 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300', glow: 'shadow-orange-500/20 shadow-md' },
-  urgent: { label: 'عاجل',  color: 'border-red-400 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300', glow: 'shadow-red-500/30 shadow-lg animate-pulse' },
+const priorityConfig: Record<string, { label: string; color: string; glow: string; border: string }> = {
+  low:    { label: 'منخفض', color: 'border-green-400 bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300', glow: '', border: 'border-l-green-500' },
+  medium: { label: 'متوسط', color: 'border-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300', glow: '', border: 'border-l-yellow-500' },
+  high:   { label: 'مرتفع', color: 'border-orange-400 bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300', glow: 'shadow-orange-500/20 shadow-md', border: 'border-l-orange-500' },
+  urgent: { label: 'عاجل',  color: 'border-red-400 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300', glow: 'shadow-red-500/30 shadow-lg animate-pulse', border: 'border-l-red-500' },
 };
+
+const emergencySteps = [
+  { key: 'pending', label: 'معلق' },
+  { key: 'dispatched', label: 'مرسل' },
+  { key: 'accepted', label: 'في الطريق' },
+  { key: 'in_progress', label: 'قيد التنفيذ' },
+  { key: 'resolved', label: 'تم الحل' },
+];
 
 /* ─────────────── Helpers ─────────────── */
 function getWhatsAppUrl(phone: string) {
@@ -482,15 +491,12 @@ export default function AdminEmergenciesPage() {
               const TypeIcon = typeIconMap[em.type] || ShieldAlert;
 
               return (
-                <motion.div key={em.id} {...cardHover} className={`rounded-2xl border bg-card shadow-sm transition-all hover:shadow-lg ${pc.glow}`}>
-                  {/* Priority Strip */}
-                  <div className={`h-1.5 rounded-t-2xl ${tc.bg}`} />
-
+                <motion.div key={em.id} {...cardHover} className={`rounded-2xl border bg-card shadow-sm transition-all hover:shadow-lg ${pc.glow} border-l-4 ${pc.border} ${em.priority === 'urgent' ? 'ring-2 ring-red-500/30' : em.priority === 'high' ? 'ring-1 ring-orange-500/20' : ''}`}>
                   <div className="p-4 space-y-3">
                     {/* Header Row */}
                     <div className="flex items-start justify-between gap-2">
                       <div className="flex items-center gap-2.5">
-                        <div className={`w-10 h-10 rounded-xl ${tc.icon} flex items-center justify-center`}>
+                        <div className={`w-10 h-10 rounded-xl ${tc.icon} flex items-center justify-center ${em.priority === 'urgent' && em.status === 'pending' ? 'animate-pulse' : ''}`}>
                           <TypeIcon className={`w-5 h-5 ${tc.text}`} />
                         </div>
                         <div>
@@ -505,7 +511,38 @@ export default function AdminEmergenciesPage() {
                         <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${sc.color}`}>
                           {sc.label}
                         </span>
+                        {em.status === 'pending' && (
+                          <span className="w-5 h-5 rounded-full bg-yellow-500 text-white flex items-center justify-center text-[10px] font-bold animate-pulse">!</span>
+                        )}
                       </div>
+                    </div>
+
+                    {/* Response Timer */}
+                    {isActive(em.status) && (
+                      <div className={`flex items-center gap-1.5 text-xs font-medium ${
+                        em.priority === 'urgent' ? 'text-red-600 dark:text-red-400' : em.priority === 'high' ? 'text-orange-600 dark:text-orange-400' : 'text-muted-foreground'
+                      }`}>
+                        <Timer className={`w-3.5 h-3.5 ${em.priority === 'urgent' ? 'animate-pulse' : ''}`} />
+                        <span>{getTimeAgo(em.createdAt)}</span>
+                        {em.priority === 'urgent' && <span className="text-[9px] text-red-500">⏱ ينتظر!</span>}
+                      </div>
+                    )}
+
+                    {/* Status Progress Indicator */}
+                    <div className="flex items-center gap-1">
+                      {emergencySteps.map((step, stepIdx) => {
+                        const currentStepIdx = emergencySteps.findIndex(s => s.key === em.status);
+                        const isCompleted = stepIdx < currentStepIdx;
+                        const isCurrent = step.key === em.status;
+                        return (
+                          <div key={step.key} className="flex items-center gap-1 flex-1">
+                            <div className={`flex-1 h-1 rounded-full transition-all ${
+                              isCompleted ? 'bg-green-500' : isCurrent ? 'bg-admin' : 'bg-muted/50'
+                            }`} />
+                            {stepIdx < emergencySteps.length - 1 && null}
+                          </div>
+                        );
+                      })}
                     </div>
 
                     {/* Beneficiary Info */}
@@ -520,8 +557,12 @@ export default function AdminEmergenciesPage() {
                         {em.beneficiaryPhone && (
                           <div className="flex items-center gap-1.5">
                             <span className="text-[10px] text-muted-foreground">{em.beneficiaryPhone}</span>
-                            <a href={`tel:${em.beneficiaryPhone}`} className="text-blue-500 hover:text-blue-600"><Phone className="w-3 h-3" /></a>
-                            <a href={getWhatsAppUrl(em.beneficiaryPhone)} target="_blank" rel="noopener noreferrer" className="text-green-500 hover:text-green-600"><MessageCircle className="w-3 h-3" /></a>
+                            <a href={`tel:${em.beneficiaryPhone}`} className="w-5 h-5 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors">
+                              <Phone className="w-2.5 h-2.5" />
+                            </a>
+                            <a href={getWhatsAppUrl(em.beneficiaryPhone)} target="_blank" rel="noopener noreferrer" className="w-5 h-5 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors">
+                              <MessageCircle className="w-2.5 h-2.5" />
+                            </a>
                           </div>
                         )}
                       </div>
@@ -532,17 +573,24 @@ export default function AdminEmergenciesPage() {
                       <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">{em.description}</p>
                     )}
 
-                    {/* Location & Time Row */}
+                    {/* Location & Map */}
                     <div className="flex items-center gap-3 text-[11px] text-muted-foreground">
-                      <div className="flex items-center gap-1">
-                        <Clock className="w-3.5 h-3.5" />
-                        <span>{getTimeAgo(em.createdAt)}</span>
-                      </div>
                       {em.address && (
                         <div className="flex items-center gap-1 flex-1 min-w-0">
                           <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" />
                           <span className="truncate">{em.address}</span>
                         </div>
+                      )}
+                      {em.lat && em.lng && (
+                        <a
+                          href={`https://www.google.com/maps?q=${em.lat},${em.lng}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-1 text-blue-600 hover:text-blue-700 shrink-0"
+                        >
+                          <Navigation className="w-3 h-3" />
+                          <span className="text-[10px]">عرض الخريطة</span>
+                        </a>
                       )}
                     </div>
 
@@ -567,7 +615,7 @@ export default function AdminEmergenciesPage() {
                       {em.status === 'pending' && (
                         <Button
                           size="sm"
-                          className="h-8 text-xs gap-1 flex-1 bg-admin hover:bg-admin/90 text-white"
+                          className="h-8 text-xs gap-1 flex-1 bg-admin hover:bg-admin/90 text-white shadow-sm"
                           onClick={() => {
                             setAssignTarget(em);
                             void fetchNearbyNurses(em);
@@ -605,22 +653,31 @@ export default function AdminEmergenciesPage() {
         </motion.div>
       )}
 
-      {/* ── Resolved/Closed Emergencies ── */}
+      {/* ── Resolved/Closed Emergencies - Accordion Style ── */}
       {resolvedEmergencies.length > 0 && (
         <motion.div variants={itemAnim}>
-          <div className="flex items-center gap-2 mb-4">
-            <CheckCircle2 className="w-5 h-5 text-green-500" />
-            <h2 className="text-lg font-bold">الحالات المنتهية</h2>
-            <Badge variant="secondary" className="text-xs">{toArabicNum(resolvedEmergencies.length)}</Badge>
-          </div>
-          <div className="space-y-2">
+          <button
+            onClick={() => {
+              const el = document.getElementById('resolved-section');
+              if (el) el.classList.toggle('hidden');
+            }}
+            className="w-full flex items-center justify-between mb-3 group"
+          >
+            <div className="flex items-center gap-2">
+              <CheckCircle2 className="w-5 h-5 text-green-500" />
+              <h2 className="text-lg font-bold">الحالات المنتهية</h2>
+              <Badge variant="secondary" className="text-xs">{toArabicNum(resolvedEmergencies.length)}</Badge>
+            </div>
+            <ChevronDown className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+          </button>
+          <div id="resolved-section" className="space-y-2">
             {resolvedEmergencies.map((em) => {
               const sc = statusConfig[em.status] || statusConfig.resolved;
               const tc = typeColors[em.type] || typeColors.other;
 
               return (
                 <motion.div key={em.id} {...cardHover}>
-                  <GlassCard variant="admin" className="p-3 opacity-80 hover:opacity-100 transition-opacity">
+                  <GlassCard variant="admin" className="p-3 opacity-70 hover:opacity-100 transition-opacity border-l-4 border-l-green-400">
                     <div className="flex items-center gap-3">
                       <div className={`w-9 h-9 rounded-lg ${tc.icon} flex items-center justify-center`}>
                         <ShieldAlert className={`w-4 h-4 ${tc.text}`} />
@@ -686,6 +743,34 @@ export default function AdminEmergenciesPage() {
 
             return (
               <div className="space-y-4">
+                {/* Horizontal Status Stepper */}
+                <div className="flex items-center gap-1 p-2 rounded-xl bg-muted/30">
+                  {emergencySteps.map((step, stepIdx) => {
+                    const currentStepIdx = emergencySteps.findIndex(s => s.key === viewTarget.status);
+                    const isCompleted = stepIdx < currentStepIdx;
+                    const isCurrent = step.key === viewTarget.status;
+                    return (
+                      <div key={step.key} className="flex items-center gap-1 flex-1">
+                        <div className="flex flex-col items-center gap-1 flex-1">
+                          <div className={`w-6 h-6 rounded-full flex items-center justify-center text-[9px] font-bold transition-all ${
+                            isCompleted ? 'bg-green-500 text-white' : isCurrent ? 'bg-admin text-white' : 'bg-muted text-muted-foreground'
+                          }`}>
+                            {isCompleted ? '✓' : stepIdx + 1}
+                          </div>
+                          <span className={`text-[8px] font-medium leading-tight text-center ${
+                            isCompleted ? 'text-green-600 dark:text-green-400' : isCurrent ? 'text-admin font-bold' : 'text-muted-foreground'
+                          }`}>
+                            {step.label}
+                          </span>
+                        </div>
+                        {stepIdx < emergencySteps.length - 1 && (
+                          <div className={`h-0.5 flex-1 rounded-full mt-[-12px] ${isCompleted ? 'bg-green-500' : 'bg-muted/50'}`} />
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+
                 {/* Emergency Header */}
                 <div className={`rounded-2xl border-2 p-4 ${
                   isActive(viewTarget.status)
@@ -694,7 +779,7 @@ export default function AdminEmergenciesPage() {
                 }`}>
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className={`w-14 h-14 rounded-xl ${tc.icon} flex items-center justify-center ${isActive(viewTarget.status) ? 'animate-pulse' : ''}`}>
+                      <div className={`w-14 h-14 rounded-xl ${tc.icon} flex items-center justify-center ${isActive(viewTarget.status) && viewTarget.priority === 'urgent' ? 'animate-pulse' : ''}`}>
                         <TypeIcon className={`w-7 h-7 ${tc.text}`} />
                       </div>
                       <div>
@@ -711,98 +796,121 @@ export default function AdminEmergenciesPage() {
                   </div>
                 </div>
 
-                {/* Time */}
-                <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                  <Clock className="w-4 h-4" />
-                  <span>تم الإرسال {getTimeAgo(viewTarget.createdAt)}</span>
+                {/* Time with icon header */}
+                <div className="flex items-center gap-2 p-3 rounded-xl bg-muted/30">
+                  <Clock className="w-4 h-4 text-muted-foreground" />
+                  <div className="flex-1">
+                    <span className="text-sm font-medium">تم الإرسال {getTimeAgo(viewTarget.createdAt)}</span>
+                  </div>
+                  {viewTarget.priority === 'urgent' && isActive(viewTarget.status) && (
+                    <span className="text-xs text-red-500 font-bold animate-pulse flex items-center gap-1">
+                      <Timer className="w-3.5 h-3.5" /> ينتظر!
+                    </span>
+                  )}
                 </div>
 
-                {/* Description */}
+                {/* Description with section header */}
                 {viewTarget.description && (
                   <div className="rounded-xl bg-muted/40 p-3">
-                    <p className="text-[10px] text-muted-foreground mb-1 font-medium">الوصف</p>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Activity className="w-3.5 h-3.5 text-muted-foreground" />
+                      <p className="text-[10px] text-muted-foreground font-bold">الوصف</p>
+                    </div>
                     <p className="text-sm leading-relaxed">{viewTarget.description}</p>
                   </div>
                 )}
 
-                {/* Beneficiary & Nurse */}
+                {/* Beneficiary & Nurse with section headers */}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-xl bg-muted/40 p-3">
-                    <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">المستفيد</p>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <User className="w-3.5 h-3.5 text-muted-foreground" />
+                      <p className="text-[10px] text-muted-foreground font-bold">المستفيد</p>
+                    </div>
                     <p className="text-sm font-medium">{viewTarget.beneficiaryName}</p>
                     {viewTarget.beneficiaryPhone && (
-                      <div className="flex items-center gap-1.5 mt-1.5">
+                      <div className="flex items-center gap-2 mt-1.5">
                         <span className="text-xs text-muted-foreground">{viewTarget.beneficiaryPhone}</span>
-                        <a href={`tel:${viewTarget.beneficiaryPhone}`}><Phone className="w-3 h-3 text-blue-500" /></a>
-                        <a href={getWhatsAppUrl(viewTarget.beneficiaryPhone)} target="_blank" rel="noopener noreferrer"><MessageCircle className="w-3 h-3 text-green-500" /></a>
+                        <a href={`tel:${viewTarget.beneficiaryPhone}`} className="w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-blue-600 hover:bg-blue-200 dark:hover:bg-blue-900/50 transition-colors">
+                          <Phone className="w-3 h-3" />
+                        </a>
+                        <a href={getWhatsAppUrl(viewTarget.beneficiaryPhone)} target="_blank" rel="noopener noreferrer" className="w-6 h-6 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center text-green-600 hover:bg-green-200 dark:hover:bg-green-900/50 transition-colors">
+                          <MessageCircle className="w-3 h-3" />
+                        </a>
                       </div>
                     )}
                   </div>
                   <div className="rounded-xl bg-muted/40 p-3">
-                    <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">الممرض/ـة</p>
+                    <div className="flex items-center gap-1.5 mb-2">
+                      <Stethoscope className="w-3.5 h-3.5 text-muted-foreground" />
+                      <p className="text-[10px] text-muted-foreground font-bold">الممرض/ـة</p>
+                    </div>
                     <p className="text-sm font-medium">{viewTarget.nurseName ?? 'غير معيَّن'}</p>
                   </div>
                 </div>
 
-                {/* Fee */}
+                {/* Fee with section header */}
                 {viewTarget.emergencyFee && (
                   <div className="flex items-center justify-between p-3 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/30">
-                    <span className="text-xs text-muted-foreground">رسوم الطوارئ</span>
+                    <div className="flex items-center gap-1.5">
+                      <Banknote className="w-3.5 h-3.5 text-red-500" />
+                      <span className="text-xs text-muted-foreground font-bold">رسوم الطوارئ</span>
+                    </div>
                     <span className="font-bold text-red-600 text-sm">{viewTarget.emergencyFee.toLocaleString('ar-YE')} ر.ي</span>
                   </div>
                 )}
 
-                {/* Location */}
+                {/* Location with section header */}
                 {viewTarget.address && (
                   <div className="rounded-xl bg-muted/40 p-3">
                     <div className="flex items-center gap-1.5 mb-1">
                       <MapPin className="w-3.5 h-3.5 text-red-500" />
-                      <p className="text-[10px] text-muted-foreground font-medium">العنوان</p>
+                      <p className="text-[10px] text-muted-foreground font-bold">العنوان</p>
                     </div>
                     <p className="text-sm font-medium">{viewTarget.address}</p>
                     {viewTarget.lat && viewTarget.lng && (
-                      <a href={`https://www.google.com/maps?q=${viewTarget.lat},${viewTarget.lng}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 text-xs text-blue-600 mt-1 hover:underline">
-                        <Navigation className="w-3 h-3" /> عرض على الخريطة
+                      <a href={`https://www.google.com/maps?q=${viewTarget.lat},${viewTarget.lng}`} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1.5 text-xs text-blue-600 mt-1.5 hover:underline font-medium">
+                        <Navigation className="w-3.5 h-3.5" /> عرض على الخريطة
                       </a>
                     )}
                   </div>
                 )}
 
-                {/* Quick Actions in Detail View */}
+                {/* Quick Actions - More Prominent */}
                 {isActive(viewTarget.status) && (
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-2 pt-2 border-t border-border">
                     {viewTarget.status === 'pending' && (
                       <Button
-                        className="flex-1 gap-2 bg-admin hover:bg-admin/90"
+                        className="flex-1 gap-2 bg-admin hover:bg-admin/90 h-11 shadow-md shadow-admin/20"
                         onClick={() => {
                           setAssignTarget(viewTarget);
                           setViewTarget(null);
                           void fetchNearbyNurses(viewTarget);
                         }}
                       >
-                        <UserPlus className="w-4 h-4" />
+                        <UserPlus className="w-5 h-5" />
                         تعيين ممرض/ـة
                       </Button>
                     )}
                     <Button
-                      className="flex-1 gap-2 bg-orange-600 hover:bg-orange-700 text-white"
+                      className="flex-1 gap-2 bg-orange-600 hover:bg-orange-700 text-white h-11 shadow-md shadow-orange-500/20"
                       onClick={() => {
                         setExecuteTarget(viewTarget);
                         setViewTarget(null);
                       }}
                     >
-                      <Zap className="w-4 h-4" />
+                      <Zap className="w-5 h-5" />
                       تنفيذ مباشر
                     </Button>
                     <Button
                       variant="outline"
-                      className="gap-2 text-green-600 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20"
+                      className="gap-2 text-green-600 border-green-300 hover:bg-green-50 dark:hover:bg-green-900/20 h-11 shadow-sm"
                       onClick={() => {
                         setResolveTarget(viewTarget);
                         setViewTarget(null);
                       }}
                     >
-                      <CheckCircle2 className="w-4 h-4" />
+                      <CheckCircle2 className="w-5 h-5" />
                       تم الحل
                     </Button>
                   </div>

@@ -7,7 +7,8 @@ import {
   Briefcase, Eye, Plus, RefreshCw, Clock, DollarSign,
   Loader2, Search, Filter, Users, CheckCircle2, XCircle,
   Flame, BarChart3, FileText, MapPin, Navigation, Building2,
-  Wallet, Percent, Hash, Landmark, ShieldCheck, Star
+  Wallet, Percent, Hash, Landmark, ShieldCheck, Star,
+  Zap, Activity, Heart, Stethoscope, Tag
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -111,6 +112,8 @@ const typeLabels: Record<string, string> = {
   lab: 'مختبر',
   midwife: 'توليد',
   home_care: 'رعاية منزلية',
+  lab_nurse: 'ممرض مخبري',
+  medical_sector: 'القطاع الطبي كامل',
   other: 'أخرى',
 };
 
@@ -119,8 +122,48 @@ const typeColors: Record<string, { bg: string; text: string; icon: string }> = {
   lab:        { bg: 'bg-purple-500',  text: 'text-purple-600 dark:text-purple-400', icon: 'bg-purple-100 dark:bg-purple-900/30' },
   midwife:    { bg: 'bg-pink-500',    text: 'text-pink-600 dark:text-pink-400',     icon: 'bg-pink-100 dark:bg-pink-900/30' },
   home_care:  { bg: 'bg-amber-500',   text: 'text-amber-600 dark:text-amber-400',   icon: 'bg-amber-100 dark:bg-amber-900/30' },
+  lab_nurse:  { bg: 'bg-indigo-500',  text: 'text-indigo-600 dark:text-indigo-400', icon: 'bg-indigo-100 dark:bg-indigo-900/30' },
+  medical_sector: { bg: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400',   icon: 'bg-rose-100 dark:bg-rose-900/30' },
   other:      { bg: 'bg-gray-500',    text: 'text-gray-600 dark:text-gray-400',      icon: 'bg-gray-100 dark:bg-gray-900/30' },
 };
+
+const specializationLabels: Record<string, string> = {
+  general_nursing: 'تمريض عام',
+  critical_care: 'الرعاية الحرجة',
+  pediatric: 'طب الأطفال',
+  elderly_care: 'رعاية المسنين',
+  lab_technician: 'مخبري',
+  emergency: 'الطوارئ',
+  anesthesia: 'التخدير',
+  radiology: 'الأشعة',
+  pharmacy: 'الصيدلة',
+  dentistry: 'طب الأسنان',
+  obstetrics: 'التوليد والنساء',
+  cardiology_nursing: 'تمريض القلب',
+  dialysis_nursing: 'تمريض الكلى والغسيل',
+  respiratory_therapy: 'العلاج التنفسي',
+  nutrition: 'التغذية العلاجية',
+};
+
+const departmentLabels: Record<string, string> = {
+  inpatient: 'رقود',
+  emergency: 'طوارئ',
+  icu: 'عناية',
+  nursery: 'حضانة',
+  surgery: 'جراحة',
+  outpatient: 'عيادات خارجية',
+};
+
+const requirementOptions = [
+  { id: 'license', label: 'يوجد مزاولة', icon: ShieldCheck },
+  { id: 'experience', label: 'خبرة سابقة', icon: Briefcase },
+  { id: 'certificates', label: 'شهادات علمية', icon: FileText },
+  { id: 'iv_therapy', label: 'شاطر في تركيب المحلول الوريدي', icon: Activity },
+  { id: 'wound_care', label: 'شاطر في العناية بالجروح', icon: Heart },
+  { id: 'cpr', label: 'شاطر في الإنعاش القلبي', icon: Zap },
+  { id: 'medication', label: 'شاطر في إعطاء الأدوية', icon: Stethoscope },
+  { id: 'patient_monitoring', label: 'شاطر في مراقبة المرضى', icon: Activity },
+];
 
 const governorateOptions = [
   'أمانة العاصمة', 'عدن', 'تعز', 'الحديدة', 'إب', 'ذمار', 'حضرموت',
@@ -172,12 +215,15 @@ export default function AdminDeploymentsPage() {
     title: '',
     description: '',
     type: 'nursing',
-    hours: 1,
+    specialization: '',
+    hours: 0,
     governorate: '',
     district: '',
     amount: 0,
     requirements: '',
     notes: '',
+    department: '',
+    requirementTags: [] as string[],
   });
   const [adminCommissionPercent, setAdminCommissionPercent] = useState(15);
   const [isCreating, setIsCreating] = useState(false);
@@ -255,14 +301,18 @@ export default function AdminDeploymentsPage() {
           title: createForm.title,
           description: createForm.description,
           type: createForm.type,
+          specialization: createForm.specialization || undefined,
           hours: createForm.hours,
           location: {
             governorate: createForm.governorate || undefined,
             district: createForm.district || undefined,
           },
           amount: createForm.amount,
-          requirements: createForm.requirements || undefined,
+          requirements: createForm.requirementTags.length > 0
+            ? createForm.requirementTags.join(', ')
+            : createForm.requirements || undefined,
           notes: createForm.notes || undefined,
+          department: createForm.department || undefined,
         }),
       });
       const json = await res.json();
@@ -274,12 +324,15 @@ export default function AdminDeploymentsPage() {
           title: '',
           description: '',
           type: 'nursing',
-          hours: 1,
+          specialization: '',
+          hours: 0,
           governorate: '',
           district: '',
           amount: 0,
           requirements: '',
           notes: '',
+          department: '',
+          requirementTags: [],
         });
       } else {
         toast.error(json.message ?? 'فشل إنشاء التكليف');
@@ -528,147 +581,290 @@ export default function AdminDeploymentsPage() {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="space-y-4">
-            {/* Title */}
-            <div className="space-y-2">
-              <Label htmlFor="admin-dep-title" className="text-sm font-medium">
-                عنوان التكليف <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="admin-dep-title"
-                placeholder="مثال: ممرض/ة لرعاية منزلية"
-                value={createForm.title}
-                onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
-              />
-            </div>
+          <div className="space-y-5">
+            {/* Section: Basic Info */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-admin/10 flex items-center justify-center">
+                  <FileText className="w-3.5 h-3.5 text-admin" />
+                </div>
+                <span className="text-sm font-bold text-admin">المعلومات الأساسية</span>
+              </div>
 
-            {/* Description */}
-            <div className="space-y-2">
-              <Label htmlFor="admin-dep-desc" className="text-sm font-medium">
-                الوصف <span className="text-red-500">*</span>
-              </Label>
-              <Textarea
-                id="admin-dep-desc"
-                placeholder="اكتب وصفاً تفصيلياً للتكليف..."
-                rows={3}
-                value={createForm.description}
-                onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-              />
-            </div>
-
-            {/* Type & Hours row */}
-            <div className="grid grid-cols-2 gap-3">
               <div className="space-y-2">
-                <Label className="text-sm font-medium">نوع التكليف</Label>
+                <Label htmlFor="admin-dep-title" className="text-sm font-medium">
+                  عنوان التكليف <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="admin-dep-title"
+                  placeholder="مثال: ممرض/ة لرعاية منزلية"
+                  value={createForm.title}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="admin-dep-desc" className="text-sm font-medium">
+                  الوصف <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="admin-dep-desc"
+                  placeholder="اكتب وصفاً تفصيلياً للتكليف..."
+                  rows={3}
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
+                />
+              </div>
+            </div>
+
+            <Separator />
+
+            {/* Section: Type & Specialization */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
+                  <Tag className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+                </div>
+                <span className="text-sm font-bold">النوع والتخصص</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">نوع التكليف</Label>
+                  <Select
+                    value={createForm.type}
+                    onValueChange={(val) => setCreateForm((p) => ({ ...p, type: val as any }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="اختر النوع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(typeLabels).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">التخصص</Label>
+                  <Select
+                    value={createForm.specialization}
+                    onValueChange={(val) => setCreateForm((p) => ({ ...p, specialization: val }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="اختر التخصص" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(specializationLabels).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-sm font-medium">القسم</Label>
                 <Select
-                  value={createForm.type}
-                  onValueChange={(val) => setCreateForm((p) => ({ ...p, type: val as any }))}
+                  value={createForm.department}
+                  onValueChange={(val) => setCreateForm((p) => ({ ...p, department: val }))}
                 >
                   <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر النوع" />
+                    <SelectValue placeholder="اختر القسم" />
                   </SelectTrigger>
                   <SelectContent>
-                    {Object.entries(typeLabels).map(([key, label]) => (
+                    {Object.entries(departmentLabels).map(([key, label]) => (
                       <SelectItem key={key} value={key}>{label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="admin-dep-hours" className="text-sm font-medium">
-                  عدد الساعات <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="admin-dep-hours"
-                  type="number"
-                  min={1}
-                  value={createForm.hours}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, hours: parseInt(e.target.value) || 1 }))}
-                />
+            </div>
+
+            <Separator />
+
+            {/* Section: Time & Payment */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                <span className="text-sm font-bold">الوقت والأجر</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label htmlFor="admin-dep-hours" className="text-sm font-medium">
+                    عدد الساعات <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="admin-dep-hours"
+                      type="number"
+                      min={0}
+                      value={createForm.hours || ''}
+                      placeholder="0"
+                      className={createForm.hours === 0 ? 'text-muted-foreground/40' : ''}
+                      onChange={(e) => setCreateForm((p) => ({ ...p, hours: parseInt(e.target.value) || 0 }))}
+                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">ساعة</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="admin-dep-amount" className="text-sm font-medium">
+                    المبلغ <span className="text-red-500">*</span>
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      id="admin-dep-amount"
+                      type="number"
+                      min={0}
+                      value={createForm.amount || ''}
+                      placeholder="0"
+                      className={`pl-14 ${createForm.amount === 0 ? 'text-muted-foreground/40' : ''}`}
+                      onChange={(e) => setCreateForm((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
+                    />
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">ر.ي</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Commission preview */}
+              {createForm.amount > 0 && (
+                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900/30 space-y-2">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <Wallet className="w-3.5 h-3.5 text-emerald-600" />
+                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">معاينة العمولة</span>
+                  </div>
+                  <div className="space-y-1.5 text-xs">
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">المبلغ الأساسي</span>
+                      <span className="font-medium">{toArabicNum(createForm.amount.toLocaleString())} ر.ي</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-muted-foreground">عمولة المنصة ({toArabicNum(adminCommissionPercent)}%)</span>
+                      <span className="font-medium text-orange-600">
+                        {toArabicNum(Math.round((createForm.amount * adminCommissionPercent) / 100).toLocaleString())} ر.ي
+                      </span>
+                    </div>
+                    <Separator />
+                    <div className="flex items-center justify-between font-bold text-sm">
+                      <span>الإجمالي مع العمولة</span>
+                      <span className="text-admin">
+                        {toArabicNum((createForm.amount + Math.round((createForm.amount * adminCommissionPercent) / 100)).toLocaleString())} ر.ي
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <Separator />
+
+            {/* Section: Location */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <MapPin className="w-3.5 h-3.5 text-red-500" />
+                </div>
+                <span className="text-sm font-bold">الموقع</span>
+                <span className="text-[10px] text-muted-foreground">(اختياري)</span>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">المحافظة</Label>
+                  <Select
+                    value={createForm.governorate}
+                    onValueChange={(val) => setCreateForm((p) => ({ ...p, governorate: val }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="اختر المحافظة" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {governorateOptions.map((gov) => (
+                        <SelectItem key={gov} value={gov}>{gov}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="admin-dep-district" className="text-sm font-medium">المديرية</Label>
+                  <Input
+                    id="admin-dep-district"
+                    placeholder="اسم المديرية"
+                    value={createForm.district}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, district: e.target.value }))}
+                  />
+                </div>
               </div>
             </div>
 
-            {/* Amount */}
-            <div className="space-y-2">
-              <Label htmlFor="admin-dep-amount" className="text-sm font-medium">
-                المبلغ (ر.ي) <span className="text-red-500">*</span>
-              </Label>
-              <Input
-                id="admin-dep-amount"
-                type="number"
-                min={0}
-                value={createForm.amount}
-                onChange={(e) => setCreateForm((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
-              />
-            </div>
+            <Separator />
 
-            {/* Commission preview */}
-            {createForm.amount > 0 && (
-              <div className="p-3 rounded-xl bg-muted/40 space-y-1.5 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">المبلغ</span>
-                  <span className="font-medium">{toArabicNum(createForm.amount.toLocaleString())} ر.ي</span>
+            {/* Section: Requirements */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
                 </div>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">عمولة المنصة ({toArabicNum(adminCommissionPercent)}%)</span>
-                  <span className="font-medium text-orange-600">
-                    {toArabicNum(Math.round((createForm.amount * adminCommissionPercent) / 100).toLocaleString())} ر.ي
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between font-bold text-sm">
-                  <span>الإجمالي مع العمولة</span>
-                  <span className="text-admin">
-                    {toArabicNum((createForm.amount + Math.round((createForm.amount * adminCommissionPercent) / 100)).toLocaleString())} ر.ي
-                  </span>
-                </div>
+                <span className="text-sm font-bold">المتطلبات اللازمة</span>
+                <span className="text-[10px] text-muted-foreground">(اختياري)</span>
               </div>
-            )}
 
-            {/* Governorate & District */}
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">المحافظة</Label>
-                <Select
-                  value={createForm.governorate}
-                  onValueChange={(val) => setCreateForm((p) => ({ ...p, governorate: val }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر المحافظة" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {governorateOptions.map((gov) => (
-                      <SelectItem key={gov} value={gov}>{gov}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              {/* Requirement Chips */}
+              <div className="flex flex-wrap gap-2">
+                {requirementOptions.map((req) => {
+                  const isSelected = createForm.requirementTags.includes(req.id);
+                  const ReqIcon = req.icon;
+                  return (
+                    <button
+                      key={req.id}
+                      type="button"
+                      onClick={() => {
+                        setCreateForm((p) => ({
+                          ...p,
+                          requirementTags: isSelected
+                            ? p.requirementTags.filter((t) => t !== req.id)
+                            : [...p.requirementTags, req.id],
+                        }));
+                      }}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
+                        isSelected
+                          ? 'bg-admin/10 border-admin/30 text-admin shadow-sm'
+                          : 'bg-transparent border-border text-muted-foreground hover:border-muted-foreground/30 hover:bg-muted/30'
+                      }`}
+                    >
+                      <ReqIcon className="w-3 h-3" />
+                      {req.label}
+                      {isSelected && <CheckCircle2 className="w-3 h-3 text-admin" />}
+                    </button>
+                  );
+                })}
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="admin-dep-district" className="text-sm font-medium">المديرية</Label>
-                <Input
-                  id="admin-dep-district"
-                  placeholder="اسم المديرية"
-                  value={createForm.district}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, district: e.target.value }))}
-                />
-              </div>
-            </div>
 
-            {/* Requirements */}
-            <div className="space-y-2">
-              <Label htmlFor="admin-dep-reqs" className="text-sm font-medium">المتطلبات</Label>
+              {/* Custom requirements textarea */}
               <Textarea
                 id="admin-dep-reqs"
-                placeholder="المتطلبات اللازمة للتكليف..."
+                placeholder="متطلبات إضافية أخرى..."
                 rows={2}
                 value={createForm.requirements}
                 onChange={(e) => setCreateForm((p) => ({ ...p, requirements: e.target.value }))}
               />
             </div>
 
-            {/* Notes */}
-            <div className="space-y-2">
-              <Label htmlFor="admin-dep-notes" className="text-sm font-medium">ملاحظات</Label>
+            <Separator />
+
+            {/* Section: Notes */}
+            <div className="space-y-3">
+              <div className="flex items-center gap-2 mb-1">
+                <div className="w-7 h-7 rounded-lg bg-muted/50 flex items-center justify-center">
+                  <FileText className="w-3.5 h-3.5 text-muted-foreground" />
+                </div>
+                <span className="text-sm font-bold">ملاحظات</span>
+                <span className="text-[10px] text-muted-foreground">(اختياري)</span>
+              </div>
+
               <Textarea
                 id="admin-dep-notes"
                 placeholder="ملاحظات إضافية..."
