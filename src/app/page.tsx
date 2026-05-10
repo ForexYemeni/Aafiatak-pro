@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -230,11 +230,18 @@ function getDashboardPath(role: UserRole): string {
 function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; role: string }; onComplete: () => void }) {
   const [countdown, setCountdown] = useState(2);
   const [progress, setProgress] = useState(0);
+  const [showConfetti, setShowConfetti] = useState(false);
   const config = roleConfig[user.role] || roleConfig.beneficiary;
   const RoleIcon = config.icon;
 
+  // Confetti colors based on role
+  const confettiColors = useMemo(() => {
+    if (user.role === 'nurse') return ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe'];
+    if (user.role === 'beneficiary') return ['#a855f7', '#c084fc', '#d8b4fe', '#e9d5ff', '#f3e8ff'];
+    return ['#f59e0b', '#fbbf24', '#fcd34d', '#fde68a', '#fef3c7'];
+  }, [user.role]);
+
   useEffect(() => {
-    // Quick 800ms welcome animation then navigate immediately
     const startTime = Date.now();
     const duration = 800;
 
@@ -245,6 +252,11 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
       setCountdown(0);
       setProgress(progressPercent);
 
+      // Trigger confetti at 90%
+      if (progressPercent > 90 && !showConfetti) {
+        setShowConfetti(true);
+      }
+
       if (elapsed >= duration) {
         clearInterval(interval);
         onComplete();
@@ -252,7 +264,7 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
     }, 50);
 
     return () => clearInterval(interval);
-  }, [onComplete]);
+  }, [onComplete, showConfetti]);
 
   return (
     <motion.div
@@ -282,6 +294,47 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
 
       {/* Floating particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        {/* Confetti */}
+        {showConfetti && Array.from({ length: 30 }).map((_, i) => (
+          <div
+            key={`confetti-${i}`}
+            className="confetti-piece"
+            style={{
+              left: `${seededRandom(i * 5 + 300) * 100}%`,
+              top: '-5%',
+              background: confettiColors[seededRandom(i * 7 + 400) * 5 | 0],
+              animationDelay: `${seededRandom(i * 3 + 500) * 0.8}s`,
+              animationDuration: `${seededRandom(i * 5 + 600) * 1.5 + 2}s`,
+              width: seededRandom(i * 4 + 700) * 6 + 4,
+              height: seededRandom(i * 4 + 701) * 6 + 4,
+              borderRadius: seededRandom(i * 2 + 800) > 0.5 ? '50%' : '2px',
+            }}
+          />
+        ))}
+        {/* Floating emojis */}
+        {progress > 30 && ['✨', '💚', '🌟', '⭐', '💫'].map((emoji, i) => (
+          <motion.div
+            key={`emoji-${i}`}
+            className="absolute text-lg"
+            style={{
+              left: `${seededRandom(i * 5 + 900) * 80 + 10}%`,
+              top: `${seededRandom(i * 5 + 901) * 80 + 10}%`,
+            }}
+            animate={{
+              y: [0, -20, 0],
+              opacity: [0.2, 0.6, 0.2],
+              scale: [0.8, 1.2, 0.8],
+            }}
+            transition={{
+              duration: 3 + i,
+              repeat: Infinity,
+              ease: 'easeInOut',
+              delay: i * 0.5,
+            }}
+          >
+            {emoji}
+          </motion.div>
+        ))}
         {Array.from({ length: 30 }).map((_, i) => (
           <motion.div
             key={i}
@@ -562,6 +615,34 @@ function EkgAnimation() {
 // ============================================================================
 
 function BrandPanel() {
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [taglineText, setTaglineText] = useState('');
+  const fullTagline = 'رعاية صحية منزلية بلمسة زر';
+
+  // Typewriter effect
+  useEffect(() => {
+    let index = 0;
+    const timer = setInterval(() => {
+      if (index <= fullTagline.length) {
+        setTaglineText(fullTagline.slice(0, index));
+        index++;
+      } else {
+        clearInterval(timer);
+      }
+    }, 60);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Mouse parallax handler
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!panelRef.current) return;
+    const rect = panelRef.current.getBoundingClientRect();
+    const x = (e.clientX - rect.left) / rect.width - 0.5;
+    const y = (e.clientY - rect.top) / rect.height - 0.5;
+    setMousePos({ x, y });
+  }, []);
+
   const features = [
     { icon: Shield, title: 'ممرضون معتمدون', desc: 'فريق طبي مرخص وموثق', delay: 0.6 },
     { icon: Clock, title: 'خدمة ٢٤ ساعة', desc: 'متاحون على مدار الساعة', delay: 0.75 },
@@ -569,11 +650,18 @@ function BrandPanel() {
   ];
 
   return (
-    <div className="relative h-full flex flex-col justify-center items-center p-12 xl:p-16 overflow-hidden">
+    <div
+      ref={panelRef}
+      onMouseMove={handleMouseMove}
+      className="relative h-full flex flex-col justify-center items-center p-12 xl:p-16 overflow-hidden noise-overlay"
+    >
       {/* Dark gradient background */}
       <div className="absolute inset-0 bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#0F172A]" />
 
-      {/* Animated blobs */}
+      {/* Aurora Borealis effect */}
+      <div className="aurora-bg" />
+
+      {/* Animated blobs with parallax */}
       <div
         className="absolute mesh-blob-1"
         style={{
@@ -582,6 +670,8 @@ function BrandPanel() {
           borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(13,148,136,0.3) 0%, rgba(13,148,136,0.08) 40%, transparent 70%)',
           filter: 'blur(60px)',
+          transform: `translate(${mousePos.x * 30}px, ${mousePos.y * 30}px)`,
+          transition: 'transform 0.3s ease-out',
         }}
       />
       <div
@@ -592,15 +682,31 @@ function BrandPanel() {
           borderRadius: '50%',
           background: 'radial-gradient(circle, rgba(139,92,246,0.25) 0%, rgba(139,92,246,0.06) 40%, transparent 70%)',
           filter: 'blur(50px)',
+          transform: `translate(${mousePos.x * -20}px, ${mousePos.y * -20}px)`,
+          transition: 'transform 0.3s ease-out',
+        }}
+      />
+      {/* Third blob for extra depth */}
+      <div
+        className="absolute mesh-blob-3"
+        style={{
+          width: '300px', height: '300px',
+          top: '40%', left: '50%',
+          borderRadius: '50%',
+          background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
+          filter: 'blur(45px)',
+          transform: `translate(${mousePos.x * 15}px, ${mousePos.y * 15}px)`,
+          transition: 'transform 0.3s ease-out',
         }}
       />
 
       {/* EKG line */}
       <EkgAnimation />
 
-      {/* Floating medical icons */}
+      {/* Floating medical icons with parallax */}
       <motion.div
         className="absolute top-[10%] left-[10%] text-teal-400/10"
+        style={{ transform: `translate(${mousePos.x * -25}px, ${mousePos.y * -25}px)`, transition: 'transform 0.3s ease-out' }}
         animate={{ y: [0, -12, 0], rotate: [0, 8, 0] }}
         transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
       >
@@ -608,6 +714,7 @@ function BrandPanel() {
       </motion.div>
       <motion.div
         className="absolute bottom-[15%] right-[10%] text-violet-400/10"
+        style={{ transform: `translate(${mousePos.x * 20}px, ${mousePos.y * 20}px)`, transition: 'transform 0.3s ease-out' }}
         animate={{ y: [0, 10, 0], rotate: [0, -6, 0] }}
         transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
       >
@@ -615,14 +722,39 @@ function BrandPanel() {
       </motion.div>
       <motion.div
         className="absolute top-[65%] left-[8%] text-teal-400/8"
+        style={{ transform: `translate(${mousePos.x * -15}px, ${mousePos.y * -15}px)`, transition: 'transform 0.3s ease-out' }}
         animate={{ y: [0, -8, 0], rotate: [0, 5, 0] }}
         transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
       >
         <Shield className="w-14 h-14" />
       </motion.div>
+      <motion.div
+        className="absolute top-[25%] right-[15%] text-blue-400/6"
+        style={{ transform: `translate(${mousePos.x * 18}px, ${mousePos.y * -18}px)`, transition: 'transform 0.3s ease-out' }}
+        animate={{ y: [0, 8, 0], rotate: [0, -4, 0] }}
+        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
+      >
+        <Activity className="w-12 h-12" />
+      </motion.div>
+      <motion.div
+        className="absolute bottom-[35%] left-[20%] text-purple-400/6"
+        style={{ transform: `translate(${mousePos.x * -12}px, ${mousePos.y * 12}px)`, transition: 'transform 0.3s ease-out' }}
+        animate={{ y: [0, -6, 0], rotate: [0, 3, 0] }}
+        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
+      >
+        <User className="w-10 h-10" />
+      </motion.div>
+      <motion.div
+        className="absolute top-[45%] right-[5%] text-teal-400/5"
+        style={{ transform: `translate(${mousePos.x * 10}px, ${mousePos.y * -10}px)`, transition: 'transform 0.3s ease-out' }}
+        animate={{ y: [0, 6, 0], rotate: [0, -3, 0] }}
+        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
+      >
+        <Clock className="w-11 h-11" />
+      </motion.div>
 
-      {/* Floating particles */}
-      {Array.from({ length: 8 }).map((_, i) => (
+      {/* Floating particles - Enhanced to 20 */}
+      {Array.from({ length: 20 }).map((_, i) => (
         <div
           key={i}
           className="absolute rounded-full bg-white/8 animate-float-gentle"
@@ -639,15 +771,19 @@ function BrandPanel() {
 
       {/* Content */}
       <div className="relative z-10 text-center max-w-md">
-        {/* Logo */}
+        {/* Logo with pulse rings */}
         <motion.div
           initial={{ scale: 0, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 200, damping: 18, delay: 0.1 }}
-          className="mb-6"
+          className="mb-6 relative"
         >
           <div className="relative inline-block">
             <div className="absolute inset-0 blur-xl bg-teal-400/30 rounded-full" />
+            {/* Pulse rings */}
+            <div className="pulse-ring" style={{ inset: '-10px', borderRadius: '16px' }} />
+            <div className="pulse-ring pulse-ring-delay-1" style={{ inset: '-10px', borderRadius: '16px' }} />
+            <div className="pulse-ring pulse-ring-delay-2" style={{ inset: '-10px', borderRadius: '16px' }} />
             <div className="relative w-20 h-20 rounded-2xl mx-auto flex items-center justify-center bg-gradient-to-br from-teal-500/30 to-violet-600/20 backdrop-blur-xl border border-white/15 shadow-2xl shadow-teal-500/20">
               <Heart className="w-10 h-10 text-white" fill="currentColor" />
             </div>
@@ -664,15 +800,16 @@ function BrandPanel() {
           عافيتك
         </motion.h1>
 
-        {/* Tagline */}
-        <motion.p
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
+        {/* Tagline with typewriter effect */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
           transition={{ delay: 0.4, duration: 0.5 }}
-          className="text-lg text-white/70 font-medium mb-2"
+          className="text-lg text-white/70 font-medium mb-2 min-h-[28px]"
         >
-          رعاية صحية منزلية بلمسة زر
-        </motion.p>
+          <span>{taglineText}</span>
+          <span className="typewriter-cursor" />
+        </motion.div>
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -806,6 +943,8 @@ function PremiumInput({
               {toggleIcon}
             </button>
           )}
+          {/* Underline focus effect */}
+          <div className="input-underline-effect" />
         </div>
       </div>
       {error && (
@@ -843,12 +982,31 @@ function PremiumButton({
   variant?: 'primary' | 'nurse';
 }) {
   const isNurse = variant === 'nurse';
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const [ripples, setRipples] = useState<Array<{ x: number; y: number; id: number }>>([]);
+
+  const handleClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
+    if (disabled || loading) return;
+    const btn = btnRef.current;
+    if (btn) {
+      const rect = btn.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const y = e.clientY - rect.top;
+      const id = Date.now();
+      setRipples(prev => [...prev, { x, y, id }]);
+      setTimeout(() => {
+        setRipples(prev => prev.filter(r => r.id !== id));
+      }, 700);
+    }
+    onClick?.();
+  }, [disabled, loading, onClick]);
 
   return (
     <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.985 }} className="w-full">
       <button
+        ref={btnRef}
         type={type}
-        onClick={onClick}
+        onClick={handleClick}
         disabled={disabled}
         className={cn(
           'premium-shimmer-btn relative w-full h-[52px] rounded-2xl font-bold text-[15px] text-white overflow-hidden',
@@ -860,6 +1018,14 @@ function PremiumButton({
           className
         )}
       >
+        {/* Ripple effects */}
+        {ripples.map(ripple => (
+          <span
+            key={ripple.id}
+            className="ripple-effect"
+            style={{ left: ripple.x - 10, top: ripple.y - 10, width: 20, height: 20 }}
+          />
+        ))}
         {loading ? (
           <Loader2 className="w-5 h-5 animate-spin mx-auto" />
         ) : (
@@ -1318,16 +1484,17 @@ function LoginPageContent() {
 
         {/* RIGHT PANEL - Form (45%) */}
         <div className="w-[45%] relative flex items-center justify-center overflow-y-auto">
-          {/* Subtle gradient background */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#FAFBFC] via-[#f0fdf9]/30 to-[#faf5ff]/20" />
+          {/* Subtle gradient background with dot pattern */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#FAFBFC] via-[#f0fdf9]/30 to-[#faf5ff]/20 dot-pattern" />
           
           <div className="w-full max-w-[460px] mx-auto px-10 py-12 relative z-10">
             <motion.div
               initial={{ opacity: 0, y: 30 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="login-form-container-v2 p-8"
+              className="animated-gradient-border"
             >
+              <div className="inner login-form-container-v2 p-8">
               {/* Brand header inside form */}
               <motion.div
                 initial={{ opacity: 0, scale: 0.9 }}
@@ -1735,6 +1902,7 @@ function LoginPageContent() {
                   </motion.div>
                 )}
               </AnimatePresence>
+              </div>
             </motion.div>
           </div>
         </div>
@@ -1745,7 +1913,10 @@ function LoginPageContent() {
         {/* Dark gradient background - fixed */}
         <div className="fixed inset-0 bg-gradient-to-br from-[#0B1120] via-[#0F172A] to-[#1a1035] -z-10" />
 
-        {/* Subtle mesh gradient overlay */}
+        {/* Aurora Borealis on mobile */}
+        <div className="aurora-bg-mobile" />
+
+        {/* Subtle mesh gradient overlay + more particles */}
         <div className="fixed inset-0 -z-5 overflow-hidden pointer-events-none">
           <div
             className="absolute mesh-blob-1"
@@ -1767,6 +1938,32 @@ function LoginPageContent() {
               filter: 'blur(45px)',
             }}
           />
+          {/* Extra blob for mobile */}
+          <div
+            className="absolute mesh-blob-3"
+            style={{
+              width: '200px', height: '200px',
+              top: '50%', left: '50%',
+              borderRadius: '50%',
+              background: 'radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)',
+              filter: 'blur(40px)',
+            }}
+          />
+          {/* Mobile floating particles */}
+          {Array.from({ length: 15 }).map((_, i) => (
+            <div
+              key={i}
+              className="absolute rounded-full bg-white/6 animate-float-gentle"
+              style={{
+                width: seededRandom(i * 3 + 120) * 4 + 1,
+                height: seededRandom(i * 3 + 121) * 4 + 1,
+                left: `${seededRandom(i * 3 + 122) * 90 + 5}%`,
+                top: `${seededRandom(i * 3 + 123) * 90 + 5}%`,
+                animationDelay: `${seededRandom(i * 5 + 130) * 4}s`,
+                animationDuration: `${seededRandom(i * 5 + 131) * 4 + 5}s`,
+              }}
+            />
+          ))}
         </div>
 
         {/* Mobile header with brand */}
@@ -1814,7 +2011,8 @@ function LoginPageContent() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.3, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
           >
-            <div className="relative glass-ultra-v2">
+            <div className="relative animated-gradient-border-mobile">
+              <div className="inner glass-ultra-v2">
               <div className="relative z-10 p-5 sm:p-6">
                 {/* Toggle */}
                 <div className="mb-5">
@@ -2188,6 +2386,7 @@ function LoginPageContent() {
                   <Shield className="w-3 h-3" />
                   <span>بياناتك مشفرة ومحمية</span>
                 </motion.div>
+              </div>
               </div>
             </div>
           </motion.div>
