@@ -21,6 +21,9 @@ interface SettingsData {
   commissionRate: number;
   emergencyFee: number;
   deploymentServiceFee: number;
+  deploymentCreatorFee: number;
+  deploymentApplicantFee: number;
+  deploymentBankAccountInfo: string;
   bankAccountInfo: string;
   nightFeePercent: number;
   fridayFeePercent: number;
@@ -53,6 +56,9 @@ const defaultSettings: SettingsData = {
   commissionRate: 15,
   emergencyFee: 500,
   deploymentServiceFee: 500,
+  deploymentCreatorFee: 500,
+  deploymentApplicantFee: 500,
+  deploymentBankAccountInfo: '',
   bankAccountInfo: '',
   nightFeePercent: 20,
   fridayFeePercent: 15,
@@ -350,11 +356,91 @@ export default function AdminSettingsPage() {
 
                 <Separator />
 
-                {/* Bank Account Info */}
+                {/* Separate Deployment Fees */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
+                      <Wallet className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">رسوم التكليف المنفصلة</p>
+                      <p className="text-[10px] text-muted-foreground">تحديد رسوم منفصلة لصاحب التكليف والمتقدم</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-orange-500" />
+                        رسوم صاحب التكليف (ر.ي)
+                      </Label>
+                      <Input
+                        type="number"
+                        value={settings.deploymentCreatorFee}
+                        onChange={(e) => updateField('deploymentCreatorFee', Number(e.target.value))}
+                        min={0}
+                        className="bg-background/50"
+                      />
+                      <p className="text-[10px] text-muted-foreground">الرسوم التي يدفعها منشئ التكليف</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-1.5">
+                        <Users className="w-3.5 h-3.5 text-teal-500" />
+                        رسوم المتقدم للتكليف (ر.ي)
+                      </Label>
+                      <Input
+                        type="number"
+                        value={settings.deploymentApplicantFee}
+                        onChange={(e) => updateField('deploymentApplicantFee', Number(e.target.value))}
+                        min={0}
+                        className="bg-background/50"
+                      />
+                      <p className="text-[10px] text-muted-foreground">الرسوم التي يدفعها الممرض المتقدم للتكليف</p>
+                    </div>
+                  </div>
+
+                  {/* Preview */}
+                  {(settings.deploymentCreatorFee > 0 || settings.deploymentApplicantFee > 0) && (
+                    <div className="p-3 rounded-xl bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800/50">
+                      <p className="text-[10px] text-cyan-600 dark:text-cyan-400 mb-2 font-medium">معاينة الرسوم عند إنشاء تكليف:</p>
+                      <div className="space-y-1 text-xs">
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">رسوم صاحب التكليف</span>
+                          <span className="font-medium">{settings.deploymentCreatorFee} ر.ي</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">رسوم المتقدم</span>
+                          <span className="font-medium">{settings.deploymentApplicantFee} ر.ي</span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* Bank Account Info for Deployments */}
                 <div className="space-y-2">
                   <Label className="text-sm font-medium flex items-center gap-1.5">
                     <Building2 className="w-3.5 h-3.5 text-emerald-500" />
-                    معلومات الحساب البنكي
+                    معلومات الحساب البنكي للتكليفات
+                  </Label>
+                  <Textarea
+                    value={settings.deploymentBankAccountInfo}
+                    onChange={(e) => updateField('deploymentBankAccountInfo', e.target.value)}
+                    placeholder="اسم البنك: &#10;رقم الحساب: &#10;اسم صاحب الحساب: &#10;IBAN:"
+                    rows={4}
+                    className="text-sm bg-background/50"
+                  />
+                  <p className="text-[10px] text-muted-foreground">معلومات الحساب البنكي لرسوم التكليف (تظهر للمتقدم عند الدفع)</p>
+                </div>
+
+                <Separator />
+
+                {/* General Bank Account Info */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-emerald-500" />
+                    معلومات الحساب البنكي العام
                   </Label>
                   <Textarea
                     value={settings.bankAccountInfo}

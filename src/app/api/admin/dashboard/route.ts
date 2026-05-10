@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { User, Nurse, Beneficiary, ServiceRequest, EmergencyRequest, Transaction, Referral } from '@/models/mongoose';
+import { User, Nurse, Beneficiary, ServiceRequest, EmergencyRequest, Transaction, Referral, Deployment } from '@/models/mongoose';
 import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
 export async function GET(request: NextRequest) {
@@ -78,6 +78,24 @@ export async function GET(request: NextRequest) {
       Nurse.find({ reviewCount: { $gt: 0 } }).select('rating reviewCount').lean(),
     ]);
 
+    // Deployment statistics
+    const [
+      totalDeployments,
+      openDeployments,
+      creatorSelectedDeployments,
+      completedDeployments,
+      totalDeploymentRevenue,
+    ] = await Promise.all([
+      Deployment.countDocuments(),
+      Deployment.countDocuments({ status: 'open' }),
+      Deployment.countDocuments({ status: 'creator_selected' }),
+      Deployment.countDocuments({ status: 'completed' }),
+      Deployment.aggregate([
+        { $match: { status: { $in: ['assigned', 'in_progress', 'completed'] } } },
+        { $group: { _id: null, totalFees: { $sum: '$serviceFee' }, totalCommission: { $sum: '$adminCommissionAmount' }, totalCreatorFees: { $sum: '$creatorServiceFee' } } },
+      ]),
+    ]);
+
     const totalRevenue = revenueAgg[0]?.totalRevenue || 0;
     const totalCommission = revenueAgg[0]?.totalCommission || 0;
     const totalNursePayouts = revenueAgg[0]?.totalNursePayouts || 0;
@@ -142,6 +160,14 @@ export async function GET(request: NextRequest) {
         activeOrders,
         revenueChartData,
         ordersChartData,
+        // Deployment stats
+        totalDeployments,
+        openDeployments,
+        pendingApprovalDeployments: creatorSelectedDeployments,
+        completedDeployments,
+        deploymentRevenue: Math.round(totalDeploymentRevenue[0]?.totalFees || 0),
+        deploymentCommission: Math.round(totalDeploymentRevenue[0]?.totalCommission || 0),
+        deploymentCreatorFees: Math.round(totalDeploymentRevenue[0]?.totalCreatorFees || 0),
       },
     });
   } catch (error) {

@@ -118,23 +118,30 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('المبلغ يجب أن يكون رقم موجب', 400, 'VALIDATION_ERROR');
     }
 
-    // ── Get settings for commission and service fee ──
+    // ── Get settings for commission and service fees ──
     const settings = await AdminSettings.findOne().lean();
     const commissionRate = settings?.commissionRate ?? 15;
-    const serviceFee = settings?.deploymentServiceFee ?? 500;
+    const deploymentCreatorFee = settings?.deploymentCreatorFee ?? 0;
+    const deploymentApplicantFee = settings?.deploymentApplicantFee ?? 500;
 
     // ── Calculate financials ──
     const adminCommissionPercent = commissionRate;
     const adminCommissionAmount = Math.round((amount * adminCommissionPercent) / 100);
+    const serviceFee = deploymentApplicantFee; // the fee the applicant pays
     const totalWithFee = amount + serviceFee;
 
     // ── Determine creator info ──
     const creatorRole: 'admin' | 'nurse' = user.role === 'nurse' ? 'nurse' : 'admin';
 
+    // ── Get creator phone ──
+    const creatorUser = await User.findById(user.userId).select('phone').lean();
+    const creatorPhone = creatorUser?.phone || '';
+
     // ── Create deployment ──
     const deployment = await Deployment.create({
       createdBy: user.userId,
       creatorRole,
+      creatorPhone,
       title,
       description,
       type: type || 'nursing',
@@ -144,6 +151,8 @@ export async function POST(request: NextRequest) {
       amount,
       adminCommissionPercent,
       adminCommissionAmount,
+      creatorServiceFee: deploymentCreatorFee,
+      applicantServiceFee: deploymentApplicantFee,
       serviceFee,
       totalWithFee,
       status: 'open',

@@ -1,5 +1,6 @@
 // ============================================================================
 // PATCH /api/deployments/[id]/verify-payment - Admin verifies payment proof
+// NEW FLOW: When verified=true → app status = accepted, deployment status = assigned, contactRevealed = true
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 // ============================================================================
 
@@ -59,14 +60,22 @@ export async function PATCH(
 
     // ── Update application ──
     if (verified) {
-      application.status = 'payment_verified';
+      // NEW FLOW: Set application status to accepted, deployment to assigned, reveal contact
+      application.status = 'accepted';
       application.paymentVerifiedAt = new Date();
       application.paymentVerifiedBy = user.userId;
+
+      // ── Set deployment assignment ──
+      deployment.assignedTo = application.applicantId;
+      deployment.assignedAt = new Date();
+      deployment.status = 'assigned';
+      deployment.contactRevealed = true;
     } else {
       // Payment rejected — reset to payment_pending so applicant can resubmit
       application.status = 'payment_pending';
       application.hasPaymentProof = false;
       application.paymentProofData = undefined;
+      application.paymentProofImage = undefined;
       application.paymentSubmittedAt = undefined;
     }
 
@@ -77,20 +86,21 @@ export async function PATCH(
 
     try {
       if (verified) {
-        // ── Notify applicant: payment verified ──
-        const applicantVoiceText = 'تم التحقق من دفعك. تم قبول تقديمك على التكليف';
+        // ── Notify applicant: payment verified, contact info revealed ──
+        const applicantVoiceText = 'تم التحقق من الدفع. يمكنك الآن التواصل مع صاحب التكليف';
         notificationPromises.push(
           Notification.create({
             userId: application.applicantId,
             userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
             titleAr: '✅ تم التحقق من الدفع',
-            bodyAr: `تم التحقق من دفعك. تم قبول تقديمك على التكليف "${deployment.title}"`,
+            bodyAr: `تم التحقق من دفعك. يمكنك الآن التواصل مع صاحب التكليف "${deployment.title}"`,
             type: 'deployment',
-            priority: 'high',
+            priority: 'urgent',
             data: {
               deploymentId: id,
               applicationId: applicationId,
-              status: 'payment_verified',
+              status: 'accepted',
+              contactRevealed: true,
               voiceAlert: true,
               voiceText: applicantVoiceText,
             },
@@ -99,37 +109,39 @@ export async function PATCH(
           }),
           sendPushToUser(application.applicantId.toString(), {
             title: '✅ تم التحقق من الدفع',
-            body: `تم التحقق من دفعك. تم قبول تقديمك على التكليف "${deployment.title}"`,
+            body: `تم التحقق من دفعك. يمكنك الآن التواصل مع صاحب التكليف "${deployment.title}"`,
             type: 'deployment',
-            priority: 'high',
+            priority: 'urgent',
             url: '/nurse/my-requests',
             userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
             sound: true,
             data: {
               deploymentId: id,
               applicationId: applicationId,
-              status: 'payment_verified',
+              status: 'accepted',
+              contactRevealed: true,
               voiceAlert: true,
               voiceText: applicantVoiceText,
             },
           })
         );
 
-        // ── Notify deployment creator: payment verified for applicant ──
-        const creatorVoiceText = `تم التحقق من دفع المتقدم ${application.applicantName}`;
+        // ── Notify deployment creator: payment verified, deployment ready ──
+        const creatorVoiceText = 'تم التحقق من دفع المكلف. التكليف جاهز للبدء';
         notificationPromises.push(
           Notification.create({
             userId: deployment.createdBy,
             userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
-            titleAr: '✅ تم التحقق من دفع المتقدم',
-            bodyAr: `تم التحقق من دفع المتقدم ${application.applicantName} على التكليف "${deployment.title}"`,
+            titleAr: '✅ تم التحقق من الدفع',
+            bodyAr: `تم التحقق من دفع المكلف ${application.applicantName} على التكليف "${deployment.title}". التكليف جاهز للبدء`,
             type: 'deployment',
             priority: 'high',
             data: {
               deploymentId: id,
               applicationId: applicationId,
               applicantName: application.applicantName,
-              status: 'payment_verified',
+              status: 'assigned',
+              contactRevealed: true,
               voiceAlert: true,
               voiceText: creatorVoiceText,
             },
@@ -137,8 +149,8 @@ export async function PATCH(
             voiceEnabled: true,
           }),
           sendPushToUser(deployment.createdBy.toString(), {
-            title: '✅ تم التحقق من دفع المتقدم',
-            body: `تم التحقق من دفع المتقدم ${application.applicantName} على التكليف "${deployment.title}"`,
+            title: '✅ تم التحقق من الدفع',
+            body: `تم التحقق من دفع المكلف ${application.applicantName}. التكليف جاهز للبدء`,
             type: 'deployment',
             priority: 'high',
             url: deployment.creatorRole === 'admin' ? '/admin/orders' : '/nurse/my-requests',
@@ -148,7 +160,8 @@ export async function PATCH(
               deploymentId: id,
               applicationId: applicationId,
               applicantName: application.applicantName,
-              status: 'payment_verified',
+              status: 'assigned',
+              contactRevealed: true,
               voiceAlert: true,
               voiceText: creatorVoiceText,
             },
@@ -205,10 +218,12 @@ export async function PATCH(
       data: {
         deploymentId: id,
         applicationId,
-        applicationStatus: verified ? 'payment_verified' : 'payment_pending',
+        applicationStatus: verified ? 'accepted' : 'payment_pending',
+        deploymentStatus: verified ? 'assigned' : deployment.status,
+        contactRevealed: verified ? true : undefined,
       },
       message: verified
-        ? 'تم التحقق من الدفع بنجاح'
+        ? 'تم التحقق من الدفع بنجاح. تم تعيين التكليف'
         : 'تم رفض إثبات الدفع. يمكن للمتقدم إعادة التقديم',
     });
   } catch (error) {

@@ -7,7 +7,8 @@ import {
   ArrowRight, Briefcase, Clock, DollarSign, MapPin, Loader2,
   CheckCircle2, XCircle, Eye, ShieldCheck, ShieldX, Play, Square,
   Navigation, Users, FileText, AlertTriangle, User, CreditCard,
-  Wallet, Percent, Building2, Calendar, MessageSquare, Ban
+  Wallet, Percent, Building2, Calendar, MessageSquare, Ban,
+  Star, Phone, PhoneOff, BadgeCheck, Award, TrendingUp
 } from 'lucide-react';
 import { GlassCard } from '@/components/common/glass-card';
 import { BadgeStatus } from '@/components/common/badge-status';
@@ -53,22 +54,32 @@ interface DeploymentApplication {
   applicantId: string;
   applicantRole: string;
   applicantName: string;
-  status: 'pending' | 'payment_pending' | 'payment_submitted' | 'payment_verified' | 'accepted' | 'rejected';
+  status: 'pending' | 'selected_by_creator' | 'admin_approved' | 'payment_pending' | 'payment_submitted' | 'payment_verified' | 'accepted' | 'rejected';
   appliedAt: string;
   hasPaymentProof: boolean;
   paymentProofData?: string;
+  paymentProofImage?: string;
   paymentSubmittedAt?: string;
   paymentVerifiedAt?: string;
   paymentVerifiedBy?: string;
   serviceFee: number;
   coverLetter?: string;
   rejectedReason?: string;
+  applicantSpecialization?: string[];
+  applicantExperience?: number;
+  applicantRating?: number;
+  applicantCompletedJobs?: number;
+  applicantVerificationStatus?: string;
 }
 
 interface DeploymentDetail {
   id: string;
   createdBy: { id?: string; name?: string; phone?: string } | null;
   creatorRole: 'admin' | 'nurse';
+  creatorPhone?: string;
+  creatorServiceFee?: number;
+  applicantServiceFee?: number;
+  contactRevealed?: boolean;
   title: string;
   description: string;
   type: 'nursing' | 'lab' | 'midwife' | 'home_care' | 'other';
@@ -80,7 +91,7 @@ interface DeploymentDetail {
   adminCommissionAmount: number;
   serviceFee: number;
   totalWithFee: number;
-  status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'open' | 'creator_selected' | 'admin_approved' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
   assignedTo: { id?: string; name?: string; phone?: string } | null;
   assignedAt?: string;
   applications: DeploymentApplication[];
@@ -91,6 +102,10 @@ interface DeploymentDetail {
   cancelReason?: string;
   requirements?: string;
   notes?: string;
+  rating?: number;
+  ratingComment?: string;
+  ratedAt?: string;
+  ratedBy?: string;
   createdAt: string;
   updatedAt?: string;
 }
@@ -114,6 +129,8 @@ const typeColors: Record<string, { bg: string; text: string; icon: string }> = {
 
 const deploymentStatusMap: Record<string, string> = {
   open: 'pending',
+  creator_selected: 'creator_selected',
+  admin_approved: 'admin_approved',
   assigned: 'assigned',
   in_progress: 'in_progress',
   completed: 'completed',
@@ -122,6 +139,8 @@ const deploymentStatusMap: Record<string, string> = {
 
 const deploymentStatusLabel: Record<string, string> = {
   open: 'متاح',
+  creator_selected: 'بانتظار الموافقة',
+  admin_approved: 'موافقة الإدارة',
   assigned: 'تم التعيين',
   in_progress: 'قيد التنفيذ',
   completed: 'مكتمل',
@@ -130,21 +149,39 @@ const deploymentStatusLabel: Record<string, string> = {
 
 const applicationStatusMap: Record<string, string> = {
   pending: 'pending',
-  payment_pending: 'awaiting_payment',
-  payment_submitted: 'awaiting_payment',
-  payment_verified: 'verified',
+  selected_by_creator: 'selected_by_creator',
+  admin_approved: 'admin_approved',
+  payment_pending: 'payment_pending',
+  payment_submitted: 'payment_submitted',
+  payment_verified: 'payment_verified',
   accepted: 'accepted',
   rejected: 'rejected',
 };
 
 const applicationStatusLabel: Record<string, string> = {
   pending: 'معلق',
+  selected_by_creator: 'تم اختياره',
+  admin_approved: 'موافقة الإدارة',
   payment_pending: 'بانتظار الدفع',
   payment_submitted: 'تم تقديم الدفع',
   payment_verified: 'تم التحقق',
   accepted: 'مقبول',
   rejected: 'مرفوض',
 };
+
+/* ─────────────── Helper: Star Rating ─────────────── */
+function StarRating({ rating, max = 5 }: { rating: number; max?: number }) {
+  return (
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: max }, (_, i) => (
+        <Star
+          key={i}
+          className={`w-3 h-3 ${i < Math.round(rating) ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300 dark:text-gray-600'}`}
+        />
+      ))}
+    </div>
+  );
+}
 
 /* ─────────────── Animation ─────────────── */
 const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
@@ -167,6 +204,10 @@ export default function AdminDeploymentDetailPage() {
   const [acceptingApp, setAcceptingApp] = useState<DeploymentApplication | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const [viewingPayment, setViewingPayment] = useState<DeploymentApplication | null>(null);
+
+  // Admin approve state
+  const [showApproveDialog, setShowApproveDialog] = useState(false);
+  const [isApproving, setIsApproving] = useState(false);
 
   // Status change states
   const [statusChangeTarget, setStatusChangeTarget] = useState<{ status: string; label: string } | null>(null);
@@ -192,6 +233,28 @@ export default function AdminDeploymentDetailPage() {
     void fetchDeployment();
   }, [fetchDeployment]);
 
+  /* ── Admin approve selection ── */
+  const handleAdminApprove = async () => {
+    setIsApproving(true);
+    try {
+      const res = await authFetch(`/api/deployments/${deploymentId}/admin-approve`, {
+        method: 'PATCH',
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تمت الموافقة على الاختيار بنجاح. تم إرسال إشعار للمتقدم بالدفع.');
+        void fetchDeployment();
+      } else {
+        toast.error(json.message ?? 'فشل الموافقة على الاختيار');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء الموافقة');
+    } finally {
+      setIsApproving(false);
+      setShowApproveDialog(false);
+    }
+  };
+
   /* ── Verify payment ── */
   const handleVerifyPayment = async (verified: boolean) => {
     if (!verifyingApp) return;
@@ -203,7 +266,7 @@ export default function AdminDeploymentDetailPage() {
       });
       const json = await res.json();
       if (json.success) {
-        toast.success(verified ? 'تم التحقق من الدفع بنجاح' : 'تم رفض إثبات الدفع');
+        toast.success(verified ? 'تم التحقق من الدفع بنجاح وتم تعيين المتقدم' : 'تم رفض إثبات الدفع');
         void fetchDeployment();
       } else {
         toast.error(json.message ?? 'فشل العملية');
@@ -299,7 +362,10 @@ export default function AdminDeploymentDetailPage() {
   }
 
   const tc = typeColors[deployment.type] || typeColors.other;
-  const isActive = ['open', 'assigned', 'in_progress'].includes(deployment.status);
+  const isActive = ['open', 'creator_selected', 'admin_approved', 'assigned', 'in_progress'].includes(deployment.status);
+
+  // Find the selected applicant (by creator)
+  const selectedApplicant = deployment.applications.find((a) => a.status === 'selected_by_creator' || a.status === 'admin_approved' || a.status === 'payment_pending' || a.status === 'payment_submitted' || a.status === 'payment_verified' || a.status === 'accepted');
 
   /* ═══════════════ RENDER ═══════════════ */
   return (
@@ -320,6 +386,48 @@ export default function AdminDeploymentDetailPage() {
         />
       </motion.div>
 
+      {/* ── APPROVE SELECTION BANNER ── */}
+      {deployment.status === 'creator_selected' && (
+        <motion.div variants={itemAnim}>
+          <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+                  <ShieldCheck className="w-6 h-6 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-amber-800 dark:text-amber-300">بانتظار موافقة الإدارة</p>
+                  <p className="text-sm text-amber-600 dark:text-amber-400">
+                    قام صاحب التكليف باختيار{' '}
+                    <span className="font-semibold">{selectedApplicant?.applicantName || 'متقدم'}</span>
+                    . يرجى الموافقة أو الرفض.
+                  </p>
+                </div>
+              </div>
+              <div className="flex gap-2 shrink-0">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={() => setStatusChangeTarget({ status: 'cancelled', label: 'ملغي' })}
+                >
+                  <Ban className="w-3.5 h-3.5" /> رفض
+                </Button>
+                <Button
+                  size="sm"
+                  className="gap-1.5 bg-amber-600 hover:bg-amber-700 text-white"
+                  onClick={() => setShowApproveDialog(true)}
+                  disabled={isApproving}
+                >
+                  {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  الموافقة على الاختيار
+                </Button>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* Deployment Info Card */}
       <motion.div variants={itemAnim}>
         <GlassCard variant="admin" className={`space-y-4 ${isActive ? 'border-r-4 border-admin' : ''}`}>
@@ -331,7 +439,14 @@ export default function AdminDeploymentDetailPage() {
               </div>
               <div>
                 <h2 className="font-bold text-lg">{deployment.title}</h2>
-                <span className="text-sm text-muted-foreground">{typeLabels[deployment.type] || deployment.type}</span>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-muted-foreground">{typeLabels[deployment.type] || deployment.type}</span>
+                  {deployment.creatorRole === 'admin' ? (
+                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-admin/10 text-admin">إدارة</Badge>
+                  ) : (
+                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">ممرض/ـة</Badge>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -363,6 +478,24 @@ export default function AdminDeploymentDetailPage() {
                 <User className="w-3 h-3" /> المنشئ
               </p>
               <p className="font-bold text-sm">{deployment.createdBy?.name || 'غير معروف'}</p>
+            </div>
+            {/* Contact Reveal Indicator */}
+            <div className="rounded-xl bg-muted/40 p-3">
+              <p className="text-[10px] text-muted-foreground mb-1 font-medium flex items-center gap-1">
+                {deployment.contactRevealed ? (
+                  <Phone className="w-3 h-3 text-green-500" />
+                ) : (
+                  <PhoneOff className="w-3 h-3 text-red-400" />
+                )}
+                كشف التواصل
+              </p>
+              <p className={`font-bold text-sm flex items-center gap-1 ${deployment.contactRevealed ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                {deployment.contactRevealed ? (
+                  <><CheckCircle2 className="w-3.5 h-3.5" /> مكشوف</>
+                ) : (
+                  <><XCircle className="w-3.5 h-3.5" /> غير مكشوف</>
+                )}
+              </p>
             </div>
             {deployment.location?.governorate && (
               <div className="rounded-xl bg-muted/40 p-3">
@@ -416,10 +549,24 @@ export default function AdminDeploymentDetailPage() {
                 <span className="text-muted-foreground">عمولة المنصة ({toArabicNum(deployment.adminCommissionPercent)}%)</span>
                 <span className="font-medium text-orange-600">{toArabicNum(deployment.adminCommissionAmount.toLocaleString())} ر.ي</span>
               </div>
-              <div className="flex justify-between">
-                <span className="text-muted-foreground">رسوم التقديم</span>
-                <span className="font-medium">{toArabicNum(deployment.serviceFee)} ر.ي</span>
-              </div>
+              {deployment.creatorServiceFee !== undefined && deployment.creatorServiceFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">رسوم صاحب التكليف</span>
+                  <span className="font-medium text-rose-600">{toArabicNum(deployment.creatorServiceFee)} ر.ي</span>
+                </div>
+              )}
+              {deployment.applicantServiceFee !== undefined && deployment.applicantServiceFee > 0 && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">رسوم المتقدم</span>
+                  <span className="font-medium text-purple-600">{toArabicNum(deployment.applicantServiceFee)} ر.ي</span>
+                </div>
+              )}
+              {(deployment.creatorServiceFee === undefined || deployment.creatorServiceFee === 0) && (
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">رسوم التقديم</span>
+                  <span className="font-medium">{toArabicNum(deployment.serviceFee)} ر.ي</span>
+                </div>
+              )}
               <Separator />
               <div className="flex justify-between font-bold">
                 <span>الإجمالي مع الرسوم</span>
@@ -439,6 +586,28 @@ export default function AdminDeploymentDetailPage() {
             <div className="rounded-xl bg-muted/40 p-3">
               <p className="text-[10px] text-muted-foreground mb-1 font-medium">ملاحظات</p>
               <p className="text-sm">{deployment.notes}</p>
+            </div>
+          )}
+
+          {/* Rating Display */}
+          {deployment.rating && (
+            <div className="p-3 rounded-xl bg-yellow-50 dark:bg-yellow-900/10 border border-yellow-200 dark:border-yellow-800/30">
+              <p className="text-[10px] text-muted-foreground mb-1.5 font-medium flex items-center gap-1">
+                <Star className="w-3 h-3 text-yellow-500" /> تقييم التكليف
+              </p>
+              <div className="flex items-center gap-2">
+                <StarRating rating={deployment.rating} />
+                <span className="font-bold text-sm text-yellow-700 dark:text-yellow-400">{toArabicNum(deployment.rating)}/5</span>
+              </div>
+              {deployment.ratingComment && (
+                <p className="text-sm mt-1.5 text-muted-foreground leading-relaxed">&quot;{deployment.ratingComment}&quot;</p>
+              )}
+              {deployment.ratedAt && (
+                <p className="text-[10px] text-muted-foreground mt-1">
+                  تم التقييم: {formatDate(deployment.ratedAt)}
+                  {deployment.ratedBy && ` بواسطة: ${deployment.ratedBy}`}
+                </p>
+              )}
             </div>
           )}
 
@@ -492,7 +661,7 @@ export default function AdminDeploymentDetailPage() {
       </motion.div>
 
       {/* Status Change Actions */}
-      {isActive && (
+      {isActive && deployment.status !== 'creator_selected' && (
         <motion.div variants={itemAnim}>
           <GlassCard variant="admin" className="space-y-3">
             <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -508,6 +677,16 @@ export default function AdminDeploymentDetailPage() {
                   onClick={() => setStatusChangeTarget({ status: 'cancelled', label: 'ملغي' })}
                 >
                   <Ban className="w-3.5 h-3.5" /> إلغاء التكليف
+                </Button>
+              )}
+              {deployment.status === 'admin_approved' && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                  onClick={() => setStatusChangeTarget({ status: 'cancelled', label: 'ملغي' })}
+                >
+                  <Ban className="w-3.5 h-3.5" /> إلغاء
                 </Button>
               )}
               {deployment.status === 'assigned' && (
@@ -568,7 +747,11 @@ export default function AdminDeploymentDetailPage() {
               {deployment.applications.map((app) => (
                 <div
                   key={app._id || app.applicantId}
-                  className="p-3 rounded-xl border bg-card space-y-2"
+                  className={`p-3 rounded-xl border bg-card space-y-2 ${
+                    app.status === 'selected_by_creator' || app.status === 'admin_approved' || app.status === 'payment_pending' || app.status === 'payment_submitted' || app.status === 'payment_verified' || app.status === 'accepted'
+                      ? 'border-amber-300 dark:border-amber-700/50 bg-amber-50/50 dark:bg-amber-900/5'
+                      : ''
+                  }`}
                 >
                   {/* Applicant Header */}
                   <div className="flex items-center justify-between">
@@ -579,7 +762,12 @@ export default function AdminDeploymentDetailPage() {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <p className="text-sm font-medium">{app.applicantName}</p>
+                        <p className="text-sm font-medium flex items-center gap-1.5">
+                          {app.applicantName}
+                          {app.applicantVerificationStatus === 'verified' && (
+                            <BadgeCheck className="w-3.5 h-3.5 text-green-500" />
+                          )}
+                        </p>
                         <p className="text-[10px] text-muted-foreground">
                           تقديم {formatDate(app.appliedAt)}
                         </p>
@@ -591,6 +779,53 @@ export default function AdminDeploymentDetailPage() {
                       size="sm"
                     />
                   </div>
+
+                  {/* Applicant Info: Specialization, Experience, Rating, Completed Jobs */}
+                  {(app.applicantSpecialization?.length || app.applicantExperience !== undefined || app.applicantRating !== undefined || app.applicantCompletedJobs !== undefined) && (
+                    <div className="flex flex-wrap items-center gap-2 text-[11px]">
+                      {/* Specialization tags */}
+                      {app.applicantSpecialization?.length ? (
+                        <div className="flex flex-wrap gap-1">
+                          {app.applicantSpecialization.map((spec, i) => (
+                            <Badge key={i} variant="outline" className="text-[9px] px-1.5 py-0 h-4">
+                              {spec}
+                            </Badge>
+                          ))}
+                        </div>
+                      ) : null}
+                      {/* Experience */}
+                      {app.applicantExperience !== undefined && (
+                        <span className="flex items-center gap-0.5 text-muted-foreground">
+                          <TrendingUp className="w-3 h-3" />
+                          {toArabicNum(app.applicantExperience)} سنوات
+                        </span>
+                      )}
+                      {/* Rating */}
+                      {app.applicantRating !== undefined && (
+                        <span className="flex items-center gap-0.5">
+                          <StarRating rating={app.applicantRating} />
+                          <span className="text-muted-foreground">{toArabicNum(app.applicantRating)}</span>
+                        </span>
+                      )}
+                      {/* Completed Jobs */}
+                      {app.applicantCompletedJobs !== undefined && (
+                        <span className="flex items-center gap-0.5 text-muted-foreground">
+                          <Award className="w-3 h-3" />
+                          {toArabicNum(app.applicantCompletedJobs)} تكليف
+                        </span>
+                      )}
+                      {/* Verification Status */}
+                      {app.applicantVerificationStatus && (
+                        <span className={`flex items-center gap-0.5 ${app.applicantVerificationStatus === 'verified' ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'}`}>
+                          {app.applicantVerificationStatus === 'verified' ? (
+                            <><BadgeCheck className="w-3 h-3" /> موثق</>
+                          ) : (
+                            <>{app.applicantVerificationStatus}</>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )}
 
                   {/* Cover letter */}
                   {app.coverLetter && (
@@ -626,7 +861,7 @@ export default function AdminDeploymentDetailPage() {
                   {/* Actions */}
                   <div className="flex gap-2 pt-1">
                     {/* View payment proof */}
-                    {app.hasPaymentProof && (
+                    {(app.hasPaymentProof || app.paymentProofImage) && (
                       <Button
                         size="sm"
                         variant="ghost"
@@ -660,8 +895,8 @@ export default function AdminDeploymentDetailPage() {
                       </>
                     )}
 
-                    {/* Accept verified application */}
-                    {app.status === 'payment_verified' && deployment.status === 'open' && (
+                    {/* Accept verified application (old flow fallback) */}
+                    {app.status === 'payment_verified' && (deployment.status === 'open' || deployment.status === 'admin_approved') && (
                       <Button
                         size="sm"
                         className="h-7 text-[11px] gap-1 bg-admin hover:bg-admin/90 text-white"
@@ -678,6 +913,34 @@ export default function AdminDeploymentDetailPage() {
         </GlassCard>
       </motion.div>
 
+      {/* ═══════════════ ADMIN APPROVE DIALOG ═══════════════ */}
+      <AlertDialog open={showApproveDialog} onOpenChange={setShowApproveDialog}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <ShieldCheck className="w-5 h-5 text-amber-600" />
+              الموافقة على الاختيار
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              هل تريد الموافقة على اختيار{' '}
+              <span className="font-semibold">{selectedApplicant?.applicantName || 'المتقدم'}</span>
+              ؟ سيتم إرسال إشعار للمتقدم بدفع رسوم التقديم.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel>إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              className="bg-amber-600 hover:bg-amber-700 text-white"
+              onClick={handleAdminApprove}
+              disabled={isApproving}
+            >
+              {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+              الموافقة على الاختيار
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       {/* ═══════════════ VERIFY PAYMENT DIALOG ═══════════════ */}
       <Dialog open={!!verifyingApp} onOpenChange={(open) => { if (!open) setVerifyingApp(null); }}>
         <DialogContent dir="rtl" className="max-w-md">
@@ -687,7 +950,7 @@ export default function AdminDeploymentDetailPage() {
               التحقق من الدفع
             </DialogTitle>
             <DialogDescription>
-              هل تريد التحقق من دفع {verifyingApp?.applicantName}؟
+              هل تريد التحقق من دفع {verifyingApp?.applicantName}؟ سيتم تعيينه على التكليف وكشف معلومات التواصل.
             </DialogDescription>
           </DialogHeader>
 
@@ -703,6 +966,17 @@ export default function AdminDeploymentDetailPage() {
                   <span className="font-medium">{toArabicNum(verifyingApp.serviceFee)} ر.ي</span>
                 </div>
               </div>
+              {/* Payment proof image */}
+              {verifyingApp.paymentProofImage && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] text-muted-foreground font-medium">صورة إثبات الدفع</p>
+                  <img
+                    src={verifyingApp.paymentProofImage}
+                    alt="إثبات الدفع"
+                    className="max-w-full rounded-lg border"
+                  />
+                </div>
+              )}
               {verifyingApp.paymentProofData && (
                 <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30">
                   <p className="text-[10px] text-muted-foreground mb-1 font-medium">إثبات الدفع</p>
@@ -830,6 +1104,17 @@ export default function AdminDeploymentDetailPage() {
                   <span className="font-medium">{formatDate(viewingPayment.paymentSubmittedAt)}</span>
                 </div>
               </div>
+              {/* Payment proof image */}
+              {viewingPayment.paymentProofImage && (
+                <div className="space-y-1.5">
+                  <p className="text-[10px] text-muted-foreground font-medium">صورة إثبات الدفع</p>
+                  <img
+                    src={viewingPayment.paymentProofImage}
+                    alt="إثبات الدفع"
+                    className="max-w-full rounded-lg border"
+                  />
+                </div>
+              )}
               {viewingPayment.paymentProofData && (
                 <div className="p-4 rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30">
                   <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">تفاصيل إثبات الدفع</p>

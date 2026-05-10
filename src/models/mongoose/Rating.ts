@@ -1,6 +1,6 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
-export type RatingType = 'service' | 'emergency';
+export type RatingType = 'service' | 'emergency' | 'deployment';
 
 export interface IRating extends Document {
   requestId: Types.ObjectId;
@@ -18,7 +18,7 @@ export interface IRating extends Document {
 
 const RatingSchema = new Schema<IRating>({
   requestId: { type: Schema.Types.ObjectId, required: true, unique: true },
-  ratingType: { type: String, enum: ['service', 'emergency'], default: 'service' },
+  ratingType: { type: String, enum: ['service', 'emergency', 'deployment'], default: 'service' },
   fromUserId: { type: Schema.Types.ObjectId, required: true },
   toUserId: { type: Schema.Types.ObjectId, required: true },
   fromRole: { type: String, required: true },

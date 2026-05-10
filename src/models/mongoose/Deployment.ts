@@ -4,6 +4,7 @@ export interface IDeployment extends Document {
   // من أنشأ التكليف
   createdBy: Types.ObjectId;
   creatorRole: 'admin' | 'nurse';
+  creatorPhone?: string;
   
   // تفاصيل التكليف
   title: string;
@@ -25,18 +26,27 @@ export interface IDeployment extends Document {
   amount: number;
   adminCommissionPercent: number;
   adminCommissionAmount: number;
-  serviceFee: number;
+  creatorServiceFee: number;
+  applicantServiceFee: number;
+  serviceFee: number; // رسوم التقديم (للمتقدم)
   totalWithFee: number;
   
   // الحالة
-  status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'open' | 'creator_selected' | 'admin_approved' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
   
   // المكلف (الممرض المعين)
   assignedTo?: Types.ObjectId;
   assignedAt?: Date;
+  contactRevealed?: boolean;
   
   // المتقدمين
   applications: IDeploymentApplication[];
+  
+  // التقييم
+  rating?: number;
+  ratingComment?: string;
+  ratedAt?: Date;
+  ratedBy?: Types.ObjectId;
   
   // التواريخ
   startDate?: Date;
@@ -54,12 +64,18 @@ export interface IDeploymentApplication {
   applicantId: Types.ObjectId;
   applicantRole: 'nurse' | 'lab_tech' | 'midwife';
   applicantName: string;
-  status: 'pending' | 'payment_pending' | 'payment_submitted' | 'payment_verified' | 'accepted' | 'rejected';
+  applicantSpecialization?: string[];
+  applicantExperience?: number;
+  applicantRating?: number;
+  applicantCompletedJobs?: number;
+  applicantVerificationStatus?: string;
+  status: 'pending' | 'selected_by_creator' | 'admin_approved' | 'payment_pending' | 'payment_submitted' | 'payment_verified' | 'accepted' | 'rejected';
   appliedAt: Date;
   
-  // إثبات الدفع
+  // إثبات الدفع (صورة)
   hasPaymentProof: boolean;
   paymentProofData?: string;
+  paymentProofImage?: string;
   paymentSubmittedAt?: Date;
   paymentVerifiedAt?: Date;
   paymentVerifiedBy?: Types.ObjectId;
@@ -76,14 +92,20 @@ const DeploymentApplicationSchema = new Schema<IDeploymentApplication>({
   applicantId: { type: Schema.Types.ObjectId, required: true },
   applicantRole: { type: String, enum: ['nurse', 'lab_tech', 'midwife'], required: true },
   applicantName: { type: String, required: true },
+  applicantSpecialization: [{ type: String }],
+  applicantExperience: { type: Number },
+  applicantRating: { type: Number },
+  applicantCompletedJobs: { type: Number },
+  applicantVerificationStatus: { type: String },
   status: { 
     type: String, 
-    enum: ['pending', 'payment_pending', 'payment_submitted', 'payment_verified', 'accepted', 'rejected'], 
+    enum: ['pending', 'selected_by_creator', 'admin_approved', 'payment_pending', 'payment_submitted', 'payment_verified', 'accepted', 'rejected'], 
     default: 'pending' 
   },
   appliedAt: { type: Date, default: Date.now },
   hasPaymentProof: { type: Boolean, default: false },
   paymentProofData: { type: String },
+  paymentProofImage: { type: String },
   paymentSubmittedAt: { type: Date },
   paymentVerifiedAt: { type: Date },
   paymentVerifiedBy: { type: Schema.Types.ObjectId },
@@ -95,6 +117,7 @@ const DeploymentApplicationSchema = new Schema<IDeploymentApplication>({
 const DeploymentSchema = new Schema<IDeployment>({
   createdBy: { type: Schema.Types.ObjectId, ref: 'User', required: true },
   creatorRole: { type: String, enum: ['admin', 'nurse'], required: true },
+  creatorPhone: { type: String },
   
   title: { type: String, required: true, trim: true },
   description: { type: String, required: true },
@@ -113,19 +136,27 @@ const DeploymentSchema = new Schema<IDeployment>({
   amount: { type: Number, required: true, min: 0 },
   adminCommissionPercent: { type: Number, default: 0 },
   adminCommissionAmount: { type: Number, default: 0 },
+  creatorServiceFee: { type: Number, default: 0 },
+  applicantServiceFee: { type: Number, default: 0 },
   serviceFee: { type: Number, default: 0 },
   totalWithFee: { type: Number, default: 0 },
   
   status: { 
     type: String, 
-    enum: ['open', 'assigned', 'in_progress', 'completed', 'cancelled'], 
+    enum: ['open', 'creator_selected', 'admin_approved', 'assigned', 'in_progress', 'completed', 'cancelled'], 
     default: 'open' 
   },
   
   assignedTo: { type: Schema.Types.ObjectId, ref: 'User' },
   assignedAt: { type: Date },
+  contactRevealed: { type: Boolean, default: false },
   
   applications: [DeploymentApplicationSchema],
+  
+  rating: { type: Number, min: 1, max: 5 },
+  ratingComment: { type: String },
+  ratedAt: { type: Date },
+  ratedBy: { type: Schema.Types.ObjectId },
   
   startDate: { type: Date },
   endDate: { type: Date },

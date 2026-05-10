@@ -1,5 +1,8 @@
 // ============================================================================
 // PATCH /api/deployments/[id]/accept - Accept an application for a deployment
+// LEGACY ROUTE: Now only works if application status is payment_verified
+// In the new flow, this is mostly superseded by verify-payment (which auto-assigns)
+// Kept for backwards compatibility
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 // ============================================================================
 
@@ -33,11 +36,6 @@ export async function PATCH(
       return createErrorResponse('التكليف غير موجود', 404, 'NOT_FOUND');
     }
 
-    // ── Validate deployment status ──
-    if (deployment.status !== 'open') {
-      return createErrorResponse('هذا التكليف غير متاح للقبول. حالته: ' + deployment.status, 400, 'DEPLOYMENT_NOT_OPEN');
-    }
-
     // ── Authorization: only creator or admin can accept ──
     const isAdminOrSubadmin = ['admin', 'subadmin'].includes(user.role);
     const isCreator = deployment.createdBy.toString() === user.userId;
@@ -57,7 +55,7 @@ export async function PATCH(
 
     const application = deployment.applications[applicationIndex] as any;
 
-    // ── Validate application status ──
+    // ── In the new flow, this route only works if application is payment_verified ──
     if (application.status !== 'payment_verified') {
       return createErrorResponse(
         'لا يمكن قبول هذا التقديم. يجب التحقق من الدفع أولاً. حالة التقديم: ' + application.status,
@@ -73,6 +71,7 @@ export async function PATCH(
     deployment.assignedTo = application.applicantId;
     deployment.assignedAt = new Date();
     deployment.status = 'assigned';
+    deployment.contactRevealed = true;
 
     // ── Reject all other applications ──
     for (let i = 0; i < deployment.applications.length; i++) {
@@ -98,13 +97,14 @@ export async function PATCH(
           userId: application.applicantId,
           userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
           titleAr: '🎉 تم قبولك على التكليف!',
-          bodyAr: `تم قبول تقديمك على التكليف "${deployment.title}". سيتم التواصل معك قريباً`,
+          bodyAr: `تم قبول تقديمك على التكليف "${deployment.title}". يمكنك الآن التواصل مع صاحب التكليف`,
           type: 'deployment',
           priority: 'urgent',
           data: {
             deploymentId: id,
             applicationId,
             status: 'accepted',
+            contactRevealed: true,
             voiceAlert: true,
             voiceText: acceptedVoiceText,
           },
@@ -123,6 +123,7 @@ export async function PATCH(
             deploymentId: id,
             applicationId,
             status: 'accepted',
+            contactRevealed: true,
             voiceAlert: true,
             voiceText: acceptedVoiceText,
           },
@@ -134,7 +135,6 @@ export async function PATCH(
         if (i === applicationIndex) continue;
 
         const otherApp = deployment.applications[i] as any;
-        // Only notify those who had a real chance (payment_verified or payment_submitted)
         if (otherApp.status === 'rejected' && otherApp.applicantId.toString() !== application.applicantId.toString()) {
           const rejectedVoiceText = `لم يتم قبولك على التكليف: ${deployment.title}`;
           notificationPromises.push(
@@ -222,6 +222,7 @@ export async function PATCH(
         assignedTo: application.applicantId.toString(),
         assignedName: application.applicantName,
         deploymentStatus: 'assigned',
+        contactRevealed: true,
       },
       message: `تم قبول ${application.applicantName} على التكليف بنجاح`,
     });

@@ -1,5 +1,6 @@
 // ============================================================================
 // POST /api/deployments/[id]/submit-payment - Submit payment proof for application
+// NEW FLOW: Accept paymentProofImage (base64), allow payment_pending (after admin approval)
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 // ============================================================================
 
@@ -20,10 +21,10 @@ export async function POST(
 
     const { id } = await params;
     const body = await request.json();
-    const { paymentProofData } = body;
+    const { paymentProofData, paymentProofImage } = body;
 
-    // ── Validate payment proof ──
-    if (!paymentProofData) {
+    // ── Validate payment proof (at least one must be provided) ──
+    if (!paymentProofData && !paymentProofImage) {
       return createErrorResponse('إثبات الدفع مطلوب', 400, 'VALIDATION_ERROR');
     }
 
@@ -44,7 +45,7 @@ export async function POST(
 
     const application = deployment.applications[applicationIndex] as any;
 
-    // ── Validate application status ──
+    // ── Validate application status - must be payment_pending (after admin approval) ──
     if (application.status !== 'payment_pending') {
       return createErrorResponse(
         'لا يمكنك تقديم إثبات الدفع في هذه المرحلة. حالة التقديم: ' + application.status,
@@ -55,7 +56,12 @@ export async function POST(
 
     // ── Update application with payment proof ──
     application.hasPaymentProof = true;
-    application.paymentProofData = paymentProofData;
+    if (paymentProofData) {
+      application.paymentProofData = paymentProofData;
+    }
+    if (paymentProofImage) {
+      application.paymentProofImage = paymentProofImage;
+    }
     application.paymentSubmittedAt = new Date();
     application.status = 'payment_submitted';
 

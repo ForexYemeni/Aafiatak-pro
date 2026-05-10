@@ -4,6 +4,9 @@ export interface IAdminSettings extends Document {
   commissionRate: number;
   emergencyFee: number;
   deploymentServiceFee: number;
+  deploymentCreatorFee: number;
+  deploymentApplicantFee: number;
+  deploymentBankAccountInfo: string;
   bankAccountInfo: string;
   nightFeePercent: number;
   fridayFeePercent: number;
@@ -33,6 +36,9 @@ const AdminSettingsSchema = new Schema<IAdminSettings>({
   commissionRate: { type: Number, default: 15 },
   emergencyFee: { type: Number, default: 5000 },
   deploymentServiceFee: { type: Number, default: 500 },
+  deploymentCreatorFee: { type: Number, default: 500 },
+  deploymentApplicantFee: { type: Number, default: 500 },
+  deploymentBankAccountInfo: { type: String, default: '' },
   bankAccountInfo: { type: String, default: '' },
   nightFeePercent: { type: Number, default: 20 },
   fridayFeePercent: { type: Number, default: 15 },

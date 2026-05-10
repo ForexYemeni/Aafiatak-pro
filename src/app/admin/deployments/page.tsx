@@ -7,7 +7,7 @@ import {
   Briefcase, Eye, Plus, RefreshCw, Clock, DollarSign,
   Loader2, Search, Filter, Users, CheckCircle2, XCircle,
   Flame, BarChart3, FileText, MapPin, Navigation, Building2,
-  Wallet, Percent, Hash, Landmark
+  Wallet, Percent, Hash, Landmark, ShieldCheck, Star
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -53,19 +53,29 @@ interface DeploymentApplication {
   applicantId: string;
   applicantRole: string;
   applicantName: string;
-  status: 'pending' | 'payment_pending' | 'payment_submitted' | 'payment_verified' | 'accepted' | 'rejected';
+  status: 'pending' | 'selected_by_creator' | 'admin_approved' | 'payment_pending' | 'payment_submitted' | 'payment_verified' | 'accepted' | 'rejected';
   appliedAt: string;
   hasPaymentProof: boolean;
   paymentProofData?: string;
+  paymentProofImage?: string;
   serviceFee: number;
   coverLetter?: string;
   rejectedReason?: string;
+  applicantSpecialization?: string[];
+  applicantExperience?: number;
+  applicantRating?: number;
+  applicantCompletedJobs?: number;
+  applicantVerificationStatus?: string;
 }
 
 interface DeploymentItem {
   id: string;
   createdBy: { id?: string; name?: string; phone?: string } | null;
   creatorRole: 'admin' | 'nurse';
+  creatorPhone?: string;
+  creatorServiceFee?: number;
+  applicantServiceFee?: number;
+  contactRevealed?: boolean;
   title: string;
   description: string;
   type: 'nursing' | 'lab' | 'midwife' | 'home_care' | 'other';
@@ -77,7 +87,7 @@ interface DeploymentItem {
   adminCommissionAmount: number;
   serviceFee: number;
   totalWithFee: number;
-  status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'open' | 'creator_selected' | 'admin_approved' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
   assignedTo: { id?: string; name?: string; phone?: string } | null;
   assignedAt?: string;
   applications: DeploymentApplication[];
@@ -88,6 +98,10 @@ interface DeploymentItem {
   cancelReason?: string;
   requirements?: string;
   notes?: string;
+  rating?: number;
+  ratingComment?: string;
+  ratedAt?: string;
+  ratedBy?: string;
   createdAt: string;
 }
 
@@ -116,6 +130,8 @@ const governorateOptions = [
 
 const deploymentStatusMap: Record<string, string> = {
   open: 'pending',
+  creator_selected: 'creator_selected',
+  admin_approved: 'admin_approved',
   assigned: 'assigned',
   in_progress: 'in_progress',
   completed: 'completed',
@@ -124,6 +140,8 @@ const deploymentStatusMap: Record<string, string> = {
 
 const deploymentStatusLabel: Record<string, string> = {
   open: 'متاح',
+  creator_selected: 'بانتظار الموافقة',
+  admin_approved: 'موافقة الإدارة',
   assigned: 'تم التعيين',
   in_progress: 'قيد التنفيذ',
   completed: 'مكتمل',
@@ -208,6 +226,7 @@ export default function AdminDeploymentsPage() {
   /* ── Derived state ── */
   const totalCount = deployments.length;
   const openCount = deployments.filter((d) => d.status === 'open').length;
+  const creatorSelectedCount = deployments.filter((d) => d.status === 'creator_selected').length;
   const assignedCount = deployments.filter((d) => d.status === 'assigned').length;
   const inProgressCount = deployments.filter((d) => d.status === 'in_progress').length;
   const completedCount = deployments.filter((d) => d.status === 'completed').length;
@@ -289,7 +308,7 @@ export default function AdminDeploymentsPage() {
       </motion.div>
 
       {/* Stats Row */}
-      <motion.div variants={itemAnim} className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <motion.div variants={itemAnim} className="grid grid-cols-2 md:grid-cols-6 gap-3">
         <GlassCard variant="admin" className="p-4 border-r-4 border-teal-500">
           <div className="flex items-center gap-3">
             <div className="w-11 h-11 rounded-xl bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
@@ -310,6 +329,18 @@ export default function AdminDeploymentsPage() {
             <div>
               <p className="text-2xl font-black text-yellow-600 dark:text-yellow-400">{toArabicNum(openCount)}</p>
               <p className="text-[11px] text-muted-foreground font-medium">متاحة</p>
+            </div>
+          </div>
+        </GlassCard>
+
+        <GlassCard variant="admin" className="p-4 border-r-4 border-amber-500">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <ShieldCheck className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+            </div>
+            <div>
+              <p className="text-2xl font-black text-amber-600 dark:text-amber-400">{toArabicNum(creatorSelectedCount)}</p>
+              <p className="text-[11px] text-muted-foreground font-medium">بانتظار الموافقة</p>
             </div>
           </div>
         </GlassCard>
@@ -368,6 +399,7 @@ export default function AdminDeploymentsPage() {
               {[
                 { key: 'all', label: 'الكل', count: totalCount },
                 { key: 'open', label: 'متاح', count: openCount },
+                { key: 'creator_selected', label: 'بانتظار الموافقة', count: creatorSelectedCount },
                 { key: 'assigned', label: 'معيَّن', count: assignedCount },
                 { key: 'in_progress', label: 'قيد التنفيذ', count: inProgressCount },
                 { key: 'completed', label: 'مكتمل', count: completedCount },
@@ -440,7 +472,14 @@ export default function AdminDeploymentsPage() {
                       <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                         <span>{typeLabels[dep.type] || dep.type}</span>
                         <span>•</span>
-                        <span>{dep.createdBy?.name || 'غير معروف'}</span>
+                        <span className="flex items-center gap-1">
+                          {dep.creatorRole === 'admin' ? (
+                            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-admin/10 text-admin">إدارة</Badge>
+                          ) : (
+                            <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">ممرض/ـة</Badge>
+                          )}
+                          {dep.createdBy?.name || 'غير معروف'}
+                        </span>
                         <span>•</span>
                         <span>{toArabicNum(dep.hours)} ساعة</span>
                         <span>•</span>
@@ -448,7 +487,10 @@ export default function AdminDeploymentsPage() {
                         {dep.applications.length > 0 && (
                           <>
                             <span>•</span>
-                            <span className="text-admin font-medium">{toArabicNum(dep.applications.length)} تقديم</span>
+                            <span className="flex items-center gap-0.5 text-admin font-medium">
+                              <Users className="w-3 h-3" />
+                              {toArabicNum(dep.applications.length)} تقديم
+                            </span>
                           </>
                         )}
                       </div>

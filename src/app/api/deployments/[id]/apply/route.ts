@@ -1,5 +1,6 @@
 // ============================================================================
 // POST /api/deployments/[id]/apply - Apply for a deployment (nurse/lab_tech/midwife)
+// NEW FLOW: status = pending (NO payment needed at apply time)
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 // ============================================================================
 
@@ -40,8 +41,10 @@ export async function POST(
       return createErrorResponse('لقد تقدمت بالفعل على هذا التكليف', 409, 'ALREADY_APPLIED');
     }
 
-    // ── Get applicant info ──
-    const applicant = await Nurse.findById(user.userId).select('name').lean();
+    // ── Get applicant info with specialization, experience, rating, completedJobs, verificationStatus ──
+    const applicant = await Nurse.findById(user.userId)
+      .select('name specialization experience rating completedJobs verificationStatus')
+      .lean();
     if (!applicant) {
       return createErrorResponse('لم يتم العثور على بيانات الممرض', 404, 'NURSE_NOT_FOUND');
     }
@@ -56,14 +59,19 @@ export async function POST(
 
     // ── Get service fee from settings ──
     const settings = await AdminSettings.findOne().lean();
-    const serviceFee = settings?.deploymentServiceFee ?? 500;
+    const serviceFee = settings?.deploymentApplicantFee ?? 500;
 
-    // ── Create application ──
+    // ── Create application with status = pending (NO payment at apply time) ──
     const application = {
       applicantId: user.userId,
       applicantRole,
       applicantName: applicant.name,
-      status: 'payment_pending',
+      applicantSpecialization: applicant.specialization || [],
+      applicantExperience: applicant.experience || 0,
+      applicantRating: applicant.rating || 0,
+      applicantCompletedJobs: applicant.completedJobs || 0,
+      applicantVerificationStatus: applicant.verificationStatus || 'unverified',
+      status: 'pending',
       appliedAt: new Date(),
       hasPaymentProof: false,
       serviceFee,
@@ -85,7 +93,7 @@ export async function POST(
           userId: deployment.createdBy,
           userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
           titleAr: '📋 تقديم جديد على التكليف',
-          bodyAr: `تقدم ${applicant.name} على التكليف "${deployment.title}". بانتظار دفع رسوم التقديم`,
+          bodyAr: `تقدم ${applicant.name} على التكليف "${deployment.title}"`,
           type: 'deployment',
           priority: 'high',
           data: {
@@ -180,9 +188,8 @@ export async function POST(
           _id: newApplication._id?.toString(),
         } : null,
         serviceFee,
-        bankAccountInfo: settings?.bankAccountInfo || '',
       },
-      message: 'تم التقديم على التكليف بنجاح. يرجى دفع رسوم التقديم',
+      message: 'تم التقديم على التكليف بنجاح. سيتم مراجعة تقديمك',
     }, { status: 201 });
   } catch (error) {
     console.error('[DEPLOYMENT APPLY ERROR]', error);

@@ -2,7 +2,7 @@
 
 import { cn } from '@/lib/utils';
 
-type BadgeStatusVariant = 'active' | 'inactive' | 'pending' | 'assigned' | 'accepted' | 'suspended' | 'verified' | 'rejected' | 'completed' | 'cancelled' | 'in_progress' | 'dispatched' | 'unverified' | 'resolved' | 'awaiting_payment';
+type BadgeStatusVariant = 'active' | 'inactive' | 'pending' | 'assigned' | 'accepted' | 'suspended' | 'verified' | 'rejected' | 'completed' | 'cancelled' | 'in_progress' | 'dispatched' | 'unverified' | 'resolved' | 'awaiting_payment' | 'creator_selected' | 'admin_approved' | 'selected_by_creator' | 'payment_pending' | 'payment_submitted' | 'payment_verified';
 
 interface BadgeStatusProps {
   status: BadgeStatusVariant | string;
@@ -72,6 +72,30 @@ const statusConfig: Record<BadgeStatusVariant, { label: string; className: strin
     label: 'بانتظار تأكيد الدفع',
     className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
   },
+  creator_selected: {
+    label: 'بانتظار الموافقة',
+    className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+  },
+  admin_approved: {
+    label: 'موافقة الإدارة',
+    className: 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-400',
+  },
+  selected_by_creator: {
+    label: 'تم اختياره',
+    className: 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400',
+  },
+  payment_pending: {
+    label: 'بانتظار الدفع',
+    className: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  },
+  payment_submitted: {
+    label: 'تم تقديم الدفع',
+    className: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  },
+  payment_verified: {
+    label: 'تم التحقق',
+    className: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  },
 };
 
 export function BadgeStatus({ status, label, className, size = 'sm' }: BadgeStatusProps) {
@@ -100,6 +124,8 @@ export function BadgeStatus({ status, label, className, size = 'sm' }: BadgeStat
           config.className.includes('blue') ? 'bg-blue-500' :
           config.className.includes('sky') ? 'bg-sky-500' :
           config.className.includes('orange') ? 'bg-orange-500' :
+          config.className.includes('amber') ? 'bg-amber-500' :
+          config.className.includes('emerald') ? 'bg-emerald-500' :
           'bg-gray-500'
         )}
       />

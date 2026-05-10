@@ -1,12 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
   ArrowRight, Briefcase, Clock, DollarSign, MapPin, Loader2,
   CheckCircle2, XCircle, Upload, Navigation, User, CreditCard,
-  Wallet, Building2, Calendar, FileText, AlertTriangle, Eye
+  Wallet, Building2, Calendar, FileText, AlertTriangle, Eye,
+  Star, ShieldCheck, Award, BriefcaseMedical, Phone, X, MessageSquare
 } from 'lucide-react';
 import { GlassCard } from '@/components/common/glass-card';
 import { BadgeStatus } from '@/components/common/badge-status';
@@ -45,10 +46,16 @@ interface DeploymentApplication {
   applicantId: string;
   applicantRole: string;
   applicantName: string;
-  status: 'pending' | 'payment_pending' | 'payment_submitted' | 'payment_verified' | 'accepted' | 'rejected';
+  applicantSpecialization?: string[];
+  applicantExperience?: number;
+  applicantRating?: number;
+  applicantCompletedJobs?: number;
+  applicantVerificationStatus?: string;
+  status: 'pending' | 'selected_by_creator' | 'admin_approved' | 'payment_pending' | 'payment_submitted' | 'payment_verified' | 'accepted' | 'rejected';
   appliedAt: string;
   hasPaymentProof: boolean;
   paymentProofData?: string;
+  paymentProofImage?: string;
   paymentSubmittedAt?: string;
   paymentVerifiedAt?: string;
   paymentVerifiedBy?: string;
@@ -61,6 +68,7 @@ interface DeploymentDetail {
   id: string;
   createdBy: { id?: string; name?: string; phone?: string } | null;
   creatorRole: 'admin' | 'nurse';
+  creatorPhone?: string;
   title: string;
   description: string;
   type: 'nursing' | 'lab' | 'midwife' | 'home_care' | 'other';
@@ -70,11 +78,18 @@ interface DeploymentDetail {
   amount: number;
   adminCommissionPercent: number;
   adminCommissionAmount: number;
+  creatorServiceFee: number;
+  applicantServiceFee: number;
   serviceFee: number;
   totalWithFee: number;
-  status: 'open' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+  status: 'open' | 'creator_selected' | 'admin_approved' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
   assignedTo: { id?: string; name?: string; phone?: string } | null;
   assignedAt?: string;
+  contactRevealed?: boolean;
+  rating?: number;
+  ratingComment?: string;
+  ratedAt?: string;
+  ratedBy?: string;
   applications: DeploymentApplication[];
   startDate?: string;
   endDate?: string;
@@ -106,6 +121,8 @@ const typeColors: Record<string, { bg: string; text: string; icon: string }> = {
 
 const deploymentStatusMap: Record<string, string> = {
   open: 'pending',
+  creator_selected: 'creator_selected',
+  admin_approved: 'admin_approved',
   assigned: 'assigned',
   in_progress: 'in_progress',
   completed: 'completed',
@@ -114,6 +131,8 @@ const deploymentStatusMap: Record<string, string> = {
 
 const deploymentStatusLabel: Record<string, string> = {
   open: 'متاح',
+  creator_selected: 'تم اختيار مكلف',
+  admin_approved: 'موافقة الإدارة',
   assigned: 'تم التعيين',
   in_progress: 'قيد التنفيذ',
   completed: 'مكتمل',
@@ -122,15 +141,19 @@ const deploymentStatusLabel: Record<string, string> = {
 
 const applicationStatusMap: Record<string, string> = {
   pending: 'pending',
-  payment_pending: 'awaiting_payment',
-  payment_submitted: 'awaiting_payment',
-  payment_verified: 'verified',
+  selected_by_creator: 'selected_by_creator',
+  admin_approved: 'admin_approved',
+  payment_pending: 'payment_pending',
+  payment_submitted: 'payment_submitted',
+  payment_verified: 'payment_verified',
   accepted: 'accepted',
   rejected: 'rejected',
 };
 
 const applicationStatusLabel: Record<string, string> = {
   pending: 'معلق',
+  selected_by_creator: 'تم اختياره',
+  admin_approved: 'موافقة الإدارة',
   payment_pending: 'بانتظار الدفع',
   payment_submitted: 'تم تقديم الدفع',
   payment_verified: 'تم التحقق',
@@ -138,15 +161,17 @@ const applicationStatusLabel: Record<string, string> = {
   rejected: 'مرفوض',
 };
 
-/* ─────────────── Status timeline config ─────────────── */
+/* ─────────────── G) Status timeline config (updated) ─────────────── */
 const statusTimeline: { key: string; label: string; icon: React.ElementType }[] = [
   { key: 'open', label: 'تم الإنشاء', icon: Briefcase },
+  { key: 'creator_selected', label: 'تم اختيار مكلف', icon: User },
+  { key: 'admin_approved', label: 'موافقة الإدارة', icon: CheckCircle2 },
   { key: 'assigned', label: 'تم التعيين', icon: User },
   { key: 'in_progress', label: 'قيد التنفيذ', icon: Clock },
   { key: 'completed', label: 'مكتمل', icon: CheckCircle2 },
 ];
 
-const statusOrder = ['open', 'assigned', 'in_progress', 'completed'];
+const statusOrder = ['open', 'creator_selected', 'admin_approved', 'assigned', 'in_progress', 'completed'];
 
 /* ─────────────── Animation ─────────────── */
 const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
@@ -160,6 +185,7 @@ export default function NurseDeploymentDetailPage() {
   const deploymentId = params.id as string;
   const authFetch = useAuthFetch();
   const currentUser = useAuthStore((s) => s.user);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [deployment, setDeployment] = useState<DeploymentDetail | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -167,12 +193,21 @@ export default function NurseDeploymentDetailPage() {
   // Payment proof modal
   const [showPaymentModal, setShowPaymentModal] = useState(false);
   const [paymentProof, setPaymentProof] = useState('');
+  const [paymentProofImage, setPaymentProofImage] = useState('');
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   // Apply modal
   const [showApplyModal, setShowApplyModal] = useState(false);
   const [coverLetter, setCoverLetter] = useState('');
   const [isApplying, setIsApplying] = useState(false);
+
+  // Rating state
+  const [ratingValue, setRatingValue] = useState(0);
+  const [ratingComment, setRatingComment] = useState('');
+  const [isSubmittingRating, setIsSubmittingRating] = useState(false);
+
+  // Select applicant state
+  const [isSelecting, setIsSelecting] = useState(false);
 
   /* ── Fetch deployment ── */
   const fetchDeployment = useCallback(async () => {
@@ -203,7 +238,7 @@ export default function NurseDeploymentDetailPage() {
   const isCreator = deployment?.createdBy?.id === currentUser?.id;
   const hasApplied = !!myApplication;
 
-  /* ── Apply for deployment ── */
+  /* ── D) Apply for deployment (updated message) ── */
   const handleApply = async () => {
     setIsApplying(true);
     try {
@@ -213,13 +248,7 @@ export default function NurseDeploymentDetailPage() {
       });
       const json = await res.json();
       if (json.success) {
-        toast.success('تم التقديم على التكليف بنجاح. يرجى دفع رسوم التقديم');
-        if (json.data?.bankAccountInfo) {
-          toast.info(`حساب البنك: ${json.data.bankAccountInfo}`);
-        }
-        if (json.data?.serviceFee) {
-          toast.info(`رسوم التقديم: ${toArabicNum(json.data.serviceFee)} ر.ي`);
-        }
+        toast.success('تم التقديم بنجاح. سيتم إشعارك عند اختيارك من قبل صاحب التكليف');
         void fetchDeployment();
         setShowApplyModal(false);
         setCoverLetter('');
@@ -233,14 +262,17 @@ export default function NurseDeploymentDetailPage() {
     }
   };
 
-  /* ── Submit payment proof ── */
+  /* ── C) Submit payment proof (updated with image) ── */
   const handleSubmitPayment = async () => {
-    if (!paymentProof) return;
+    if (!paymentProof && !paymentProofImage) return;
     setIsSubmittingPayment(true);
     try {
       const res = await authFetch(`/api/deployments/${deploymentId}/submit-payment`, {
         method: 'POST',
-        body: JSON.stringify({ paymentProofData: paymentProof }),
+        body: JSON.stringify({
+          paymentProofData: paymentProof || undefined,
+          paymentProofImage: paymentProofImage || undefined,
+        }),
       });
       const json = await res.json();
       if (json.success) {
@@ -248,6 +280,7 @@ export default function NurseDeploymentDetailPage() {
         void fetchDeployment();
         setShowPaymentModal(false);
         setPaymentProof('');
+        setPaymentProofImage('');
       } else {
         toast.error(json.message ?? 'فشل تقديم إثبات الدفع');
       }
@@ -255,6 +288,78 @@ export default function NurseDeploymentDetailPage() {
       toast.error('حدث خطأ أثناء تقديم إثبات الدفع');
     } finally {
       setIsSubmittingPayment(false);
+    }
+  };
+
+  /* ── Handle image upload (convert to base64) ── */
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('يرجى اختيار ملف صورة فقط');
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('حجم الصورة يجب أن يكون أقل من 5 ميجابايت');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setPaymentProofImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  /* ── F) Submit rating ── */
+  const handleRate = async () => {
+    if (ratingValue < 1 || ratingValue > 5) {
+      toast.error('يرجى اختيار تقييم من 1 إلى 5');
+      return;
+    }
+    setIsSubmittingRating(true);
+    try {
+      const res = await authFetch(`/api/deployments/${deploymentId}/rate`, {
+        method: 'POST',
+        body: JSON.stringify({ rating: ratingValue, ratingComment }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم تقييم المكلف بنجاح');
+        void fetchDeployment();
+        setRatingValue(0);
+        setRatingComment('');
+      } else {
+        toast.error(json.message ?? 'فشل التقييم');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء التقييم');
+    } finally {
+      setIsSubmittingRating(false);
+    }
+  };
+
+  /* ── Select applicant ── */
+  const handleSelectApplicant = async (applicationId: string) => {
+    setIsSelecting(true);
+    try {
+      const res = await authFetch(`/api/deployments/${deploymentId}/select-applicant`, {
+        method: 'PATCH',
+        body: JSON.stringify({ applicationId }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم اختيار المتقدم. بانتظار موافقة الإدارة');
+        void fetchDeployment();
+      } else {
+        toast.error(json.message ?? 'فشل اختيار المتقدم');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء اختيار المتقدم');
+    } finally {
+      setIsSelecting(false);
     }
   };
 
@@ -359,12 +464,21 @@ export default function NurseDeploymentDetailPage() {
               </p>
               <p className="font-bold text-sm">{deployment.createdBy?.name || 'غير معروف'}</p>
             </div>
-            {deployment.serviceFee > 0 && (
+            {/* Show admin commission info */}
+            {deployment.adminCommissionAmount > 0 && (
               <div className="rounded-xl bg-orange-50 dark:bg-orange-900/10 p-3 border border-orange-200 dark:border-orange-900/30">
                 <p className="text-[10px] text-orange-600 dark:text-orange-400 mb-1 font-medium flex items-center gap-1">
-                  <Wallet className="w-3 h-3" /> رسوم التقديم
+                  <Wallet className="w-3 h-3" /> للإدارة
                 </p>
-                <p className="font-bold text-sm text-orange-600 dark:text-orange-400">{toArabicNum(deployment.serviceFee)} ر.ي</p>
+                <p className="font-bold text-sm text-orange-600 dark:text-orange-400">{toArabicNum(deployment.adminCommissionAmount.toLocaleString())} ر.ي</p>
+              </div>
+            )}
+            {deployment.applicantServiceFee > 0 && (
+              <div className="rounded-xl bg-orange-50 dark:bg-orange-900/10 p-3 border border-orange-200 dark:border-orange-900/30">
+                <p className="text-[10px] text-orange-600 dark:text-orange-400 mb-1 font-medium flex items-center gap-1">
+                  <CreditCard className="w-3 h-3" /> رسوم التقديم
+                </p>
+                <p className="font-bold text-sm text-orange-600 dark:text-orange-400">{toArabicNum(deployment.applicantServiceFee)} ر.ي</p>
               </div>
             )}
             {deployment.location?.governorate && (
@@ -427,7 +541,7 @@ export default function NurseDeploymentDetailPage() {
         </GlassCard>
       </motion.div>
 
-      {/* Status Timeline */}
+      {/* G) Status Timeline (updated) */}
       <motion.div variants={itemAnim}>
         <GlassCard variant="nurse" className="space-y-4">
           <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -475,7 +589,7 @@ export default function NurseDeploymentDetailPage() {
         </GlassCard>
       </motion.div>
 
-      {/* My Application Status */}
+      {/* My Application Status (updated for new flow) */}
       {hasApplied && myApplication && (
         <motion.div variants={itemAnim}>
           <GlassCard variant="nurse" className="space-y-4">
@@ -516,7 +630,37 @@ export default function NurseDeploymentDetailPage() {
               )}
             </div>
 
-            {/* Payment proof upload area if pending */}
+            {/* E) Status display for applicant - selected_by_creator */}
+            {myApplication.status === 'selected_by_creator' && (
+              <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <Star className="w-4 h-4 text-amber-600" />
+                  <p className="text-sm font-medium text-amber-700 dark:text-amber-300">
+                    تم اختيارك! بانتظار موافقة الإدارة
+                  </p>
+                </div>
+                <p className="text-xs text-amber-600 dark:text-amber-400">
+                  تم اختيارك من قبل صاحب التكليف. سيتم إشعارك عند موافقة الإدارة
+                </p>
+              </div>
+            )}
+
+            {/* E) admin_approved → payment_pending */}
+            {myApplication.status === 'admin_approved' && (
+              <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900/30">
+                <div className="flex items-center gap-2 mb-1">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                  <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
+                    تمت موافقة الإدارة! يرجى دفع رسوم التقديم
+                  </p>
+                </div>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400">
+                  المبلغ المطلوب: {toArabicNum(myApplication.serviceFee)} ر.ي
+                </p>
+              </div>
+            )}
+
+            {/* Payment proof upload area if payment_pending */}
             {myApplication.status === 'payment_pending' && (
               <div className="space-y-3">
                 <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30">
@@ -535,6 +679,7 @@ export default function NurseDeploymentDetailPage() {
                   onClick={() => {
                     setShowPaymentModal(true);
                     setPaymentProof('');
+                    setPaymentProofImage('');
                   }}
                 >
                   <Upload className="w-4 h-4" />
@@ -566,12 +711,66 @@ export default function NurseDeploymentDetailPage() {
                 </div>
               </div>
             )}
+
+            {/* Show if accepted */}
+            {myApplication.status === 'accepted' && (
+              <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30">
+                <div className="flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 text-green-600" />
+                  <p className="text-sm font-medium text-green-700 dark:text-green-300">
+                    تم قبولك! يمكنك الآن التواصل مع صاحب التكليف
+                  </p>
+                </div>
+              </div>
+            )}
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* B) Contact reveal section */}
+      {isAssignedToMe && deployment.contactRevealed && (
+        <motion.div variants={itemAnim}>
+          <GlassCard variant="nurse" className="space-y-4">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <Phone className="w-4 h-4 text-nurse" />
+              بيانات التواصل
+            </h3>
+            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">اسم صاحب التكليف</span>
+                <span className="font-medium">{deployment.createdBy?.name || 'غير معروف'}</span>
+              </div>
+              {deployment.creatorPhone && (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">رقم الهاتف</span>
+                    <span className="font-medium font-mono" dir="ltr">{deployment.creatorPhone}</span>
+                  </div>
+                  <div className="flex gap-2 pt-2">
+                    <a
+                      href={`tel:${deployment.creatorPhone}`}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors"
+                    >
+                      <Phone className="w-4 h-4" /> اتصال
+                    </a>
+                    <a
+                      href={`https://wa.me/${deployment.creatorPhone.replace(/^0+/, '')}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+                    >
+                      <MessageSquare className="w-4 h-4" /> واتساب
+                    </a>
+                  </div>
+                </>
+              )}
+            </div>
           </GlassCard>
         </motion.div>
       )}
 
       {/* If assigned to me, show assignment details */}
-      {isAssignedToMe && (
+      {isAssignedToMe && !deployment.contactRevealed && (
         <motion.div variants={itemAnim}>
           <GlassCard variant="nurse" className="space-y-4">
             <h3 className="font-semibold text-sm flex items-center gap-2">
@@ -594,6 +793,219 @@ export default function NurseDeploymentDetailPage() {
                 />
               </div>
             </div>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Creator: Manage applicants section */}
+      {isCreator && deployment.applications.length > 0 && (
+        <motion.div variants={itemAnim}>
+          <GlassCard variant="nurse" className="space-y-4">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <User className="w-4 h-4 text-nurse" />
+              المتقدمون ({toArabicNum(deployment.applications.length)})
+            </h3>
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {deployment.applications.map((app) => (
+                <div
+                  key={app._id || app.applicantId}
+                  className="p-3 rounded-xl border bg-card space-y-2"
+                >
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-nurse/10 flex items-center justify-center">
+                        <User className="w-4 h-4 text-nurse" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-medium">{app.applicantName}</p>
+                        {app.applicantVerificationStatus === 'verified' && (
+                          <ShieldCheck className="w-3 h-3 text-emerald-500 inline-block ml-1" />
+                        )}
+                      </div>
+                    </div>
+                    <BadgeStatus
+                      status={applicationStatusMap[app.status] || 'pending'}
+                      label={applicationStatusLabel[app.status] || app.status}
+                      size="sm"
+                    />
+                  </div>
+
+                  {/* Applicant details (NO phone numbers) */}
+                  <div className="grid grid-cols-2 gap-1.5 text-[11px]">
+                    {app.applicantSpecialization && app.applicantSpecialization.length > 0 && (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <BriefcaseMedical className="w-3 h-3" />
+                        <span className="truncate">{app.applicantSpecialization.slice(0, 2).join('، ')}</span>
+                      </div>
+                    )}
+                    {app.applicantExperience !== undefined && app.applicantExperience > 0 && (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <Award className="w-3 h-3" />
+                        <span>{toArabicNum(app.applicantExperience)} سنوات خبرة</span>
+                      </div>
+                    )}
+                    {app.applicantRating !== undefined && app.applicantRating > 0 && (
+                      <div className="flex items-center gap-1 text-amber-600">
+                        <Star className="w-3 h-3 fill-amber-500" />
+                        <span>{toArabicNum(app.applicantRating)}</span>
+                      </div>
+                    )}
+                    {app.applicantCompletedJobs !== undefined && app.applicantCompletedJobs > 0 && (
+                      <div className="flex items-center gap-1 text-muted-foreground">
+                        <CheckCircle2 className="w-3 h-3" />
+                        <span>{toArabicNum(app.applicantCompletedJobs)} تكليف مكتمل</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {app.coverLetter && (
+                    <div className="p-2 rounded-lg bg-muted/40">
+                      <p className="text-[10px] text-muted-foreground mb-0.5">رسالة التقديم</p>
+                      <p className="text-[11px] leading-relaxed">{app.coverLetter}</p>
+                    </div>
+                  )}
+
+                  {/* Select button for pending applicants */}
+                  {app.status === 'pending' && deployment.status === 'open' && (
+                    <Button
+                      size="sm"
+                      className="w-full h-8 text-xs gap-1 bg-nurse hover:bg-nurse/90 text-white"
+                      onClick={() => handleSelectApplicant(app._id!)}
+                      disabled={isSelecting}
+                    >
+                      {isSelecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                      اختيار
+                    </Button>
+                  )}
+
+                  {/* Status messages */}
+                  {app.status === 'selected_by_creator' && (
+                    <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
+                      <p className="text-[11px] text-amber-700 dark:text-amber-300 font-medium">بانتظار موافقة الإدارة</p>
+                    </div>
+                  )}
+                  {(app.status === 'admin_approved' || app.status === 'payment_pending') && (
+                    <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900/30">
+                      <p className="text-[11px] text-emerald-700 dark:text-emerald-300 font-medium">بانتظار دفع المكلف</p>
+                    </div>
+                  )}
+                  {app.status === 'payment_submitted' && (
+                    <div className="p-2 rounded-lg bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30">
+                      <p className="text-[11px] text-blue-700 dark:text-blue-300 font-medium">تم تقديم إثبات الدفع — جارٍ المراجعة</p>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Creator status messages for created deployments */}
+      {isCreator && deployment.status === 'creator_selected' && (
+        <motion.div variants={itemAnim}>
+          <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
+            <div className="flex items-center gap-2">
+              <Clock className="w-4 h-4 text-amber-600" />
+              <p className="text-sm font-medium text-amber-700 dark:text-amber-300">بانتظار موافقة الإدارة على اختيارك</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+      {isCreator && deployment.status === 'admin_approved' && (
+        <motion.div variants={itemAnim}>
+          <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900/30">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-4 h-4 text-emerald-600" />
+              <p className="text-sm font-medium text-emerald-700 dark:text-emerald-300">تمت الموافقة الإدارية — بانتظار دفع المكلف</p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
+      {/* F) Rating section — creator rates assigned nurse after completion */}
+      {isCreator && deployment.status === 'completed' && !deployment.rating && deployment.assignedTo && (
+        <motion.div variants={itemAnim}>
+          <GlassCard variant="nurse" className="space-y-4">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <Star className="w-4 h-4 text-nurse" />
+              تقييم المكلف
+            </h3>
+            <p className="text-xs text-muted-foreground">
+              قيّم أداء {deployment.assignedTo?.name || 'المكلف'} على هذا التكليف
+            </p>
+
+            {/* Star rating */}
+            <div className="flex items-center gap-1.5">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <button
+                  key={star}
+                  type="button"
+                  onClick={() => setRatingValue(star)}
+                  className="transition-transform hover:scale-110"
+                >
+                  <Star
+                    className={`w-8 h-8 ${
+                      star <= ratingValue
+                        ? 'text-amber-500 fill-amber-500'
+                        : 'text-muted-foreground/30'
+                    }`}
+                  />
+                </button>
+              ))}
+              {ratingValue > 0 && (
+                <span className="text-sm font-medium ms-2">{toArabicNum(ratingValue)}/5</span>
+              )}
+            </div>
+
+            {/* Comment */}
+            <div className="space-y-2">
+              <Label htmlFor="rating-comment" className="text-sm font-medium">تعليق (اختياري)</Label>
+              <Textarea
+                id="rating-comment"
+                placeholder="اكتب تعليقاً على أداء المكلف..."
+                rows={2}
+                value={ratingComment}
+                onChange={(e) => setRatingComment(e.target.value)}
+              />
+            </div>
+
+            <Button
+              className="w-full gap-2 bg-nurse hover:bg-nurse/90 text-white"
+              onClick={handleRate}
+              disabled={isSubmittingRating || ratingValue === 0}
+            >
+              {isSubmittingRating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Star className="w-4 h-4" />}
+              إرسال التقييم
+            </Button>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Show existing rating if already rated */}
+      {isCreator && deployment.rating && (
+        <motion.div variants={itemAnim}>
+          <GlassCard variant="nurse" className="space-y-3">
+            <h3 className="font-semibold text-sm flex items-center gap-2">
+              <Star className="w-4 h-4 text-amber-500" />
+              تقييمك
+            </h3>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={`w-5 h-5 ${
+                    star <= (deployment.rating ?? 0)
+                      ? 'text-amber-500 fill-amber-500'
+                      : 'text-muted-foreground/30'
+                  }`}
+                />
+              ))}
+              <span className="text-sm font-medium ms-2">{toArabicNum(deployment.rating ?? 0)}/5</span>
+            </div>
+            {deployment.ratingComment && (
+              <p className="text-sm text-muted-foreground">{deployment.ratingComment}</p>
+            )}
           </GlassCard>
         </motion.div>
       )}
@@ -653,12 +1065,18 @@ export default function NurseDeploymentDetailPage() {
                 <span className="text-muted-foreground">المبلغ</span>
                 <span className="font-medium">{toArabicNum(deployment.amount.toLocaleString())} ر.ي</span>
               </div>
-              {deployment.serviceFee > 0 && (
+              {deployment.adminCommissionAmount > 0 && (
                 <div className="flex items-center justify-between text-sm text-orange-600 dark:text-orange-400">
-                  <span>رسوم التقديم</span>
-                  <span className="font-bold">{toArabicNum(deployment.serviceFee)} ر.ي</span>
+                  <span>منها {toArabicNum(deployment.adminCommissionAmount.toLocaleString())} للإدارة</span>
                 </div>
               )}
+            </div>
+
+            {/* D) Info note: no payment at apply time */}
+            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30">
+              <p className="text-xs text-blue-700 dark:text-blue-300">
+                التقديم مجاني. سيتم طلب رسوم التقديم فقط عند اختيارك وموافقة الإدارة.
+              </p>
             </div>
 
             {/* Cover letter */}
@@ -688,7 +1106,7 @@ export default function NurseDeploymentDetailPage() {
         </DialogContent>
       </Dialog>
 
-      {/* ═══════════════ PAYMENT PROOF DIALOG ═══════════════ */}
+      {/* ═══════════════ PAYMENT PROOF DIALOG (updated with image upload) ═══════════════ */}
       <Dialog open={showPaymentModal} onOpenChange={setShowPaymentModal}>
         <DialogContent dir="rtl" className="max-w-md">
           <DialogHeader>
@@ -706,25 +1124,65 @@ export default function NurseDeploymentDetailPage() {
               <div className="flex items-center justify-between text-sm">
                 <span className="text-orange-700 dark:text-orange-300">رسوم التقديم</span>
                 <span className="font-bold text-orange-700 dark:text-orange-300">
-                  {toArabicNum(myApplication?.serviceFee ?? deployment.serviceFee)} ر.ي
+                  {toArabicNum(myApplication?.serviceFee ?? deployment.applicantServiceFee ?? deployment.serviceFee)} ر.ي
                 </span>
               </div>
             </div>
 
+            {/* Image upload */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">
+                صورة إثبات الدفع <span className="text-red-500">*</span>
+              </Label>
+              <div className="space-y-2">
+                {paymentProofImage ? (
+                  <div className="relative rounded-xl overflow-hidden border border-border">
+                    <img
+                      src={paymentProofImage}
+                      alt="إثبات الدفع"
+                      className="w-full h-48 object-cover"
+                    />
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      className="absolute top-2 left-2 w-7 h-7"
+                      onClick={() => setPaymentProofImage('')}
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                ) : (
+                  <div
+                    className="border-2 border-dashed border-muted-foreground/30 rounded-xl p-6 flex flex-col items-center gap-2 cursor-pointer hover:border-orange-400 transition-colors"
+                    onClick={() => fileInputRef.current?.click()}
+                  >
+                    <Upload className="w-8 h-8 text-muted-foreground" />
+                    <p className="text-xs text-muted-foreground">اضغط لرفع صورة إثبات الدفع</p>
+                    <p className="text-[10px] text-muted-foreground">PNG, JPG حتى 5MB</p>
+                  </div>
+                )}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleImageUpload}
+                />
+              </div>
+            </div>
+
+            {/* Text input (alternative) */}
             <div className="space-y-2">
               <Label htmlFor="nurse-payment-proof" className="text-sm font-medium">
-                إثبات الدفع <span className="text-red-500">*</span>
+                أو أدخل رقم العملية (اختياري)
               </Label>
               <Textarea
                 id="nurse-payment-proof"
                 placeholder="أدخل رقم العملية أو معلومات التحويل البنكي..."
-                rows={3}
+                rows={2}
                 value={paymentProof}
                 onChange={(e) => setPaymentProof(e.target.value)}
               />
-              <p className="text-[11px] text-muted-foreground">
-                أدخل رقم إيصال التحويل أو أي معلومات تثبت عملية الدفع
-              </p>
             </div>
           </div>
 
@@ -733,7 +1191,7 @@ export default function NurseDeploymentDetailPage() {
             <Button
               className="gap-2 bg-orange-600 hover:bg-orange-700 text-white"
               onClick={handleSubmitPayment}
-              disabled={isSubmittingPayment || !paymentProof}
+              disabled={isSubmittingPayment || (!paymentProof && !paymentProofImage)}
             >
               {isSubmittingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               إرسال إثبات الدفع
