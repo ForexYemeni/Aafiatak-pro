@@ -39,6 +39,14 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('الحساب معطل. يرجى التواصل مع الإدارة', 403, 'ACCOUNT_DISABLED');
     }
 
+    if (user.isBlocked) {
+      return createErrorResponse(
+        user.blockedReason ? `الحساب محظور: ${user.blockedReason}` : 'الحساب محظور. يرجى التواصل مع الإدارة',
+        403,
+        'ACCOUNT_BLOCKED'
+      );
+    }
+
     const isValid = await verifyPassword(password, user.password);
     if (!isValid) {
       return createErrorResponse('رقم الهاتف أو كلمة المرور غير صحيحة', 401, 'INVALID_CREDENTIALS');

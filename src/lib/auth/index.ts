@@ -12,8 +12,15 @@ import jwt from 'jsonwebtoken';
 const SALT_ROUNDS = 12;
 const JWT_EXPIRY = process.env.JWT_EXPIRY ?? '7d';
 const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY ?? '30d';
-const JWT_SECRET = process.env.JWT_SECRET ?? 'aafiatak-dev-jwt-secret-change-in-production';
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET ?? 'aafiatak-dev-refresh-secret-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
+
+if (!JWT_SECRET) {
+  console.error('[AUTH FATAL] JWT_SECRET environment variable is not set! Authentication will not work.');
+}
+if (!JWT_REFRESH_SECRET) {
+  console.error('[AUTH FATAL] JWT_REFRESH_SECRET environment variable is not set! Token refresh will not work.');
+}
 
 // ---- Password Hashing ----
 

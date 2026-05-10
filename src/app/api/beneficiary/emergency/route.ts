@@ -109,7 +109,7 @@ export async function POST(request: NextRequest) {
     // 1. Notify admins IMMEDIATELY with voice alert (highest priority)
     try {
       const { User, Beneficiary: BeneficiaryModel } = await import('@/models/mongoose');
-      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id').lean();
       const beneficiaryDoc = await BeneficiaryModel.findById(user.userId).select('name phone').lean();
       const beneficiaryName = beneficiaryDoc?.name || 'مستفيد';
 

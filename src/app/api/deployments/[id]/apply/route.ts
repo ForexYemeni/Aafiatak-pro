@@ -41,6 +41,11 @@ export async function POST(
       return createErrorResponse('لقد تقدمت بالفعل على هذا التكليف', 409, 'ALREADY_APPLIED');
     }
 
+    // Prevent creator from applying to their own deployment
+    if (deployment.createdBy.toString() === user.userId) {
+      return createErrorResponse('لا يمكنك التقديم على تكليف أنشأته', 400, 'CANNOT_APPLY_TO_OWN');
+    }
+
     // ── Get applicant info with specialization, experience, rating, completedJobs, verificationStatus ──
     const applicant = await Nurse.findById(user.userId)
       .select('name specialization experience rating completedJobs verificationStatus')

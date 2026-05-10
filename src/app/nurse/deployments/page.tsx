@@ -7,7 +7,7 @@ import {
   Briefcase, FileText, CheckCircle2, Plus, MapPin, Clock, DollarSign,
   Loader2, Upload, X, Eye, RefreshCw, Filter, Search, Navigation,
   Building2, Landmark, Hash, Percent, FileCheck, Wallet, Star,
-  User, ShieldCheck, Award, BriefcaseMedical, Phone
+  User, ShieldCheck, Award, BriefcaseMedical, Phone, CheckCircle
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -306,6 +306,14 @@ export default function NurseDeploymentsPage() {
       const creatorId = d.createdBy?.id || (typeof d.createdBy === 'string' ? d.createdBy : null);
       return idMatches(creatorId, currentUserId) && d.creatorRole === 'nurse';
     }
+  );
+
+  // Completed tab: completed/cancelled deployments the user is related to
+  const completedDeployments = deployments.filter(
+    (d) => ['completed', 'cancelled'].includes(d.status)
+      && (idMatches(d.createdBy?.id, currentUserId)
+          || d.applications.some((a) => idMatches(a.applicantId, currentUserId))
+          || idMatches(d.assignedTo?.id, currentUserId))
   );
 
   /* ── Apply for deployment ── */
@@ -735,10 +743,10 @@ export default function NurseDeploymentsPage() {
         />
       </motion.div>
 
-      {/* Tabs - C) Updated to 5 tabs */}
+      {/* Tabs - Updated to 6 tabs */}
       <motion.div variants={itemAnim}>
         <Tabs value={activeTab} onValueChange={setActiveTab} dir="rtl">
-          <TabsList className="w-full grid grid-cols-5 h-auto p-1 gap-1">
+          <TabsList className="w-full grid grid-cols-6 h-auto p-1 gap-1">
             <TabsTrigger value="available" className="text-xs py-2 data-[state=active]:bg-nurse data-[state=active]:text-white">
               المتاحة
               {availableDeployments.length > 0 && (
@@ -768,6 +776,14 @@ export default function NurseDeploymentsPage() {
               {myCreatedDeployments.length > 0 && (
                 <Badge variant="secondary" className="mr-1 text-[10px] px-1.5 py-0">
                   {toArabicNum(myCreatedDeployments.length)}
+                </Badge>
+              )}
+            </TabsTrigger>
+            <TabsTrigger value="completed" className="text-xs py-2">
+              مكتملة
+              {completedDeployments.length > 0 && (
+                <Badge variant="secondary" className="mr-1 text-[10px] px-1.5 py-0">
+                  {toArabicNum(completedDeployments.length)}
                 </Badge>
               )}
             </TabsTrigger>
@@ -873,7 +889,27 @@ export default function NurseDeploymentsPage() {
             )}
           </TabsContent>
 
-          {/* ── Tab 5: Create Deployment ── */}
+          {/* ── Tab 5: Completed Deployments ── */}
+          <TabsContent value="completed" className="mt-4">
+            {isLoading ? (
+              <div className="space-y-3">
+                <CardSkeleton />
+                <CardSkeleton />
+              </div>
+            ) : completedDeployments.length === 0 ? (
+              <EmptyState
+                icon={<CheckCircle className="w-10 h-10 text-muted-foreground" />}
+                title="لا توجد تكليفات مكتملة"
+                description="لم تكمل أو تلغِ أي تكليف بعد"
+              />
+            ) : (
+              <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {completedDeployments.map((dep) => renderDeploymentCard(dep, 'view'))}
+              </motion.div>
+            )}
+          </TabsContent>
+
+          {/* ── Tab 6: Create Deployment ── */}
           <TabsContent value="create" className="mt-4">
             <GlassCard variant="nurse" className="space-y-5">
               <div className="flex items-center gap-2">

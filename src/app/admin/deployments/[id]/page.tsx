@@ -8,7 +8,8 @@ import {
   CheckCircle2, XCircle, Eye, ShieldCheck, ShieldX, Play, Square,
   Navigation, Users, FileText, AlertTriangle, User, CreditCard,
   Wallet, Percent, Building2, Calendar, MessageSquare, Ban,
-  Star, Phone, PhoneOff, BadgeCheck, Award, TrendingUp
+  Star, Phone, PhoneOff, BadgeCheck, Award, TrendingUp,
+  UserCheck, ZoomIn, ZoomOut, Download, X
 } from 'lucide-react';
 import { GlassCard } from '@/components/common/glass-card';
 import { BadgeStatus } from '@/components/common/badge-status';
@@ -204,10 +205,15 @@ export default function AdminDeploymentDetailPage() {
   const [acceptingApp, setAcceptingApp] = useState<DeploymentApplication | null>(null);
   const [isAccepting, setIsAccepting] = useState(false);
   const [viewingPayment, setViewingPayment] = useState<DeploymentApplication | null>(null);
+  const [paymentZoom, setPaymentZoom] = useState(1);
 
   // Admin approve state
   const [showApproveDialog, setShowApproveDialog] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+
+  // Select applicant state (admin can directly select)
+  const [selectingApp, setSelectingApp] = useState<DeploymentApplication | null>(null);
+  const [isSelecting, setIsSelecting] = useState(false);
 
   // Status change states
   const [statusChangeTarget, setStatusChangeTarget] = useState<{ status: string; label: string } | null>(null);
@@ -252,6 +258,30 @@ export default function AdminDeploymentDetailPage() {
     } finally {
       setIsApproving(false);
       setShowApproveDialog(false);
+    }
+  };
+
+  /* ── Select applicant (admin directly selects) ── */
+  const handleSelectApplicant = async () => {
+    if (!selectingApp) return;
+    setIsSelecting(true);
+    try {
+      const res = await authFetch(`/api/deployments/${deploymentId}/select-applicant`, {
+        method: 'PATCH',
+        body: JSON.stringify({ applicationId: selectingApp._id }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`تم اختيار ${selectingApp.applicantName} بنجاح. بانتظار موافقة الإدارة.`);
+        void fetchDeployment();
+      } else {
+        toast.error(json.error?.message ?? json.message ?? 'فشل اختيار المتقدم');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء اختيار المتقدم');
+    } finally {
+      setIsSelecting(false);
+      setSelectingApp(null);
     }
   };
 
@@ -860,13 +890,24 @@ export default function AdminDeploymentDetailPage() {
 
                   {/* Actions */}
                   <div className="flex gap-2 pt-1">
+                    {/* Select applicant (admin can select for open deployments) */}
+                    {app.status === 'pending' && deployment.status === 'open' && (
+                      <Button
+                        size="sm"
+                        className="h-7 text-[11px] gap-1 bg-admin hover:bg-admin/90 text-white"
+                        onClick={() => setSelectingApp(app)}
+                      >
+                        <UserCheck className="w-3 h-3" /> اختيار
+                      </Button>
+                    )}
+
                     {/* View payment proof */}
                     {(app.hasPaymentProof || app.paymentProofImage) && (
                       <Button
                         size="sm"
                         variant="ghost"
                         className="h-7 text-[11px] gap-1"
-                        onClick={() => setViewingPayment(app)}
+                        onClick={() => { setViewingPayment(app); setPaymentZoom(1); }}
                       >
                         <Eye className="w-3 h-3" /> عرض الدفع
                       </Button>
@@ -880,7 +921,7 @@ export default function AdminDeploymentDetailPage() {
                           className="h-7 text-[11px] gap-1 bg-green-600 hover:bg-green-700 text-white"
                           onClick={() => setVerifyingApp(app)}
                         >
-                          <ShieldCheck className="w-3 h-3" /> تحقق من الدفع
+                          <ShieldCheck className="w-3 h-3" /> تحقق
                         </Button>
                         <Button
                           size="sm"
@@ -936,6 +977,33 @@ export default function AdminDeploymentDetailPage() {
             >
               {isApproving ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
               الموافقة على الاختيار
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* ═══════════════ SELECT APPLICANT DIALOG ═══════════════ */}
+      <AlertDialog open={!!selectingApp} onOpenChange={(open) => { if (!open) setSelectingApp(null); }}>
+        <AlertDialogContent dir="rtl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <UserCheck className="w-5 h-5 text-admin" />
+              اختيار المتقدم
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              هل تريد اختيار <span className="font-bold">{selectingApp?.applicantName}</span> لهذا التكليف؟
+              سيتم تحويل حالة التكليف إلى "بانتظار الموافقة" بانتظار موافقتك كإدارة.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="gap-2">
+            <AlertDialogCancel className="gap-1.5">إلغاء</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleSelectApplicant}
+              disabled={isSelecting}
+              className="gap-1.5 bg-admin hover:bg-admin/90"
+            >
+              {isSelecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <UserCheck className="w-4 h-4" />}
+              تأكيد الاختيار
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -1076,57 +1144,111 @@ export default function AdminDeploymentDetailPage() {
       </AlertDialog>
 
       {/* ═══════════════ VIEW PAYMENT PROOF DIALOG ═══════════════ */}
-      <Dialog open={!!viewingPayment} onOpenChange={(open) => { if (!open) setViewingPayment(null); }}>
-        <DialogContent dir="rtl" className="max-w-md">
+      <Dialog open={!!viewingPayment} onOpenChange={(open) => { if (!open) { setViewingPayment(null); setPaymentZoom(1); } }}>
+        <DialogContent dir="rtl" className="max-w-lg">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Wallet className="w-5 h-5 text-orange-600" />
-              إثبات الدفع
+              <Eye className="w-5 h-5 text-blue-600" />
+              إثبات الدفع - {viewingPayment?.applicantName}
             </DialogTitle>
             <DialogDescription>
-              إثبات دفع {viewingPayment?.applicantName}
+              تم التقديم: {viewingPayment?.paymentSubmittedAt ? formatDate(viewingPayment.paymentSubmittedAt) : '—'}
             </DialogDescription>
           </DialogHeader>
 
-          {viewingPayment && (
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-muted/40 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">المتقدم</span>
-                  <span className="font-medium">{viewingPayment.applicantName}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">رسوم التقديم</span>
-                  <span className="font-medium">{toArabicNum(viewingPayment.serviceFee)} ر.ي</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">تاريخ الدفع</span>
-                  <span className="font-medium">{formatDate(viewingPayment.paymentSubmittedAt)}</span>
-                </div>
-              </div>
-              {/* Payment proof image */}
-              {viewingPayment.paymentProofImage && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] text-muted-foreground font-medium">صورة إثبات الدفع</p>
-                  <img
-                    src={viewingPayment.paymentProofImage}
-                    alt="إثبات الدفع"
-                    className="max-w-full rounded-lg border"
-                  />
-                </div>
+          <div className="space-y-3">
+            {/* Image with zoom */}
+            <div className="relative rounded-xl border bg-muted/30 overflow-auto max-h-[60vh] flex items-center justify-center p-2">
+              {viewingPayment?.paymentProofImage && (
+                <img
+                  src={viewingPayment.paymentProofImage.startsWith('data:') ? viewingPayment.paymentProofImage : `data:image/jpeg;base64,${viewingPayment.paymentProofImage}`}
+                  alt="إثبات الدفع"
+                  className="rounded-lg transition-transform duration-200"
+                  style={{ transform: `scale(${paymentZoom})`, transformOrigin: 'center' }}
+                />
               )}
-              {viewingPayment.paymentProofData && (
-                <div className="p-4 rounded-xl bg-orange-50 dark:bg-orange-900/10 border border-orange-200 dark:border-orange-900/30">
-                  <p className="text-[10px] text-muted-foreground mb-1.5 font-medium">تفاصيل إثبات الدفع</p>
-                  <p className="text-sm leading-relaxed whitespace-pre-wrap">{viewingPayment.paymentProofData}</p>
-                </div>
+              {!viewingPayment?.paymentProofImage && viewingPayment?.paymentProofData && (
+                <img
+                  src={viewingPayment.paymentProofData.startsWith('data:') ? viewingPayment.paymentProofData : `data:image/jpeg;base64,${viewingPayment.paymentProofData}`}
+                  alt="إثبات الدفع"
+                  className="rounded-lg transition-transform duration-200"
+                  style={{ transform: `scale(${paymentZoom})`, transformOrigin: 'center' }}
+                />
               )}
             </div>
-          )}
 
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setViewingPayment(null)}>إغلاق</Button>
-          </DialogFooter>
+            {/* Zoom controls */}
+            <div className="flex items-center justify-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setPaymentZoom(Math.max(0.25, paymentZoom - 0.25))}
+              >
+                <ZoomOut className="w-4 h-4" />
+              </Button>
+              <span className="text-xs font-medium w-14 text-center">{Math.round(paymentZoom * 100)}%</span>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-8 w-8"
+                onClick={() => setPaymentZoom(Math.min(3, paymentZoom + 0.25))}
+              >
+                <ZoomIn className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1 text-xs"
+                onClick={() => {
+                  const imgSrc = viewingPayment?.paymentProofImage || viewingPayment?.paymentProofData;
+                  if (imgSrc) {
+                    const link = document.createElement('a');
+                    link.href = imgSrc.startsWith('data:') ? imgSrc : `data:image/jpeg;base64,${imgSrc}`;
+                    link.download = `payment-proof-${viewingPayment?.applicantName || 'unknown'}.jpg`;
+                    link.click();
+                  }
+                }}
+              >
+                <Download className="w-3 h-3" /> تحميل
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 gap-1 text-xs"
+                onClick={() => setPaymentZoom(1)}
+              >
+                إعادة تعيين
+              </Button>
+            </div>
+          </div>
+
+          {/* Verify/Reject buttons if status is payment_submitted */}
+          {viewingPayment?.status === 'payment_submitted' && (
+            <DialogFooter className="gap-2 sm:gap-0">
+              <Button
+                variant="outline"
+                className="gap-1.5 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                onClick={() => {
+                  setVerifyingApp(viewingPayment);
+                  setViewingPayment(null);
+                  setPaymentZoom(1);
+                }}
+              >
+                <ShieldX className="w-4 h-4" /> رفض الدفع
+              </Button>
+              <Button
+                className="gap-1.5 bg-green-600 hover:bg-green-700 text-white"
+                onClick={() => {
+                  setVerifyingApp(viewingPayment);
+                  setViewingPayment(null);
+                  setPaymentZoom(1);
+                }}
+              >
+                <ShieldCheck className="w-4 h-4" /> التحقق والموافقة
+              </Button>
+            </DialogFooter>
+          )}
         </DialogContent>
       </Dialog>
     </motion.div>
