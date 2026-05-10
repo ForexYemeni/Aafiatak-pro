@@ -64,7 +64,10 @@ export async function POST(
 
     // ── Get service fee from settings ──
     const settings = await AdminSettings.findOne().lean();
-    const serviceFee = settings?.deploymentApplicantFee ?? 500;
+    const feeResponsible = settings?.deploymentFeeResponsible ?? 'applicant';
+    const serviceFee = feeResponsible === 'applicant'
+      ? (settings?.deploymentApplicantFee ?? 500)
+      : 0; // No fee for applicant when creator is responsible
 
     // ── Create application with status = pending (NO payment at apply time) ──
     const application = {

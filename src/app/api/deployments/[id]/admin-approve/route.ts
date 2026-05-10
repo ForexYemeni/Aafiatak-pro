@@ -47,11 +47,22 @@ export async function PATCH(
 
     const application = deployment.applications[applicationIndex] as any;
 
-    // ── Update application status: admin_approved → payment_pending ──
-    application.status = 'payment_pending';
+    // ── Check fee responsibility ──
+    const feeResponsible = deployment.feeResponsible || 'applicant';
 
-    // ── Update deployment status ──
-    deployment.status = 'admin_approved';
+    if (feeResponsible === 'creator') {
+      // When creator is responsible for fees, skip payment step for applicant
+      // Go directly to accepted/assigned
+      application.status = 'accepted';
+      deployment.status = 'assigned';
+      deployment.assignedTo = application.applicantId;
+      deployment.assignedAt = new Date();
+      deployment.contactRevealed = true;
+    } else {
+      // When applicant is responsible for fees, they need to pay
+      application.status = 'payment_pending';
+      deployment.status = 'admin_approved';
+    }
 
     await deployment.save();
 
@@ -59,86 +70,166 @@ export async function PATCH(
     const notificationPromises: Promise<any>[] = [];
 
     try {
-      const fee = application.serviceFee || deployment.serviceFee || 0;
+      if (feeResponsible === 'creator') {
+        // ── Notify applicant: accepted directly (no payment needed) ──
+        const applicantVoiceText = `تم قبولك على التكليف ${deployment.title}. يمكنك الآن التواصل مع صاحب التكليف`;
+        notificationPromises.push(
+          Notification.create({
+            userId: application.applicantId,
+            userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
+            titleAr: '✅ تم قبولك على التكليف',
+            bodyAr: `تم قبولك على التكليف "${deployment.title}". يمكنك الآن التواصل مع صاحب التكليف`,
+            type: 'deployment',
+            priority: 'urgent',
+            data: {
+              deploymentId: id,
+              applicationId: application._id.toString(),
+              status: 'accepted',
+              voiceAlert: true,
+              voiceText: applicantVoiceText,
+            },
+            actionUrl: '/nurse/deployments',
+            voiceEnabled: true,
+          }),
+          sendPushToUser(application.applicantId.toString(), {
+            title: '✅ تم قبولك على التكليف',
+            body: `تم قبولك على التكليف "${deployment.title}". يمكنك الآن التواصل مع صاحب التكليف`,
+            type: 'deployment',
+            priority: 'urgent',
+            url: '/nurse/deployments',
+            userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
+            sound: true,
+            data: {
+              deploymentId: id,
+              applicationId: application._id.toString(),
+              status: 'accepted',
+              voiceAlert: true,
+              voiceText: applicantVoiceText,
+            },
+          })
+        );
 
-      // ── Notify selected applicant with voice notification ──
-      const applicantVoiceText = `تمت الموافقة على التكليف ${deployment.title}. يرجى دفع رسوم التقديم بمبلغ ${fee} ريال`;
-      notificationPromises.push(
-        Notification.create({
-          userId: application.applicantId,
-          userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
-          titleAr: '✅ تمت الموافقة الإدارية على التكليف',
-          bodyAr: `تمت الموافقة على اختيارك للتكليف "${deployment.title}". يرجى دفع رسوم التقديم بمبلغ ${fee} ريال`,
-          type: 'deployment',
-          priority: 'urgent',
-          data: {
-            deploymentId: id,
-            applicationId: application._id.toString(),
-            status: 'payment_pending',
-            fee,
-            voiceAlert: true,
-            voiceText: applicantVoiceText,
-          },
-          actionUrl: '/nurse/deployments',
-          voiceEnabled: true,
-        }),
-        sendPushToUser(application.applicantId.toString(), {
-          title: '✅ تمت الموافقة الإدارية على التكليف',
-          body: `تمت الموافقة على اختيارك للتكليف "${deployment.title}". يرجى دفع رسوم التقديم`,
-          type: 'deployment',
-          priority: 'urgent',
-          url: '/nurse/deployments',
-          userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
-          sound: true,
-          data: {
-            deploymentId: id,
-            applicationId: application._id.toString(),
-            status: 'payment_pending',
-            fee,
-            voiceAlert: true,
-            voiceText: applicantVoiceText,
-          },
-        })
-      );
+        // ── Notify creator ──
+        const creatorVoiceText = `تم تعيين مكلف على التكليف ${deployment.title}`;
+        notificationPromises.push(
+          Notification.create({
+            userId: deployment.createdBy,
+            userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
+            titleAr: '✅ تم تعيين مكلف',
+            bodyAr: `تم تعيين ${application.applicantName} على التكليف "${deployment.title}"`,
+            type: 'deployment',
+            priority: 'high',
+            data: {
+              deploymentId: id,
+              applicationId: application._id.toString(),
+              applicantName: application.applicantName,
+              status: 'assigned',
+              voiceAlert: true,
+              voiceText: creatorVoiceText,
+            },
+            actionUrl: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
+            voiceEnabled: true,
+          }),
+          sendPushToUser(deployment.createdBy.toString(), {
+            title: '✅ تم تعيين مكلف',
+            body: `تم تعيين ${application.applicantName} على التكليف "${deployment.title}"`,
+            type: 'deployment',
+            priority: 'high',
+            url: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
+            userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
+            sound: true,
+            data: {
+              deploymentId: id,
+              applicationId: application._id.toString(),
+              status: 'assigned',
+              voiceAlert: true,
+              voiceText: creatorVoiceText,
+            },
+          })
+        );
+      } else {
+        // ── Original flow: applicant needs to pay ──
+        const fee = application.serviceFee || deployment.serviceFee || 0;
 
-      // ── Notify creator with voice notification ──
-      const creatorVoiceText = `تمت الموافقة الإدارية على التكليف ${deployment.title}. بانتظار دفع المكلف`;
-      notificationPromises.push(
-        Notification.create({
-          userId: deployment.createdBy,
-          userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
-          titleAr: '✅ تمت الموافقة الإدارية',
-          bodyAr: `تمت الموافقة الإدارية على التكليف "${deployment.title}". بانتظار دفع المكلف الرسوم`,
-          type: 'deployment',
-          priority: 'high',
-          data: {
-            deploymentId: id,
-            applicationId: application._id.toString(),
-            applicantName: application.applicantName,
-            status: 'admin_approved',
-            voiceAlert: true,
-            voiceText: creatorVoiceText,
-          },
-          actionUrl: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
-          voiceEnabled: true,
-        }),
-        sendPushToUser(deployment.createdBy.toString(), {
-          title: '✅ تمت الموافقة الإدارية',
-          body: `تمت الموافقة الإدارية على التكليف "${deployment.title}". بانتظار دفع المكلف الرسوم`,
-          type: 'deployment',
-          priority: 'high',
-          url: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
-          userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
-          sound: true,
-          data: {
-            deploymentId: id,
-            applicationId: application._id.toString(),
-            status: 'admin_approved',
-            voiceAlert: true,
-            voiceText: creatorVoiceText,
-          },
-        })
-      );
+        // ── Notify selected applicant with voice notification ──
+        const applicantVoiceText = `تمت الموافقة على التكليف ${deployment.title}. يرجى دفع رسوم التقديم بمبلغ ${fee} ريال`;
+        notificationPromises.push(
+          Notification.create({
+            userId: application.applicantId,
+            userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
+            titleAr: '✅ تمت الموافقة الإدارية على التكليف',
+            bodyAr: `تمت الموافقة على اختيارك للتكليف "${deployment.title}". يرجى دفع رسوم التقديم بمبلغ ${fee} ريال`,
+            type: 'deployment',
+            priority: 'urgent',
+            data: {
+              deploymentId: id,
+              applicationId: application._id.toString(),
+              status: 'payment_pending',
+              fee,
+              voiceAlert: true,
+              voiceText: applicantVoiceText,
+            },
+            actionUrl: '/nurse/deployments',
+            voiceEnabled: true,
+          }),
+          sendPushToUser(application.applicantId.toString(), {
+            title: '✅ تمت الموافقة الإدارية على التكليف',
+            body: `تمت الموافقة على اختيارك للتكليف "${deployment.title}". يرجى دفع رسوم التقديم`,
+            type: 'deployment',
+            priority: 'urgent',
+            url: '/nurse/deployments',
+            userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
+            sound: true,
+            data: {
+              deploymentId: id,
+              applicationId: application._id.toString(),
+              status: 'payment_pending',
+              fee,
+              voiceAlert: true,
+              voiceText: applicantVoiceText,
+            },
+          })
+        );
+
+        // ── Notify creator with voice notification ──
+        const creatorVoiceText = `تمت الموافقة الإدارية على التكليف ${deployment.title}. بانتظار دفع المكلف`;
+        notificationPromises.push(
+          Notification.create({
+            userId: deployment.createdBy,
+            userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
+            titleAr: '✅ تمت الموافقة الإدارية',
+            bodyAr: `تمت الموافقة الإدارية على التكليف "${deployment.title}". بانتظار دفع المكلف الرسوم`,
+            type: 'deployment',
+            priority: 'high',
+            data: {
+              deploymentId: id,
+              applicationId: application._id.toString(),
+              applicantName: application.applicantName,
+              status: 'admin_approved',
+              voiceAlert: true,
+              voiceText: creatorVoiceText,
+            },
+            actionUrl: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
+            voiceEnabled: true,
+          }),
+          sendPushToUser(deployment.createdBy.toString(), {
+            title: '✅ تمت الموافقة الإدارية',
+            body: `تمت الموافقة الإدارية على التكليف "${deployment.title}". بانتظار دفع المكلف الرسوم`,
+            type: 'deployment',
+            priority: 'high',
+            url: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
+            userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
+            sound: true,
+            data: {
+              deploymentId: id,
+              applicationId: application._id.toString(),
+              status: 'admin_approved',
+              voiceAlert: true,
+              voiceText: creatorVoiceText,
+            },
+          })
+        );
+      } // end else (applicant pays)
     } catch {
       // Non-critical
     }
@@ -151,10 +242,12 @@ export async function PATCH(
       data: {
         deploymentId: id,
         applicationId: application._id.toString(),
-        applicationStatus: 'payment_pending',
-        deploymentStatus: 'admin_approved',
+        applicationStatus: feeResponsible === 'creator' ? 'accepted' : 'payment_pending',
+        deploymentStatus: feeResponsible === 'creator' ? 'assigned' : 'admin_approved',
       },
-      message: 'تمت الموافقة الإدارية على التكليف. بانتظار دفع المكلف الرسوم',
+      message: feeResponsible === 'creator'
+        ? 'تمت الموافقة الإدارية وتم تعيين المكلف مباشرة (الرسوم على صاحب التكليف)'
+        : 'تمت الموافقة الإدارية على التكليف. بانتظار دفع المكلف الرسوم',
     });
   } catch (error) {
     console.error('[DEPLOYMENT ADMIN APPROVE ERROR]', error);

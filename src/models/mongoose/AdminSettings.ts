@@ -6,6 +6,10 @@ export interface IAdminSettings extends Document {
   deploymentServiceFee: number;
   deploymentCreatorFee: number;
   deploymentApplicantFee: number;
+  deploymentFeeResponsible: 'applicant' | 'creator';
+  deploymentPaymentMethod: string;
+  deploymentWalletNumber: string;
+  deploymentWalletOwnerName: string;
   deploymentBankAccountInfo: string;
   bankAccountInfo: string;
   nightFeePercent: number;
@@ -38,6 +42,10 @@ const AdminSettingsSchema = new Schema<IAdminSettings>({
   deploymentServiceFee: { type: Number, default: 500 },
   deploymentCreatorFee: { type: Number, default: 500 },
   deploymentApplicantFee: { type: Number, default: 500 },
+  deploymentFeeResponsible: { type: String, enum: ['applicant', 'creator'], default: 'applicant' },
+  deploymentPaymentMethod: { type: String, default: '' },
+  deploymentWalletNumber: { type: String, default: '' },
+  deploymentWalletOwnerName: { type: String, default: '' },
   deploymentBankAccountInfo: { type: String, default: '' },
   bankAccountInfo: { type: String, default: '' },
   nightFeePercent: { type: Number, default: 20 },

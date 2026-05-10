@@ -7,7 +7,8 @@ import {
   Briefcase, FileText, CheckCircle2, Plus, MapPin, Clock, DollarSign,
   Loader2, Upload, X, Eye, RefreshCw, Filter, Search, Navigation,
   Building2, Landmark, Hash, Percent, FileCheck, Wallet, Star,
-  User, ShieldCheck, Award, BriefcaseMedical, Phone, CheckCircle
+  User, ShieldCheck, Award, BriefcaseMedical, Phone, CheckCircle,
+  CreditCard, MessageSquare
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -91,6 +92,10 @@ interface DeploymentItem {
   applicantServiceFee: number;
   serviceFee: number;
   totalWithFee: number;
+  feeResponsible: 'applicant' | 'creator';
+  paymentMethod: string;
+  walletNumber: string;
+  walletOwnerName: string;
   status: 'open' | 'creator_selected' | 'admin_approved' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
   assignedTo: { id?: string; name?: string; phone?: string } | null;
   assignedAt?: string;
@@ -1248,6 +1253,56 @@ export default function NurseDeploymentsPage() {
                     <span className="font-bold text-orange-700 dark:text-orange-300">{toArabicNum(myApp?.serviceFee ?? paymentTarget.applicantServiceFee ?? paymentTarget.serviceFee)} ر.ي</span>
                   </div>
                 </div>
+
+                {/* Payment Details in Modal */}
+                {(paymentTarget.paymentMethod || paymentTarget.walletNumber || paymentTarget.walletOwnerName) && (
+                  <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 space-y-2">
+                    <p className="text-xs font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-1.5">
+                      <Wallet className="w-3.5 h-3.5" />
+                      تفاصيل الدفع
+                    </p>
+                    {paymentTarget.paymentMethod && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-blue-600 dark:text-blue-400">طريقة الدفع</span>
+                        <span className="font-medium text-blue-800 dark:text-blue-200">{paymentTarget.paymentMethod}</span>
+                      </div>
+                    )}
+                    <div className="flex justify-between text-xs">
+                      <span className="text-blue-600 dark:text-blue-400">المبلغ</span>
+                      <span className="font-medium text-blue-800 dark:text-blue-200">{toArabicNum(myApp?.serviceFee ?? paymentTarget.applicantServiceFee ?? paymentTarget.serviceFee)} ر.ي</span>
+                    </div>
+                    {paymentTarget.walletNumber && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-blue-600 dark:text-blue-400">رقم المحفظة</span>
+                        <span className="font-medium text-blue-800 dark:text-blue-200 font-mono" dir="ltr">{paymentTarget.walletNumber}</span>
+                      </div>
+                    )}
+                    {paymentTarget.walletOwnerName && (
+                      <div className="flex justify-between text-xs">
+                        <span className="text-blue-600 dark:text-blue-400">اسم صاحب المحفظة</span>
+                        <span className="font-medium text-blue-800 dark:text-blue-200">{paymentTarget.walletOwnerName}</span>
+                      </div>
+                    )}
+                    {paymentTarget.walletNumber && (
+                      <div className="flex gap-2 pt-1">
+                        <a
+                          href={`https://wa.me/${paymentTarget.walletNumber.replace(/^0+/, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-green-600 hover:bg-green-700 text-white text-[10px] font-medium"
+                        >
+                          تحويل واتساب
+                        </a>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(paymentTarget.walletNumber); toast.success('تم نسخ رقم المحفظة'); }}
+                          className="flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-[10px] font-medium"
+                        >
+                          نسخ الرقم
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {/* Image upload */}
                 <div className="space-y-2">

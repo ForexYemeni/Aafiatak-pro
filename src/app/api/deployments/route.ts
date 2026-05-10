@@ -141,11 +141,16 @@ export async function POST(request: NextRequest) {
     const commissionRate = settings?.commissionRate ?? 15;
     const deploymentCreatorFee = settings?.deploymentCreatorFee ?? 0;
     const deploymentApplicantFee = settings?.deploymentApplicantFee ?? 500;
+    const feeResponsible = settings?.deploymentFeeResponsible ?? 'applicant';
+    const deploymentPaymentMethod = settings?.deploymentPaymentMethod ?? '';
+    const deploymentWalletNumber = settings?.deploymentWalletNumber ?? '';
+    const deploymentWalletOwnerName = settings?.deploymentWalletOwnerName ?? '';
 
-    // ── Calculate financials ──
+    // ── Calculate financials based on fee responsibility ──
     const adminCommissionPercent = commissionRate;
     const adminCommissionAmount = Math.round((amount * adminCommissionPercent) / 100);
-    const serviceFee = deploymentApplicantFee; // the fee the applicant pays
+    const effectiveFee = feeResponsible === 'applicant' ? deploymentApplicantFee : deploymentCreatorFee;
+    const serviceFee = feeResponsible === 'applicant' ? deploymentApplicantFee : 0;
     const totalWithFee = amount + serviceFee;
 
     // ── Determine creator info ──
@@ -169,10 +174,14 @@ export async function POST(request: NextRequest) {
       amount,
       adminCommissionPercent,
       adminCommissionAmount,
-      creatorServiceFee: deploymentCreatorFee,
-      applicantServiceFee: deploymentApplicantFee,
+      creatorServiceFee: feeResponsible === 'creator' ? effectiveFee : deploymentCreatorFee,
+      applicantServiceFee: feeResponsible === 'applicant' ? effectiveFee : 0,
       serviceFee,
       totalWithFee,
+      feeResponsible,
+      paymentMethod: deploymentPaymentMethod,
+      walletNumber: deploymentWalletNumber,
+      walletOwnerName: deploymentWalletOwnerName,
       status: 'open',
       startDate: startDate ? new Date(startDate) : undefined,
       endDate: endDate ? new Date(endDate) : undefined,

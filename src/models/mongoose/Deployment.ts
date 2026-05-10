@@ -30,6 +30,10 @@ export interface IDeployment extends Document {
   applicantServiceFee: number;
   serviceFee: number; // رسوم التقديم (للمتقدم)
   totalWithFee: number;
+  feeResponsible: 'applicant' | 'creator'; // من يتحمل الرسوم
+  paymentMethod: string; // طريقة الدفع
+  walletNumber: string; // رقم المحفظة
+  walletOwnerName: string; // اسم صاحب المحفظة
   
   // الحالة
   status: 'open' | 'creator_selected' | 'admin_approved' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
@@ -140,6 +144,10 @@ const DeploymentSchema = new Schema<IDeployment>({
   applicantServiceFee: { type: Number, default: 0 },
   serviceFee: { type: Number, default: 0 },
   totalWithFee: { type: Number, default: 0 },
+  feeResponsible: { type: String, enum: ['applicant', 'creator'], default: 'applicant' },
+  paymentMethod: { type: String, default: '' },
+  walletNumber: { type: String, default: '' },
+  walletOwnerName: { type: String, default: '' },
   
   status: { 
     type: String, 
