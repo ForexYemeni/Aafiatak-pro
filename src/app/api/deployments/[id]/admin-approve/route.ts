@@ -79,7 +79,7 @@ export async function PATCH(
             voiceAlert: true,
             voiceText: applicantVoiceText,
           },
-          actionUrl: '/nurse/my-requests',
+          actionUrl: '/nurse/deployments',
           voiceEnabled: true,
         }),
         sendPushToUser(application.applicantId.toString(), {
@@ -87,7 +87,7 @@ export async function PATCH(
           body: `تمت الموافقة على اختيارك للتكليف "${deployment.title}". يرجى دفع رسوم التقديم`,
           type: 'deployment',
           priority: 'urgent',
-          url: '/nurse/my-requests',
+          url: '/nurse/deployments',
           userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
           sound: true,
           data: {
@@ -119,7 +119,7 @@ export async function PATCH(
             voiceAlert: true,
             voiceText: creatorVoiceText,
           },
-          actionUrl: deployment.creatorRole === 'admin' ? '/admin/orders' : '/nurse/my-requests',
+          actionUrl: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
           voiceEnabled: true,
         }),
         sendPushToUser(deployment.createdBy.toString(), {
@@ -127,7 +127,7 @@ export async function PATCH(
           body: `تمت الموافقة الإدارية على التكليف "${deployment.title}". بانتظار دفع المكلف الرسوم`,
           type: 'deployment',
           priority: 'high',
-          url: deployment.creatorRole === 'admin' ? '/admin/orders' : '/nurse/my-requests',
+          url: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
           userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
           sound: true,
           data: {

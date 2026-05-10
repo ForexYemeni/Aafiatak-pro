@@ -30,16 +30,20 @@ export async function GET(
       return createErrorResponse('التكليف غير موجود', 404, 'NOT_FOUND');
     }
 
-    // Serialize
+    // Serialize with fallback for unpopulated references
     const serialized = {
       ...deployment,
       id: deployment._id.toString(),
-      createdBy: deployment.createdBy
-        ? { ...(deployment.createdBy as any), id: (deployment.createdBy as any)._id?.toString() }
-        : null,
-      assignedTo: deployment.assignedTo
-        ? { ...(deployment.assignedTo as any), id: (deployment.assignedTo as any)._id?.toString() }
-        : null,
+      createdBy: deployment.createdBy && typeof deployment.createdBy === 'object' && (deployment.createdBy as any)._id
+        ? { ...(deployment.createdBy as any), id: (deployment.createdBy as any)._id.toString() }
+        : deployment.createdBy
+          ? { id: deployment.createdBy.toString() }
+          : null,
+      assignedTo: deployment.assignedTo && typeof deployment.assignedTo === 'object' && (deployment.assignedTo as any)._id
+        ? { ...(deployment.assignedTo as any), id: (deployment.assignedTo as any)._id.toString() }
+        : deployment.assignedTo
+          ? { id: deployment.assignedTo.toString() }
+          : null,
       applications: (deployment.applications || []).map((a: any) => ({
         ...a,
         applicantId: a.applicantId?.toString(),
@@ -138,7 +142,7 @@ export async function PATCH(
                   voiceAlert: true,
                   voiceText,
                 },
-                actionUrl: '/nurse/my-requests',
+                actionUrl: '/nurse/deployments',
                 voiceEnabled: true,
               }),
               sendPushToUser(app.applicantId.toString(), {
@@ -146,7 +150,7 @@ export async function PATCH(
                 body: `تم إلغاء التكليف "${deployment.title}"`,
                 type: 'deployment',
                 priority: 'high',
-                url: '/nurse/my-requests',
+                url: '/nurse/deployments',
                 userRole: app.applicantRole === 'lab_tech' ? 'nurse' : app.applicantRole,
                 sound: true,
                 data: {
@@ -177,7 +181,7 @@ export async function PATCH(
                 voiceAlert: true,
                 voiceText,
               },
-              actionUrl: '/nurse/my-requests',
+              actionUrl: '/nurse/deployments',
               voiceEnabled: true,
             }),
             sendPushToUser(deployment.assignedTo.toString(), {
@@ -185,7 +189,7 @@ export async function PATCH(
               body: `تم إلغاء التكليف المعين لك "${deployment.title}"`,
               type: 'deployment',
               priority: 'urgent',
-              url: '/nurse/my-requests',
+              url: '/nurse/deployments',
               userRole: 'nurse',
               sound: true,
               data: {
@@ -216,7 +220,7 @@ export async function PATCH(
               voiceAlert: true,
               voiceText,
             },
-            actionUrl: '/nurse/my-requests',
+            actionUrl: '/nurse/deployments',
             voiceEnabled: true,
           }),
           sendPushToUser(deployment.assignedTo.toString(), {
@@ -224,7 +228,7 @@ export async function PATCH(
             body: `تم إكمال التكليف "${deployment.title}"`,
             type: 'deployment',
             priority: 'high',
-            url: '/nurse/my-requests',
+            url: '/nurse/deployments',
             userRole: 'nurse',
             sound: true,
             data: {
@@ -254,7 +258,7 @@ export async function PATCH(
               voiceAlert: true,
               voiceText,
             },
-            actionUrl: deployment.creatorRole === 'admin' ? '/admin/orders' : '/nurse/my-requests',
+            actionUrl: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
             voiceEnabled: true,
           }),
           sendPushToUser(deployment.createdBy.toString(), {
@@ -262,7 +266,7 @@ export async function PATCH(
             body: `بدأ تنفيذ التكليف "${deployment.title}"`,
             type: 'deployment',
             priority: 'high',
-            url: deployment.creatorRole === 'admin' ? '/admin/orders' : '/nurse/my-requests',
+            url: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
             userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
             sound: true,
             data: {

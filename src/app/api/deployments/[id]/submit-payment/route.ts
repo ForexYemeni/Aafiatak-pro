@@ -91,7 +91,7 @@ export async function POST(
               voiceAlert: true,
               voiceText,
             },
-            actionUrl: '/admin/orders',
+            actionUrl: '/admin/deployments',
             voiceEnabled: true,
           }),
           sendPushToUser(admin._id.toString(), {
@@ -99,7 +99,7 @@ export async function POST(
             body: `تم تقديم إثبات دفع من ${application.applicantName} على التكليف "${deployment.title}"`,
             type: 'deployment',
             priority: 'high',
-            url: '/admin/orders',
+            url: '/admin/deployments',
             userRole: 'admin',
             sound: true,
             data: {
@@ -130,7 +130,7 @@ export async function POST(
               voiceAlert: true,
               voiceText,
             },
-            actionUrl: '/nurse/my-requests',
+            actionUrl: '/nurse/deployments',
             voiceEnabled: true,
           }),
           sendPushToUser(deployment.createdBy.toString(), {
@@ -138,7 +138,7 @@ export async function POST(
             body: `تم تقديم إثبات دفع من ${application.applicantName}`,
             type: 'deployment',
             priority: 'high',
-            url: '/nurse/my-requests',
+            url: '/nurse/deployments',
             userRole: 'nurse',
             sound: true,
             data: {

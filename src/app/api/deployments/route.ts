@@ -54,18 +54,36 @@ export async function GET(request: NextRequest) {
       Deployment.countDocuments(filter),
     ]);
 
-    // Serialize _id fields
-    const serialized = deployments.map((d: any) => ({
-      ...d,
-      id: d._id.toString(),
-      createdBy: d.createdBy ? { ...d.createdBy, id: d.createdBy._id?.toString() } : null,
-      assignedTo: d.assignedTo ? { ...d.assignedTo, id: d.assignedTo._id?.toString() } : null,
-      applications: (d.applications || []).map((a: any) => ({
-        ...a,
-        applicantId: a.applicantId?.toString(),
-        paymentVerifiedBy: a.paymentVerifiedBy?.toString(),
-      })),
-    }));
+    // Serialize _id fields with fallback for unpopulated references
+    const serialized = deployments.map((d: any) => {
+      // Handle createdBy: if populated, it's an object; if not, it's an ObjectId string
+      let createdBySerialized = null;
+      if (d.createdBy && typeof d.createdBy === 'object' && d.createdBy._id) {
+        createdBySerialized = { ...d.createdBy, id: d.createdBy._id.toString() };
+      } else if (d.createdBy) {
+        // createdBy wasn't populated (still an ObjectId) — create minimal object
+        createdBySerialized = { id: d.createdBy.toString() };
+      }
+
+      let assignedToSerialized = null;
+      if (d.assignedTo && typeof d.assignedTo === 'object' && d.assignedTo._id) {
+        assignedToSerialized = { ...d.assignedTo, id: d.assignedTo._id.toString() };
+      } else if (d.assignedTo) {
+        assignedToSerialized = { id: d.assignedTo.toString() };
+      }
+
+      return {
+        ...d,
+        id: d._id.toString(),
+        createdBy: createdBySerialized,
+        assignedTo: assignedToSerialized,
+        applications: (d.applications || []).map((a: any) => ({
+          ...a,
+          applicantId: a.applicantId?.toString(),
+          paymentVerifiedBy: a.paymentVerifiedBy?.toString(),
+        })),
+      };
+    });
 
     return Response.json({
       success: true,
@@ -210,7 +228,7 @@ export async function POST(request: NextRequest) {
                 voiceAlert: true,
                 voiceText,
               },
-              actionUrl: '/nurse/my-requests',
+              actionUrl: '/nurse/deployments',
               voiceEnabled: true,
             }),
             sendPushToUser(nurse._id.toString(), {
@@ -218,7 +236,7 @@ export async function POST(request: NextRequest) {
               body: `تم إضافة تكليف جديد: ${title} (${deploymentType}) - ${hours} ساعة`,
               type: 'deployment',
               priority: 'high',
-              url: '/nurse/my-requests',
+              url: '/nurse/deployments',
               userRole: 'nurse',
               sound: true,
               data: {
@@ -231,8 +249,8 @@ export async function POST(request: NextRequest) {
           );
         }
       } else {
-        // Nurse created — notify admins
-        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        // Nurse created — notify admins (also notify subadmins)
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id').lean();
 
         const nurseDoc = await Nurse.findById(user.userId).select('name').lean();
         const nurseName = nurseDoc?.name || 'ممرض';
@@ -240,6 +258,9 @@ export async function POST(request: NextRequest) {
         const voiceText = `أنشأ الممرض ${nurseName} تكليفاً جديداً: ${title}`;
 
         for (const admin of admins) {
+          const isAdmin = (admin as any).role === 'admin';
+          const adminActionUrl = '/admin/deployments';
+
           notificationPromises.push(
             Notification.create({
               userId: admin._id,
@@ -254,7 +275,7 @@ export async function POST(request: NextRequest) {
                 voiceAlert: true,
                 voiceText,
               },
-              actionUrl: '/admin/orders',
+              actionUrl: adminActionUrl,
               voiceEnabled: true,
             }),
             sendPushToUser(admin._id.toString(), {
@@ -262,7 +283,7 @@ export async function POST(request: NextRequest) {
               body: `أنشأ ${nurseName} تكليفاً جديداً: ${title}`,
               type: 'deployment',
               priority: 'high',
-              url: '/admin/orders',
+              url: adminActionUrl,
               userRole: 'admin',
               sound: true,
               data: {
@@ -275,7 +296,8 @@ export async function POST(request: NextRequest) {
           );
         }
       }
-    } catch {
+    } catch (notifError) {
+      console.error('[DEPLOYMENT CREATE] Notification error:', notifError);
       // Non-critical — notifications should not block creation
     }
 

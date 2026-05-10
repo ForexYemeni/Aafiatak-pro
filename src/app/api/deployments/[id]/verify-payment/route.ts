@@ -104,7 +104,7 @@ export async function PATCH(
               voiceAlert: true,
               voiceText: applicantVoiceText,
             },
-            actionUrl: '/nurse/my-requests',
+            actionUrl: '/nurse/deployments',
             voiceEnabled: true,
           }),
           sendPushToUser(application.applicantId.toString(), {
@@ -112,7 +112,7 @@ export async function PATCH(
             body: `تم التحقق من دفعك. يمكنك الآن التواصل مع صاحب التكليف "${deployment.title}"`,
             type: 'deployment',
             priority: 'urgent',
-            url: '/nurse/my-requests',
+            url: '/nurse/deployments',
             userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
             sound: true,
             data: {
@@ -145,7 +145,7 @@ export async function PATCH(
               voiceAlert: true,
               voiceText: creatorVoiceText,
             },
-            actionUrl: deployment.creatorRole === 'admin' ? '/admin/orders' : '/nurse/my-requests',
+            actionUrl: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
             voiceEnabled: true,
           }),
           sendPushToUser(deployment.createdBy.toString(), {
@@ -153,7 +153,7 @@ export async function PATCH(
             body: `تم التحقق من دفع المكلف ${application.applicantName}. التكليف جاهز للبدء`,
             type: 'deployment',
             priority: 'high',
-            url: deployment.creatorRole === 'admin' ? '/admin/orders' : '/nurse/my-requests',
+            url: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
             userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
             sound: true,
             data: {
@@ -185,7 +185,7 @@ export async function PATCH(
               voiceAlert: true,
               voiceText: rejectedVoiceText,
             },
-            actionUrl: '/nurse/my-requests',
+            actionUrl: '/nurse/deployments',
             voiceEnabled: true,
           }),
           sendPushToUser(application.applicantId.toString(), {
@@ -193,7 +193,7 @@ export async function PATCH(
             body: `لم يتم قبول إثبات الدفع للتقديم على التكليف "${deployment.title}"`,
             type: 'deployment',
             priority: 'high',
-            url: '/nurse/my-requests',
+            url: '/nurse/deployments',
             userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
             sound: true,
             data: {

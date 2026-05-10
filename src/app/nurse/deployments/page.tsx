@@ -16,6 +16,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -198,6 +199,8 @@ export default function NurseDeploymentsPage() {
   const router = useRouter();
   const authFetch = useAuthFetch();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const authUser = useAuthStore((s) => s.user);
+  const currentUserId = authUser?.id || '';
 
   // Data state
   const [deployments, setDeployments] = useState<DeploymentItem[]>([]);
@@ -277,25 +280,28 @@ export default function NurseDeploymentsPage() {
   }, [authFetch]);
 
   /* ── Derived state ── */
-  const user = typeof window !== 'undefined' ? JSON.parse(localStorage.getItem('aafiatak-auth-storage') || '{}')?.state?.user : null;
-  const currentUserId = user?.id || '';
+  // Helper: Compare IDs safely (handles string vs ObjectId mismatch)
+  const idMatches = (a: string | undefined | null, b: string): boolean => {
+    if (!a || !b) return false;
+    return a.toString() === b.toString();
+  };
 
   // A) Updated filter: Show ALL open deployments (both admin-created AND nurse-created)
   const availableDeployments = deployments.filter(
-    (d) => d.status === 'open' && d.createdBy?.id !== currentUserId && !d.applications.some((a) => a.applicantId === currentUserId)
+    (d) => d.status === 'open' && !idMatches(d.createdBy?.id, currentUserId) && !d.applications.some((a) => idMatches(a.applicantId, currentUserId))
   );
 
   const myApplications = deployments.filter(
-    (d) => d.applications.some((a) => a.applicantId === currentUserId)
+    (d) => d.applications.some((a) => idMatches(a.applicantId, currentUserId))
   );
 
   const activeDeployments = deployments.filter(
-    (d) => d.assignedTo?.id === currentUserId && ['assigned', 'in_progress'].includes(d.status)
+    (d) => idMatches(d.assignedTo?.id, currentUserId) && ['assigned', 'in_progress'].includes(d.status)
   );
 
   // B) My Created tab: deployments created by the current nurse
   const myCreatedDeployments = deployments.filter(
-    (d) => d.createdBy?.id === currentUserId && d.creatorRole === 'nurse'
+    (d) => idMatches(d.createdBy?.id, currentUserId) && d.creatorRole === 'nurse'
   );
 
   /* ── Apply for deployment ── */
@@ -463,7 +469,7 @@ export default function NurseDeploymentsPage() {
 
   /* ── Get current user's application for a deployment ── */
   const getMyApplication = (deployment: DeploymentItem): DeploymentApplication | undefined => {
-    return deployment.applications.find((a) => a.applicantId === currentUserId);
+    return deployment.applications.find((a) => idMatches(a.applicantId, currentUserId));
   };
 
   /* ── Render deployment card ── */

@@ -108,7 +108,7 @@ export async function PATCH(
             voiceAlert: true,
             voiceText: acceptedVoiceText,
           },
-          actionUrl: '/nurse/my-requests',
+          actionUrl: '/nurse/deployments',
           voiceEnabled: true,
         }),
         sendPushToUser(application.applicantId.toString(), {
@@ -116,7 +116,7 @@ export async function PATCH(
           body: `تم قبول تقديمك على التكليف "${deployment.title}"`,
           type: 'deployment',
           priority: 'urgent',
-          url: '/nurse/my-requests',
+          url: '/nurse/deployments',
           userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
           sound: true,
           data: {
@@ -151,7 +151,7 @@ export async function PATCH(
                 voiceAlert: false,
                 voiceText: rejectedVoiceText,
               },
-              actionUrl: '/nurse/my-requests',
+              actionUrl: '/nurse/deployments',
               voiceEnabled: false,
             }),
             sendPushToUser(otherApp.applicantId.toString(), {
@@ -159,7 +159,7 @@ export async function PATCH(
               body: `لم يتم قبول تقديمك على التكليف "${deployment.title}"`,
               type: 'deployment',
               priority: 'medium',
-              url: '/nurse/my-requests',
+              url: '/nurse/deployments',
               userRole: otherApp.applicantRole === 'lab_tech' ? 'nurse' : otherApp.applicantRole,
               data: {
                 deploymentId: id,
@@ -190,7 +190,7 @@ export async function PATCH(
               applicantName: application.applicantName,
               status: 'assigned',
             },
-            actionUrl: '/admin/orders',
+            actionUrl: '/admin/deployments',
             voiceEnabled: false,
           }),
           sendPushToUser(admin._id.toString(), {
@@ -198,7 +198,7 @@ export async function PATCH(
             body: `تم قبول ${application.applicantName} على التكليف "${deployment.title}"`,
             type: 'deployment',
             priority: 'high',
-            url: '/admin/orders',
+            url: '/admin/deployments',
             userRole: 'admin',
             data: {
               deploymentId: id,

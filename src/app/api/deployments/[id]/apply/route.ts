@@ -103,7 +103,7 @@ export async function POST(
             voiceAlert: true,
             voiceText,
           },
-          actionUrl: deployment.creatorRole === 'admin' ? '/admin/orders' : '/nurse/my-requests',
+          actionUrl: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
           voiceEnabled: true,
         }),
         sendPushToUser(deployment.createdBy.toString(), {
@@ -111,7 +111,7 @@ export async function POST(
           body: `تقدم ${applicant.name} على التكليف "${deployment.title}"`,
           type: 'deployment',
           priority: 'high',
-          url: deployment.creatorRole === 'admin' ? '/admin/orders' : '/nurse/my-requests',
+          url: deployment.creatorRole === 'admin' ? '/admin/deployments' : '/nurse/deployments',
           userRole: deployment.creatorRole === 'admin' ? 'admin' : 'nurse',
           sound: true,
           data: {
@@ -143,7 +143,7 @@ export async function POST(
                 voiceAlert: true,
                 voiceText,
               },
-              actionUrl: '/admin/orders',
+              actionUrl: '/admin/deployments',
               voiceEnabled: true,
             }),
             sendPushToUser(admin._id.toString(), {
@@ -151,7 +151,7 @@ export async function POST(
               body: `تقدم ${applicant.name} على التكليف "${deployment.title}"`,
               type: 'deployment',
               priority: 'high',
-              url: '/admin/orders',
+              url: '/admin/deployments',
               userRole: 'admin',
               sound: true,
               data: {

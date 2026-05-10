@@ -116,7 +116,7 @@ export async function PATCH(
               voiceAlert: true,
               voiceText: adminVoiceText,
             },
-            actionUrl: '/admin/orders',
+            actionUrl: '/admin/deployments',
             voiceEnabled: true,
           }),
           sendPushToUser(admin._id.toString(), {
@@ -124,7 +124,7 @@ export async function PATCH(
             body: `اختار ${creatorName} المتقدم ${application.applicantName} للتكليف "${deployment.title}"`,
             type: 'deployment',
             priority: 'high',
-            url: '/admin/orders',
+            url: '/admin/deployments',
             userRole: 'admin',
             sound: true,
             data: {
@@ -156,7 +156,7 @@ export async function PATCH(
             voiceAlert: true,
             voiceText: applicantVoiceText,
           },
-          actionUrl: '/nurse/my-requests',
+          actionUrl: '/nurse/deployments',
           voiceEnabled: true,
         }),
         sendPushToUser(application.applicantId.toString(), {
@@ -164,7 +164,7 @@ export async function PATCH(
           body: `تم اختيارك للتكليف "${deployment.title}". بانتظار موافقة الإدارة`,
           type: 'deployment',
           priority: 'high',
-          url: '/nurse/my-requests',
+          url: '/nurse/deployments',
           userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
           sound: true,
           data: {
@@ -198,7 +198,7 @@ export async function PATCH(
                 voiceAlert: false,
                 voiceText: rejectedVoiceText,
               },
-              actionUrl: '/nurse/my-requests',
+              actionUrl: '/nurse/deployments',
               voiceEnabled: false,
             }),
             sendPushToUser(otherApp.applicantId.toString(), {
@@ -206,7 +206,7 @@ export async function PATCH(
               body: `لم يتم اختيار تقديمك على التكليف "${deployment.title}"`,
               type: 'deployment',
               priority: 'medium',
-              url: '/nurse/my-requests',
+              url: '/nurse/deployments',
               userRole: otherApp.applicantRole === 'lab_tech' ? 'nurse' : otherApp.applicantRole,
               data: {
                 deploymentId: id,
