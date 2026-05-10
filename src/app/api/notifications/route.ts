@@ -20,7 +20,9 @@ export async function GET(request: NextRequest) {
     const type = searchParams.get('type');
     const since = searchParams.get('since'); // ISO date string for polling
 
-    const filter: any = { userId: user.userId, userRole: user.role };
+    const filter: any = { userId: user.userId };
+    // Only filter by userRole if explicitly set in notification (prevents role-mismatch issues)
+    // Since userId is unique per user, userRole is just metadata for routing/display
     if (unreadOnly) filter.read = false;
     if (type) filter.type = type;
     if (since) {

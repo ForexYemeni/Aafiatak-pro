@@ -301,7 +301,11 @@ export default function NurseDeploymentsPage() {
 
   // B) My Created tab: deployments created by the current nurse
   const myCreatedDeployments = deployments.filter(
-    (d) => idMatches(d.createdBy?.id, currentUserId) && d.creatorRole === 'nurse'
+    (d) => {
+      // Defensive ID comparison: handle both populated and unpopulated createdBy
+      const creatorId = d.createdBy?.id || (typeof d.createdBy === 'string' ? d.createdBy : null);
+      return idMatches(creatorId, currentUserId) && d.creatorRole === 'nurse';
+    }
   );
 
   /* ── Apply for deployment ── */
@@ -432,7 +436,7 @@ export default function NurseDeploymentsPage() {
       const json = await res.json();
       if (json.success) {
         toast.success('تم إنشاء التكليف بنجاح');
-        void fetchDeployments();
+        await fetchDeployments();
         setCreateForm({
           title: '',
           description: '',

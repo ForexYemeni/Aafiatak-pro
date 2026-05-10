@@ -96,12 +96,13 @@ export async function PATCH(
 
       // ── Notify admins with voice notification ──
       const adminVoiceText = `الممرض ${creatorName} اختار ${application.applicantName} للتكليف ${deployment.title}. يرجى الموافقة`;
-      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
       for (const admin of admins) {
+        const adminRole = (admin as any).role || 'admin';
         notificationPromises.push(
           Notification.create({
             userId: admin._id,
-            userRole: 'admin',
+            userRole: adminRole,
             titleAr: '📋 اختيار متقدم للتكليف',
             bodyAr: `اختار ${creatorName} المتقدم ${application.applicantName} للتكليف "${deployment.title}". يرجى الموافقة`,
             type: 'deployment',
@@ -125,7 +126,7 @@ export async function PATCH(
             type: 'deployment',
             priority: 'high',
             url: '/admin/deployments',
-            userRole: 'admin',
+            userRole: adminRole,
             sound: true,
             data: {
               deploymentId: id,

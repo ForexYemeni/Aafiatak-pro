@@ -250,7 +250,7 @@ export async function POST(request: NextRequest) {
         }
       } else {
         // Nurse created — notify admins (also notify subadmins)
-        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id').lean();
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
 
         const nurseDoc = await Nurse.findById(user.userId).select('name').lean();
         const nurseName = nurseDoc?.name || 'ممرض';
@@ -258,13 +258,13 @@ export async function POST(request: NextRequest) {
         const voiceText = `أنشأ الممرض ${nurseName} تكليفاً جديداً: ${title}`;
 
         for (const admin of admins) {
-          const isAdmin = (admin as any).role === 'admin';
+          const adminRole = (admin as any).role || 'admin';
           const adminActionUrl = '/admin/deployments';
 
           notificationPromises.push(
             Notification.create({
               userId: admin._id,
-              userRole: 'admin',
+              userRole: adminRole,
               titleAr: '📋 تكليف جديد من ممرض',
               bodyAr: `أنشأ ${nurseName} تكليفاً جديداً: ${title} (${deploymentType}) - ${hours} ساعة`,
               type: 'deployment',
@@ -284,7 +284,7 @@ export async function POST(request: NextRequest) {
               type: 'deployment',
               priority: 'high',
               url: adminActionUrl,
-              userRole: 'admin',
+              userRole: adminRole,
               sound: true,
               data: {
                 deploymentId: deployment._id.toString(),

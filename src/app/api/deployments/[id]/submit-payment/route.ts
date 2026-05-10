@@ -74,12 +74,13 @@ export async function POST(
       const voiceText = 'تم تقديم إثبات دفع رسوم تكليف';
 
       // Notify all admins
-      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
       for (const admin of admins) {
+        const adminRole = (admin as any).role || 'admin';
         notificationPromises.push(
           Notification.create({
             userId: admin._id,
-            userRole: 'admin',
+            userRole: adminRole,
             titleAr: '💰 إثبات دفع رسوم تكليف',
             bodyAr: `تم تقديم إثبات دفع رسوم تكليف "${deployment.title}" من ${application.applicantName}. يرجى التحقق`,
             type: 'deployment',
@@ -100,7 +101,7 @@ export async function POST(
             type: 'deployment',
             priority: 'high',
             url: '/admin/deployments',
-            userRole: 'admin',
+            userRole: adminRole,
             sound: true,
             data: {
               deploymentId: id,

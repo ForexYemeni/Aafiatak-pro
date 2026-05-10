@@ -171,15 +171,16 @@ export async function PATCH(
       }
 
       // ── Notify admins about the assignment ──
-      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
       for (const admin of admins) {
         // Skip if the admin is the one who performed the action
         if (admin._id.toString() === user.userId) continue;
 
+        const adminRole = (admin as any).role || 'admin';
         notificationPromises.push(
           Notification.create({
             userId: admin._id,
-            userRole: 'admin',
+            userRole: adminRole,
             titleAr: '✅ تم تعيين تكليف',
             bodyAr: `تم قبول ${application.applicantName} على التكليف "${deployment.title}"`,
             type: 'deployment',
@@ -199,7 +200,7 @@ export async function PATCH(
             type: 'deployment',
             priority: 'high',
             url: '/admin/deployments',
-            userRole: 'admin',
+            userRole: adminRole,
             data: {
               deploymentId: id,
               assignedTo: application.applicantId.toString(),

@@ -126,12 +126,13 @@ export async function POST(
 
       // Also notify admins if the creator is a nurse
       if (deployment.creatorRole === 'nurse') {
-        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
         for (const admin of admins) {
+          const adminRole = (admin as any).role || 'admin';
           notificationPromises.push(
             Notification.create({
               userId: admin._id,
-              userRole: 'admin',
+              userRole: adminRole,
               titleAr: '📋 تقديم جديد على تكليف',
               bodyAr: `تقدم ${applicant.name} على التكليف "${deployment.title}"`,
               type: 'deployment',
@@ -152,7 +153,7 @@ export async function POST(
               type: 'deployment',
               priority: 'high',
               url: '/admin/deployments',
-              userRole: 'admin',
+              userRole: adminRole,
               sound: true,
               data: {
                 deploymentId: id,

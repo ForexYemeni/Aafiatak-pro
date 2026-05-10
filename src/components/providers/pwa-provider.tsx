@@ -186,12 +186,40 @@ function VoiceNotificationPoller() {
 
     isPollingRef.current = true;
     try {
-      const response = await fetch(VOICE_POLL_URL, {
+      let response = await fetch(VOICE_POLL_URL, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
+
+      // Handle expired token: try to refresh once
+      if (response.status === 401) {
+        try {
+          const refreshToken = useAuthStore.getState().refreshToken;
+          const refreshRes = await fetch('/api/auth/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refreshToken }),
+          });
+          if (refreshRes.ok) {
+            const refreshData = await refreshRes.json();
+            if (refreshData.success && refreshData.data?.token) {
+              // Update the token in the auth store
+              useAuthStore.getState().setTokens(refreshData.data.token, refreshData.data.refreshToken || refreshToken || '');
+              // Retry with the new token
+              response = await fetch(VOICE_POLL_URL, {
+                headers: {
+                  'Authorization': `Bearer ${refreshData.data.token}`,
+                  'Content-Type': 'application/json',
+                },
+              });
+            }
+          }
+        } catch {
+          // Refresh failed — will retry on next poll
+        }
+      }
 
       if (!response.ok) {
         isPollingRef.current = false;
