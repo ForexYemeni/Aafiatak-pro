@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { RefreshCw } from 'lucide-react';
@@ -45,7 +45,8 @@ export function AuthHydrationGuard({
   const redirectAttemptedRef = useRef(false);
 
   // Check if auth is cached (skip guard entirely)
-  const authCached = Date.now() - _authVerifiedAt < AUTH_CACHE_TTL;
+  // Use useMemo to avoid hydration mismatch from Date.now() in render
+  const authCached = useMemo(() => Date.now() - _authVerifiedAt < AUTH_CACHE_TTL, []);
 
   // FAST PATH: If already hydrated and auth is valid, render children immediately
   if (zustandHydrated && isAuthenticated && user && requiredRoles.includes(user.role)) {

@@ -124,7 +124,7 @@ function isToday(d: Date): boolean {
 
 export default function NurseSchedulePage() {
   const [weekOffset, setWeekOffset] = useState(0);
-  const [selectedDate, setSelectedDate] = useState<Date>(new Date());
+  const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [scheduleData, setScheduleData] = useState<{
     assignments: ScheduleClipboardList[];
     emergencyClipboardLists: ScheduleEmergency[];
@@ -135,6 +135,11 @@ export default function NurseSchedulePage() {
     0: true, 1: true, 2: true, 3: true, 4: true, 5: true, 6: true,
   });
   const authFetch = useAuthFetch();
+
+  // Initialize selectedDate on client only to avoid hydration mismatch
+  useEffect(() => {
+    if (!selectedDate) setSelectedDate(new Date());
+  }, [selectedDate]);
 
   const referenceDate = new Date();
   referenceDate.setDate(referenceDate.getDate() + weekOffset * 7);
@@ -163,14 +168,14 @@ export default function NurseSchedulePage() {
     fetchSchedule();
   }, [fetchSchedule]);
 
-  const currentDayClipboardLists = scheduleData.assignments.filter((a) => {
+  const currentDayClipboardLists = selectedDate ? scheduleData.assignments.filter((a) => {
     if (!a.request.scheduledAt) return false;
     return isSameDay(new Date(a.request.scheduledAt), selectedDate);
-  });
+  }) : [];
 
-  const currentDayEmergencies = scheduleData.emergencyClipboardLists.filter((a) => {
+  const currentDayEmergencies = selectedDate ? scheduleData.emergencyClipboardLists.filter((a) => {
     return isSameDay(new Date(a.assignedAt), selectedDate);
-  });
+  }) : [];
 
   const getClipboardListCountForDay = (date: Date): number => {
     const count = scheduleData.assignments.filter((a) => {
@@ -216,7 +221,7 @@ export default function NurseSchedulePage() {
         {/* Day Selector */}
         <div className="grid grid-cols-7 gap-1">
           {weekDates.map((date, idx) => {
-            const isSelected = isSameDay(date, selectedDate);
+            const isSelected = selectedDate ? isSameDay(date, selectedDate) : false;
             const isTodayDate = isToday(date);
             const count = getClipboardListCountForDay(date);
 
@@ -250,16 +255,16 @@ export default function NurseSchedulePage() {
             <CalendarDays className="w-5 h-5 text-nurse" />
             <div>
               <p className="text-sm font-semibold">
-                {arabicDays[selectedDate.getDay()]} - {formatDateOnly(selectedDate)}
+                {selectedDate ? `${arabicDays[selectedDate.getDay()]} - ${formatDateOnly(selectedDate)}` : '...'}
               </p>
               <p className="text-xs text-muted-foreground">
-                {availableDays[selectedDate.getDay()] ? 'متاح لاستقبال الطلبات' : 'غير متاح'}
+                {selectedDate ? (availableDays[selectedDate.getDay()] ? 'متاح لاستقبال الطلبات' : 'غير متاح') : ''}
               </p>
             </div>
           </div>
           <Switch
-            checked={availableDays[selectedDate.getDay()] ?? true}
-            onCheckedChange={() => handleAvailabilityToggle(selectedDate.getDay())}
+            checked={selectedDate ? (availableDays[selectedDate.getDay()] ?? true) : true}
+            onCheckedChange={() => selectedDate && handleAvailabilityToggle(selectedDate.getDay())}
           />
         </div>
       </GlassCard>

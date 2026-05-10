@@ -107,6 +107,7 @@ export function DateFormatter({ date: dateProp, format = 'relative', className }
       dateTime={date.toISOString()}
       title={formatFullDate(date)}
       className={cn('text-sm', className)}
+      suppressHydrationWarning
     >
       {formatted}
     </time>

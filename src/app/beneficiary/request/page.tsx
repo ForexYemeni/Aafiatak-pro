@@ -555,7 +555,7 @@ export default function MultiServiceRequestPage() {
               </h2>
               <div className="space-y-2">
                 <Label htmlFor="date">التاريخ</Label>
-                <Input id="date" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} min={new Date().toISOString().split('T')[0]} dir="ltr" className="text-left" />
+                <Input id="date" type="date" value={scheduledDate} onChange={(e) => setScheduledDate(e.target.value)} min={typeof window !== 'undefined' ? new Date().toISOString().split('T')[0] : ''} dir="ltr" className="text-left" />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="time">الوقت</Label>
