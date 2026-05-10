@@ -568,75 +568,52 @@ export default function AdminDeploymentsPage() {
         </motion.div>
       )}
 
-      {/* ═══════════════ CREATE DEPLOYMENT DIALOG ═══════════════ */}
+      {/* ═══════════════ CREATE DEPLOYMENT - FULL PAGE SHEET ═══════════════ */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
-        <DialogContent dir="rtl" className="max-w-lg max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Plus className="w-5 h-5 text-admin" />
-              إنشاء تكليف جديد
-            </DialogTitle>
-            <DialogDescription>
-              أنشئ تكليفاً جديداً للبحث عن ممرض/ـة مناسب/ـة
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-5">
-            {/* Section: Basic Info */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-7 h-7 rounded-lg bg-admin/10 flex items-center justify-center">
-                  <FileText className="w-3.5 h-3.5 text-admin" />
-                </div>
-                <span className="text-sm font-bold text-admin">المعلومات الأساسية</span>
+        <DialogContent dir="rtl" className="max-w-2xl max-h-[95vh] overflow-y-auto p-0 gap-0">
+          {/* Gradient Header */}
+          <div className="relative bg-gradient-to-l from-admin via-admin/90 to-amber-600 p-6 pb-5 rounded-t-lg overflow-hidden">
+            <div className="absolute inset-0 opacity-10">
+              <div className="absolute top-2 left-8 w-20 h-20 rounded-full bg-white/20 blur-xl" />
+              <div className="absolute bottom-1 right-12 w-16 h-16 rounded-full bg-white/15 blur-lg" />
+            </div>
+            <div className="relative flex items-center gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-lg">
+                <Briefcase className="w-7 h-7 text-white" />
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="admin-dep-title" className="text-sm font-medium">
-                  عنوان التكليف <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="admin-dep-title"
-                  placeholder="مثال: ممرض/ة لرعاية منزلية"
-                  value={createForm.title}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
-                />
+              <div className="flex-1">
+                <DialogTitle className="text-xl font-black text-white mb-0.5">إنشاء تكليف جديد</DialogTitle>
+                <DialogDescription className="text-white/80 text-sm">أنشئ تكليفاً جديداً للبحث عن ممرض/ـة مناسب/ـة</DialogDescription>
               </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="admin-dep-desc" className="text-sm font-medium">
-                  الوصف <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="admin-dep-desc"
-                  placeholder="اكتب وصفاً تفصيلياً للتكليف..."
-                  rows={3}
-                  value={createForm.description}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-                />
+              <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-white/20">
+                <Hash className="w-4 h-4 text-white/80" />
+                <span className="text-xs font-bold text-white/90">تكليف جديد</span>
               </div>
             </div>
+          </div>
 
-            <Separator />
-
-            {/* Section: Type & Specialization */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-7 h-7 rounded-lg bg-teal-100 dark:bg-teal-900/30 flex items-center justify-center">
-                  <Tag className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+          <div className="p-6 space-y-1">
+            {/* ── Step 1: نوع التكليف ── */}
+            <div className="rounded-2xl border-2 border-admin/20 bg-gradient-to-b from-admin/5 to-transparent p-5 space-y-4 hover:border-admin/30 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-admin text-white flex items-center justify-center text-sm font-black shadow-md shadow-admin/30">١</div>
+                <div>
+                  <h4 className="font-bold text-admin text-base">نوع التكليف</h4>
+                  <p className="text-[11px] text-muted-foreground">اختر نوع وقسم التكليف</p>
                 </div>
-                <span className="text-sm font-bold">النوع والتخصص</span>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">نوع التكليف</Label>
+                  <Label className="text-sm font-semibold flex items-center gap-1.5">
+                    <Tag className="w-3.5 h-3.5 text-admin" />
+                    نوع التكليف <span className="text-red-500">*</span>
+                  </Label>
                   <Select
                     value={createForm.type}
                     onValueChange={(val) => setCreateForm((p) => ({ ...p, type: val as any }))}
                   >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="اختر النوع" />
+                    <SelectTrigger className="w-full h-12 text-sm font-medium border-admin/20 focus:border-admin">
+                      <SelectValue placeholder="اختر نوع التكليف" />
                     </SelectTrigger>
                     <SelectContent>
                       {Object.entries(typeLabels).map(([key, label]) => (
@@ -646,55 +623,67 @@ export default function AdminDeploymentsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">التخصص</Label>
+                  <Label className="text-sm font-semibold flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-teal-600" />
+                    القسم <span className="text-muted-foreground text-[10px] font-normal">(اختياري)</span>
+                  </Label>
                   <Select
-                    value={createForm.specialization}
-                    onValueChange={(val) => setCreateForm((p) => ({ ...p, specialization: val }))}
+                    value={createForm.department}
+                    onValueChange={(val) => setCreateForm((p) => ({ ...p, department: val }))}
                   >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="اختر التخصص" />
+                    <SelectTrigger className="w-full h-12 text-sm font-medium border-teal-200 dark:border-teal-900/50 focus:border-teal-500">
+                      <SelectValue placeholder="اختر القسم" />
                     </SelectTrigger>
                     <SelectContent>
-                      {Object.entries(specializationLabels).map(([key, label]) => (
+                      {Object.entries(departmentLabels).map(([key, label]) => (
                         <SelectItem key={key} value={key}>{label}</SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
               </div>
-
               <div className="space-y-2">
-                <Label className="text-sm font-medium">القسم</Label>
-                <Select
-                  value={createForm.department}
-                  onValueChange={(val) => setCreateForm((p) => ({ ...p, department: val }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر القسم" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(departmentLabels).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label htmlFor="admin-dep-title" className="text-sm font-semibold flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-admin" />
+                  عنوان التكليف <span className="text-red-500">*</span>
+                </Label>
+                <Input
+                  id="admin-dep-title"
+                  placeholder="مثال: ممرض/ة لرعاية منزلية"
+                  value={createForm.title}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
+                  className="h-11 border-admin/20 focus:border-admin"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="admin-dep-desc" className="text-sm font-semibold flex items-center gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-admin" />
+                  الوصف <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="admin-dep-desc"
+                  placeholder="اكتب وصفاً تفصيلياً للتكليف..."
+                  rows={2}
+                  value={createForm.description}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
+                  className="border-admin/20 focus:border-admin"
+                />
               </div>
             </div>
 
-            <Separator />
-
-            {/* Section: Time & Payment */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-7 h-7 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                  <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+            {/* ── Step 2: عدد الساعات والمبلغ ── */}
+            <div className="rounded-2xl border-2 border-emerald-200 dark:border-emerald-900/40 bg-gradient-to-b from-emerald-50/50 dark:from-emerald-950/10 to-transparent p-5 space-y-4 hover:border-emerald-300 dark:hover:border-emerald-800/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm font-black shadow-md shadow-emerald-600/30">٢</div>
+                <div>
+                  <h4 className="font-bold text-emerald-700 dark:text-emerald-400 text-base">الوقت والأجر</h4>
+                  <p className="text-[11px] text-muted-foreground">حدد عدد الساعات والمبلغ</p>
                 </div>
-                <span className="text-sm font-bold">الوقت والأجر</span>
               </div>
-
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label htmlFor="admin-dep-hours" className="text-sm font-medium">
+                  <Label htmlFor="admin-dep-hours" className="text-sm font-semibold flex items-center gap-1.5">
+                    <Clock className="w-3.5 h-3.5 text-emerald-600" />
                     عدد الساعات <span className="text-red-500">*</span>
                   </Label>
                   <div className="relative">
@@ -704,14 +693,15 @@ export default function AdminDeploymentsPage() {
                       min={0}
                       value={createForm.hours || ''}
                       placeholder="0"
-                      className={createForm.hours === 0 ? 'text-muted-foreground/40' : ''}
+                      className={`h-12 text-lg font-bold text-center border-emerald-200 dark:border-emerald-900/50 focus:border-emerald-500 ${createForm.hours === 0 ? 'text-muted-foreground/30 placeholder:text-muted-foreground/30' : 'text-emerald-700 dark:text-emerald-400'}`}
                       onChange={(e) => setCreateForm((p) => ({ ...p, hours: parseInt(e.target.value) || 0 }))}
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-muted-foreground">ساعة</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-emerald-600/70 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-800/50">ساعة</span>
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="admin-dep-amount" className="text-sm font-medium">
+                  <Label htmlFor="admin-dep-amount" className="text-sm font-semibold flex items-center gap-1.5">
+                    <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
                     المبلغ <span className="text-red-500">*</span>
                   </Label>
                   <div className="relative">
@@ -721,64 +711,127 @@ export default function AdminDeploymentsPage() {
                       min={0}
                       value={createForm.amount || ''}
                       placeholder="0"
-                      className={`pl-14 ${createForm.amount === 0 ? 'text-muted-foreground/40' : ''}`}
+                      className={`h-12 text-lg font-bold text-center pl-20 border-emerald-200 dark:border-emerald-900/50 focus:border-emerald-500 ${createForm.amount === 0 ? 'text-muted-foreground/30 placeholder:text-muted-foreground/30' : 'text-emerald-700 dark:text-emerald-400'}`}
                       onChange={(e) => setCreateForm((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
                     />
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-muted-foreground bg-muted/60 px-1.5 py-0.5 rounded">ر.ي</span>
+                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600/70 bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 rounded-md border border-emerald-200 dark:border-emerald-800/50">ر.ي</span>
                   </div>
                 </div>
               </div>
 
               {/* Commission preview */}
               {createForm.amount > 0 && (
-                <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900/30 space-y-2">
-                  <div className="flex items-center gap-1.5 mb-1">
-                    <Wallet className="w-3.5 h-3.5 text-emerald-600" />
-                    <span className="text-[11px] font-bold text-emerald-700 dark:text-emerald-400">معاينة العمولة</span>
+                <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="overflow-hidden">
+                  <div className="p-4 rounded-xl bg-gradient-to-l from-emerald-50 to-emerald-100/50 dark:from-emerald-950/20 dark:to-emerald-900/10 border border-emerald-200 dark:border-emerald-900/40 space-y-2.5">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Wallet className="w-4 h-4 text-emerald-600" />
+                      <span className="text-xs font-black text-emerald-700 dark:text-emerald-400">معاينة العمولة</span>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">المبلغ الأساسي</span>
+                        <span className="font-bold">{toArabicNum(createForm.amount.toLocaleString())} ر.ي</span>
+                      </div>
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">عمولة المنصة ({toArabicNum(adminCommissionPercent)}%)</span>
+                        <span className="font-bold text-orange-600">
+                          {toArabicNum(Math.round((createForm.amount * adminCommissionPercent) / 100).toLocaleString())} ر.ي
+                        </span>
+                      </div>
+                      <Separator className="bg-emerald-200 dark:bg-emerald-800/40" />
+                      <div className="flex items-center justify-between font-black text-base">
+                        <span>الإجمالي مع العمولة</span>
+                        <span className="text-admin text-lg">
+                          {toArabicNum((createForm.amount + Math.round((createForm.amount * adminCommissionPercent) / 100)).toLocaleString())} ر.ي
+                        </span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="space-y-1.5 text-xs">
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">المبلغ الأساسي</span>
-                      <span className="font-medium">{toArabicNum(createForm.amount.toLocaleString())} ر.ي</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-muted-foreground">عمولة المنصة ({toArabicNum(adminCommissionPercent)}%)</span>
-                      <span className="font-medium text-orange-600">
-                        {toArabicNum(Math.round((createForm.amount * adminCommissionPercent) / 100).toLocaleString())} ر.ي
-                      </span>
-                    </div>
-                    <Separator />
-                    <div className="flex items-center justify-between font-bold text-sm">
-                      <span>الإجمالي مع العمولة</span>
-                      <span className="text-admin">
-                        {toArabicNum((createForm.amount + Math.round((createForm.amount * adminCommissionPercent) / 100)).toLocaleString())} ر.ي
-                      </span>
-                    </div>
-                  </div>
-                </div>
+                </motion.div>
               )}
             </div>
 
-            <Separator />
-
-            {/* Section: Location */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-7 h-7 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                  <MapPin className="w-3.5 h-3.5 text-red-500" />
+            {/* ── Step 3: المتطلبات اللازمة ── */}
+            <div className="rounded-2xl border-2 border-amber-200 dark:border-amber-900/40 bg-gradient-to-b from-amber-50/50 dark:from-amber-950/10 to-transparent p-5 space-y-4 hover:border-amber-300 dark:hover:border-amber-800/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-sm font-black shadow-md shadow-amber-500/30">٣</div>
+                <div>
+                  <h4 className="font-bold text-amber-700 dark:text-amber-400 text-base">المتطلبات اللازمة</h4>
+                  <p className="text-[11px] text-muted-foreground">اختياري - حدد المتطلبات المطلوبة</p>
                 </div>
-                <span className="text-sm font-bold">الموقع</span>
-                <span className="text-[10px] text-muted-foreground">(اختياري)</span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              {/* Requirement Cards Grid */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                {requirementOptions.map((req) => {
+                  const isSelected = createForm.requirementTags.includes(req.id);
+                  const ReqIcon = req.icon;
+                  return (
+                    <motion.button
+                      key={req.id}
+                      type="button"
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => {
+                        setCreateForm((p) => ({
+                          ...p,
+                          requirementTags: isSelected
+                            ? p.requirementTags.filter((t) => t !== req.id)
+                            : [...p.requirementTags, req.id],
+                        }));
+                      }}
+                      className={`relative flex flex-col items-center gap-2 p-3 rounded-xl text-center transition-all border-2 ${
+                        isSelected
+                          ? 'bg-admin/10 border-admin/40 text-admin shadow-md shadow-admin/10'
+                          : 'bg-card border-border text-muted-foreground hover:border-amber-300 dark:hover:border-amber-800/50 hover:bg-amber-50/50 dark:hover:bg-amber-950/10'
+                      }`}
+                    >
+                      {isSelected && (
+                        <div className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-admin flex items-center justify-center">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-white" />
+                        </div>
+                      )}
+                      <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                        isSelected ? 'bg-admin/15' : 'bg-muted/50'
+                      }`}>
+                        <ReqIcon className={`w-4.5 h-4.5 ${isSelected ? 'text-admin' : ''}`} />
+                      </div>
+                      <span className="text-[11px] font-semibold leading-tight">{req.label}</span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+
+              {/* Custom requirements */}
+              <Textarea
+                id="admin-dep-reqs"
+                placeholder="متطلبات إضافية أخرى..."
+                rows={2}
+                value={createForm.requirements}
+                onChange={(e) => setCreateForm((p) => ({ ...p, requirements: e.target.value }))}
+                className="border-amber-200 dark:border-amber-900/50 focus:border-amber-500"
+              />
+            </div>
+
+            {/* ── Step 4: الموقع ── */}
+            <div className="rounded-2xl border-2 border-sky-200 dark:border-sky-900/40 bg-gradient-to-b from-sky-50/50 dark:from-sky-950/10 to-transparent p-5 space-y-4 hover:border-sky-300 dark:hover:border-sky-800/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-sky-500 text-white flex items-center justify-center text-sm font-black shadow-md shadow-sky-500/30">٤</div>
+                <div>
+                  <h4 className="font-bold text-sky-700 dark:text-sky-400 text-base">الموقع</h4>
+                  <p className="text-[11px] text-muted-foreground">اختياري - حدد موقع التكليف</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-2">
-                  <Label className="text-sm font-medium">المحافظة</Label>
+                  <Label className="text-sm font-semibold flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-sky-600" />
+                    المحافظة
+                  </Label>
                   <Select
                     value={createForm.governorate}
                     onValueChange={(val) => setCreateForm((p) => ({ ...p, governorate: val }))}
                   >
-                    <SelectTrigger className="w-full">
+                    <SelectTrigger className="w-full h-11 border-sky-200 dark:border-sky-900/50 focus:border-sky-500">
                       <SelectValue placeholder="اختر المحافظة" />
                     </SelectTrigger>
                     <SelectContent>
@@ -789,108 +842,66 @@ export default function AdminDeploymentsPage() {
                   </Select>
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="admin-dep-district" className="text-sm font-medium">المديرية</Label>
+                  <Label htmlFor="admin-dep-district" className="text-sm font-semibold flex items-center gap-1.5">
+                    <Navigation className="w-3.5 h-3.5 text-sky-600" />
+                    المديرية
+                  </Label>
                   <Input
                     id="admin-dep-district"
                     placeholder="اسم المديرية"
                     value={createForm.district}
                     onChange={(e) => setCreateForm((p) => ({ ...p, district: e.target.value }))}
+                    className="h-11 border-sky-200 dark:border-sky-900/50 focus:border-sky-500"
                   />
                 </div>
               </div>
             </div>
 
-            <Separator />
-
-            {/* Section: Requirements */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-7 h-7 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-                  <ShieldCheck className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+            {/* ── Step 5: ملاحظات ── */}
+            <div className="rounded-2xl border-2 border-gray-200 dark:border-gray-800/40 bg-gradient-to-b from-gray-50/50 dark:from-gray-950/10 to-transparent p-5 space-y-4 hover:border-gray-300 dark:hover:border-gray-700/50 transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-gray-500 text-white flex items-center justify-center text-sm font-black shadow-md shadow-gray-500/20">٥</div>
+                <div>
+                  <h4 className="font-bold text-gray-700 dark:text-gray-400 text-base">ملاحظات</h4>
+                  <p className="text-[11px] text-muted-foreground">اختياري - أضف ملاحظات إضافية</p>
                 </div>
-                <span className="text-sm font-bold">المتطلبات اللازمة</span>
-                <span className="text-[10px] text-muted-foreground">(اختياري)</span>
               </div>
-
-              {/* Requirement Chips */}
-              <div className="flex flex-wrap gap-2">
-                {requirementOptions.map((req) => {
-                  const isSelected = createForm.requirementTags.includes(req.id);
-                  const ReqIcon = req.icon;
-                  return (
-                    <button
-                      key={req.id}
-                      type="button"
-                      onClick={() => {
-                        setCreateForm((p) => ({
-                          ...p,
-                          requirementTags: isSelected
-                            ? p.requirementTags.filter((t) => t !== req.id)
-                            : [...p.requirementTags, req.id],
-                        }));
-                      }}
-                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium transition-all border ${
-                        isSelected
-                          ? 'bg-admin/10 border-admin/30 text-admin shadow-sm'
-                          : 'bg-transparent border-border text-muted-foreground hover:border-muted-foreground/30 hover:bg-muted/30'
-                      }`}
-                    >
-                      <ReqIcon className="w-3 h-3" />
-                      {req.label}
-                      {isSelected && <CheckCircle2 className="w-3 h-3 text-admin" />}
-                    </button>
-                  );
-                })}
-              </div>
-
-              {/* Custom requirements textarea */}
-              <Textarea
-                id="admin-dep-reqs"
-                placeholder="متطلبات إضافية أخرى..."
-                rows={2}
-                value={createForm.requirements}
-                onChange={(e) => setCreateForm((p) => ({ ...p, requirements: e.target.value }))}
-              />
-            </div>
-
-            <Separator />
-
-            {/* Section: Notes */}
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 mb-1">
-                <div className="w-7 h-7 rounded-lg bg-muted/50 flex items-center justify-center">
-                  <FileText className="w-3.5 h-3.5 text-muted-foreground" />
-                </div>
-                <span className="text-sm font-bold">ملاحظات</span>
-                <span className="text-[10px] text-muted-foreground">(اختياري)</span>
-              </div>
-
               <Textarea
                 id="admin-dep-notes"
                 placeholder="ملاحظات إضافية..."
                 rows={2}
                 value={createForm.notes}
                 onChange={(e) => setCreateForm((p) => ({ ...p, notes: e.target.value }))}
+                className="border-gray-200 dark:border-gray-800/50 focus:border-gray-400"
               />
             </div>
           </div>
 
-          <DialogFooter className="gap-2">
+          {/* Footer Actions */}
+          <div className="p-5 pt-0 flex items-center justify-between border-t bg-muted/20 -mx-0 -mb-0 rounded-b-lg">
             <Button
-              variant="outline"
+              variant="ghost"
               onClick={() => setShowCreateDialog(false)}
+              className="gap-2 text-muted-foreground hover:text-foreground"
             >
               إلغاء
             </Button>
-            <Button
-              className="gap-2 bg-admin hover:bg-admin/90 text-white"
-              onClick={handleCreateDeployment}
-              disabled={isCreating}
-            >
-              {isCreating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              إنشاء التكليف
-            </Button>
-          </DialogFooter>
+            <div className="flex items-center gap-2">
+              {createForm.title && createForm.description && createForm.hours > 0 && createForm.amount > 0 && (
+                <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
+                  <CheckCircle2 className="w-3 h-3" /> جاهز للإنشاء
+                </span>
+              )}
+              <Button
+                className="gap-2 bg-gradient-to-l from-admin to-amber-600 hover:from-admin/90 hover:to-amber-600/90 text-white shadow-lg shadow-admin/20 px-6 h-11 font-bold"
+                onClick={handleCreateDeployment}
+                disabled={isCreating}
+              >
+                {isCreating ? <Loader2 className="w-5 h-5 animate-spin" /> : <Plus className="w-5 h-5" />}
+                إنشاء التكليف
+              </Button>
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
     </motion.div>
