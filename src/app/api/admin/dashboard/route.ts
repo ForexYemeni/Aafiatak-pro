@@ -108,25 +108,35 @@ export async function GET(request: NextRequest) {
     const nurseGrowthRate = newNursesLastWeek > 0 ? ((newNursesThisWeek - newNursesLastWeek) / newNursesLastWeek) * 100 : 0;
     const orderGrowthRate = ordersLastWeek > 0 ? ((ordersThisWeek - ordersLastWeek) / ordersLastWeek) * 100 : 0;
 
-    // Revenue chart data (last 7 days)
+    // Revenue chart data (last 7 days) — OPTIMIZED: 2 aggregation queries instead of 14 sequential queries
+    const sixDaysAgo = new Date(todayStart);
+    sixDaysAgo.setDate(sixDaysAgo.getDate() - 6);
+
+    const [revenueAggByDay, ordersAggByDay] = await Promise.all([
+      Transaction.aggregate([
+        { $match: { status: 'completed', processedAt: { $gte: sixDaysAgo } } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$processedAt' } }, revenue: { $sum: '$amount' } } },
+        { $sort: { _id: 1 } },
+      ]),
+      ServiceRequest.aggregate([
+        { $match: { createdAt: { $gte: sixDaysAgo } } },
+        { $group: { _id: { $dateToString: { format: '%Y-%m-%d', date: '$createdAt' } }, orders: { $sum: 1 } } },
+        { $sort: { _id: 1 } },
+      ]),
+    ]);
+
+    // Build a map for quick lookup
+    const revenueByDate = new Map(revenueAggByDay.map((d: any) => [d._id, d.revenue]));
+    const ordersByDate = new Map(ordersAggByDay.map((d: any) => [d._id, d.orders]));
+
     const revenueChartData = [];
     const ordersChartData = [];
     for (let i = 6; i >= 0; i--) {
       const dayStart = new Date(todayStart);
       dayStart.setDate(dayStart.getDate() - i);
-      const dayEnd = new Date(dayStart);
-      dayEnd.setDate(dayEnd.getDate() + 1);
-
-      const [dayRevAgg, dayOrders] = await Promise.all([
-        Transaction.aggregate([
-          { $match: { status: 'completed', processedAt: { $gte: dayStart, $lt: dayEnd } } },
-          { $group: { _id: null, total: { $sum: '$amount' } } },
-        ]),
-        ServiceRequest.countDocuments({ createdAt: { $gte: dayStart, $lt: dayEnd } }),
-      ]);
-
-      revenueChartData.push({ date: dayStart.toISOString().split('T')[0], revenue: dayRevAgg[0]?.total || 0 });
-      ordersChartData.push({ date: dayStart.toISOString().split('T')[0], orders: dayOrders });
+      const dateKey = dayStart.toISOString().split('T')[0];
+      revenueChartData.push({ date: dateKey, revenue: revenueByDate.get(dateKey) || 0 });
+      ordersChartData.push({ date: dateKey, orders: ordersByDate.get(dateKey) || 0 });
     }
 
     return Response.json({

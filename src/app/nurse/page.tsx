@@ -267,12 +267,19 @@ export default function NurseTasksPage() {
     }
   }, [authFetch, activeTab]);
 
+  // OPTIMIZED: Run all initial API calls in parallel instead of sequentially
   useEffect(() => {
     setIsLoading(true);
-    fetchAssignments();
-    fetchCounts();
-    fetchVerificationStatus();
-  }, [fetchAssignments, fetchCounts, fetchVerificationStatus]);
+    Promise.allSettled([
+      fetchAssignments(),
+      fetchCounts(),
+      fetchVerificationStatus(),
+      fetchRatingSummary(),
+    ]).finally(() => {
+      // fetchAssignments sets isLoading=false internally
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeTab]); // Only re-fetch when tab changes
 
   // Refresh on real-time order updates
   useEffect(() => {
@@ -497,10 +504,6 @@ export default function NurseTasksPage() {
       // silently handle
     }
   }, [authFetch]);
-
-  useEffect(() => {
-    fetchRatingSummary();
-  }, [fetchRatingSummary]);
 
   // Get verification config for current status
   const vConfig = verificationStatus ? verificationConfig[verificationStatus] : null;

@@ -89,10 +89,10 @@ function playNotificationSound(type: string, priority: string, notifId: string):
 // This is the PRIMARY delivery mechanism on Vercel where Socket.IO is unavailable.
 // ============================================================================
 
-const POLL_INTERVAL = 15000; // 15 seconds for UI-only store refresh
-const VOICE_POLL_INTERVAL = 8000; // 8 seconds for voice-pending notifications (balanced speed/battery)
-const VOICE_POLL_INTERVAL_VISIBLE = 8000; // 8 seconds when tab is visible
-const VOICE_POLL_INTERVAL_HIDDEN = 30000; // 30 seconds when tab is hidden (saves battery)
+const POLL_INTERVAL = 30000; // 30 seconds for UI-only store refresh (increased from 15s to reduce load)
+const VOICE_POLL_INTERVAL = 15000; // 15 seconds for voice-pending notifications (increased from 8s)
+const VOICE_POLL_INTERVAL_VISIBLE = 15000; // 15 seconds when tab is visible (increased from 8s)
+const VOICE_POLL_INTERVAL_HIDDEN = 60000; // 60 seconds when tab is hidden (increased from 30s)
 const VOICE_POLL_URL = '/api/notifications/voice-pending';
 
 function NotificationPoller() {

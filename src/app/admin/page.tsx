@@ -48,7 +48,6 @@ import {
 } from '@/components/ui/dialog';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useSearchParams } from 'next/navigation';
 
 interface DashboardData {
   totalBeneficiaries: number;
@@ -113,7 +112,6 @@ const item = {
 export default function AdminDashboardPage() {
   const authFetch = useAuthFetch();
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
   const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
   const [recentRegistrations, setRecentRegistrations] = useState<RecentRegistration[]>([]);

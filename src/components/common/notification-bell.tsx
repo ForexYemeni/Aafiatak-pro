@@ -138,9 +138,10 @@ export function NotificationBell({ className }: NotificationBellProps) {
   }, [token]);
 
   // Fetch on mount and periodically (UI-only, no sounds)
+  // OPTIMIZED: Reduced polling from 30s to 60s since NotificationPoller also polls
   useEffect(() => {
     fetchNotifications();
-    const interval = setInterval(fetchNotifications, 30000);
+    const interval = setInterval(fetchNotifications, 60000);
     return () => clearInterval(interval);
   }, [fetchNotifications]);
 

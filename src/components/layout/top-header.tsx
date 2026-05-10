@@ -16,9 +16,16 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { NotificationBell } from '@/components/common/notification-bell';
+import dynamic from 'next/dynamic';
 import type { UserRole } from '@/types';
 import { cn } from '@/lib/utils';
+
+// Lazy-load NotificationBell — it fetches notifications on mount and polls,
+// so we don't need it in the initial render payload
+const NotificationBell = dynamic(
+  () => import('@/components/common/notification-bell').then(mod => ({ default: mod.NotificationBell })),
+  { ssr: false, loading: () => <Button variant="ghost" size="icon" className="w-9 h-9"><Bell className="w-4 h-4" /></Button> }
+);
 
 interface TopHeaderProps {
   onMenuToggle: () => void;
