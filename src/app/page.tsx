@@ -1035,8 +1035,15 @@ function LoginPageContent() {
   const searchParams = useSearchParams();
   const redirectPath = searchParams.get('redirect');
 
-  const { login, registerNurse, registerBeneficiary, isAuthenticated, user, isLoading, error, clearError, _hasHydrated } =
-    useAuthStore();
+  const login = useAuthStore((s) => s.login);
+  const registerNurse = useAuthStore((s) => s.registerNurse);
+  const registerBeneficiary = useAuthStore((s) => s.registerBeneficiary);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const user = useAuthStore((s) => s.user);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const error = useAuthStore((s) => s.error);
+  const clearError = useAuthStore((s) => s.clearError);
+  const _hasHydrated = useAuthStore((s) => s._hasHydrated);
 
   const [activeTab, setActiveTab] = useState<string>('login');
   const [registerRole, setRegisterRole] = useState<string>('beneficiary');

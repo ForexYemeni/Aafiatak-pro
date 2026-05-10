@@ -10,7 +10,7 @@ import { NotificationToastListener } from "@/components/common/notification-toas
 const notoArabic = Noto_Sans_Arabic({
   variable: "--font-noto-arabic",
   subsets: ["arabic"],
-  weight: ["300", "400", "500", "600", "700", "800"],
+  weight: ["400", "600", "700"],
   display: "swap",
 });
 

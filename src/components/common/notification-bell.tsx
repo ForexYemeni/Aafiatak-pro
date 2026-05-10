@@ -11,24 +11,10 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
 import { cn } from '@/lib/utils';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useNotificationStore } from '@/lib/stores/notification-store';
 import type { NotificationType } from '@/types';
-
-// ============================================================================
-// Real notification interface from API
-// ============================================================================
-
-interface NotificationItem {
-  id: string;
-  title: string;
-  body: string;
-  type: NotificationType;
-  read: boolean;
-  createdAt: string;
-  actionUrl?: string;
-}
 
 // ============================================================================
 // Notification icon by type
@@ -94,8 +80,8 @@ function getRelativeTimeString(dateStr: string): string {
 
 // ============================================================================
 // Notification Bell Component
+// *** Uses notification store — NO independent API polling ***
 // *** Does NOT play sounds. Sounds are ONLY from Push/Socket events. ***
-// This component only updates UI state (badge count, notification list).
 // ============================================================================
 
 interface NotificationBellProps {
@@ -104,129 +90,30 @@ interface NotificationBellProps {
 
 export function NotificationBell({ className }: NotificationBellProps) {
   const router = useRouter();
-  const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
-  const [notifications, setNotifications] = useState<NotificationItem[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const token = useAuthStore((s) => s.token);
   const [isOpen, setIsOpen] = useState(false);
 
-  const fetchNotifications = useCallback(async () => {
-    if (!token) return;
-    setIsLoading(true);
-    try {
-      const res = await fetch('/api/notifications?limit=50', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const data = await res.json();
-      if (data.success && data.data) {
-        const notifs = data.data.notifications || [];
-        const newUnreadCount = data.data.unreadCount || 0;
+  // Read from notification store (populated by NotificationPoller in PWA provider)
+  const notifications = useNotificationStore((s) => s.notifications);
+  const unreadCount = useNotificationStore((s) => s.unreadCount);
+  const isLoading = useNotificationStore((s) => s.isLoading);
+  const storeMarkAsRead = useNotificationStore((s) => s.markAsRead);
+  const storeMarkAllAsRead = useNotificationStore((s) => s.markAllAsRead);
+  const storeRemoveNotification = useNotificationStore((s) => s.removeNotification);
+  const storeClearAll = useNotificationStore((s) => s.clearAll);
+  const fetchNotifications = useNotificationStore((s) => s.fetchNotifications);
 
-        // *** NO SOUND PLAYING HERE ***
-        // Sounds are handled ONLY by the PWA provider (push/Socket events)
-        // This component ONLY updates UI state
-
-        setNotifications(notifs);
-        setUnreadCount(newUnreadCount);
-      }
-    } catch {
-      // silent - keep existing notifications
-    } finally {
-      setIsLoading(false);
-    }
-  }, [token]);
-
-  // Fetch on mount and periodically (UI-only, no sounds)
-  // OPTIMIZED: Reduced polling from 30s to 60s since NotificationPoller also polls
+  // Fetch fresh data when popover opens
   useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 60000);
-    return () => clearInterval(interval);
-  }, [fetchNotifications]);
-
-  // Fetch when popover opens
-  useEffect(() => {
-    if (isOpen) fetchNotifications();
-  }, [isOpen, fetchNotifications]);
-
-  const markAsRead = async (id: string) => {
-    // Optimistic update
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    setUnreadCount((prev) => Math.max(0, prev - 1));
-    try {
-      const res = await fetch(`/api/notifications/${id}/read`, {
-        method: 'PATCH',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ read: true }),
-      });
-      if (!res.ok) {
-        setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: false } : n)));
-        setUnreadCount((prev) => prev + 1);
-      }
-    } catch {
-      setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: false } : n)));
-      setUnreadCount((prev) => prev + 1);
+    if (isOpen && token) {
+      fetchNotifications();
     }
-  };
+  }, [isOpen, token, fetchNotifications]);
 
-  const markAllAsRead = async () => {
-    const prevNotifications = [...notifications];
-    const prevUnreadCount = unreadCount;
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    setUnreadCount(0);
-    try {
-      const res = await fetch('/api/notifications/read-all', {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({}),
-      });
-      if (!res.ok) {
-        setNotifications(prevNotifications.map((n) => ({ ...n })));
-        setUnreadCount(prevUnreadCount);
-      }
-    } catch {
-      setNotifications(prevNotifications.map((n) => ({ ...n })));
-      setUnreadCount(prevUnreadCount);
-    }
-  };
-
-  const deleteAllNotifications = async () => {
-    const prevNotifications = [...notifications];
-    const prevUnreadCount = unreadCount;
-    // Optimistic update
-    setNotifications([]);
-    setUnreadCount(0);
-    try {
-      const res = await fetch('/api/notifications/delete-all', {
-        method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (!res.ok) {
-        setNotifications(prevNotifications.map((n) => ({ ...n })));
-        setUnreadCount(prevUnreadCount);
-      }
-    } catch {
-      setNotifications(prevNotifications.map((n) => ({ ...n })));
-      setUnreadCount(prevUnreadCount);
-    }
-  };
-
-  const deleteNotification = async (id: string) => {
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-    setUnreadCount((prev) => {
-      const notif = notifications.find((n) => n.id === id);
-      return notif && !notif.read ? Math.max(0, prev - 1) : prev;
-    });
+  // Delete a single notification (optimistic)
+  const deleteNotification = useCallback(async (id: string) => {
+    storeRemoveNotification(id);
     try {
       await fetch(`/api/notifications/${id}`, {
         method: 'DELETE',
@@ -235,7 +122,23 @@ export function NotificationBell({ className }: NotificationBellProps) {
     } catch {
       // Silently fail - local state already updated
     }
-  };
+  }, [token, storeRemoveNotification]);
+
+  // Delete all notifications (optimistic)
+  const deleteAllNotifications = useCallback(async () => {
+    storeClearAll();
+    try {
+      await fetch('/api/notifications/delete-all', {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+    } catch {
+      // Silently fail
+    }
+  }, [token, storeClearAll]);
 
   return (
     <Popover open={isOpen} onOpenChange={setIsOpen}>
@@ -280,7 +183,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
                 variant="ghost"
                 size="sm"
                 className="text-[11px] h-7 px-2 text-blue-600 hover:text-blue-700"
-                onClick={markAllAsRead}
+                onClick={storeMarkAllAsRead}
                 title="تحديد الكل كمقروء"
               >
                 <Check className="w-3.5 h-3.5 ml-1" />
@@ -338,7 +241,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
                   <div
                     className="flex-1 min-w-0 cursor-pointer"
                     onClick={() => {
-                      if (!notification.read) markAsRead(notification.id);
+                      if (!notification.read) storeMarkAsRead(notification.id);
                       // Navigate based on notification type and actionUrl
                       if (notification.actionUrl) {
                         router.push(notification.actionUrl);
@@ -389,7 +292,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
                     <p className="text-xs text-muted-foreground mt-0.5 leading-4 line-clamp-2">
                       {notification.body}
                     </p>
-                    <p className="text-[10px] text-muted-foreground/70 mt-1">
+                    <p className="text-[10px] text-muted-foreground/70 mt-1" suppressHydrationWarning>
                       {getRelativeTimeString(notification.createdAt)}
                     </p>
                   </div>
