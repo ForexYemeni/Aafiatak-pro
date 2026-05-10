@@ -269,16 +269,15 @@ export const useAuthStore = create<AuthState>()(
           window.location.href = '/?logout=true';
         }
 
-        // Clear local state after navigation is initiated
-        // (these changes won't trigger re-renders since the page is unloading)
-        set({
-          user: null,
-          token: null,
-          refreshToken: null,
-          isAuthenticated: false,
-          isLoading: false,
-          error: null,
-        });
+        // DO NOT call set() here! Calling set() triggers React re-renders
+        // that conflict with the pending hard navigation from window.location.href.
+        // The AuthHydrationGuard sees isAuthenticated=false and fires router.replace(),
+        // which races with the hard navigation, causing a brief error page.
+        //
+        // This is safe to skip because:
+        // 1. localStorage.removeItem() already cleared persisted state (line above)
+        // 2. window.location.href causes a full page reload — all JS state resets
+        // 3. The reloaded page rehydrates Zustand from localStorage (now empty) → unauthenticated
       },
 
       // ---- Refresh Token ----

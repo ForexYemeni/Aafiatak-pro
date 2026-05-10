@@ -86,6 +86,13 @@ export function AuthHydrationGuard({
     if (redirectAttemptedRef.current) return;
     if (authCached) return; // Auth was recently verified, skip
 
+    // Don't redirect during logout — the hard navigation (window.location.href)
+    // in the logout handler will handle the redirect. If we fire router.replace()
+    // here, it races with the hard navigation and causes a brief error page.
+    if (typeof window !== 'undefined' && sessionStorage.getItem('aafiatak-logged-out')) {
+      return;
+    }
+
     if (!isAuthenticated || !user) {
       redirectAttemptedRef.current = true;
       router.replace(redirectPath);
