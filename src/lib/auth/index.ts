@@ -113,8 +113,8 @@ export function verifyRefreshToken(token: string): { userId: string; phone: stri
 export function validateYemeniPhone(phone: string): boolean {
   const cleaned = phone.replace(/[\s\-()]/g, '');
   if (/^7\d{8}$/.test(cleaned)) return true;
-  if (/^\+9677\d{7}$/.test(cleaned)) return true;
-  if (/^9677\d{7}$/.test(cleaned)) return true;
+  if (/^\+9677\d{8}$/.test(cleaned)) return true;
+  if (/^9677\d{8}$/.test(cleaned)) return true;
   return false;
 }
 

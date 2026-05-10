@@ -44,11 +44,11 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<Ap
   let response: Response;
   try {
     response = await fetch(url, {
+      ...options,
       headers: {
         'Content-Type': 'application/json',
         ...options.headers,
       },
-      ...options,
     });
   } catch (networkError) {
     throw new Error('تعذر الاتصال بالخادم. تحقق من اتصالك بالإنترنت');
@@ -111,6 +111,16 @@ export const useAuthStore = create<AuthState>()(
             soundManager.forceUserInteracted();
             // Note: welcome-back sound is handled by WelcomeBackPlayer in pwa-provider.tsx
             // to avoid duplicate sounds (race condition between this and WelcomeBackPlayer)
+          } else {
+            // API returned success but no data - unexpected format
+            set({
+              isLoading: false,
+              error: 'استجابة غير متوقعة من الخادم',
+              isAuthenticated: false,
+              user: null,
+              token: null,
+              refreshToken: null,
+            });
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'فشل تسجيل الدخول';
@@ -147,6 +157,15 @@ export const useAuthStore = create<AuthState>()(
             });
             // Unlock audio playback - user clicked register button
             soundManager.forceUserInteracted();
+          } else {
+            set({
+              isLoading: false,
+              error: 'استجابة غير متوقعة من الخادم',
+              isAuthenticated: false,
+              user: null,
+              token: null,
+              refreshToken: null,
+            });
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'فشل تسجيل الممرض/ـة';
@@ -183,6 +202,15 @@ export const useAuthStore = create<AuthState>()(
             });
             // Unlock audio playback - user clicked register button
             soundManager.forceUserInteracted();
+          } else {
+            set({
+              isLoading: false,
+              error: 'استجابة غير متوقعة من الخادم',
+              isAuthenticated: false,
+              user: null,
+              token: null,
+              refreshToken: null,
+            });
           }
         } catch (error) {
           const message = error instanceof Error ? error.message : 'فشل تسجيل المستفيد';
