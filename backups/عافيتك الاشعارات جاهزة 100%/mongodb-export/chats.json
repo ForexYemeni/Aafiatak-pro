@@ -1,0 +1,114 @@
+[
+  {
+    "_id": "69fdc0ea32b2c4837a2e441c",
+    "participants": [
+      {
+        "userId": "69fce96b20f5ae3fa06b7c2f",
+        "role": "beneficiary",
+        "joinedAt": "2026-05-08 10:54:34.863000",
+        "_id": "69fdc0ea32b2c4837a2e441d"
+      },
+      {
+        "userId": "69fd0638ffb3638fd8f6d323",
+        "role": "nurse",
+        "joinedAt": "2026-05-08 10:54:34.863000",
+        "_id": "69fdc0ea32b2c4837a2e441e"
+      }
+    ],
+    "unreadCount": {
+      "69fd0638ffb3638fd8f6d323": 3,
+      "69fce96b20f5ae3fa06b7c2f": 0
+    },
+    "isActive": true,
+    "createdAt": "2026-05-08T10:54:34.868000",
+    "updatedAt": "2026-05-09T08:46:29.364000",
+    "__v": 0,
+    "lastMessageAt": "2026-05-09T08:46:26.967000",
+    "lastMessageContent": "مرحباً، أنا في انتظارك",
+    "lastMessageSender": "69fce96b20f5ae3fa06b7c2f"
+  },
+  {
+    "_id": "69fdd622ad2e5bbf01d3c909",
+    "participants": [
+      {
+        "userId": "69fceb661b6979c0ab71a8ea",
+        "role": "admin",
+        "joinedAt": "2026-05-08 12:25:06.921000",
+        "_id": "69fdd622ad2e5bbf01d3c90a"
+      },
+      {
+        "userId": "69fd0638ffb3638fd8f6d323",
+        "role": "nurse",
+        "joinedAt": "2026-05-08 12:25:06.921000",
+        "_id": "69fdd622ad2e5bbf01d3c90b"
+      }
+    ],
+    "unreadCount": {
+      "69fceb661b6979c0ab71a8ea": 2,
+      "69fd0638ffb3638fd8f6d323": 0
+    },
+    "isActive": true,
+    "createdAt": "2026-05-08T12:25:06.926000",
+    "updatedAt": "2026-05-09T03:32:30.006000",
+    "__v": 0,
+    "lastMessageAt": "2026-05-09T03:32:24.045000",
+    "lastMessageContent": "مرحبا",
+    "lastMessageSender": "69fd0638ffb3638fd8f6d323"
+  },
+  {
+    "_id": "69fdd6a0305c3de0b0c63213",
+    "participants": [
+      {
+        "userId": "69fce96b20f5ae3fa06b7c2f",
+        "role": "beneficiary",
+        "joinedAt": "2026-05-08 12:27:12.643000",
+        "_id": "69fdd6a0305c3de0b0c63214"
+      },
+      {
+        "userId": "69fceb661b6979c0ab71a8ea",
+        "role": "admin",
+        "joinedAt": "2026-05-08 12:27:12.643000",
+        "_id": "69fdd6a0305c3de0b0c63215"
+      }
+    ],
+    "lastMessageContent": "احتاج ممرض",
+    "lastMessageSender": "69fce96b20f5ae3fa06b7c2f",
+    "lastMessageAt": "2026-05-08T12:27:28.553000",
+    "unreadCount": {
+      "69fce96b20f5ae3fa06b7c2f": 0,
+      "69fceb661b6979c0ab71a8ea": 1
+    },
+    "isActive": true,
+    "createdAt": "2026-05-08T12:27:12.648000",
+    "updatedAt": "2026-05-08T12:27:29.781000",
+    "__v": 0
+  },
+  {
+    "_id": "69fe5e3370cdc9286272330b",
+    "participants": [
+      {
+        "userId": "69fe4dba6c7402778efee3ce",
+        "role": "nurse",
+        "joinedAt": "2026-05-08 22:05:39.484000",
+        "_id": "69fe5e3370cdc9286272330c"
+      },
+      {
+        "userId": "69fceb661b6979c0ab71a8ea",
+        "role": "admin",
+        "joinedAt": "2026-05-08 22:05:39.484000",
+        "_id": "69fe5e3370cdc9286272330d"
+      }
+    ],
+    "lastMessageContent": "أنا في الطريق إليكم",
+    "lastMessageSender": "69fe4dba6c7402778efee3ce",
+    "lastMessageAt": "2026-05-08T22:06:22.653000",
+    "unreadCount": {
+      "69fe4dba6c7402778efee3ce": 0,
+      "69fceb661b6979c0ab71a8ea": 1
+    },
+    "isActive": true,
+    "createdAt": "2026-05-08T22:05:39.496000",
+    "updatedAt": "2026-05-08T22:06:22.655000",
+    "__v": 0
+  }
+]
