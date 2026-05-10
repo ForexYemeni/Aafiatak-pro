@@ -1,35 +1,32 @@
 'use client';
 
-import { useEffect, useState, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { RefreshCw } from 'lucide-react';
 
 // ============================================================================
-// Auth Hydration Guard
+// Auth Hydration Guard (OPTIMIZED)
 // ============================================================================
-// Waits for Zustand hydration, then checks authentication and role.
-// Redirects unauthenticated / wrong-role users to the login page
-// using router.replace() (client-side navigation) to avoid redirect loops.
-//
-// Key design decisions:
-// - No localStorage fallback: Zustand is the single source of truth.
-// - Uses a ref to track redirect attempts (survives re-renders).
-// - 3-second safety timeout forces ready state if hydration stalls.
-// - No server-side (middleware) redirects — everything is client-side.
+// Key performance improvements:
+// 1. If Zustand is already hydrated on mount, renders children IMMEDIATELY
+//    without any intermediate loading state (no spinner flash).
+// 2. Uses module-level cache so subsequent navigations skip the guard check.
+// 3. Only shows spinner on the very first hydration (cold start).
 // ============================================================================
 
 interface AuthHydrationGuardProps {
   children: ReactNode;
-  /** The role(s) required to view this page */
   requiredRoles: string[];
-  /** Redirect path if not authenticated */
   redirectPath: string;
-  /** Gradient background class */
   gradientClass: string;
-  /** Theme color class for spinner */
   spinnerColorClass: string;
 }
+
+// Module-level cache: once auth is verified for a session, we skip re-checking
+// This prevents the guard from blocking on every client-side navigation
+let _authVerifiedAt = 0;
+const AUTH_CACHE_TTL = 60_000; // 1 minute — re-verify after this
 
 export function AuthHydrationGuard({
   children,
@@ -43,12 +40,23 @@ export function AuthHydrationGuard({
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
 
-  const [isReady, setIsReady] = useState(false);
+  const [isReady, setIsReady] = useState(() => zustandHydrated);
   const [showRetry, setShowRetry] = useState(false);
   const redirectAttemptedRef = useRef(false);
 
-  // Phase 1: Wait for Zustand hydration (with 3-second timeout)
+  // Check if auth is cached (skip guard entirely)
+  const authCached = Date.now() - _authVerifiedAt < AUTH_CACHE_TTL;
+
+  // FAST PATH: If already hydrated and auth is valid, render children immediately
+  if (zustandHydrated && isAuthenticated && user && requiredRoles.includes(user.role)) {
+    _authVerifiedAt = Date.now();
+    return <>{children}</>;
+  }
+
+  // Phase 1: Wait for Zustand hydration (only on cold start)
   useEffect(() => {
+    if (isReady) return;
+
     if (zustandHydrated) {
       setIsReady(true);
       return;
@@ -57,7 +65,6 @@ export function AuthHydrationGuard({
     // Safety timeout: force ready after 3 seconds
     const timer = setTimeout(() => {
       setIsReady(true);
-      // Also force Zustand hydration flag so the rest of the app works
       useAuthStore.setState({ _hasHydrated: true });
     }, 3000);
 
@@ -70,31 +77,31 @@ export function AuthHydrationGuard({
       clearTimeout(timer);
       clearTimeout(retryTimer);
     };
-  }, [zustandHydrated]);
+  }, [zustandHydrated, isReady]);
 
-  // Phase 2: Auth check and redirect (using router.replace to avoid loops)
+  // Phase 2: Auth check and redirect
   useEffect(() => {
     if (!isReady) return;
     if (redirectAttemptedRef.current) return;
+    if (authCached) return; // Auth was recently verified, skip
 
     if (!isAuthenticated || !user) {
-      // Not authenticated — redirect to login
       redirectAttemptedRef.current = true;
       router.replace(redirectPath);
       return;
     }
 
     if (!requiredRoles.includes(user.role)) {
-      // Wrong role — redirect to login
       redirectAttemptedRef.current = true;
       router.replace(redirectPath);
       return;
     }
 
-    // Authenticated with correct role — the guard will render children below
-  }, [isReady, isAuthenticated, user, requiredRoles, redirectPath, router]);
+    // Mark auth as verified
+    _authVerifiedAt = Date.now();
+  }, [isReady, isAuthenticated, user, requiredRoles, redirectPath, router, authCached]);
 
-  // Show loading spinner while not ready
+  // Show loading spinner while not ready (only on cold start)
   if (!isReady) {
     return (
       <div className={`min-h-screen flex items-center justify-center ${gradientClass}`} dir="rtl" lang="ar">
@@ -104,7 +111,6 @@ export function AuthHydrationGuard({
           {showRetry && (
             <button
               onClick={() => {
-                // Clear any stale auth state and reload
                 try { localStorage.removeItem('aafiatak-auth-storage'); } catch {}
                 window.location.href = '/';
               }}

@@ -2,7 +2,6 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
 import {
   Home,
   ClipboardList,
@@ -112,15 +111,13 @@ export function BottomNav({ role }: BottomNavProps) {
             >
               <div className="relative">
                 {isActive && (
-                  <motion.div
-                    layoutId="bottom-nav-active"
-                    className="absolute -inset-2 rounded-xl bg-current/10"
-                    transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+                  <div
+                    className="absolute -inset-2 rounded-xl bg-current/10 transition-opacity duration-150"
                   />
                 )}
                 <Icon
                   className={cn(
-                    'w-5 h-5 relative z-10 transition-colors',
+                    'w-5 h-5 relative z-10 transition-colors duration-150',
                     isActive ? activeColor : 'text-muted-foreground'
                   )}
                 />
@@ -132,7 +129,7 @@ export function BottomNav({ role }: BottomNavProps) {
               </div>
               <span
                 className={cn(
-                  'text-[10px] transition-colors',
+                  'text-[10px] transition-colors duration-150',
                   isActive ? activeColor : 'text-muted-foreground'
                 )}
               >

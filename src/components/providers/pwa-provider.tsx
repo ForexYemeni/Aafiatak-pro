@@ -90,7 +90,9 @@ function playNotificationSound(type: string, priority: string, notifId: string):
 // ============================================================================
 
 const POLL_INTERVAL = 15000; // 15 seconds for UI-only store refresh
-const VOICE_POLL_INTERVAL = 2000; // 2 seconds for voice-pending notifications (near-instant)
+const VOICE_POLL_INTERVAL = 8000; // 8 seconds for voice-pending notifications (balanced speed/battery)
+const VOICE_POLL_INTERVAL_VISIBLE = 8000; // 8 seconds when tab is visible
+const VOICE_POLL_INTERVAL_HIDDEN = 30000; // 30 seconds when tab is hidden (saves battery)
 const VOICE_POLL_URL = '/api/notifications/voice-pending';
 
 function NotificationPoller() {
@@ -335,8 +337,22 @@ function VoiceNotificationPoller() {
       // Initial poll immediately on auth
       pollForVoiceNotifications();
 
-      // Fast polling for voice notifications (every 2 seconds)
-      intervalRef.current = setInterval(pollForVoiceNotifications, VOICE_POLL_INTERVAL);
+      // Adaptive polling: faster when visible, slower when hidden
+      const getInterval = () => document.hidden ? VOICE_POLL_INTERVAL_HIDDEN : VOICE_POLL_INTERVAL_VISIBLE;
+
+      intervalRef.current = setInterval(pollForVoiceNotifications, getInterval());
+
+      // Update interval when visibility changes
+      const handleVisibilityForInterval = () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          if (isAuthenticated && token) {
+            intervalRef.current = setInterval(pollForVoiceNotifications, getInterval());
+          }
+        }
+      };
+
+      document.addEventListener('visibilitychange', handleVisibilityForInterval);
     } else {
       // Clear processed IDs on logout
       processedIdsRef.current.clear();
@@ -363,6 +379,7 @@ function VoiceNotificationPoller() {
         intervalRef.current = null;
       }
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      document.removeEventListener('visibilitychange', handleVisibilityForInterval);
     };
   }, [hasHydrated, isAuthenticated, token, pollForVoiceNotifications]);
 

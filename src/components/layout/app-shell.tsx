@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Menu, X } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 import { Sidebar } from './sidebar';
 import { BottomNav } from './bottom-nav';
 import { TopHeader } from './top-header';
@@ -44,33 +42,22 @@ export function AppShell({ children }: AppShellProps) {
           />
         )}
 
-        {/* Mobile Sidebar Overlay */}
-        <AnimatePresence>
-          {isMobile && sidebarOpen && (
-            <>
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 bg-black/50 z-40"
-                onClick={() => setSidebarOpen(false)}
+        {/* Mobile Sidebar Overlay - CSS transitions instead of framer-motion */}
+        {isMobile && sidebarOpen && (
+          <>
+            <div
+              className="fixed inset-0 bg-black/50 z-40 animate-in fade-in duration-200"
+              onClick={() => setSidebarOpen(false)}
+            />
+            <div className="fixed right-0 top-0 bottom-0 z-50 w-80 animate-in slide-in-from-right duration-200">
+              <Sidebar
+                role={role}
+                isOpen={true}
+                onToggle={() => setSidebarOpen(false)}
               />
-              <motion.div
-                initial={{ x: 300 }}
-                animate={{ x: 0 }}
-                exit={{ x: 300 }}
-                transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-                className="fixed right-0 top-0 bottom-0 z-50 w-80"
-              >
-                <Sidebar
-                  role={role}
-                  isOpen={true}
-                  onToggle={() => setSidebarOpen(false)}
-                />
-              </motion.div>
-            </>
-          )}
-        </AnimatePresence>
+            </div>
+          </>
+        )}
 
         {/* Main Content */}
         <main className="flex-1 overflow-y-auto custom-scrollbar pb-20 md:pb-0">

@@ -5,27 +5,60 @@ import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { UserRole } from '@/types';
 
-// ---- useAuth ----
+// ---- useAuth (OPTIMIZED) ----
 
 /**
  * Main auth hook - returns auth state and all methods.
+ * OPTIMIZED: Uses specific selectors to avoid unnecessary re-renders.
  */
 export function useAuth() {
-  const store = useAuthStore();
-  return store;
+  const user = useAuthStore((s) => s.user);
+  const token = useAuthStore((s) => s.token);
+  const refreshToken = useAuthStore((s) => s.refreshToken);
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
+  const error = useAuthStore((s) => s.error);
+  const _hasHydrated = useAuthStore((s) => s._hasHydrated);
+  const login = useAuthStore((s) => s.login);
+  const registerNurse = useAuthStore((s) => s.registerNurse);
+  const registerBeneficiary = useAuthStore((s) => s.registerBeneficiary);
+  const logout = useAuthStore((s) => s.logout);
+  const refreshAuthToken = useAuthStore((s) => s.refreshAuthToken);
+  const updateUser = useAuthStore((s) => s.updateUser);
+  const clearError = useAuthStore((s) => s.clearError);
+  const setUser = useAuthStore((s) => s.setUser);
+  const setTokens = useAuthStore((s) => s.setTokens);
+
+  return {
+    user,
+    token,
+    refreshToken,
+    isAuthenticated,
+    isLoading,
+    error,
+    _hasHydrated,
+    login,
+    registerNurse,
+    registerBeneficiary,
+    logout,
+    refreshAuthToken,
+    updateUser,
+    clearError,
+    setUser,
+    setTokens,
+  };
 }
 
-// ---- useRequireAuth ----
+// ---- useRequireAuth (OPTIMIZED) ----
 
 /**
  * Redirects to login if not authenticated.
- * Returns the auth state and methods.
- * @param redirectPath - The path to redirect to after login (default: current path)
+ * OPTIMIZED: Uses specific selectors.
  */
 export function useRequireAuth(redirectPath?: string) {
   const router = useRouter();
-  const store = useAuthStore();
-  const { isAuthenticated, isLoading } = store;
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const isLoading = useAuthStore((s) => s.isLoading);
 
   useEffect(() => {
     if (!isLoading && !isAuthenticated) {
@@ -34,7 +67,7 @@ export function useRequireAuth(redirectPath?: string) {
     }
   }, [isAuthenticated, isLoading, router, redirectPath]);
 
-  return store;
+  return useAuth();
 }
 
 // ---- useRole ----
@@ -77,39 +110,37 @@ export function useIsBeneficiary(): boolean {
   return role === 'beneficiary';
 }
 
-// ---- useAuthFetch ----
+// ---- useAuthFetch (OPTIMIZED) ----
 
 /**
  * Hook that provides an authenticated fetch wrapper.
  * Automatically adds the Authorization header and handles token refresh.
- * Returns null during hydration until the token is available.
+ * OPTIMIZED: No busy-wait polling. Checks hydration synchronously.
  */
 export function useAuthFetch() {
-  const token = useAuthStore((state) => state.token);
-  const _hasHydrated = useAuthStore((state) => state._hasHydrated);
-  const refreshAuthToken = useAuthStore((state) => state.refreshAuthToken);
-  const logout = useAuthStore((state) => state.logout);
+  const refreshAuthToken = useAuthStore((s) => s.refreshAuthToken);
+  const logout = useAuthStore((s) => s.logout);
 
   const authFetch = useCallback(
     async (url: string, options: RequestInit = {}): Promise<Response> => {
-      // Wait for hydration to complete before making requests
+      // Get current state synchronously (no subscription needed)
+      const { _hasHydrated, token: currentToken } = useAuthStore.getState();
+
+      // Wait for hydration with a single check + short sleep (max 500ms instead of 3s)
       if (!_hasHydrated) {
-        // Wait up to 3 seconds for hydration
-        for (let i = 0; i < 30; i++) {
-          await new Promise((r) => setTimeout(r, 100));
-          const hydrated = useAuthStore.getState()._hasHydrated;
-          if (hydrated) break;
+        for (let i = 0; i < 10; i++) {
+          await new Promise((r) => setTimeout(r, 50));
+          if (useAuthStore.getState()._hasHydrated) break;
         }
       }
 
-      const currentToken = useAuthStore.getState().token;
-      if (!currentToken) {
+      const token = useAuthStore.getState().token;
+      if (!token) {
         throw new Error('غير مصادق عليه');
       }
 
       const headers = new Headers(options.headers);
-      headers.set('Authorization', `Bearer ${currentToken}`);
-      // Don't set Content-Type for FormData - browser must set it with boundary automatically
+      headers.set('Authorization', `Bearer ${token}`);
       const isFormData = options.body instanceof FormData;
       if (!isFormData) {
         headers.set('Content-Type', 'application/json');
@@ -141,7 +172,7 @@ export function useAuthFetch() {
 
       return response;
     },
-    [token, _hasHydrated, refreshAuthToken, logout]
+    [refreshAuthToken, logout]
   );
 
   return authFetch;
