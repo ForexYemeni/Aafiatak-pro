@@ -27,6 +27,7 @@ import {
   Activity,
   UserPlus,
   Settings,
+  Briefcase,
 } from 'lucide-react';
 import { StatCard } from '@/components/common/stat-card';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
@@ -733,6 +734,13 @@ export default function AdminDashboardPage() {
             <p className="text-2xl font-bold text-sky-600 dark:text-sky-400">{dashboard.totalReferrals}</p>
             <p className="text-xs text-muted-foreground mt-1">إجمالي الإحالات</p>
           </div>
+          <Link href="/admin/deployments" className="glass rounded-2xl p-4 text-center hover:shadow-md transition-all duration-200 border border-transparent hover:border-indigo-200 dark:hover:border-indigo-900/50">
+            <div className="w-10 h-10 rounded-xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center mx-auto mb-2">
+              <Briefcase className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+            </div>
+            <p className="text-2xl font-bold text-indigo-600 dark:text-indigo-400">التكليفات</p>
+            <p className="text-xs text-muted-foreground mt-1">إدارة التكليفات</p>
+          </Link>
         </div>
       </motion.div>
 

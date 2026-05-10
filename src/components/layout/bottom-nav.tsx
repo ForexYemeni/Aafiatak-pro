@@ -15,6 +15,7 @@ import {
   Bell,
   Heart,
   Star,
+  Briefcase,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
@@ -28,8 +29,8 @@ interface BottomNavItem {
 
 const adminBottomItems: BottomNavItem[] = [
   { label: 'الرئيسية', href: '/admin', icon: Home },
-  { label: 'الخدمات', href: '/admin/services', icon: Heart },
   { label: 'الطلبات', href: '/admin/orders', icon: ClipboardList },
+  { label: 'التكليفات', href: '/admin/deployments', icon: Briefcase },
   { label: 'الطوارئ', href: '/admin/emergencies', icon: AlertTriangle },
   { label: 'المزيد', href: '/admin/settings', icon: MoreHorizontal },
 ];
@@ -44,7 +45,7 @@ const subadminBottomItems: BottomNavItem[] = [
 
 const nurseBottomItems: BottomNavItem[] = [
   { label: 'المهام', href: '/nurse', icon: ClipboardList },
-  { label: 'التقييمات', href: '/nurse/ratings', icon: Star },
+  { label: 'التكليفات', href: '/nurse/deployments', icon: Briefcase },
   { label: 'الأرباح', href: '/nurse/earnings', icon: Wallet },
   { label: 'الإشعارات', href: '/nurse/notifications', icon: Bell },
   { label: 'المزيد', href: '/nurse/profile', icon: MoreHorizontal },

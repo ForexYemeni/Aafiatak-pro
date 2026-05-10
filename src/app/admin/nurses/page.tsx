@@ -70,6 +70,7 @@ import { Currency } from '@/components/common/currency';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import { VerifiedBadge } from '@/components/common/verified-badge';
 
 // ─── Types ───────────────────────────────────────────────────────
 interface NurseItem {
@@ -499,7 +500,7 @@ export default function AdminNursesPage() {
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2 flex-wrap">
-            <h3 className="text-xl font-bold">{nurse.name}</h3>
+            <h3 className="text-xl font-bold flex items-center gap-1.5">{nurse.name}{nurse.verificationStatus === 'verified' && <VerifiedBadge size="md" />}</h3>
             {nurse.isBlocked && (
               <Badge variant="destructive" className="text-[10px]">
                 <Ban className="w-3 h-3 ml-0.5" />محظور
@@ -906,7 +907,7 @@ export default function AdminNursesPage() {
 
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2 flex-wrap">
-                            <h3 className="font-bold text-base truncate">{nurse.name}</h3>
+                            <h3 className="font-bold text-base truncate flex items-center gap-1">{nurse.name}{nurse.verificationStatus === 'verified' && <VerifiedBadge size="sm" />}</h3>
                             {nurse.isBlocked && (
                               <Badge variant="destructive" className="text-[9px] h-4 px-1.5 shrink-0">
                                 <Ban className="w-2.5 h-2.5 ml-0.5" />محظور

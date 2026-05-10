@@ -23,6 +23,7 @@ import {
   Shield,
   UserCog,
   UserCircle,
+  Briefcase,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -51,6 +52,7 @@ const adminNavItems: NavItem[] = [
   { label: 'المستفيدون', href: '/admin/beneficiaries', icon: Users, permission: 'manage_beneficiaries' },
   { label: 'الطلبات', href: '/admin/orders', icon: ClipboardList, permission: 'manage_orders' },
   { label: 'الطوارئ', href: '/admin/emergencies', icon: AlertTriangle, permission: 'manage_emergencies', badge: 0 },
+  { label: 'التكليفات', href: '/admin/deployments', icon: Briefcase, permission: 'manage_orders' },
   { label: 'المدفوعات', href: '/admin/payments', icon: CreditCard, permission: 'manage_payments' },
   { label: 'الكوبونات', href: '/admin/coupons', icon: Tags, permission: 'manage_payments' },
   { label: 'التقييمات', href: '/admin/ratings', icon: Star, permission: 'view_reports' },
@@ -66,6 +68,7 @@ const nurseNavItems: NavItem[] = [
   { label: 'لوحة التحكم', href: '/nurse', icon: LayoutDashboard },
   { label: 'الطلبات المتاحة', href: '/nurse/requests', icon: ClipboardList },
   { label: 'طلباتي', href: '/nurse/my-requests', icon: Stethoscope },
+  { label: 'التكليفات', href: '/nurse/deployments', icon: Briefcase },
   { label: 'التقييمات', href: '/nurse/ratings', icon: Star },
   { label: 'المحادثات', href: '/nurse/chat', icon: MessageSquare },
   { label: 'الأرباح', href: '/nurse/earnings', icon: CreditCard },

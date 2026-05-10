@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import {
   Settings, Save, Loader2, Wallet, X, Percent, Moon, Shield,
   Phone, MessageSquare, FileText, Wrench, MapPin, Users,
-  Heart, Gift, Zap, Clock, AlertTriangle, Globe
+  Heart, Gift, Zap, Clock, AlertTriangle, Globe, Briefcase, Building2
 } from 'lucide-react';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { useAuthFetch } from '@/hooks/use-auth';
@@ -20,6 +20,8 @@ import { toast } from 'sonner';
 interface SettingsData {
   commissionRate: number;
   emergencyFee: number;
+  deploymentServiceFee: number;
+  bankAccountInfo: string;
   nightFeePercent: number;
   fridayFeePercent: number;
   nightStartHour: number;
@@ -50,6 +52,8 @@ const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
 const defaultSettings: SettingsData = {
   commissionRate: 15,
   emergencyFee: 500,
+  deploymentServiceFee: 500,
+  bankAccountInfo: '',
   nightFeePercent: 20,
   fridayFeePercent: 15,
   nightStartHour: 22,
@@ -132,6 +136,7 @@ export default function AdminSettingsPage() {
 
   const sections = [
     { id: 'commission', label: 'العمولة والرسوم', icon: Percent },
+    { id: 'deployment', label: 'إعدادات التكليفات', icon: Briefcase },
     { id: 'withdrawal', label: 'سحب الأرباح', icon: Wallet },
     { id: 'loyalty', label: 'نقاط الولاء', icon: Gift },
     { id: 'autoassign', label: 'التعيين التلقائي', icon: Zap },
@@ -279,6 +284,86 @@ export default function AdminSettingsPage() {
                     max={23}
                     className="bg-background/50"
                   />
+                </div>
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Deployment Settings */}
+      {activeSection === 'deployment' && (
+        <motion.div variants={itemAnim} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <GlassCard variant="admin">
+            <GlassCardHeader>
+              <GlassCardTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-cyan-100 dark:bg-cyan-900/30 flex items-center justify-center">
+                  <Briefcase className="w-4 h-4 text-cyan-600 dark:text-cyan-400" />
+                </div>
+                إعدادات التكليفات
+              </GlassCardTitle>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="space-y-6">
+                {/* Info banner */}
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-cyan-50 dark:bg-cyan-900/20 border border-cyan-200 dark:border-cyan-800/50">
+                  <Briefcase className="w-5 h-5 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-cyan-700 dark:text-cyan-400 mb-1">إعدادات التكليفات</p>
+                    <p className="text-xs text-cyan-600/80 dark:text-cyan-400/70 leading-relaxed">
+                      تحكم في رسوم وعمولات خدمة التكليف ومعلومات الحساب البنكي لتحويل الأرباح
+                    </p>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Briefcase className="w-3.5 h-3.5 text-cyan-500" />
+                      رسوم خدمة التكليف (ر.ي)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={settings.deploymentServiceFee}
+                      onChange={(e) => updateField('deploymentServiceFee', Number(e.target.value))}
+                      min={0}
+                      className="bg-background/50"
+                    />
+                    <p className="text-[10px] text-muted-foreground">رسوم خدمة تُضاف لكل تكليف جديد</p>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Percent className="w-3.5 h-3.5 text-amber-500" />
+                      نسبة عمولة الإدارة (%)
+                    </Label>
+                    <Input
+                      type="number"
+                      value={settings.commissionRate}
+                      onChange={(e) => updateField('commissionRate', Number(e.target.value))}
+                      min={0}
+                      max={100}
+                      className="bg-background/50"
+                    />
+                    <p className="text-[10px] text-muted-foreground">نسبة العمولة التي تخصمها الإدارة من كل تكليف</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Bank Account Info */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <Building2 className="w-3.5 h-3.5 text-emerald-500" />
+                    معلومات الحساب البنكي
+                  </Label>
+                  <Textarea
+                    value={settings.bankAccountInfo}
+                    onChange={(e) => updateField('bankAccountInfo', e.target.value)}
+                    placeholder="اسم البنك: &#10;رقم الحساب: &#10;اسم صاحب الحساب: &#10;IBAN:"
+                    rows={5}
+                    className="text-sm bg-background/50"
+                  />
+                  <p className="text-[10px] text-muted-foreground">معلومات الحساب البنكي لتحويل أرباح الممرضين</p>
                 </div>
               </div>
             </GlassCardContent>

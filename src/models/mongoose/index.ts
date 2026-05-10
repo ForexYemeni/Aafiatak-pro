@@ -69,3 +69,7 @@ export type { IAdminSettings } from './AdminSettings';
 // Withdrawal request model
 export { WithdrawalRequest } from './WithdrawalRequest';
 export type { IWithdrawalRequest } from './WithdrawalRequest';
+
+// Deployment/Assignment model (تكليف)
+export { Deployment } from './Deployment';
+export type { IDeployment, IDeploymentApplication } from './Deployment';

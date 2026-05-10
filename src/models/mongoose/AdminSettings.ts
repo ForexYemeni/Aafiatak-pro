@@ -3,6 +3,8 @@ import mongoose, { Schema, Document } from 'mongoose';
 export interface IAdminSettings extends Document {
   commissionRate: number;
   emergencyFee: number;
+  deploymentServiceFee: number;
+  bankAccountInfo: string;
   nightFeePercent: number;
   fridayFeePercent: number;
   nightStartHour: number;
@@ -30,6 +32,8 @@ export interface IAdminSettings extends Document {
 const AdminSettingsSchema = new Schema<IAdminSettings>({
   commissionRate: { type: Number, default: 15 },
   emergencyFee: { type: Number, default: 5000 },
+  deploymentServiceFee: { type: Number, default: 500 },
+  bankAccountInfo: { type: String, default: '' },
   nightFeePercent: { type: Number, default: 20 },
   fridayFeePercent: { type: Number, default: 15 },
   nightStartHour: { type: Number, default: 22 },

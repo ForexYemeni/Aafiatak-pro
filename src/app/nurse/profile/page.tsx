@@ -32,6 +32,7 @@ import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { GlassCard } from '@/components/common/glass-card';
 import { BadgeStatus } from '@/components/common/badge-status';
+import { VerifiedBadge } from '@/components/common/verified-badge';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
@@ -614,7 +615,10 @@ export default function NurseProfilePage() {
             <input type="file" accept="image/*" className="hidden" ref={avatarInputRef} onChange={handleAvatarChange} />
           </div>
 
-          <h2 className="text-xl font-bold mb-1">{profile.name}</h2>
+          <h2 className="text-xl font-bold mb-1 flex items-center justify-center gap-1.5">
+            {profile.name}
+            {profile.verificationStatus === 'verified' && <VerifiedBadge size="md" showText={false} />}
+          </h2>
           <p className="text-sm text-muted-foreground mb-2">{profile.phone}</p>
 
           <div className="flex items-center gap-2 mb-3">
