@@ -14,13 +14,9 @@ import {
   Shield,
   ShieldCheck,
   MapPin,
-  ArrowLeft,
   Sparkles,
   CheckCircle2,
   Loader2,
-  Activity,
-  Clock,
-  Users,
   AlertTriangle,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
@@ -37,7 +33,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { YEMEN_GOVERNORATES } from '@/lib/constants/governorates';
 import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
@@ -224,7 +219,7 @@ function getDashboardPath(role: UserRole): string {
 }
 
 // ============================================================================
-// Post-Login Loading Screen with 5-Second Countdown (KEEP AS IS)
+// Post-Login Loading Screen (KEEP AS IS)
 // ============================================================================
 
 function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; role: string }; onComplete: () => void }) {
@@ -234,7 +229,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
   const config = roleConfig[user.role] || roleConfig.beneficiary;
   const RoleIcon = config.icon;
 
-  // Confetti colors based on role
   const confettiColors = useMemo(() => {
     if (user.role === 'nurse') return ['#0ea5e9', '#38bdf8', '#7dd3fc', '#bae6fd', '#e0f2fe'];
     if (user.role === 'beneficiary') return ['#a855f7', '#c084fc', '#d8b4fe', '#e9d5ff', '#f3e8ff'];
@@ -252,7 +246,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
       setCountdown(0);
       setProgress(progressPercent);
 
-      // Trigger confetti at 90%
       if (progressPercent > 90 && !showConfetti) {
         setShowConfetti(true);
       }
@@ -275,10 +268,8 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
       className="fixed inset-0 z-50 flex items-center justify-center overflow-hidden"
       dir="rtl"
     >
-      {/* Dynamic gradient background based on role */}
       <div className={cn('absolute inset-0 bg-gradient-to-br', config.bgGradient)} />
 
-      {/* Animated orbs */}
       <motion.div
         className="absolute top-0 right-0 w-[800px] h-[800px] rounded-full"
         style={{ background: `radial-gradient(circle, ${config.ringColor} 0%, transparent 70%)` }}
@@ -292,9 +283,7 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
         transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut' }}
       />
 
-      {/* Floating particles */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        {/* Confetti */}
         {showConfetti && Array.from({ length: 30 }).map((_, i) => (
           <div
             key={`confetti-${i}`}
@@ -311,7 +300,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
             }}
           />
         ))}
-        {/* Floating emojis */}
         {progress > 30 && ['✨', '💚', '🌟', '⭐', '💫'].map((emoji, i) => (
           <motion.div
             key={`emoji-${i}`}
@@ -360,16 +348,13 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
         ))}
       </div>
 
-      {/* Content */}
       <div className="relative z-10 flex flex-col items-center text-center px-6">
-        {/* Heartbeat animation icon */}
         <motion.div
           initial={{ scale: 0 }}
           animate={{ scale: 1 }}
           transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.2 }}
           className="relative mb-8"
         >
-          {/* Pulsing rings */}
           <motion.div
             animate={{
               boxShadow: [
@@ -381,7 +366,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
             transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' }}
             className="w-28 h-28 rounded-full flex items-center justify-center bg-white/15 backdrop-blur-xl border-2 border-white/30"
           >
-            {/* Heartbeat effect */}
             <motion.div
               animate={{ scale: [1, 1.15, 1, 1.15, 1] }}
               transition={{ duration: 1.2, repeat: Infinity, ease: 'easeInOut' }}
@@ -390,7 +374,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
             </motion.div>
           </motion.div>
 
-          {/* Orbiting dot */}
           <motion.div
             className="absolute inset-0"
             animate={{ rotate: 360 }}
@@ -400,7 +383,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
           </motion.div>
         </motion.div>
 
-        {/* Welcome message */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -410,7 +392,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
           <h2 className="text-3xl font-bold text-white mb-2">مرحباً، {user.name}</h2>
         </motion.div>
 
-        {/* Role detection badge */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -425,7 +406,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
           </div>
         </motion.div>
 
-        {/* Dashboard label */}
         <motion.p
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -435,7 +415,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
           جارٍ التحويل إلى {config.dashboardLabel}...
         </motion.p>
 
-        {/* Countdown timer - circular */}
         <motion.div
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
@@ -468,7 +447,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
           </div>
         </motion.div>
 
-        {/* Progress bar */}
         <motion.div
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -483,7 +461,6 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
           </div>
         </motion.div>
 
-        {/* Loading steps */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -537,37 +514,37 @@ function PostLoginLoadingScreen({ user, onComplete }: { user: { name: string; ro
 }
 
 // ============================================================================
-// Password Strength Bar Component (KEEP AS IS)
+// Password Strength Bar Component
 // ============================================================================
 
-function PasswordStrengthBar({ password, variant = 'dark' }: { password: string; variant?: 'dark' | 'light' }) {
+function PasswordStrengthBar({ password }: { password: string }) {
   const strength = getPasswordStrength(password);
   if (!password) return null;
+
+  const colors = ['bg-red-500', 'bg-amber-500', 'bg-yellow-500', 'bg-emerald-500', 'bg-emerald-600'];
+  const textColors = ['text-red-400', 'text-amber-400', 'text-yellow-400', 'text-emerald-400', 'text-emerald-400'];
 
   return (
     <motion.div
       initial={{ opacity: 0, height: 0 }}
       animate={{ opacity: 1, height: 'auto' }}
       exit={{ opacity: 0, height: 0 }}
-      className="space-y-1"
+      className="space-y-1.5 mt-1"
     >
-      <div className="flex gap-1">
+      <div className="flex gap-1.5">
         {Array.from({ length: 5 }).map((_, i) => (
           <div
             key={i}
             className={cn(
-              'h-1 flex-1 rounded-full transition-all duration-300',
-              i < strength.score ? strength.color : variant === 'light' ? 'bg-slate-200' : 'bg-muted-foreground/20'
+              'h-1 flex-1 rounded-full transition-all duration-500',
+              i < strength.score ? colors[strength.score - 1] : 'bg-white/10'
             )}
           />
         ))}
       </div>
       <p className={cn(
-        'text-[10px] font-medium transition-colors duration-300',
-        strength.score <= 1 ? 'text-red-500' :
-        strength.score <= 2 ? 'text-amber-500' :
-        strength.score <= 3 ? 'text-yellow-500' :
-        'text-emerald-500'
+        'text-[11px] font-medium transition-colors duration-300',
+        textColors[strength.score - 1] || 'text-white/30'
       )}>
         قوة كلمة المرور: {strength.label}
       </p>
@@ -576,624 +553,21 @@ function PasswordStrengthBar({ password, variant = 'dark' }: { password: string;
 }
 
 // ============================================================================
-// EKG / Heartbeat SVG Animation
+// Yemen Flag Component
 // ============================================================================
 
-function EkgAnimation() {
+function YemenFlag() {
   return (
-    <div className="absolute inset-x-0 top-1/2 -translate-y-1/2 overflow-hidden pointer-events-none opacity-20">
-      <svg
-        className="w-full ekg-line-draw"
-        viewBox="0 0 1200 120"
-        preserveAspectRatio="none"
-        style={{ height: '80px' }}
-      >
-        <path
-          d="M0,60 L200,60 L220,60 L240,20 L260,100 L280,10 L300,80 L320,60 L400,60 L420,60 L440,25 L460,95 L480,15 L500,75 L520,60 L600,60 L800,60 L820,60 L840,22 L860,98 L880,12 L900,78 L920,60 L1000,60 L1200,60"
-          fill="none"
-          stroke="url(#ekg-gradient)"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        <defs>
-          <linearGradient id="ekg-gradient" x1="0%" y1="0%" x2="100%" y2="0%">
-            <stop offset="0%" stopColor="#14B8A6" stopOpacity="0" />
-            <stop offset="20%" stopColor="#14B8A6" stopOpacity="1" />
-            <stop offset="50%" stopColor="#0D9488" stopOpacity="1" />
-            <stop offset="80%" stopColor="#8B5CF6" stopOpacity="1" />
-            <stop offset="100%" stopColor="#8B5CF6" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-      </svg>
-    </div>
+    <span className="inline-flex flex-col w-5 h-[14px] rounded-[2px] overflow-hidden shrink-0">
+      <span className="bg-[#CE1126] flex-1" />
+      <span className="bg-white flex-1" />
+      <span className="bg-black flex-1" />
+    </span>
   );
 }
 
 // ============================================================================
-// Brand Panel - Left side for desktop split layout
-// ============================================================================
-
-function BrandPanel() {
-  const panelRef = useRef<HTMLDivElement>(null);
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [taglineText, setTaglineText] = useState('');
-  const fullTagline = 'رعاية صحية منزلية بلمسة زر';
-
-  // Typewriter effect
-  useEffect(() => {
-    let index = 0;
-    const timer = setInterval(() => {
-      if (index <= fullTagline.length) {
-        setTaglineText(fullTagline.slice(0, index));
-        index++;
-      } else {
-        clearInterval(timer);
-      }
-    }, 60);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Mouse parallax handler
-  const handleMouseMove = useCallback((e: React.MouseEvent) => {
-    if (!panelRef.current) return;
-    const rect = panelRef.current.getBoundingClientRect();
-    const x = (e.clientX - rect.left) / rect.width - 0.5;
-    const y = (e.clientY - rect.top) / rect.height - 0.5;
-    setMousePos({ x, y });
-  }, []);
-
-  const features = [
-    { icon: Shield, title: 'ممرضون معتمدون', desc: 'فريق طبي مرخص وموثق', delay: 0.6 },
-    { icon: Clock, title: 'خدمة ٢٤ ساعة', desc: 'متاحون على مدار الساعة', delay: 0.75 },
-    { icon: Activity, title: 'دعم طوارئ', desc: 'استجابة سريعة للحالات', delay: 0.9 },
-  ];
-
-  return (
-    <div
-      ref={panelRef}
-      onMouseMove={handleMouseMove}
-      className="relative h-full flex flex-col justify-center items-center p-12 xl:p-16 overflow-hidden noise-overlay"
-    >
-      {/* Dark gradient background */}
-      <div className="absolute inset-0 bg-gradient-to-br from-[#0F172A] via-[#1E1B4B] to-[#0F172A]" />
-
-      {/* Aurora Borealis effect */}
-      <div className="aurora-bg" />
-
-      {/* Animated blobs with parallax */}
-      <div
-        className="absolute mesh-blob-1"
-        style={{
-          width: '500px', height: '500px',
-          top: '-10%', right: '-5%',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(13,148,136,0.3) 0%, rgba(13,148,136,0.08) 40%, transparent 70%)',
-          filter: 'blur(60px)',
-          transform: `translate(${mousePos.x * 30}px, ${mousePos.y * 30}px)`,
-          transition: 'transform 0.3s ease-out',
-        }}
-      />
-      <div
-        className="absolute mesh-blob-2"
-        style={{
-          width: '400px', height: '400px',
-          bottom: '-5%', left: '-5%',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(139,92,246,0.25) 0%, rgba(139,92,246,0.06) 40%, transparent 70%)',
-          filter: 'blur(50px)',
-          transform: `translate(${mousePos.x * -20}px, ${mousePos.y * -20}px)`,
-          transition: 'transform 0.3s ease-out',
-        }}
-      />
-      {/* Third blob for extra depth */}
-      <div
-        className="absolute mesh-blob-3"
-        style={{
-          width: '300px', height: '300px',
-          top: '40%', left: '50%',
-          borderRadius: '50%',
-          background: 'radial-gradient(circle, rgba(59,130,246,0.15) 0%, transparent 70%)',
-          filter: 'blur(45px)',
-          transform: `translate(${mousePos.x * 15}px, ${mousePos.y * 15}px)`,
-          transition: 'transform 0.3s ease-out',
-        }}
-      />
-
-      {/* EKG line */}
-      <EkgAnimation />
-
-      {/* Floating medical icons with parallax */}
-      <motion.div
-        className="absolute top-[10%] left-[10%] text-teal-400/10"
-        style={{ transform: `translate(${mousePos.x * -25}px, ${mousePos.y * -25}px)`, transition: 'transform 0.3s ease-out' }}
-        animate={{ y: [0, -12, 0], rotate: [0, 8, 0] }}
-        transition={{ duration: 5, repeat: Infinity, ease: 'easeInOut' }}
-      >
-        <Stethoscope className="w-20 h-20" />
-      </motion.div>
-      <motion.div
-        className="absolute bottom-[15%] right-[10%] text-violet-400/10"
-        style={{ transform: `translate(${mousePos.x * 20}px, ${mousePos.y * 20}px)`, transition: 'transform 0.3s ease-out' }}
-        animate={{ y: [0, 10, 0], rotate: [0, -6, 0] }}
-        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 1 }}
-      >
-        <Heart className="w-16 h-16" fill="currentColor" />
-      </motion.div>
-      <motion.div
-        className="absolute top-[65%] left-[8%] text-teal-400/8"
-        style={{ transform: `translate(${mousePos.x * -15}px, ${mousePos.y * -15}px)`, transition: 'transform 0.3s ease-out' }}
-        animate={{ y: [0, -8, 0], rotate: [0, 5, 0] }}
-        transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut', delay: 2 }}
-      >
-        <Shield className="w-14 h-14" />
-      </motion.div>
-      <motion.div
-        className="absolute top-[25%] right-[15%] text-blue-400/6"
-        style={{ transform: `translate(${mousePos.x * 18}px, ${mousePos.y * -18}px)`, transition: 'transform 0.3s ease-out' }}
-        animate={{ y: [0, 8, 0], rotate: [0, -4, 0] }}
-        transition={{ duration: 8, repeat: Infinity, ease: 'easeInOut', delay: 1.5 }}
-      >
-        <Activity className="w-12 h-12" />
-      </motion.div>
-      <motion.div
-        className="absolute bottom-[35%] left-[20%] text-purple-400/6"
-        style={{ transform: `translate(${mousePos.x * -12}px, ${mousePos.y * 12}px)`, transition: 'transform 0.3s ease-out' }}
-        animate={{ y: [0, -6, 0], rotate: [0, 3, 0] }}
-        transition={{ duration: 9, repeat: Infinity, ease: 'easeInOut', delay: 0.5 }}
-      >
-        <User className="w-10 h-10" />
-      </motion.div>
-      <motion.div
-        className="absolute top-[45%] right-[5%] text-teal-400/5"
-        style={{ transform: `translate(${mousePos.x * 10}px, ${mousePos.y * -10}px)`, transition: 'transform 0.3s ease-out' }}
-        animate={{ y: [0, 6, 0], rotate: [0, -3, 0] }}
-        transition={{ duration: 6, repeat: Infinity, ease: 'easeInOut', delay: 3 }}
-      >
-        <Clock className="w-11 h-11" />
-      </motion.div>
-
-      {/* Floating particles - Enhanced to 20 */}
-      {Array.from({ length: 20 }).map((_, i) => (
-        <div
-          key={i}
-          className="absolute rounded-full bg-white/8 animate-float-gentle"
-          style={{
-            width: seededRandom(i * 3 + 70) * 3 + 2,
-            height: seededRandom(i * 3 + 71) * 3 + 2,
-            left: `${seededRandom(i * 3 + 72) * 80 + 10}%`,
-            top: `${seededRandom(i * 3 + 73) * 80 + 10}%`,
-            animationDelay: `${seededRandom(i * 5 + 80) * 3}s`,
-            animationDuration: `${seededRandom(i * 5 + 81) * 3 + 4}s`,
-          }}
-        />
-      ))}
-
-      {/* Content */}
-      <div className="relative z-10 text-center max-w-md">
-        {/* Logo with pulse rings */}
-        <motion.div
-          initial={{ scale: 0, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 18, delay: 0.1 }}
-          className="mb-6 relative"
-        >
-          <div className="relative inline-block">
-            <div className="absolute inset-0 blur-xl bg-teal-400/30 rounded-full" />
-            {/* Pulse rings */}
-            <div className="pulse-ring" style={{ inset: '-10px', borderRadius: '16px' }} />
-            <div className="pulse-ring pulse-ring-delay-1" style={{ inset: '-10px', borderRadius: '16px' }} />
-            <div className="pulse-ring pulse-ring-delay-2" style={{ inset: '-10px', borderRadius: '16px' }} />
-            <div className="relative w-20 h-20 rounded-2xl mx-auto flex items-center justify-center bg-gradient-to-br from-teal-500/30 to-violet-600/20 backdrop-blur-xl border border-white/15 shadow-2xl shadow-teal-500/20">
-              <Heart className="w-10 h-10 text-white" fill="currentColor" />
-            </div>
-          </div>
-        </motion.div>
-
-        {/* Brand name */}
-        <motion.h1
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.25, duration: 0.6 }}
-          className="text-5xl font-black text-white mb-3 tracking-tight"
-        >
-          عافيتك
-        </motion.h1>
-
-        {/* Tagline with typewriter effect */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.4, duration: 0.5 }}
-          className="text-lg text-white/70 font-medium mb-2 min-h-[28px]"
-        >
-          <span>{taglineText}</span>
-          <span className="typewriter-cursor" />
-        </motion.div>
-        <motion.p
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="text-sm text-white/40 mb-10"
-        >
-          منصة الرعاية الصحية المنزلية الأولى في اليمن
-        </motion.p>
-
-        {/* Feature cards */}
-        <div className="space-y-3">
-          {features.map((feature) => (
-            <motion.div
-              key={feature.title}
-              initial={{ opacity: 0, x: 30 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: feature.delay, duration: 0.5 }}
-              className="flex items-center gap-4 bg-white/[0.06] backdrop-blur-sm rounded-xl p-3.5 border border-white/[0.08] hover:bg-white/[0.09] transition-colors"
-            >
-              <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-teal-500/20 to-teal-600/10 flex items-center justify-center shrink-0 border border-teal-400/15">
-                <feature.icon className="w-5 h-5 text-teal-400" />
-              </div>
-              <div className="text-right flex-1">
-                <p className="text-sm font-bold text-white/90">{feature.title}</p>
-                <p className="text-[11px] text-white/40">{feature.desc}</p>
-              </div>
-            </motion.div>
-          ))}
-        </div>
-
-        {/* Trust badge */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 1.1, duration: 0.5 }}
-          className="mt-8 flex items-center justify-center gap-2 text-white/25 text-xs"
-        >
-          <Shield className="w-3.5 h-3.5" />
-          <span>بياناتك مشفرة ومحمية بتقنيات متقدمة</span>
-        </motion.div>
-      </div>
-    </div>
-  );
-}
-
-// ============================================================================
-// Premium Input - Enhanced for desktop and mobile
-// ============================================================================
-
-function PremiumInput({
-  id,
-  label,
-  icon: Icon,
-  type = 'text',
-  dir,
-  showToggle,
-  onToggle,
-  toggleIcon,
-  registration,
-  error,
-  className,
-  variant = 'light',
-}: {
-  id: string;
-  label: string;
-  icon: React.ElementType;
-  type?: string;
-  dir?: string;
-  showToggle?: boolean;
-  onToggle?: () => void;
-  toggleIcon?: React.ReactNode;
-  registration: object;
-  error?: string;
-  className?: string;
-  variant?: 'light' | 'dark';
-}) {
-  const isLight = variant === 'light';
-
-  return (
-    <div className="space-y-1.5">
-      <div className="premium-input-group">
-        <div className="relative">
-          <Icon className={cn(
-            'absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] z-10 pointer-events-none transition-colors duration-200',
-            isLight ? 'text-slate-400' : 'text-white/40'
-          )} />
-          <Input
-            id={id}
-            type={type}
-            placeholder=" "
-            dir={dir}
-            className={cn(
-              'peer pr-11 pl-11 text-right rounded-xl premium-input-glow transition-all duration-200',
-              // Default: desktop h-12, mobile h-12 (48px touch target)
-              'h-12 text-[15px]',
-              isLight
-                ? cn(
-                    'bg-white border-slate-200 text-slate-900 placeholder-transparent',
-                    'hover:border-slate-300',
-                    'focus:bg-white focus:border-teal-400 focus:ring-2 focus:ring-teal-400/15',
-                    error && 'border-red-400 focus:border-red-400 focus:ring-red-400/15'
-                  )
-                : cn(
-                    'bg-white/[0.06] border-white/[0.1] text-white placeholder-transparent',
-                    'hover:bg-white/[0.08] hover:border-white/[0.15]',
-                    'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
-                    error && 'border-red-400/50 focus:border-red-400/70'
-                  ),
-              className
-            )}
-            {...registration}
-          />
-          <label
-            htmlFor={id}
-            className={cn(
-              'premium-floating-label',
-              isLight ? 'premium-floating-label-light' : 'premium-floating-label-dark'
-            )}
-          >
-            {label}
-          </label>
-          {showToggle && (
-            <button
-              type="button"
-              onClick={onToggle}
-              className={cn(
-                'absolute left-3.5 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[44px] min-h-[44px] flex items-center justify-center -my-1',
-                isLight ? 'text-slate-400 hover:text-slate-600' : 'text-white/40 hover:text-white/70'
-              )}
-            >
-              {toggleIcon}
-            </button>
-          )}
-          {/* Underline focus effect */}
-          <div className="input-underline-effect" />
-        </div>
-      </div>
-      {error && (
-        <motion.p
-          initial={{ opacity: 0, y: -3 }}
-          animate={{ opacity: 1, y: 0 }}
-          className={cn('text-xs mr-3', isLight ? 'text-red-500' : 'text-red-400')}
-        >
-          {error}
-        </motion.p>
-      )}
-    </div>
-  );
-}
-
-// ============================================================================
-// Premium Button - Gradient CTA with shimmer - Enhanced
-// ============================================================================
-
-function PremiumButton({
-  children,
-  disabled,
-  loading,
-  className,
-  type = 'submit',
-  onClick,
-  variant = 'primary',
-}: {
-  children: React.ReactNode;
-  disabled?: boolean;
-  loading?: boolean;
-  className?: string;
-  type?: 'submit' | 'button';
-  onClick?: () => void;
-  variant?: 'primary' | 'nurse';
-}) {
-  const isNurse = variant === 'nurse';
-  const btnRef = useRef<HTMLButtonElement>(null);
-  const [ripples, setRipples] = useState<Array<{ x: number; y: number; id: number }>>([]);
-
-  const handleClick = useCallback((e: React.MouseEvent<HTMLButtonElement>) => {
-    if (disabled || loading) return;
-    const btn = btnRef.current;
-    if (btn) {
-      const rect = btn.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const id = Date.now();
-      setRipples(prev => [...prev, { x, y, id }]);
-      setTimeout(() => {
-        setRipples(prev => prev.filter(r => r.id !== id));
-      }, 700);
-    }
-    onClick?.();
-  }, [disabled, loading, onClick]);
-
-  return (
-    <motion.div whileHover={{ scale: 1.015 }} whileTap={{ scale: 0.985 }} className="w-full">
-      <button
-        ref={btnRef}
-        type={type}
-        onClick={handleClick}
-        disabled={disabled}
-        className={cn(
-          'premium-shimmer-btn relative w-full h-[52px] rounded-2xl font-bold text-[15px] text-white overflow-hidden',
-          isNurse
-            ? 'bg-gradient-to-l from-sky-600 via-cyan-600 to-teal-600 hover:from-sky-500 hover:via-cyan-500 hover:to-teal-500 shadow-lg shadow-sky-500/20 hover:shadow-xl hover:shadow-sky-500/25'
-            : 'bg-gradient-to-l from-teal-600 via-emerald-600 to-violet-600 hover:from-teal-500 hover:via-emerald-500 hover:to-violet-500 shadow-lg shadow-teal-500/20 hover:shadow-xl hover:shadow-teal-500/25',
-          'disabled:opacity-60 disabled:cursor-not-allowed',
-          'transition-all duration-300',
-          className
-        )}
-      >
-        {/* Ripple effects */}
-        {ripples.map(ripple => (
-          <span
-            key={ripple.id}
-            className="ripple-effect"
-            style={{ left: ripple.x - 10, top: ripple.y - 10, width: 20, height: 20 }}
-          />
-        ))}
-        {loading ? (
-          <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-        ) : (
-          children
-        )}
-      </button>
-    </motion.div>
-  );
-}
-
-// ============================================================================
-// Premium Toggle - Tab switch with sliding indicator - Enhanced
-// ============================================================================
-
-function PremiumToggle({
-  activeTab,
-  onTabChange,
-  variant = 'light',
-}: {
-  activeTab: string;
-  onTabChange: (tab: string) => void;
-  variant?: 'light' | 'dark';
-}) {
-  const isLight = variant === 'light';
-
-  return (
-    <div className={cn(
-      'relative flex rounded-2xl p-1.5 premium-toggle-enhanced',
-      isLight ? 'bg-slate-100 border border-slate-200/80' : 'bg-white/[0.06] border border-white/[0.08]'
-    )}>
-      {/* Sliding indicator */}
-      <motion.div
-        className={cn(
-          'absolute top-1.5 bottom-1.5 rounded-xl',
-          isLight
-            ? 'bg-white shadow-lg shadow-slate-200/50'
-            : 'bg-gradient-to-l from-teal-500/80 to-violet-600/80 shadow-lg shadow-teal-500/20'
-        )}
-        initial={false}
-        animate={{
-          x: activeTab === 'login' ? '0%' : '100%',
-          width: '50%',
-        }}
-        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-        style={{ right: activeTab === 'login' ? '50%' : '0%' }}
-      />
-      <button
-        type="button"
-        onClick={() => onTabChange('login')}
-        className={cn(
-          'relative z-10 flex-1 py-3 text-sm font-bold rounded-xl transition-colors duration-200 min-h-[44px]',
-          isLight
-            ? (activeTab === 'login' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600')
-            : (activeTab === 'login' ? 'text-white' : 'text-white/50 hover:text-white/70')
-        )}
-      >
-        تسجيل دخول
-      </button>
-      <button
-        type="button"
-        onClick={() => onTabChange('register')}
-        className={cn(
-          'relative z-10 flex-1 py-3 text-sm font-bold rounded-xl transition-colors duration-200 min-h-[44px]',
-          isLight
-            ? (activeTab === 'register' ? 'text-slate-900' : 'text-slate-400 hover:text-slate-600')
-            : (activeTab === 'register' ? 'text-white' : 'text-white/50 hover:text-white/70')
-        )}
-      >
-        إنشاء حساب
-      </button>
-    </div>
-  );
-}
-
-// ============================================================================
-// Premium Role Card - Animated selection - Enhanced
-// ============================================================================
-
-function PremiumRoleCard({
-  role,
-  isActive,
-  onClick,
-  icon: Icon,
-  title,
-  subtitle,
-  activeColor,
-  variant = 'light',
-}: {
-  role: string;
-  isActive: boolean;
-  onClick: () => void;
-  icon: React.ElementType;
-  title: string;
-  subtitle: string;
-  activeColor: string;
-  variant?: 'light' | 'dark';
-}) {
-  const isLight = variant === 'light';
-
-  return (
-    <motion.button
-      type="button"
-      whileTap={{ scale: 0.97 }}
-      whileHover={{ scale: 1.02 }}
-      onClick={onClick}
-      className={cn(
-        'relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border min-h-[100px] role-card-enhanced',
-        isLight
-          ? (isActive
-            ? 'border-teal-300 bg-teal-50/80 shadow-lg shadow-teal-100/50'
-            : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50')
-          : (isActive
-            ? 'border-white/25 bg-white/[0.12] shadow-lg'
-            : 'border-white/[0.08] bg-white/[0.04] hover:bg-white/[0.07] hover:border-white/15')
-      )}
-    >
-      {isActive && (
-        <motion.div
-          layoutId="role-glow-premium"
-          className={cn('absolute inset-0 opacity-10', activeColor)}
-          transition={{ type: 'spring', stiffness: 200, damping: 25 }}
-        />
-      )}
-      <div className="relative z-10">
-        <div className={cn(
-          'w-12 h-12 rounded-xl mx-auto mb-2.5 flex items-center justify-center transition-all duration-300',
-          isActive
-            ? cn('bg-gradient-to-br shadow-lg', activeColor, 'text-white')
-            : isLight
-              ? 'bg-slate-100 text-slate-400'
-              : 'bg-white/[0.08] text-white/40'
-        )}>
-          <Icon className="w-5 h-5" />
-        </div>
-        <span className={cn(
-          'text-sm font-bold transition-colors duration-300',
-          isLight
-            ? (isActive ? 'text-slate-900' : 'text-slate-500')
-            : (isActive ? 'text-white' : 'text-white/50')
-        )}>
-          {title}
-        </span>
-        <p className={cn(
-          'text-[11px] mt-0.5',
-          isLight ? 'text-slate-400' : 'text-white/30'
-        )}>{subtitle}</p>
-      </div>
-    </motion.button>
-  );
-}
-
-// ============================================================================
-// Form Section Divider - Enhanced
-// ============================================================================
-
-function FormSectionHeader({ icon: Icon, title, color, variant = 'light' }: { icon: React.ElementType; title: string; color: string; variant?: 'light' | 'dark' }) {
-  return (
-    <div className="flex items-center gap-2 mb-2">
-      <div className={cn('w-6 h-6 rounded-lg flex items-center justify-center', variant === 'light' ? 'bg-slate-100/80' : 'bg-white/[0.06]')}>
-        <Icon className={cn('w-3.5 h-3.5', color)} />
-      </div>
-      <span className={cn('text-xs font-semibold', color)}>{title}</span>
-    </div>
-  );
-}
-
-// ============================================================================
-// Main Login Page Component - EXTREMELY PROFESSIONAL REDESIGN
+// Main Login Page Component - Elegant Minimalism Redesign
 // ============================================================================
 
 function LoginPageContent() {
@@ -1218,64 +592,41 @@ function LoginPageContent() {
   const [nurseNameShake, setNurseNameShake] = useState(false);
   const [nurseNameWarning, setNurseNameWarning] = useState(false);
 
-  // Track whether this is a fresh login (clicked login button)
-  // vs returning to the app with an existing session
   const [isFreshLogin, setIsFreshLogin] = useState(false);
-
-  // Track if we've already attempted a redirect to prevent infinite loops
-  // Uses a ref so it survives re-renders without triggering the effect again
   const hasRedirectedRef = useRef(false);
-
-  // Consumed-once guard: prevents auto-redirect when landing after logout,
-  // but does NOT block subsequent manual login attempts.
-  // We use a ref instead of deriving from URL searchParams because
-  // window.history.replaceState does NOT update Next.js internal router state,
-  // so searchParams.get('logout') stays 'true' even after URL cleanup,
-  // which permanently blocks navigation after re-login.
   const logoutGuardConsumedRef = useRef(false);
 
-  // On mount: detect if we arrived after a logout, set the guard,
-  // and clean the URL using router.replace (which DOES update Next.js state).
+  // On mount: detect if we arrived after a logout
   useEffect(() => {
     const isAfterLogout = searchParams.get('logout') === 'true';
     if (isAfterLogout) {
       logoutGuardConsumedRef.current = true;
-      // Clean URL using Next.js router so useSearchParams updates properly
       router.replace('/', { scroll: false });
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Mount only
+  }, []);
 
   // Handle post-login redirect with loading screen
   useEffect(() => {
     if (!_hasHydrated) return;
-    if (hasRedirectedRef.current) return; // Prevent redirect loop
+    if (hasRedirectedRef.current) return;
 
-    // If we just arrived after a logout, consume the guard ONCE and stay on login page.
-    // The guard only blocks the initial auto-redirect — it does NOT block
-    // a subsequent manual login, because the ref is consumed (set to false) here.
     if (logoutGuardConsumedRef.current) {
       logoutGuardConsumedRef.current = false;
       return;
     }
 
-    // If user is already authenticated (returning to app with saved session)
-    // Validate the token with the server BEFORE redirecting.
-    // This is the ONLY place where token validation + redirect happens.
     if (isAuthenticated && user && !isFreshLogin) {
       const token = useAuthStore.getState().token;
       if (token) {
-        hasRedirectedRef.current = true; // Prevent re-triggering
+        hasRedirectedRef.current = true;
         fetch('/api/auth/me', {
           headers: { 'Authorization': `Bearer ${token}` },
         })
           .then(res => {
             if (res.ok) {
-              // Token is valid — use hard navigation for reliability
               const destination = redirectPath ?? getDashboardPath(user.role);
               window.location.href = destination;
             } else {
-              // Token is invalid, clear auth state and stay on login page
               useAuthStore.setState({
                 user: null,
                 token: null,
@@ -1287,12 +638,10 @@ function LoginPageContent() {
             }
           })
           .catch(() => {
-            // Network error — assume offline, allow redirect via hard navigation
             const destination = redirectPath ?? getDashboardPath(user.role);
             window.location.href = destination;
           });
       } else {
-        // No token in store but isAuthenticated is true — corrupted state, clear it
         useAuthStore.setState({
           user: null,
           token: null,
@@ -1304,7 +653,6 @@ function LoginPageContent() {
       return;
     }
 
-    // If this is a fresh login, show the animated loading screen
     if (isAuthenticated && user && isFreshLogin && !showLoadingScreen) {
       setShowLoadingScreen(true);
     }
@@ -1313,10 +661,6 @@ function LoginPageContent() {
   const handleLoadingComplete = useCallback(() => {
     if (user) {
       const destination = redirectPath ?? getDashboardPath(user.role);
-      // Use window.location.href for RELIABLE hard navigation.
-      // router.replace() client-side navigation can be flaky on Vercel
-      // (hydration issues, state not syncing, page not rendering properly).
-      // Since middleware no longer does page-level redirects, hard navigation is safe.
       window.location.href = destination;
     }
   }, [user, redirectPath]);
@@ -1332,11 +676,11 @@ function LoginPageContent() {
 
   const onLoginSubmit = async (data: LoginFormValues) => {
     clearError();
-    setIsFreshLogin(true); // Mark as fresh login to show loading screen
+    setIsFreshLogin(true);
     try {
       await login(data.phone, data.password);
     } catch {
-      setIsFreshLogin(false); // Reset on failure
+      setIsFreshLogin(false);
     }
   };
 
@@ -1355,7 +699,6 @@ function LoginPageContent() {
   const onNurseRegister = async (data: NurseRegisterFormValues) => {
     clearError();
 
-    // Validate four-part name (الاسم الرباعي)
     const nameWords = data.name.trim().split(/\s+/).filter(Boolean);
     if (nameWords.length < 4) {
       setNurseNameShake(true);
@@ -1379,7 +722,7 @@ function LoginPageContent() {
         address: data.address,
         governorate: data.governorate as never,
       });
-      setIsFreshLogin(true); // Show loading screen after registration
+      setIsFreshLogin(true);
     } catch {
       // Error handled in store
     }
@@ -1408,63 +751,25 @@ function LoginPageContent() {
         governorate: data.governorate as never,
         referralCode: data.referralCode || undefined,
       });
-      setIsFreshLogin(true); // Show loading screen after registration
+      setIsFreshLogin(true);
     } catch {
       // Error handled in store
     }
   };
 
   // ============================================================================
-  // Password watchers for strength indicator
+  // Password watchers
   // ============================================================================
   const loginPasswordValue = loginForm.watch('password');
   const nursePasswordValue = nurseForm.watch('password');
   const beneficiaryPasswordValue = beneficiaryForm.watch('password');
 
   // ============================================================================
-  // Error display component
-  // ============================================================================
-  const ErrorDisplay = ({ variant = 'light' }: { variant?: 'light' | 'dark' }) => (
-    <AnimatePresence mode="wait">
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
-          className={cn(
-            'mb-4 text-sm rounded-xl p-3 flex items-center gap-2 border',
-            variant === 'light'
-              ? 'bg-red-50 text-red-700 border-red-200'
-              : 'bg-red-500/10 text-red-300 border-red-500/20'
-          )}
-        >
-          <Shield className="w-4 h-4 shrink-0" />
-          {error}
-        </motion.div>
-      )}
-    </AnimatePresence>
-  );
-
-  // ============================================================================
-  // Shared phone prefix component
-  // ============================================================================
-  const PhonePrefix = ({ variant }: { variant: 'light' | 'dark' }) => (
-    <div className={cn('phone-prefix', variant === 'light' ? 'phone-prefix-light' : 'phone-prefix-dark')}>
-      <span className="yemen-flag">
-        <span className="yemen-flag-top" />
-        <span className="yemen-flag-mid" />
-        <span className="yemen-flag-bot" />
-      </span>
-      <span>+967</span>
-    </div>
-  );
-
-  // ============================================================================
   // Render
   // ============================================================================
 
   return (
-    <div className="min-h-screen flex flex-col relative overflow-hidden" dir="rtl" lang="ar">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" dir="rtl" lang="ar">
       {/* Post-login loading screen */}
       <AnimatePresence>
         {showLoadingScreen && user && (
@@ -1475,948 +780,822 @@ function LoginPageContent() {
         )}
       </AnimatePresence>
 
-      {/* ============ DESKTOP: Split-screen layout ============ */}
-      <div className="hidden lg:flex lg:h-screen">
-        {/* LEFT PANEL - Brand (55%) */}
-        <div className="w-[55%] relative">
-          <BrandPanel />
-        </div>
+      {/* Background */}
+      <div className="fixed inset-0 bg-gradient-to-br from-[#0a0f1e] via-[#0d1525] to-[#0a1628]" />
 
-        {/* RIGHT PANEL - Form (45%) */}
-        <div className="w-[45%] relative flex items-center justify-center overflow-y-auto">
-          {/* Subtle gradient background with dot pattern */}
-          <div className="absolute inset-0 bg-gradient-to-br from-[#FAFBFC] via-[#f0fdf9]/30 to-[#faf5ff]/20 dot-pattern" />
-          
-          <div className="w-full max-w-[460px] mx-auto px-10 py-12 relative z-10">
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}
-              className="animated-gradient-border"
-            >
-              <div className="inner login-form-container-v2 p-8">
-              {/* Brand header inside form */}
-              <motion.div
-                initial={{ opacity: 0, scale: 0.9 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1, duration: 0.4 }}
-                className="login-brand-header"
-              >
-                <div className="login-brand-icon mx-auto">
-                  <Heart className="w-5 h-5 text-teal-600" fill="currentColor" />
-                </div>
-                <h2 className="text-2xl font-black text-slate-900 mb-1">
-                  {activeTab === 'login' ? 'مرحباً بعودتك' : 'حساب جديد'}
-                </h2>
-                <p className="text-sm text-slate-400">
-                  {activeTab === 'login' ? 'سجّل دخولك للمتابعة إلى عافيتك' : 'أنشئ حسابك وابدأ رحلتك الصحية'}
-                </p>
-              </motion.div>
-
-              {/* Elegant divider */}
-              <div className="login-divider login-divider-light mb-6">
-                <span className="text-[10px] font-semibold text-slate-300 uppercase tracking-wider px-2">
-                  {activeTab === 'login' ? 'تسجيل الدخول' : 'إنشاء حساب'}
-                </span>
-              </div>
-
-              {/* Toggle */}
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.3 }}
-                className="mb-6"
-              >
-                <PremiumToggle
-                  activeTab={activeTab}
-                  onTabChange={(tab) => { setActiveTab(tab); clearError(); }}
-                  variant="light"
-                />
-              </motion.div>
-
-              <ErrorDisplay variant="light" />
-
-              {/* ====== Login Form ====== */}
-              <AnimatePresence mode="wait">
-                {activeTab === 'login' && (
-                  <motion.form
-                    key="login-form"
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: 20 }}
-                    transition={{ duration: 0.3 }}
-                    onSubmit={loginForm.handleSubmit(onLoginSubmit)}
-                    className="space-y-4"
-                  >
-                    {/* Phone input with +967 prefix */}
-                    <div className="phone-input-wrapper">
-                      <PhonePrefix variant="light" />
-                      <PremiumInput
-                        id="login-phone"
-                        label="رقم الهاتف"
-                        icon={Phone}
-                        type="tel"
-                        dir="ltr"
-                        variant="light"
-                        registration={loginForm.register('phone')}
-                        error={loginForm.formState.errors.phone?.message}
-                        className="!pl-[100px]"
-                      />
-                    </div>
-
-                    <PremiumInput
-                      id="login-password"
-                      label="كلمة المرور"
-                      icon={Lock}
-                      type={showPassword ? 'text' : 'password'}
-                      dir="ltr"
-                      variant="light"
-                      showToggle
-                      onToggle={() => setShowPassword(!showPassword)}
-                      toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                      registration={loginForm.register('password')}
-                      error={loginForm.formState.errors.password?.message}
-                    />
-
-                    <PasswordStrengthBar password={loginPasswordValue} variant="light" />
-
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <input
-                          type="checkbox"
-                          id="remember"
-                          className="premium-checkbox-light"
-                        />
-                        <Label htmlFor="remember" className="text-xs font-normal cursor-pointer text-slate-500">تذكرني</Label>
-                      </div>
-                      <button type="button" className="text-xs text-teal-600/80 hover:text-teal-600 transition-colors font-medium">
-                        نسيت كلمة المرور؟
-                      </button>
-                    </div>
-
-                    <div className="pt-1">
-                      <PremiumButton loading={isLoading} disabled={isLoading} className="premium-btn-elevated">
-                        <span className="flex items-center gap-2 justify-center">
-                          تسجيل الدخول
-                          <ArrowLeft className="w-4 h-4" />
-                        </span>
-                      </PremiumButton>
-                    </div>
-                  </motion.form>
-                )}
-              </AnimatePresence>
-
-              {/* ====== Register Forms ====== */}
-              <AnimatePresence mode="wait">
-                {activeTab === 'register' && (
-                  <motion.div
-                    key="register-container"
-                    initial={{ opacity: 0, x: 20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    transition={{ duration: 0.3 }}
-                    className="space-y-4"
-                  >
-                    {/* Step indicator */}
-                    <div className="reg-step-indicator px-2">
-                      <div className="reg-step-dot reg-step-dot-active-light" />
-                      <div className="reg-step-line reg-step-line-active-light" />
-                      <div className="reg-step-dot reg-step-dot-active-light" />
-                      <div className="reg-step-line reg-step-line-inactive-light" />
-                      <div className="reg-step-dot reg-step-dot-inactive-light" />
-                    </div>
-                    <div className="flex justify-between px-1 -mt-1 mb-2">
-                      <span className="text-[9px] font-semibold text-teal-600">نوع الحساب</span>
-                      <span className="text-[9px] font-semibold text-teal-600">البيانات</span>
-                      <span className="text-[9px] font-medium text-slate-300">تأكيد</span>
-                    </div>
-
-                    {/* Role selector */}
-                    <div className="grid grid-cols-2 gap-3">
-                      <PremiumRoleCard
-                        role="beneficiary"
-                        isActive={registerRole === 'beneficiary'}
-                        onClick={() => { setRegisterRole('beneficiary'); clearError(); }}
-                        icon={User}
-                        title="مستفيد"
-                        subtitle="رعاية منزلية"
-                        activeColor="from-teal-500 to-emerald-600"
-                        variant="light"
-                      />
-                      <PremiumRoleCard
-                        role="nurse"
-                        isActive={registerRole === 'nurse'}
-                        onClick={() => { setRegisterRole('nurse'); clearError(); }}
-                        icon={Stethoscope}
-                        title="ممرض/ـة"
-                        subtitle="ممرض معتمد"
-                        activeColor="from-sky-500 to-sky-700"
-                        variant="light"
-                      />
-                    </div>
-
-                    <AnimatePresence mode="wait">
-                      {/* Beneficiary Registration Form */}
-                      {registerRole === 'beneficiary' && (
-                        <motion.form
-                          key="beneficiary-form"
-                          initial={{ opacity: 0, x: -15 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: 15 }}
-                          transition={{ duration: 0.25 }}
-                          onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)}
-                          className="space-y-3"
-                        >
-                          {/* Personal info */}
-                          <div className="form-section-card-light space-y-3">
-                            <FormSectionHeader icon={User} title="المعلومات الشخصية" color="text-teal-600" variant="light" />
-                            <PremiumInput
-                              id="ben-name"
-                              label="الاسم الكامل"
-                              icon={User}
-                              variant="light"
-                              registration={beneficiaryForm.register('name')}
-                              error={beneficiaryForm.formState.errors.name?.message}
-                            />
-                            {/* Phone input with +967 prefix */}
-                            <div className="phone-input-wrapper">
-                              <PhonePrefix variant="light" />
-                              <PremiumInput
-                                id="ben-phone"
-                                label="رقم الهاتف"
-                                icon={Phone}
-                                type="tel"
-                                dir="ltr"
-                                variant="light"
-                                registration={beneficiaryForm.register('phone')}
-                                error={beneficiaryForm.formState.errors.phone?.message}
-                                className="!pl-[100px]"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Location info */}
-                          <div className="form-section-card-light space-y-3">
-                            <FormSectionHeader icon={MapPin} title="معلومات الموقع" color="text-teal-600" variant="light" />
-                            <GpsLocationButton
-                              onLocationDetected={(loc) => {
-                                if (loc.governorate && loc.governorateValue) {
-                                  beneficiaryForm.setValue('governorate', loc.governorateValue);
-                                }
-                                if (loc.address || loc.district) {
-                                  beneficiaryForm.setValue('address', loc.district || loc.address);
-                                }
-                              }}
-                              size="sm"
-                              className="w-full"
-                            />
-                            <PremiumInput
-                              id="ben-address"
-                              label="العنوان"
-                              icon={MapPin}
-                              variant="light"
-                              registration={beneficiaryForm.register('address')}
-                              error={beneficiaryForm.formState.errors.address?.message}
-                            />
-                            <PremiumInput
-                              id="ben-referral"
-                              label="كود الإحالة (اختياري)"
-                              icon={Sparkles}
-                              dir="ltr"
-                              variant="light"
-                              registration={beneficiaryForm.register('referralCode')}
-                            />
-                          </div>
-
-                          {/* Security */}
-                          <div className="form-section-card-light space-y-3">
-                            <FormSectionHeader icon={Lock} title="الأمان" color="text-amber-600" variant="light" />
-                            <PremiumInput
-                              id="ben-password"
-                              label="كلمة المرور"
-                              icon={Lock}
-                              type={showPassword ? 'text' : 'password'}
-                              dir="ltr"
-                              variant="light"
-                              showToggle
-                              onToggle={() => setShowPassword(!showPassword)}
-                              toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              registration={beneficiaryForm.register('password')}
-                              error={beneficiaryForm.formState.errors.password?.message}
-                            />
-                            <PasswordStrengthBar password={beneficiaryPasswordValue} variant="light" />
-                          </div>
-
-                          <div className="pt-1">
-                            <PremiumButton loading={isLoading} disabled={isLoading} className="premium-btn-elevated">
-                              <span className="flex items-center gap-2 justify-center">
-                                <CheckCircle2 className="w-4 h-4" />
-                                إنشاء حساب مستفيد
-                              </span>
-                            </PremiumButton>
-                          </div>
-                        </motion.form>
-                      )}
-
-                      {/* Nurse Registration Form */}
-                      {registerRole === 'nurse' && (
-                        <motion.form
-                          key="nurse-form"
-                          initial={{ opacity: 0, x: 15 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          exit={{ opacity: 0, x: -15 }}
-                          transition={{ duration: 0.25 }}
-                          onSubmit={nurseForm.handleSubmit(onNurseRegister)}
-                          className="space-y-3 max-h-[55vh] overflow-y-auto custom-scrollbar pl-1"
-                        >
-                          {/* Personal info */}
-                          <div className="form-section-card-light space-y-3">
-                            <FormSectionHeader icon={User} title="المعلومات الشخصية" color="text-sky-600" variant="light" />
-                            <motion.div
-                              className="relative"
-                              animate={nurseNameShake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
-                              transition={{ duration: 0.5, ease: 'easeInOut' }}
-                            >
-                              <PremiumInput
-                                id="nurse-name"
-                                label="الاسم الرباعي"
-                                icon={User}
-                                variant="light"
-                                registration={nurseForm.register('name')}
-                                error={nurseNameShake ? undefined : nurseForm.formState.errors.name?.message}
-                                className={nurseNameShake ? '!border-red-400' : ''}
-                              />
-                            </motion.div>
-                            {nurseNameWarning && (
-                              <motion.div
-                                initial={{ opacity: 0, y: -5 }}
-                                animate={{ opacity: 1, y: 0 }}
-                                className="flex items-center gap-1.5"
-                              >
-                                <AlertTriangle className="w-3.5 h-3.5 text-red-500 shrink-0" />
-                                <p className="text-xs text-red-500 font-medium">يجب أن تكتب اسمك الرباعي (أربعة أجزاء)</p>
-                              </motion.div>
-                            )}
-                            {nurseForm.formState.errors.name && !nurseNameWarning && (
-                              <p className="text-xs text-red-500">{nurseForm.formState.errors.name.message}</p>
-                            )}
-                            {/* Phone input with +967 prefix */}
-                            <div className="phone-input-wrapper">
-                              <PhonePrefix variant="light" />
-                              <PremiumInput
-                                id="nurse-phone"
-                                label="رقم الهاتف"
-                                icon={Phone}
-                                type="tel"
-                                dir="ltr"
-                                variant="light"
-                                registration={nurseForm.register('phone')}
-                                error={nurseForm.formState.errors.phone?.message}
-                                className="!pl-[100px]"
-                              />
-                            </div>
-                          </div>
-
-                          {/* Professional info */}
-                          <div className="form-section-card-light space-y-3">
-                            <FormSectionHeader icon={Stethoscope} title="المعلومات المهنية" color="text-violet-600" variant="light" />
-                            <div className="space-y-1.5">
-                              <Label className="text-xs text-slate-500">التخصص</Label>
-                              <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}>
-                                <SelectTrigger className="h-12 rounded-xl bg-white border-slate-200 text-slate-800 hover:border-slate-300 focus:border-teal-400 focus:ring-2 focus:ring-teal-400/15">
-                                  <SelectValue placeholder="اختر التخصص" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  {specializations.map((spec) => (
-                                    <SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>
-                                  ))}
-                                </SelectContent>
-                              </Select>
-                              {nurseForm.formState.errors.specialization && (
-                                <p className="text-xs text-red-500">{nurseForm.formState.errors.specialization.message}</p>
-                              )}
-                            </div>
-                            <PremiumInput
-                              id="nurse-license"
-                              label="رقم الترخيص"
-                              icon={Shield}
-                              variant="light"
-                              registration={nurseForm.register('licenseNumber')}
-                              error={nurseForm.formState.errors.licenseNumber?.message}
-                            />
-                          </div>
-
-                          {/* Location info */}
-                          <div className="form-section-card-light space-y-3">
-                            <FormSectionHeader icon={MapPin} title="معلومات الموقع" color="text-teal-600" variant="light" />
-                            <GpsLocationButton
-                              onLocationDetected={(loc) => {
-                                if (loc.governorate && loc.governorateValue) {
-                                  nurseForm.setValue('governorate', loc.governorateValue);
-                                }
-                                if (loc.address || loc.district) {
-                                  nurseForm.setValue('address', loc.district || loc.address);
-                                }
-                              }}
-                              size="sm"
-                              className="w-full"
-                            />
-                            <PremiumInput
-                              id="nurse-address"
-                              label="العنوان التفصيلي"
-                              icon={MapPin}
-                              variant="light"
-                              registration={nurseForm.register('address')}
-                              error={nurseForm.formState.errors.address?.message}
-                            />
-                          </div>
-
-                          {/* Security */}
-                          <div className="form-section-card-light space-y-3">
-                            <FormSectionHeader icon={Lock} title="الأمان" color="text-amber-600" variant="light" />
-                            <PremiumInput
-                              id="nurse-password"
-                              label="كلمة المرور"
-                              icon={Lock}
-                              type={showPassword ? 'text' : 'password'}
-                              dir="ltr"
-                              variant="light"
-                              showToggle
-                              onToggle={() => setShowPassword(!showPassword)}
-                              toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                              registration={nurseForm.register('password')}
-                              error={nurseForm.formState.errors.password?.message}
-                            />
-                            <PasswordStrengthBar password={nursePasswordValue} variant="light" />
-                          </div>
-
-                          <PremiumButton loading={isLoading} disabled={isLoading} variant="nurse">
-                            <span className="flex items-center gap-2 justify-center">
-                              <CheckCircle2 className="w-4 h-4" />
-                              إنشاء حساب ممرض/ـة
-                            </span>
-                          </PremiumButton>
-                        </motion.form>
-                      )}
-                    </AnimatePresence>
-                  </motion.div>
-                )}
-              </AnimatePresence>
-              </div>
-            </motion.div>
-          </div>
-        </div>
+      {/* Animated mesh gradient orbs */}
+      <div className="fixed inset-0 pointer-events-none overflow-hidden">
+        <div
+          className="absolute w-[600px] h-[600px] rounded-full login-mesh-orb-1"
+          style={{
+            top: '-15%',
+            right: '-10%',
+            background: 'radial-gradient(circle, rgba(20,184,166,0.15) 0%, rgba(20,184,166,0.03) 40%, transparent 70%)',
+            filter: 'blur(80px)',
+          }}
+        />
+        <div
+          className="absolute w-[500px] h-[500px] rounded-full login-mesh-orb-2"
+          style={{
+            bottom: '-10%',
+            left: '-8%',
+            background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.02) 40%, transparent 70%)',
+            filter: 'blur(70px)',
+          }}
+        />
+        <div
+          className="absolute w-[400px] h-[400px] rounded-full login-mesh-orb-3"
+          style={{
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)',
+            filter: 'blur(60px)',
+          }}
+        />
       </div>
 
-      {/* ============ MOBILE: Professional full-screen dark layout ============ */}
-      <div className="lg:hidden flex flex-col min-h-dvh">
-        {/* Dark gradient background - fixed */}
-        <div className="fixed inset-0 bg-gradient-to-br from-[#0B1120] via-[#0F172A] to-[#1a1035] -z-10" />
+      {/* Subtle noise overlay */}
+      <div className="fixed inset-0 pointer-events-none opacity-[0.015]" style={{
+        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
+      }} />
 
-        {/* Aurora Borealis on mobile */}
-        <div className="aurora-bg-mobile" />
-
-        {/* Subtle mesh gradient overlay + more particles */}
-        <div className="fixed inset-0 -z-5 overflow-hidden pointer-events-none">
-          <div
-            className="absolute mesh-blob-1"
-            style={{
-              width: '350px', height: '350px',
-              top: '-15%', right: '-10%',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(13,148,136,0.2) 0%, rgba(13,148,136,0.05) 40%, transparent 70%)',
-              filter: 'blur(50px)',
-            }}
-          />
-          <div
-            className="absolute mesh-blob-2"
-            style={{
-              width: '280px', height: '280px',
-              bottom: '-5%', left: '-8%',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(139,92,246,0.15) 0%, transparent 70%)',
-              filter: 'blur(45px)',
-            }}
-          />
-          {/* Extra blob for mobile */}
-          <div
-            className="absolute mesh-blob-3"
-            style={{
-              width: '200px', height: '200px',
-              top: '50%', left: '50%',
-              borderRadius: '50%',
-              background: 'radial-gradient(circle, rgba(59,130,246,0.1) 0%, transparent 70%)',
-              filter: 'blur(40px)',
-            }}
-          />
-          {/* Mobile floating particles */}
-          {Array.from({ length: 15 }).map((_, i) => (
-            <div
-              key={i}
-              className="absolute rounded-full bg-white/6 animate-float-gentle"
-              style={{
-                width: seededRandom(i * 3 + 120) * 4 + 1,
-                height: seededRandom(i * 3 + 121) * 4 + 1,
-                left: `${seededRandom(i * 3 + 122) * 90 + 5}%`,
-                top: `${seededRandom(i * 3 + 123) * 90 + 5}%`,
-                animationDelay: `${seededRandom(i * 5 + 130) * 4}s`,
-                animationDuration: `${seededRandom(i * 5 + 131) * 4 + 5}s`,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Mobile header with brand */}
-        <motion.header
-          initial={{ opacity: 0, y: -15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.1, duration: 0.5 }}
-          className="mobile-header-gradient pt-12 pb-5 px-6 text-center safe-top"
-        >
-          {/* Logo with glow */}
+      {/* Main Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 w-full max-w-[480px] mx-4 sm:mx-auto login-glass-card rounded-3xl"
+      >
+        <div className="p-6 sm:p-8 lg:p-10 safe-bottom">
+          {/* Logo Section */}
           <motion.div
-            initial={{ scale: 0, rotate: -90 }}
-            animate={{ scale: 1, rotate: 0 }}
-            transition={{ type: 'spring', stiffness: 200, damping: 15, delay: 0.1 }}
-            className="relative inline-block mb-3"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            transition={{ delay: 0.1, duration: 0.5 }}
+            className="text-center mb-8"
           >
-            <div className="absolute inset-0 blur-xl bg-teal-400/25 rounded-2xl" />
-            <div className="relative w-16 h-16 rounded-2xl mx-auto flex items-center justify-center bg-gradient-to-br from-teal-500/25 to-violet-600/15 backdrop-blur-xl border border-white/15 shadow-lg shadow-teal-500/10">
+            <motion.div
+              animate={{ scale: [1, 1.05, 1] }}
+              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+              className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-gradient-to-br from-teal-500 to-emerald-500 shadow-lg shadow-teal-500/25"
+            >
               <Heart className="w-8 h-8 text-white" fill="currentColor" />
-            </div>
+            </motion.div>
+            <h1 className="text-3xl font-black text-white mb-1">عافيتك</h1>
+            <p className="text-sm text-white/40">رعاية صحية منزلية بلمسة زر</p>
           </motion.div>
 
-          <motion.h1
+          {/* Tab Switcher */}
+          <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2 }}
-            className="text-3xl font-black text-white tracking-tight"
+            className="relative flex bg-white/[0.04] rounded-xl p-1 mb-6 border border-white/[0.06]"
           >
-            عافيتك
-          </motion.h1>
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.3 }}
-            className="text-[13px] text-white/50 mt-1.5 font-medium"
-          >
-            رعاية صحية منزلية بلمسة زر
-          </motion.p>
-        </motion.header>
+            <motion.div
+              className="absolute top-1 bottom-1 rounded-lg bg-gradient-to-l from-teal-500/80 to-emerald-500/80"
+              initial={false}
+              animate={{
+                x: activeTab === 'login' ? '0%' : '100%',
+                width: '50%',
+              }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              style={{ right: activeTab === 'login' ? '50%' : '0%' }}
+            />
+            <button
+              type="button"
+              onClick={() => { setActiveTab('login'); clearError(); }}
+              className={cn(
+                'relative z-10 flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors duration-200 min-h-[44px]',
+                activeTab === 'login' ? 'text-white' : 'text-white/40 hover:text-white/60'
+              )}
+            >
+              تسجيل دخول
+            </button>
+            <button
+              type="button"
+              onClick={() => { setActiveTab('register'); clearError(); }}
+              className={cn(
+                'relative z-10 flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors duration-200 min-h-[44px]',
+                activeTab === 'register' ? 'text-white' : 'text-white/40 hover:text-white/60'
+              )}
+            >
+              إنشاء حساب
+            </button>
+          </motion.div>
 
-        {/* Form card - Scrollable content */}
-        <div className="flex-1 px-4 sm:px-5 pb-6 mobile-safe-area">
-          <motion.div
-            initial={{ opacity: 0, y: 25 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3, duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
-          >
-            <div className="relative animated-gradient-border-mobile">
-              <div className="inner glass-ultra-v2">
-              <div className="relative z-10 p-5 sm:p-6">
-                {/* Toggle */}
-                <div className="mb-5">
-                  <PremiumToggle
-                    activeTab={activeTab}
-                    onTabChange={(tab) => { setActiveTab(tab); clearError(); }}
-                    variant="dark"
-                  />
+          {/* Error Display */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, height: 0, marginBottom: 0 }}
+                animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+                exit={{ opacity: 0, height: 0, marginBottom: 0 }}
+                className="overflow-hidden"
+              >
+                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center gap-2 text-sm text-red-300">
+                  <AlertTriangle className="w-4 h-4 shrink-0" />
+                  <span>{error}</span>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+
+          {/* ====== Login Form ====== */}
+          <AnimatePresence mode="wait">
+            {activeTab === 'login' && (
+              <motion.form
+                key="login-form"
+                initial={{ opacity: 0, x: -15 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 15 }}
+                transition={{ duration: 0.25 }}
+                onSubmit={loginForm.handleSubmit(onLoginSubmit)}
+                className="space-y-4"
+              >
+                {/* Phone input with +967 prefix */}
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] z-10 pointer-events-none text-white/30" />
+                    <Input
+                      id="login-phone"
+                      type="tel"
+                      placeholder="رقم الهاتف"
+                      dir="ltr"
+                      className={cn(
+                        'peer h-12 pr-11 pl-[105px] text-right rounded-xl text-[15px]',
+                        'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/25',
+                        'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                        'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
+                        loginForm.formState.errors.phone && 'border-red-400/50 focus:border-red-400/70',
+                        'transition-all duration-200'
+                      )}
+                      {...loginForm.register('phone')}
+                    />
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.08] pointer-events-none">
+                      <YemenFlag />
+                      <span className="text-white/50 text-[13px] font-semibold tracking-wide">+967</span>
+                    </div>
+                  </div>
+                  {loginForm.formState.errors.phone && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-xs text-red-400 mr-1"
+                    >
+                      {loginForm.formState.errors.phone.message}
+                    </motion.p>
+                  )}
                 </div>
 
-                <ErrorDisplay variant="dark" />
-
-                {/* Mobile Login Form */}
-                <AnimatePresence mode="wait">
-                  {activeTab === 'login' && (
-                    <motion.form
-                      key="m-login-form"
-                      initial={{ opacity: 0, x: -15 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 15 }}
-                      transition={{ duration: 0.25 }}
-                      onSubmit={loginForm.handleSubmit(onLoginSubmit)}
-                      className="space-y-4"
+                {/* Password input */}
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] z-10 pointer-events-none text-white/30" />
+                    <Input
+                      id="login-password"
+                      type={showPassword ? 'text' : 'password'}
+                      placeholder="كلمة المرور"
+                      dir="ltr"
+                      className={cn(
+                        'peer h-12 pr-11 pl-11 text-right rounded-xl text-[15px]',
+                        'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/25',
+                        'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                        'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
+                        loginForm.formState.errors.password && 'border-red-400/50 focus:border-red-400/70',
+                        'transition-all duration-200'
+                      )}
+                      {...loginForm.register('password')}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors z-10 min-w-[44px] min-h-[44px] flex items-center justify-center -my-1"
                     >
-                      {/* Phone input with +967 prefix */}
-                      <div className="phone-input-wrapper">
-                        <PhonePrefix variant="dark" />
-                        <PremiumInput
-                          id="m-login-phone"
-                          label="رقم الهاتف"
-                          icon={Phone}
-                          type="tel"
-                          dir="ltr"
-                          variant="dark"
-                          registration={loginForm.register('phone')}
-                          error={loginForm.formState.errors.phone?.message}
-                          className="!pl-[95px]"
-                        />
+                      {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  {loginForm.formState.errors.password && (
+                    <motion.p
+                      initial={{ opacity: 0, y: -3 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="text-xs text-red-400 mr-1"
+                    >
+                      {loginForm.formState.errors.password.message}
+                    </motion.p>
+                  )}
+                  <PasswordStrengthBar password={loginPasswordValue} />
+                </div>
+
+                {/* Remember me & forgot password */}
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="remember"
+                      className="w-4 h-4 rounded border-white/20 bg-white/[0.06] text-teal-500 focus:ring-teal-400/30 focus:ring-offset-0 cursor-pointer"
+                    />
+                    <Label htmlFor="remember" className="text-xs font-normal cursor-pointer text-white/40">تذكرني</Label>
+                  </div>
+                  <button type="button" className="text-xs text-teal-400/70 hover:text-teal-400 transition-colors font-medium">
+                    نسيت كلمة المرور؟
+                  </button>
+                </div>
+
+                {/* Submit button */}
+                <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="pt-1">
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className={cn(
+                      'login-shimmer-btn relative w-full h-12 rounded-xl font-bold text-[15px] text-white overflow-hidden',
+                      'bg-gradient-to-l from-teal-500 via-emerald-500 to-cyan-500',
+                      'shadow-lg shadow-teal-500/20',
+                      'hover:shadow-xl hover:shadow-teal-500/25',
+                      'disabled:opacity-60 disabled:cursor-not-allowed',
+                      'transition-all duration-300'
+                    )}
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                    ) : (
+                      <span className="flex items-center gap-2 justify-center">
+                        تسجيل الدخول
+                        <svg className="w-4 h-4 rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                      </span>
+                    )}
+                  </button>
+                </motion.div>
+              </motion.form>
+            )}
+          </AnimatePresence>
+
+          {/* ====== Register Forms ====== */}
+          <AnimatePresence mode="wait">
+            {activeTab === 'register' && (
+              <motion.div
+                key="register-container"
+                initial={{ opacity: 0, x: 15 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -15 }}
+                transition={{ duration: 0.25 }}
+                className="space-y-4"
+              >
+                {/* Role selector */}
+                <div className="grid grid-cols-2 gap-3">
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => { setRegisterRole('beneficiary'); clearError(); }}
+                    className={cn(
+                      'relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border min-h-[100px]',
+                      registerRole === 'beneficiary'
+                        ? 'border-teal-400/30 bg-white/[0.08] shadow-lg shadow-teal-500/10'
+                        : 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/[0.1]'
+                    )}
+                  >
+                    {registerRole === 'beneficiary' && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-emerald-500/5" />
+                    )}
+                    <div className="relative z-10">
+                      <div className={cn(
+                        'w-12 h-12 rounded-xl mx-auto mb-2.5 flex items-center justify-center transition-all duration-300',
+                        registerRole === 'beneficiary'
+                          ? 'bg-gradient-to-br from-teal-500 to-emerald-500 text-white shadow-lg shadow-teal-500/25'
+                          : 'bg-white/[0.08] text-white/30'
+                      )}>
+                        <User className="w-5 h-5" />
                       </div>
+                      <span className={cn(
+                        'text-sm font-bold transition-colors duration-300',
+                        registerRole === 'beneficiary' ? 'text-white' : 'text-white/40'
+                      )}>
+                        مستفيد/ـة
+                      </span>
+                      <p className="text-[11px] mt-0.5 text-white/25">رعاية منزلية</p>
+                    </div>
+                  </motion.button>
 
-                      <PremiumInput
-                        id="m-login-password"
-                        label="كلمة المرور"
-                        icon={Lock}
-                        type={showPassword ? 'text' : 'password'}
-                        dir="ltr"
-                        variant="dark"
-                        showToggle
-                        onToggle={() => setShowPassword(!showPassword)}
-                        toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                        registration={loginForm.register('password')}
-                        error={loginForm.formState.errors.password?.message}
-                      />
+                  <motion.button
+                    type="button"
+                    whileTap={{ scale: 0.97 }}
+                    onClick={() => { setRegisterRole('nurse'); clearError(); }}
+                    className={cn(
+                      'relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border min-h-[100px]',
+                      registerRole === 'nurse'
+                        ? 'border-sky-400/30 bg-white/[0.08] shadow-lg shadow-sky-500/10'
+                        : 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/[0.1]'
+                    )}
+                  >
+                    {registerRole === 'nurse' && (
+                      <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 to-cyan-500/5" />
+                    )}
+                    <div className="relative z-10">
+                      <div className={cn(
+                        'w-12 h-12 rounded-xl mx-auto mb-2.5 flex items-center justify-center transition-all duration-300',
+                        registerRole === 'nurse'
+                          ? 'bg-gradient-to-br from-sky-500 to-cyan-500 text-white shadow-lg shadow-sky-500/25'
+                          : 'bg-white/[0.08] text-white/30'
+                      )}>
+                        <Stethoscope className="w-5 h-5" />
+                      </div>
+                      <span className={cn(
+                        'text-sm font-bold transition-colors duration-300',
+                        registerRole === 'nurse' ? 'text-white' : 'text-white/40'
+                      )}>
+                        ممرض/ـة
+                      </span>
+                      <p className="text-[11px] mt-0.5 text-white/25">ممرض معتمد</p>
+                    </div>
+                  </motion.button>
+                </div>
 
-                      <PasswordStrengthBar password={loginPasswordValue} variant="dark" />
-
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <input type="checkbox" id="m-remember" className="premium-checkbox-dark" />
-                          <Label htmlFor="m-remember" className="text-[12px] font-normal cursor-pointer text-white/40">تذكرني</Label>
+                {/* Beneficiary Registration Form */}
+                <AnimatePresence mode="wait">
+                  {registerRole === 'beneficiary' && (
+                    <motion.form
+                      key="beneficiary-form"
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: 10 }}
+                      transition={{ duration: 0.2 }}
+                      onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)}
+                      className="space-y-3"
+                    >
+                      {/* Personal info section */}
+                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                            <User className="w-3.5 h-3.5 text-teal-400" />
+                          </div>
+                          <span className="text-xs font-semibold text-teal-400">المعلومات الشخصية</span>
                         </div>
-                        <button type="button" className="text-[12px] text-teal-400/70 hover:text-teal-300 transition-colors font-medium">
-                          نسيت كلمة المرور؟
-                        </button>
+
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
+                            <Input
+                              id="ben-name"
+                              placeholder="الاسم الكامل"
+                              className={cn(
+                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
+                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
+                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                                'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
+                                beneficiaryForm.formState.errors.name && 'border-red-400/50',
+                                'transition-all duration-200'
+                              )}
+                              {...beneficiaryForm.register('name')}
+                            />
+                          </div>
+                          {beneficiaryForm.formState.errors.name && (
+                            <p className="text-xs text-red-400 mr-1">{beneficiaryForm.formState.errors.name.message}</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
+                            <Input
+                              id="ben-phone"
+                              type="tel"
+                              placeholder="رقم الهاتف"
+                              dir="ltr"
+                              className={cn(
+                                'h-11 pr-10 pl-[105px] text-right rounded-xl text-sm',
+                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
+                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                                'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
+                                beneficiaryForm.formState.errors.phone && 'border-red-400/50',
+                                'transition-all duration-200'
+                              )}
+                              {...beneficiaryForm.register('phone')}
+                            />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.06] border border-white/[0.08] pointer-events-none">
+                              <YemenFlag />
+                              <span className="text-white/40 text-[12px] font-semibold">+967</span>
+                            </div>
+                          </div>
+                          {beneficiaryForm.formState.errors.phone && (
+                            <p className="text-xs text-red-400 mr-1">{beneficiaryForm.formState.errors.phone.message}</p>
+                          )}
+                        </div>
                       </div>
 
-                      <PremiumButton loading={isLoading} disabled={isLoading} className="premium-btn-elevated">
-                        <span className="flex items-center gap-2 justify-center">
-                          تسجيل الدخول
-                          <ArrowLeft className="w-4 h-4" />
-                        </span>
-                      </PremiumButton>
+                      {/* Location section */}
+                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                            <MapPin className="w-3.5 h-3.5 text-teal-400" />
+                          </div>
+                          <span className="text-xs font-semibold text-teal-400">معلومات الموقع</span>
+                        </div>
+
+                        <GpsLocationButton
+                          onLocationDetected={(loc) => {
+                            if (loc.governorate && loc.governorateValue) {
+                              beneficiaryForm.setValue('governorate', loc.governorateValue);
+                            }
+                            if (loc.address || loc.district) {
+                              beneficiaryForm.setValue('address', loc.district || loc.address);
+                            }
+                          }}
+                        />
+
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <MapPin className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
+                            <Input
+                              id="ben-address"
+                              placeholder="العنوان"
+                              className={cn(
+                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
+                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
+                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                                'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
+                                beneficiaryForm.formState.errors.address && 'border-red-400/50',
+                                'transition-all duration-200'
+                              )}
+                              {...beneficiaryForm.register('address')}
+                            />
+                          </div>
+                          {beneficiaryForm.formState.errors.address && (
+                            <p className="text-xs text-red-400 mr-1">{beneficiaryForm.formState.errors.address.message}</p>
+                          )}
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Sparkles className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
+                            <Input
+                              id="ben-referral"
+                              placeholder="كود الإحالة (اختياري)"
+                              dir="ltr"
+                              className={cn(
+                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
+                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
+                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                                'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
+                                'transition-all duration-200'
+                              )}
+                              {...beneficiaryForm.register('referralCode')}
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Security section */}
+                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                            <Lock className="w-3.5 h-3.5 text-amber-400" />
+                          </div>
+                          <span className="text-xs font-semibold text-amber-400">الأمان</span>
+                        </div>
+
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
+                            <Input
+                              id="ben-password"
+                              type={showPassword ? 'text' : 'password'}
+                              placeholder="كلمة المرور"
+                              dir="ltr"
+                              className={cn(
+                                'h-11 pr-10 pl-10 text-right rounded-xl text-sm',
+                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
+                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                                'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
+                                beneficiaryForm.formState.errors.password && 'border-red-400/50',
+                                'transition-all duration-200'
+                              )}
+                              {...beneficiaryForm.register('password')}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          {beneficiaryForm.formState.errors.password && (
+                            <p className="text-xs text-red-400 mr-1">{beneficiaryForm.formState.errors.password.message}</p>
+                          )}
+                          <PasswordStrengthBar password={beneficiaryPasswordValue} />
+                        </div>
+                      </div>
+
+                      {/* Submit button */}
+                      <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="pt-1">
+                        <button
+                          type="submit"
+                          disabled={isLoading}
+                          className={cn(
+                            'login-shimmer-btn relative w-full h-12 rounded-xl font-bold text-[15px] text-white overflow-hidden',
+                            'bg-gradient-to-l from-teal-500 via-emerald-500 to-cyan-500',
+                            'shadow-lg shadow-teal-500/20',
+                            'hover:shadow-xl hover:shadow-teal-500/25',
+                            'disabled:opacity-60 disabled:cursor-not-allowed',
+                            'transition-all duration-300'
+                          )}
+                        >
+                          {isLoading ? (
+                            <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                          ) : (
+                            <span className="flex items-center gap-2 justify-center">
+                              <CheckCircle2 className="w-4 h-4" />
+                              إنشاء حساب مستفيد
+                            </span>
+                          )}
+                        </button>
+                      </motion.div>
                     </motion.form>
                   )}
                 </AnimatePresence>
 
-                {/* Mobile Register Forms */}
+                {/* Nurse Registration Form */}
                 <AnimatePresence mode="wait">
-                  {activeTab === 'register' && (
-                    <motion.div
-                      key="m-register-container"
-                      initial={{ opacity: 0, x: 15 }}
+                  {registerRole === 'nurse' && (
+                    <motion.form
+                      key="nurse-form"
+                      initial={{ opacity: 0, x: 10 }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -15 }}
-                      transition={{ duration: 0.25 }}
-                      className="space-y-4"
+                      exit={{ opacity: 0, x: -10 }}
+                      transition={{ duration: 0.2 }}
+                      onSubmit={nurseForm.handleSubmit(onNurseRegister)}
+                      className="space-y-3"
                     >
-                      {/* Step indicator - Enhanced */}
-                      <div className="reg-step-indicator-enhanced">
-                        <div className="reg-step-dot-enhanced reg-step-dot-active-dark" />
-                        <div className="reg-step-line-enhanced reg-step-line-active-dark" />
-                        <div className="reg-step-dot-enhanced reg-step-dot-active-dark" />
-                        <div className="reg-step-line-enhanced reg-step-line-inactive-dark" />
-                        <div className="reg-step-dot-enhanced reg-step-dot-inactive-dark" />
-                      </div>
-                      <div className="flex justify-between px-1 -mt-0.5 mb-2">
-                        <span className="text-[10px] font-semibold text-teal-400">نوع الحساب</span>
-                        <span className="text-[10px] font-semibold text-teal-400">البيانات</span>
-                        <span className="text-[10px] font-medium text-white/25">تأكيد</span>
-                      </div>
+                      {/* Personal info section */}
+                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                            <Stethoscope className="w-3.5 h-3.5 text-sky-400" />
+                          </div>
+                          <span className="text-xs font-semibold text-sky-400">المعلومات المهنية</span>
+                        </div>
 
-                      {/* Role selector */}
-                      <div className="grid grid-cols-2 gap-3">
-                        <PremiumRoleCard
-                          role="beneficiary"
-                          isActive={registerRole === 'beneficiary'}
-                          onClick={() => { setRegisterRole('beneficiary'); clearError(); }}
-                          icon={User}
-                          title="مستفيد"
-                          subtitle="رعاية منزلية"
-                          activeColor="from-teal-500 to-emerald-600"
-                          variant="dark"
-                        />
-                        <PremiumRoleCard
-                          role="nurse"
-                          isActive={registerRole === 'nurse'}
-                          onClick={() => { setRegisterRole('nurse'); clearError(); }}
-                          icon={Stethoscope}
-                          title="ممرض/ـة"
-                          subtitle="ممرض معتمد"
-                          activeColor="from-sky-500 to-sky-700"
-                          variant="dark"
-                        />
-                      </div>
+                        {/* Name with shake animation */}
+                        <div className="space-y-1.5">
+                          <div className={cn('relative', nurseNameShake && 'animate-shake')}>
+                            <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
+                            <Input
+                              id="nurse-name"
+                              placeholder="الاسم الرباعي (أربع كلمات)"
+                              className={cn(
+                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
+                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
+                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                                'focus:bg-white/[0.1] focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15',
+                                (nurseForm.formState.errors.name || nurseNameWarning) && 'border-amber-400/50',
+                                'transition-all duration-200'
+                              )}
+                              {...nurseForm.register('name')}
+                            />
+                          </div>
+                          {nurseNameWarning && (
+                            <motion.p
+                              initial={{ opacity: 0, y: -3 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              className="text-xs text-amber-400 mr-1"
+                            >
+                              يجب إدخال الاسم الرباعي (٤ كلمات على الأقل)
+                            </motion.p>
+                          )}
+                          {nurseForm.formState.errors.name && !nurseNameWarning && (
+                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.name.message}</p>
+                          )}
+                        </div>
 
-                      <AnimatePresence mode="wait">
-                        {/* Mobile Beneficiary Form */}
-                        {registerRole === 'beneficiary' && (
-                          <motion.form
-                            key="m-beneficiary-form"
-                            initial={{ opacity: 0, x: -12 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: 12 }}
-                            transition={{ duration: 0.2 }}
-                            onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)}
-                            className="space-y-3.5"
+                        {/* Phone */}
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
+                            <Input
+                              id="nurse-phone"
+                              type="tel"
+                              placeholder="رقم الهاتف"
+                              dir="ltr"
+                              className={cn(
+                                'h-11 pr-10 pl-[105px] text-right rounded-xl text-sm',
+                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
+                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                                'focus:bg-white/[0.1] focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15',
+                                nurseForm.formState.errors.phone && 'border-red-400/50',
+                                'transition-all duration-200'
+                              )}
+                              {...nurseForm.register('phone')}
+                            />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.06] border border-white/[0.08] pointer-events-none">
+                              <YemenFlag />
+                              <span className="text-white/40 text-[12px] font-semibold">+967</span>
+                            </div>
+                          </div>
+                          {nurseForm.formState.errors.phone && (
+                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.phone.message}</p>
+                          )}
+                        </div>
+
+                        {/* Specialization select */}
+                        <div className="space-y-1.5">
+                          <Select
+                            onValueChange={(value) => nurseForm.setValue('specialization', value)}
+                            defaultValue={nurseForm.getValues('specialization')}
                           >
-                            <div className="form-section-dark-enhanced space-y-3">
-                              <FormSectionHeader icon={User} title="المعلومات الشخصية" color="text-teal-400" variant="dark" />
-                              <PremiumInput
-                                id="m-ben-name"
-                                label="الاسم الكامل"
-                                icon={User}
-                                variant="dark"
-                                registration={beneficiaryForm.register('name')}
-                                error={beneficiaryForm.formState.errors.name?.message}
-                              />
-                              {/* Phone with +967 prefix */}
-                              <div className="phone-input-wrapper">
-                                <PhonePrefix variant="dark" />
-                                <PremiumInput
-                                  id="m-ben-phone"
-                                  label="رقم الهاتف"
-                                  icon={Phone}
-                                  type="tel"
-                                  dir="ltr"
-                                  variant="dark"
-                                  registration={beneficiaryForm.register('phone')}
-                                  error={beneficiaryForm.formState.errors.phone?.message}
-                                  className="!pl-[90px]"
-                                />
-                              </div>
-                            </div>
-
-                            <div className="form-section-dark-enhanced space-y-3">
-                              <FormSectionHeader icon={MapPin} title="معلومات الموقع" color="text-teal-400" variant="dark" />
-                              <GpsLocationButton
-                                onLocationDetected={(loc) => {
-                                  if (loc.governorate && loc.governorateValue) {
-                                    beneficiaryForm.setValue('governorate', loc.governorateValue);
-                                  }
-                                  if (loc.address || loc.district) {
-                                    beneficiaryForm.setValue('address', loc.district || loc.address);
-                                  }
-                                }}
-                                size="sm"
-                                className="w-full"
-                              />
-                              <PremiumInput
-                                id="m-ben-address"
-                                label="العنوان"
-                                icon={MapPin}
-                                variant="dark"
-                                registration={beneficiaryForm.register('address')}
-                                error={beneficiaryForm.formState.errors.address?.message}
-                              />
-                              <PremiumInput
-                                id="m-ben-referral"
-                                label="كود الإحالة (اختياري)"
-                                icon={Sparkles}
-                                dir="ltr"
-                                variant="dark"
-                                registration={beneficiaryForm.register('referralCode')}
-                              />
-                            </div>
-
-                            <div className="form-section-dark-enhanced space-y-3">
-                              <FormSectionHeader icon={Lock} title="الأمان" color="text-amber-400" variant="dark" />
-                              <PremiumInput
-                                id="m-ben-password"
-                                label="كلمة المرور"
-                                icon={Lock}
-                                type={showPassword ? 'text' : 'password'}
-                                dir="ltr"
-                                variant="dark"
-                                showToggle
-                                onToggle={() => setShowPassword(!showPassword)}
-                                toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                registration={beneficiaryForm.register('password')}
-                                error={beneficiaryForm.formState.errors.password?.message}
-                              />
-                              <PasswordStrengthBar password={beneficiaryPasswordValue} variant="dark" />
-                            </div>
-
-                            <PremiumButton loading={isLoading} disabled={isLoading} className="premium-btn-elevated">
-                              <span className="flex items-center gap-2 justify-center text-[15px]">
-                                <CheckCircle2 className="w-4 h-4" />
-                                إنشاء حساب مستفيد
-                              </span>
-                            </PremiumButton>
-                          </motion.form>
-                        )}
-
-                        {/* Mobile Nurse Form */}
-                        {registerRole === 'nurse' && (
-                          <motion.form
-                            key="m-nurse-form"
-                            initial={{ opacity: 0, x: 12 }}
-                            animate={{ opacity: 1, x: 0 }}
-                            exit={{ opacity: 0, x: -12 }}
-                            transition={{ duration: 0.2 }}
-                            onSubmit={nurseForm.handleSubmit(onNurseRegister)}
-                            className="space-y-3.5 mobile-nurse-scroll custom-scrollbar pl-0.5"
-                          >
-                            <div className="form-section-dark-enhanced space-y-3">
-                              <FormSectionHeader icon={User} title="المعلومات الشخصية" color="text-sky-400" variant="dark" />
-                              <motion.div
-                                animate={nurseNameShake ? { x: [0, -10, 10, -8, 8, -4, 4, 0] } : { x: 0 }}
-                                transition={{ duration: 0.5, ease: 'easeInOut' }}
-                              >
-                                <PremiumInput
-                                  id="m-nurse-name"
-                                  label="الاسم الرباعي"
-                                  icon={User}
-                                  variant="dark"
-                                  registration={nurseForm.register('name')}
-                                  error={nurseNameShake ? undefined : nurseForm.formState.errors.name?.message}
-                                  className={cn(nurseNameShake && '!border-red-400/60')}
-                                />
-                              </motion.div>
-                              {nurseNameWarning && (
-                                <motion.div
-                                  initial={{ opacity: 0, y: -5 }}
-                                  animate={{ opacity: 1, y: 0 }}
-                                  className="flex items-center gap-1.5"
+                            <SelectTrigger className={cn(
+                              'h-11 rounded-xl text-sm',
+                              'bg-white/[0.06] border-white/[0.08] text-white',
+                              'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                              'focus:ring-sky-400/15',
+                              nurseForm.formState.errors.specialization && 'border-red-400/50',
+                              'transition-all duration-200'
+                            )}>
+                              <SelectValue placeholder="اختر التخصص" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#1a2235] border-white/[0.1] max-h-60">
+                              {specializations.map((spec) => (
+                                <SelectItem
+                                  key={spec.value}
+                                  value={spec.value}
+                                  className="text-white/80 focus:bg-white/[0.08] focus:text-white"
                                 >
-                                  <AlertTriangle className="w-3.5 h-3.5 text-red-400 shrink-0" />
-                                  <p className="text-[11px] text-red-400 font-medium">يجب أن تكتب اسمك الرباعي (أربعة أجزاء)</p>
-                                </motion.div>
+                                  {spec.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          {nurseForm.formState.errors.specialization && (
+                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.specialization.message}</p>
+                          )}
+                        </div>
+
+                        {/* License number */}
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Shield className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
+                            <Input
+                              id="nurse-license"
+                              placeholder="رقم الترخيص"
+                              className={cn(
+                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
+                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
+                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                                'focus:bg-white/[0.1] focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15',
+                                nurseForm.formState.errors.licenseNumber && 'border-red-400/50',
+                                'transition-all duration-200'
                               )}
-                              {nurseForm.formState.errors.name && !nurseNameWarning && (
-                                <p className="text-xs text-red-400">{nurseForm.formState.errors.name.message}</p>
+                              {...nurseForm.register('licenseNumber')}
+                            />
+                          </div>
+                          {nurseForm.formState.errors.licenseNumber && (
+                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.licenseNumber.message}</p>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Location section */}
+                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                            <MapPin className="w-3.5 h-3.5 text-sky-400" />
+                          </div>
+                          <span className="text-xs font-semibold text-sky-400">معلومات الموقع</span>
+                        </div>
+
+                        <GpsLocationButton
+                          onLocationDetected={(loc) => {
+                            if (loc.governorate && loc.governorateValue) {
+                              nurseForm.setValue('governorate', loc.governorateValue);
+                            }
+                            if (loc.address || loc.district) {
+                              nurseForm.setValue('address', loc.district || loc.address);
+                            }
+                          }}
+                        />
+
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <MapPin className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
+                            <Input
+                              id="nurse-address"
+                              placeholder="العنوان التفصيلي"
+                              className={cn(
+                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
+                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
+                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                                'focus:bg-white/[0.1] focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15',
+                                nurseForm.formState.errors.address && 'border-red-400/50',
+                                'transition-all duration-200'
                               )}
-                              {/* Phone with +967 prefix */}
-                              <div className="phone-input-wrapper">
-                                <PhonePrefix variant="dark" />
-                                <PremiumInput
-                                  id="m-nurse-phone"
-                                  label="رقم الهاتف"
-                                  icon={Phone}
-                                  type="tel"
-                                  dir="ltr"
-                                  variant="dark"
-                                  registration={nurseForm.register('phone')}
-                                  error={nurseForm.formState.errors.phone?.message}
-                                  className="!pl-[90px]"
-                                />
-                              </div>
-                            </div>
+                              {...nurseForm.register('address')}
+                            />
+                          </div>
+                          {nurseForm.formState.errors.address && (
+                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.address.message}</p>
+                          )}
+                        </div>
+                      </div>
 
-                            <div className="form-section-dark-enhanced space-y-3">
-                              <FormSectionHeader icon={Stethoscope} title="المعلومات المهنية" color="text-violet-400" variant="dark" />
-                              <div className="space-y-1.5">
-                                <Label className="text-[11px] text-white/40">التخصص</Label>
-                                <Select onValueChange={(v) => nurseForm.setValue('specialization', v)}>
-                                  <SelectTrigger className="h-12 rounded-xl bg-white/[0.06] border-white/[0.1] text-white/80 text-sm hover:bg-white/[0.08] focus:border-teal-400/50">
-                                    <SelectValue placeholder="اختر التخصص" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {specializations.map((spec) => (
-                                      <SelectItem key={spec.value} value={spec.value}>{spec.label}</SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                                {nurseForm.formState.errors.specialization && (
-                                  <p className="text-xs text-red-400">{nurseForm.formState.errors.specialization.message}</p>
-                                )}
-                              </div>
-                              <PremiumInput
-                                id="m-nurse-license"
-                                label="رقم الترخيص"
-                                icon={Shield}
-                                variant="dark"
-                                registration={nurseForm.register('licenseNumber')}
-                                error={nurseForm.formState.errors.licenseNumber?.message}
-                              />
-                            </div>
+                      {/* Security section */}
+                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
+                        <div className="flex items-center gap-2 mb-1">
+                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                            <Lock className="w-3.5 h-3.5 text-amber-400" />
+                          </div>
+                          <span className="text-xs font-semibold text-amber-400">الأمان</span>
+                        </div>
 
-                            <div className="form-section-dark-enhanced space-y-3">
-                              <FormSectionHeader icon={MapPin} title="معلومات الموقع" color="text-teal-400" variant="dark" />
-                              <GpsLocationButton
-                                onLocationDetected={(loc) => {
-                                  if (loc.governorate && loc.governorateValue) {
-                                    nurseForm.setValue('governorate', loc.governorateValue);
-                                  }
-                                  if (loc.address || loc.district) {
-                                    nurseForm.setValue('address', loc.district || loc.address);
-                                  }
-                                }}
-                                size="sm"
-                                className="w-full"
-                              />
-                              <PremiumInput
-                                id="m-nurse-address"
-                                label="العنوان التفصيلي"
-                                icon={MapPin}
-                                variant="dark"
-                                registration={nurseForm.register('address')}
-                                error={nurseForm.formState.errors.address?.message}
-                              />
-                            </div>
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
+                            <Input
+                              id="nurse-password"
+                              type={showPassword ? 'text' : 'password'}
+                              placeholder="كلمة المرور"
+                              dir="ltr"
+                              className={cn(
+                                'h-11 pr-10 pl-10 text-right rounded-xl text-sm',
+                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
+                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
+                                'focus:bg-white/[0.1] focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15',
+                                nurseForm.formState.errors.password && 'border-red-400/50',
+                                'transition-all duration-200'
+                              )}
+                              {...nurseForm.register('password')}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword(!showPassword)}
+                              className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center"
+                            >
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          {nurseForm.formState.errors.password && (
+                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.password.message}</p>
+                          )}
+                          <PasswordStrengthBar password={nursePasswordValue} />
+                        </div>
+                      </div>
 
-                            <div className="form-section-dark-enhanced space-y-3">
-                              <FormSectionHeader icon={Lock} title="الأمان" color="text-amber-400" variant="dark" />
-                              <PremiumInput
-                                id="m-nurse-password"
-                                label="كلمة المرور"
-                                icon={Lock}
-                                type={showPassword ? 'text' : 'password'}
-                                dir="ltr"
-                                variant="dark"
-                                showToggle
-                                onToggle={() => setShowPassword(!showPassword)}
-                                toggleIcon={showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                                registration={nurseForm.register('password')}
-                                error={nurseForm.formState.errors.password?.message}
-                              />
-                              <PasswordStrengthBar password={nursePasswordValue} variant="dark" />
-                            </div>
-
-                            <PremiumButton loading={isLoading} disabled={isLoading} variant="nurse" className="premium-btn-elevated">
-                              <span className="flex items-center gap-2 justify-center text-[15px]">
-                                <CheckCircle2 className="w-4 h-4" />
-                                إنشاء حساب ممرض/ـة
-                              </span>
-                            </PremiumButton>
-                          </motion.form>
-                        )}
-                      </AnimatePresence>
-                    </motion.div>
+                      {/* Submit button */}
+                      <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="pt-1">
+                        <button
+                          type="submit"
+                          disabled={isLoading}
+                          className={cn(
+                            'login-shimmer-btn relative w-full h-12 rounded-xl font-bold text-[15px] text-white overflow-hidden',
+                            'bg-gradient-to-l from-sky-500 via-cyan-500 to-teal-500',
+                            'shadow-lg shadow-sky-500/20',
+                            'hover:shadow-xl hover:shadow-sky-500/25',
+                            'disabled:opacity-60 disabled:cursor-not-allowed',
+                            'transition-all duration-300'
+                          )}
+                        >
+                          {isLoading ? (
+                            <Loader2 className="w-5 h-5 animate-spin mx-auto" />
+                          ) : (
+                            <span className="flex items-center gap-2 justify-center">
+                              <CheckCircle2 className="w-4 h-4" />
+                              إنشاء حساب ممرض/ـة
+                            </span>
+                          )}
+                        </button>
+                      </motion.div>
+                    </motion.form>
                   )}
                 </AnimatePresence>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-                {/* Trust badge at bottom of card */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.6 }}
-                  className="mt-5 pt-4 border-t border-white/[0.06] flex items-center justify-center gap-1.5 text-white/20 text-[10px]"
-                >
-                  <Shield className="w-3 h-3" />
-                  <span>بياناتك مشفرة ومحمية</span>
-                </motion.div>
-              </div>
-              </div>
-            </div>
+          {/* Trust badge */}
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6 }}
+            className="mt-6 flex items-center justify-center gap-2 text-white/15 text-[11px]"
+          >
+            <Shield className="w-3 h-3" />
+            <span>بياناتك مشفرة ومحمية بتقنيات متقدمة</span>
           </motion.div>
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 }
 
 // ============================================================================
-// Default Export with Suspense
+// Page wrapper with Suspense for useSearchParams
 // ============================================================================
 
 export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0B1120] via-[#0F172A] to-[#1a1035]" dir="rtl">
-          <div className="flex flex-col items-center gap-4">
-            <div className="relative">
-              <div className="absolute inset-0 blur-xl bg-teal-400/20 rounded-2xl" />
-              <div className="relative w-16 h-16 rounded-2xl bg-white/10 backdrop-blur-xl border border-white/20 flex items-center justify-center animate-pulse">
-                <Heart className="w-8 h-8 text-white/60" fill="currentColor" />
-              </div>
-            </div>
-            <div className="flex items-center gap-2 text-white/40 text-sm">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>جارٍ التحميل...</span>
-            </div>
-          </div>
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0a0f1e] via-[#0d1525] to-[#0a1628]" dir="rtl">
+          <Loader2 className="w-8 h-8 animate-spin text-teal-400/50" />
         </div>
       }
     >
