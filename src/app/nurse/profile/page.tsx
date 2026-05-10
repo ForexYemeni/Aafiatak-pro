@@ -21,6 +21,8 @@ import {
   AlertTriangle,
   Power,
   PowerOff,
+  Droplets,
+  MapPin,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -41,6 +43,13 @@ import { toArabicNum } from '@/components/common/date-formatter';
 import { compressImage } from '@/lib/utils/image-compress';
 import { toast as sonnerToast } from 'sonner';
 import Link from 'next/link';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 // ---- Types ----
 
@@ -63,6 +72,7 @@ interface NurseProfile {
   address: string | null;
   city: string | null;
   governorate: string | null;
+  bloodType: string | null;
   experience: number;
   identityDocumentUrl: string | null;
   licenseDocumentUrl: string | null;
@@ -86,6 +96,12 @@ const specializationLabels: Record<string, string> = {
   post_surgery: 'رعاية ما بعد الجراحة',
   emergency: 'طوارئ',
 };
+
+const governorateOptions = [
+  'أمانة العاصمة', 'عدن', 'تعز', 'الحديدة', 'إب', 'ذمار', 'حضرموت',
+  'المكلا', 'عمران', 'صعدة', 'البيضاء', 'مأرب', 'لحج', 'أبين',
+  'شبوة', 'حجة', 'صنعاء', 'الضالع', 'ريمة', 'سقطرى',
+];
 
 // ---- Component ----
 
@@ -111,6 +127,7 @@ export default function NurseProfilePage() {
   const [editCity, setEditCity] = useState('');
   const [editGovernorate, setEditGovernorate] = useState('');
   const [editExperience, setEditExperience] = useState('');
+  const [editBloodType, setEditBloodType] = useState('');
 
   // Document upload state
   const [identityFile, setIdentityFile] = useState<File | null>(null);
@@ -144,6 +161,7 @@ export default function NurseProfilePage() {
         setEditCity(p.city ?? '');
         setEditGovernorate(p.governorate ?? '');
         setEditExperience(String(p.experience ?? 0));
+        setEditBloodType(p.bloodType ?? '');
       }
     } catch {
       // silently handle
@@ -173,11 +191,12 @@ export default function NurseProfilePage() {
           city: editCity,
           governorate: editGovernorate,
           experience: Number(editExperience) || 0,
+          bloodType: editBloodType || undefined,
         }),
       });
       const data = await res.json();
       if (data.success) {
-        setProfile((prev) => prev ? { ...prev, name: editName, bio: editBio, address: editAddress, city: editCity, governorate: editGovernorate, experience: Number(editExperience) || 0 } : null);
+        setProfile((prev) => prev ? { ...prev, name: editName, bio: editBio, address: editAddress, city: editCity, governorate: editGovernorate, experience: Number(editExperience) || 0, bloodType: editBloodType || null } : null);
         updateUser({ name: editName });
         setIsEditing(false);
         showToast('تم تحديث الملف الشخصي بنجاح');
@@ -704,6 +723,37 @@ export default function NurseProfilePage() {
               <Label htmlFor="experience">سنوات الخبرة</Label>
               <Input id="experience" type="number" value={editExperience} onChange={(e) => setEditExperience(e.target.value)} min={0} />
             </div>
+            <div className="space-y-2">
+              <Label>المحافظة</Label>
+              <Select value={editGovernorate} onValueChange={setEditGovernorate}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="اختر المحافظة" />
+                </SelectTrigger>
+                <SelectContent>
+                  {governorateOptions.map((gov) => (
+                    <SelectItem key={gov} value={gov}>{gov}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>فصيلة الدم</Label>
+              <Select value={editBloodType} onValueChange={setEditBloodType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="اختر فصيلة الدم" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A+">A+</SelectItem>
+                  <SelectItem value="A-">A-</SelectItem>
+                  <SelectItem value="B+">B+</SelectItem>
+                  <SelectItem value="B-">B-</SelectItem>
+                  <SelectItem value="AB+">AB+</SelectItem>
+                  <SelectItem value="AB-">AB-</SelectItem>
+                  <SelectItem value="O+">O+</SelectItem>
+                  <SelectItem value="O-">O-</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
             <Button
               className="w-full bg-nurse hover:bg-nurse/90"
               onClick={handleSaveProfile}
@@ -723,9 +773,10 @@ export default function NurseProfilePage() {
             <InfoRow icon={<Shield className="w-4 h-4" />} label="رقم الترخيص" value={profile.licenseNumber ?? 'غير محدد'} />
             <InfoRow icon={<FileText className="w-4 h-4" />} label="التخصص" value={(profile.specialization || []).map((s) => specializationLabels[s] ?? s).join('، ') || 'غير محدد'} />
             <InfoRow icon={<Clock className="w-4 h-4" />} label="سنوات الخبرة" value={`${toArabicNum(profile.experience)} سنة`} />
+            <InfoRow icon={<Droplets className="w-4 h-4" />} label="فصيلة الدم" value={profile.bloodType || 'غير محدد'} />
             {profile.bio && <InfoRow icon={<User className="w-4 h-4" />} label="نبذة" value={profile.bio} />}
             {profile.address && <InfoRow icon={<User className="w-4 h-4" />} label="العنوان" value={profile.address} />}
-            {profile.governorate && <InfoRow icon={<User className="w-4 h-4" />} label="المحافظة" value={profile.governorate} />}
+            <InfoRow icon={<MapPin className="w-4 h-4" />} label="المحافظة" value={profile.governorate || 'غير محدد'} />
           </div>
         )}
       </GlassCard>

@@ -79,7 +79,9 @@ interface DeploymentItem {
   contactRevealed?: boolean;
   title: string;
   description: string;
-  type: 'nursing' | 'lab' | 'midwife' | 'home_care' | 'other';
+  type: 'nursing' | 'lab' | 'midwife' | 'home_care' | 'lab_nurse' | 'medical_sector' | 'other';
+  gender?: 'male' | 'female';
+  department?: string;
   specialization: string[];
   hours: number;
   location: DeploymentLocation;
@@ -212,8 +214,6 @@ export default function AdminDeploymentsPage() {
   // Create dialog
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [createForm, setCreateForm] = useState({
-    title: '',
-    description: '',
     type: 'nursing',
     specialization: '',
     hours: 0,
@@ -223,8 +223,10 @@ export default function AdminDeploymentsPage() {
     requirements: '',
     notes: '',
     department: '',
+    gender: '',
     requirementTags: [] as string[],
   });
+  const [customReq, setCustomReq] = useState('');
   const [adminCommissionPercent, setAdminCommissionPercent] = useState(15);
   const [isCreating, setIsCreating] = useState(false);
 
@@ -289,8 +291,16 @@ export default function AdminDeploymentsPage() {
 
   /* ── Create deployment ── */
   const handleCreateDeployment = async () => {
-    if (!createForm.title || !createForm.description || !createForm.hours || !createForm.amount) {
-      toast.error('العنوان والوصف وعدد الساعات والمبلغ مطلوبة');
+    if (!createForm.type || !createForm.hours || !createForm.amount) {
+      toast.error('نوع التكليف وعدد الساعات والمبلغ مطلوبة');
+      return;
+    }
+    if (!createForm.gender) {
+      toast.error('الجنس مطلوب');
+      return;
+    }
+    if (!createForm.department) {
+      toast.error('القسم مطلوب');
       return;
     }
     setIsCreating(true);
@@ -298,9 +308,9 @@ export default function AdminDeploymentsPage() {
       const res = await authFetch('/api/deployments', {
         method: 'POST',
         body: JSON.stringify({
-          title: createForm.title,
-          description: createForm.description,
           type: createForm.type,
+          gender: createForm.gender,
+          department: createForm.department,
           specialization: createForm.specialization || undefined,
           hours: createForm.hours,
           location: {
@@ -312,7 +322,6 @@ export default function AdminDeploymentsPage() {
             ? createForm.requirementTags.join(', ')
             : createForm.requirements || undefined,
           notes: createForm.notes || undefined,
-          department: createForm.department || undefined,
         }),
       });
       const json = await res.json();
@@ -321,8 +330,6 @@ export default function AdminDeploymentsPage() {
         void fetchDeployments();
         setShowCreateDialog(false);
         setCreateForm({
-          title: '',
-          description: '',
           type: 'nursing',
           specialization: '',
           hours: 0,
@@ -332,8 +339,10 @@ export default function AdminDeploymentsPage() {
           requirements: '',
           notes: '',
           department: '',
+          gender: '',
           requirementTags: [],
         });
+        setCustomReq('');
       } else {
         toast.error(json.message ?? 'فشل إنشاء التكليف');
       }
@@ -515,7 +524,7 @@ export default function AdminDeploymentsPage() {
                     {/* Info */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-bold text-sm truncate">{dep.title}</p>
+                        <p className="font-bold text-sm truncate">{dep.title || typeLabels[dep.type] || dep.type}</p>
                         <BadgeStatus
                           status={deploymentStatusMap[dep.status] || 'pending'}
                           label={deploymentStatusLabel[dep.status] || dep.status}
@@ -602,7 +611,7 @@ export default function AdminDeploymentsPage() {
                   <p className="text-[11px] text-muted-foreground">اختر نوع وقسم التكليف</p>
                 </div>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold flex items-center gap-1.5">
                     <Tag className="w-3.5 h-3.5 text-admin" />
@@ -625,7 +634,7 @@ export default function AdminDeploymentsPage() {
                 <div className="space-y-2">
                   <Label className="text-sm font-semibold flex items-center gap-1.5">
                     <Building2 className="w-3.5 h-3.5 text-teal-600" />
-                    القسم <span className="text-muted-foreground text-[10px] font-normal">(اختياري)</span>
+                    القسم <span className="text-red-500">*</span>
                   </Label>
                   <Select
                     value={createForm.department}
@@ -641,34 +650,26 @@ export default function AdminDeploymentsPage() {
                     </SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-semibold flex items-center gap-1.5">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-pink-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+                    الجنس <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={createForm.gender}
+                    onValueChange={(val) => setCreateForm((p) => ({ ...p, gender: val }))}
+                  >
+                    <SelectTrigger className="w-full h-12 text-sm font-medium border-pink-200 dark:border-pink-900/50 focus:border-pink-500">
+                      <SelectValue placeholder="اختر الجنس" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">ذكر</SelectItem>
+                      <SelectItem value="female">أنثى</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="admin-dep-title" className="text-sm font-semibold flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-admin" />
-                  عنوان التكليف <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="admin-dep-title"
-                  placeholder="مثال: ممرض/ة لرعاية منزلية"
-                  value={createForm.title}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
-                  className="h-11 border-admin/20 focus:border-admin"
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="admin-dep-desc" className="text-sm font-semibold flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-admin" />
-                  الوصف <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="admin-dep-desc"
-                  placeholder="اكتب وصفاً تفصيلياً للتكليف..."
-                  rows={2}
-                  value={createForm.description}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-                  className="border-admin/20 focus:border-admin"
-                />
-              </div>
+
             </div>
 
             {/* ── Step 2: عدد الساعات والمبلغ ── */}
@@ -801,15 +802,54 @@ export default function AdminDeploymentsPage() {
                 })}
               </div>
 
-              {/* Custom requirements */}
-              <Textarea
-                id="admin-dep-reqs"
-                placeholder="متطلبات إضافية أخرى..."
-                rows={2}
-                value={createForm.requirements}
-                onChange={(e) => setCreateForm((p) => ({ ...p, requirements: e.target.value }))}
-                className="border-amber-200 dark:border-amber-900/50 focus:border-amber-500"
-              />
+              {/* Custom requirements input */}
+              <div className="space-y-2">
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="أضف متطلباً مخصصاً..."
+                    value={customReq}
+                    onChange={(e) => setCustomReq(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && customReq.trim()) {
+                        e.preventDefault();
+                        setCreateForm((p) => ({ ...p, requirementTags: [...p.requirementTags, customReq.trim()] }));
+                        setCustomReq('');
+                      }
+                    }}
+                    className="border-amber-200 dark:border-amber-900/50 focus:border-amber-500"
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1 border-amber-300 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                    onClick={() => {
+                      if (customReq.trim()) {
+                        setCreateForm((p) => ({ ...p, requirementTags: [...p.requirementTags, customReq.trim()] }));
+                        setCustomReq('');
+                      }
+                    }}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> إضافة
+                  </Button>
+                </div>
+                {createForm.requirementTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mt-2">
+                    {createForm.requirementTags.map((tag, idx) => (
+                      <Badge key={idx} variant="secondary" className="gap-1 px-2.5 py-1 text-xs bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => setCreateForm((p) => ({ ...p, requirementTags: p.requirementTags.filter((_, i) => i !== idx) }))}
+                          className="hover:text-red-500 transition-colors"
+                        >
+                          <XCircle className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
 
             {/* ── Step 4: الموقع ── */}
@@ -887,7 +927,7 @@ export default function AdminDeploymentsPage() {
               إلغاء
             </Button>
             <div className="flex items-center gap-2">
-              {createForm.title && createForm.description && createForm.hours > 0 && createForm.amount > 0 && (
+              {createForm.type && createForm.gender && createForm.department && createForm.hours > 0 && createForm.amount > 0 && (
                 <span className="text-[10px] text-emerald-600 font-medium flex items-center gap-1">
                   <CheckCircle2 className="w-3 h-3" /> جاهز للإنشاء
                 </span>

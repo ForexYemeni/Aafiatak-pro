@@ -9,7 +9,9 @@ export interface IDeployment extends Document {
   // تفاصيل التكليف
   title: string;
   description: string;
-  type: 'nursing' | 'lab' | 'midwife' | 'home_care' | 'other';
+  type: 'nursing' | 'lab' | 'midwife' | 'home_care' | 'lab_nurse' | 'medical_sector' | 'other';
+  gender?: 'male' | 'female';
+  department?: string;
   specialization: string[];
   
   // المكان والزمن
@@ -123,9 +125,11 @@ const DeploymentSchema = new Schema<IDeployment>({
   creatorRole: { type: String, enum: ['admin', 'nurse'], required: true },
   creatorPhone: { type: String },
   
-  title: { type: String, required: true, trim: true },
-  description: { type: String, required: true },
-  type: { type: String, enum: ['nursing', 'lab', 'midwife', 'home_care', 'other'], default: 'nursing' },
+  title: { type: String, trim: true },
+  description: { type: String, default: '' },
+  type: { type: String, enum: ['nursing', 'lab', 'midwife', 'home_care', 'lab_nurse', 'medical_sector', 'other'], default: 'nursing' },
+  gender: { type: String, enum: ['male', 'female'] },
+  department: { type: String },
   specialization: [{ type: String }],
   
   hours: { type: Number, required: true, min: 1 },

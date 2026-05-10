@@ -19,6 +19,7 @@ import {
   ChevronLeft,
   AlertCircle,
   Star,
+  Droplets,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,13 @@ import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useToast } from '@/hooks/use-toast';
 import type { ApiResponse } from '@/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 
 interface BeneficiaryProfile {
   name: string;
@@ -81,6 +89,7 @@ export default function ProfilePage() {
   const [editEmergencyName, setEditEmergencyName] = useState('');
   const [editEmergencyPhone, setEditEmergencyPhone] = useState('');
   const [editEmergencyRelation, setEditEmergencyRelation] = useState('');
+  const [editBloodType, setEditBloodType] = useState('');
 
   const fetchProfile = useCallback(async () => {
     if (!token) return;
@@ -99,6 +108,7 @@ export default function ProfilePage() {
         setEditEmergencyName(data.data.emergencyContactName ?? '');
         setEditEmergencyPhone(data.data.emergencyContactPhone ?? '');
         setEditEmergencyRelation(data.data.emergencyContactRelation ?? '');
+        setEditBloodType(data.data.bloodType ?? '');
       }
     } catch {
       // Error handled silently
@@ -145,6 +155,7 @@ export default function ProfilePage() {
           emergencyContactName: editEmergencyName,
           emergencyContactPhone: editEmergencyPhone,
           emergencyContactRelation: editEmergencyRelation,
+          bloodType: editBloodType || undefined,
         }),
       });
       const data = await res.json();
@@ -318,7 +329,28 @@ export default function ProfilePage() {
 
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">فصيلة الدم</Label>
-            <p className="text-sm font-medium">{profile?.bloodType ?? 'غير محدد'}</p>
+            {isEditing ? (
+              <Select value={editBloodType} onValueChange={setEditBloodType}>
+                <SelectTrigger className="w-full">
+                  <SelectValue placeholder="اختر فصيلة الدم" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="A+">A+</SelectItem>
+                  <SelectItem value="A-">A-</SelectItem>
+                  <SelectItem value="B+">B+</SelectItem>
+                  <SelectItem value="B-">B-</SelectItem>
+                  <SelectItem value="AB+">AB+</SelectItem>
+                  <SelectItem value="AB-">AB-</SelectItem>
+                  <SelectItem value="O+">O+</SelectItem>
+                  <SelectItem value="O-">O-</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <p className="text-sm font-medium flex items-center gap-1.5">
+                <Droplets className="w-3.5 h-3.5 text-red-500" />
+                {profile?.bloodType ?? 'غير محدد'}
+              </p>
+            )}
           </div>
         </div>
 

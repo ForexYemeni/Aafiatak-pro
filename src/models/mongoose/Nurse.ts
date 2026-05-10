@@ -21,6 +21,7 @@ export interface INurse extends Document {
   availableBalance: number;
   experience: number;
   bio?: string;
+  bloodType?: string;
   governorate?: string;
   district?: string;
   address?: string;
@@ -52,6 +53,7 @@ const NurseSchema = new Schema({
   availableBalance: { type: Number, default: 0 },
   experience: { type: Number, default: 0 },
   bio: { type: String },
+  bloodType: { type: String },
   governorate: { type: String },
   district: { type: String },
   address: { type: String },

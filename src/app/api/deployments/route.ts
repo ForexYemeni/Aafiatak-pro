@@ -121,11 +121,19 @@ export async function POST(request: NextRequest) {
       endDate,
       requirements,
       notes,
+      gender,
+      department,
     } = body;
 
     // ── Validation ──
-    if (!title || !description || !hours || !amount) {
-      return createErrorResponse('العنوان والوصف وعدد الساعات والمبلغ مطلوبة', 400, 'VALIDATION_ERROR');
+    if (!type || !hours || !amount) {
+      return createErrorResponse('نوع التكليف وعدد الساعات والمبلغ مطلوبة', 400, 'VALIDATION_ERROR');
+    }
+    if (!gender) {
+      return createErrorResponse('الجنس مطلوب', 400, 'VALIDATION_ERROR');
+    }
+    if (!department) {
+      return createErrorResponse('القسم مطلوب', 400, 'VALIDATION_ERROR');
     }
 
     if (hours < 1) {
@@ -160,14 +168,23 @@ export async function POST(request: NextRequest) {
     const creatorUser = await User.findById(user.userId).select('phone').lean();
     const creatorPhone = creatorUser?.phone || '';
 
+    // ── Auto-set title from type ──
+    const typeLabelsMap: Record<string, string> = {
+      nursing: 'تمريض', lab: 'مختبر', midwife: 'توليد', home_care: 'رعاية منزلية',
+      lab_nurse: 'ممرض مخبري', medical_sector: 'القطاع الطبي كامل', other: 'أخرى',
+    };
+    const autoTitle = title || typeLabelsMap[type] || 'تكليف';
+
     // ── Create deployment ──
     const deployment = await Deployment.create({
       createdBy: user.userId,
       creatorRole,
       creatorPhone,
-      title,
-      description,
+      title: autoTitle,
+      description: description || '',
       type: type || 'nursing',
+      gender,
+      department,
       specialization: specialization || [],
       hours,
       location: location || {},
@@ -198,6 +215,8 @@ export async function POST(request: NextRequest) {
         lab: 'مختبر',
         midwife: 'توليد',
         home_care: 'رعاية منزلية',
+        lab_nurse: 'ممرض مخبري',
+        medical_sector: 'القطاع الطبي كامل',
         other: 'أخرى',
       };
       const deploymentType = typeLabels[type || 'nursing'] || 'تمريض';

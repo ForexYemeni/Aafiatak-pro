@@ -87,6 +87,7 @@ interface NurseItem {
   reviewCount: number;
   completedJobs: number;
   governorate: string | null;
+  bloodType?: string | null;
   experience: number;
   bio: string | null;
   rejectedReason: string | null;
@@ -541,6 +542,12 @@ export default function AdminNursesPage() {
           <p className="text-[11px] text-muted-foreground mb-1">حالة التوثيق</p>
           <BadgeStatus status={nurse.verificationStatus} size="sm" />
         </div>
+        {nurse.bloodType && (
+          <div className="rounded-xl bg-muted/40 backdrop-blur-sm p-3 border border-border/30">
+            <p className="text-[11px] text-muted-foreground mb-1">فصيلة الدم</p>
+            <p className="text-sm font-bold text-red-600 dark:text-red-400">{nurse.bloodType}</p>
+          </div>
+        )}
       </div>
 
       {/* Location */}

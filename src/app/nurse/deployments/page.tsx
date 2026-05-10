@@ -8,14 +8,13 @@ import {
   Loader2, Upload, X, Eye, RefreshCw, Filter, Search, Navigation,
   Building2, Landmark, Hash, Percent, FileCheck, Wallet, Star,
   User, ShieldCheck, Award, BriefcaseMedical, Phone, CheckCircle,
-  CreditCard, MessageSquare
+  CreditCard, MessageSquare, Activity, Heart, Zap, Stethoscope, XCircle
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { EmptyState } from '@/components/common/empty-state';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
-import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
@@ -81,7 +80,9 @@ interface DeploymentItem {
   creatorPhone?: string;
   title: string;
   description: string;
-  type: 'nursing' | 'lab' | 'midwife' | 'home_care' | 'other';
+  type: 'nursing' | 'lab' | 'midwife' | 'home_care' | 'lab_nurse' | 'medical_sector' | 'other';
+  gender?: 'male' | 'female';
+  department?: string;
   specialization: string[];
   hours: number;
   location: DeploymentLocation;
@@ -121,6 +122,8 @@ const typeLabels: Record<string, string> = {
   lab: 'مختبر',
   midwife: 'توليد',
   home_care: 'رعاية منزلية',
+  lab_nurse: 'ممرض مخبري',
+  medical_sector: 'القطاع الطبي كامل',
   other: 'أخرى',
 };
 
@@ -129,20 +132,29 @@ const typeColors: Record<string, { bg: string; text: string; icon: string }> = {
   lab:        { bg: 'bg-purple-500',  text: 'text-purple-600 dark:text-purple-400', icon: 'bg-purple-100 dark:bg-purple-900/30' },
   midwife:    { bg: 'bg-pink-500',    text: 'text-pink-600 dark:text-pink-400',     icon: 'bg-pink-100 dark:bg-pink-900/30' },
   home_care:  { bg: 'bg-amber-500',   text: 'text-amber-600 dark:text-amber-400',   icon: 'bg-amber-100 dark:bg-amber-900/30' },
+  lab_nurse:  { bg: 'bg-indigo-500',  text: 'text-indigo-600 dark:text-indigo-400', icon: 'bg-indigo-100 dark:bg-indigo-900/30' },
+  medical_sector: { bg: 'bg-rose-500', text: 'text-rose-600 dark:text-rose-400',   icon: 'bg-rose-100 dark:bg-rose-900/30' },
   other:      { bg: 'bg-gray-500',    text: 'text-gray-600 dark:text-gray-400',      icon: 'bg-gray-100 dark:bg-gray-900/30' },
 };
 
-const specializationOptions = [
-  { id: 'general_nursing', label: 'تمريض عام' },
-  { id: 'critical_care', label: 'رعاية حرجة' },
-  { id: 'pediatric', label: 'أطفال' },
-  { id: 'surgical', label: 'جراحي' },
-  { id: 'obstetrics', label: 'توليد' },
-  { id: 'mental_health', label: 'صحة نفسية' },
-  { id: 'community_health', label: 'صحة مجتمع' },
-  { id: 'emergency', label: 'طوارئ' },
-  { id: 'lab_tech', label: 'مختبر' },
-  { id: 'midwife', label: 'قابلة' },
+const departmentLabels: Record<string, string> = {
+  inpatient: 'رقود',
+  emergency: 'طوارئ',
+  icu: 'عناية',
+  nursery: 'حضانة',
+  surgery: 'جراحة',
+  outpatient: 'عيادات خارجية',
+};
+
+const requirementOptions = [
+  { id: 'license', label: 'يوجد مزاولة', icon: ShieldCheck },
+  { id: 'experience', label: 'خبرة سابقة', icon: Briefcase },
+  { id: 'certificates', label: 'شهادات علمية', icon: FileText },
+  { id: 'iv_therapy', label: 'شاطر في تركيب المحلول الوريدي', icon: Activity },
+  { id: 'wound_care', label: 'شاطر في العناية بالجروح', icon: Heart },
+  { id: 'cpr', label: 'شاطر في الإنعاش القلبي', icon: Zap },
+  { id: 'medication', label: 'شاطر في إعطاء الأدوية', icon: Stethoscope },
+  { id: 'patient_monitoring', label: 'شاطر في مراقبة المرضى', icon: Activity },
 ];
 
 const governorateOptions = [
@@ -229,8 +241,6 @@ export default function NurseDeploymentsPage() {
 
   // Create deployment form state
   const [createForm, setCreateForm] = useState({
-    title: '',
-    description: '',
     type: 'nursing',
     specialization: [] as string[],
     hours: 1,
@@ -240,7 +250,11 @@ export default function NurseDeploymentsPage() {
     amount: 0,
     requirements: '',
     notes: '',
+    gender: '',
+    department: '',
+    requirementTags: [] as string[],
   });
+  const [customReq, setCustomReq] = useState('');
   const [adminCommissionPercent, setAdminCommissionPercent] = useState(15);
   const [creatorServiceFee, setCreatorServiceFee] = useState(0);
   const [applicantServiceFee, setApplicantServiceFee] = useState(500);
@@ -422,8 +436,16 @@ export default function NurseDeploymentsPage() {
 
   /* ── Create deployment ── */
   const handleCreateDeployment = async () => {
-    if (!createForm.title || !createForm.description || !createForm.hours || !createForm.amount) {
-      toast.error('العنوان والوصف وعدد الساعات والمبلغ مطلوبة');
+    if (!createForm.type || !createForm.hours || !createForm.amount) {
+      toast.error('نوع التكليف وعدد الساعات والمبلغ مطلوبة');
+      return;
+    }
+    if (!createForm.gender) {
+      toast.error('الجنس مطلوب');
+      return;
+    }
+    if (!createForm.department) {
+      toast.error('القسم مطلوب');
       return;
     }
     setIsCreating(true);
@@ -431,9 +453,9 @@ export default function NurseDeploymentsPage() {
       const res = await authFetch('/api/deployments', {
         method: 'POST',
         body: JSON.stringify({
-          title: createForm.title,
-          description: createForm.description,
           type: createForm.type,
+          gender: createForm.gender,
+          department: createForm.department,
           specialization: createForm.specialization,
           hours: createForm.hours,
           location: {
@@ -442,7 +464,9 @@ export default function NurseDeploymentsPage() {
             district: createForm.district || undefined,
           },
           amount: createForm.amount,
-          requirements: createForm.requirements || undefined,
+          requirements: createForm.requirementTags.length > 0
+            ? createForm.requirementTags.join(', ')
+            : createForm.requirements || undefined,
           notes: createForm.notes || undefined,
         }),
       });
@@ -451,8 +475,6 @@ export default function NurseDeploymentsPage() {
         toast.success('تم إنشاء التكليف بنجاح');
         await fetchDeployments();
         setCreateForm({
-          title: '',
-          description: '',
           type: 'nursing',
           specialization: [],
           hours: 1,
@@ -462,7 +484,11 @@ export default function NurseDeploymentsPage() {
           amount: 0,
           requirements: '',
           notes: '',
+          gender: '',
+          department: '',
+          requirementTags: [],
         });
+        setCustomReq('');
         setActiveTab('mycreated');
       } else {
         toast.error(json.message ?? 'فشل إنشاء التكليف');
@@ -579,8 +605,20 @@ export default function NurseDeploymentsPage() {
                 <Briefcase className={`w-5 h-5 ${tc.text}`} />
               </div>
               <div>
-                <p className="font-bold text-sm line-clamp-1">{dep.title}</p>
-                <span className="text-[11px] text-muted-foreground">{typeLabels[dep.type] || dep.type}</span>
+                <p className="font-bold text-sm line-clamp-1">{dep.title || typeLabels[dep.type] || dep.type}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Badge variant="secondary" className={`text-[9px] px-1.5 py-0 h-4 ${tc.bg} text-white`}>{typeLabels[dep.type] || dep.type}</Badge>
+                  {dep.gender && (
+                    <Badge variant="secondary" className={`text-[9px] px-1.5 py-0 h-4 ${dep.gender === 'male' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'}`}>
+                      {dep.gender === 'male' ? 'ذكر' : 'أنثى'}
+                    </Badge>
+                  )}
+                  {dep.department && (
+                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
+                      {departmentLabels[dep.department] || dep.department}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
             <BadgeStatus
@@ -600,10 +638,22 @@ export default function NurseDeploymentsPage() {
               <DollarSign className="w-3.5 h-3.5" />
               <span>{toArabicNum(dep.amount.toLocaleString())} ر.ي</span>
             </div>
-            {dep.location?.address && (
+            {(dep.location?.governorate || dep.location?.district) && (
+              <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
+                <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" />
+                <span className="truncate">{[dep.location.governorate, dep.location.district].filter(Boolean).join(' - ')}</span>
+              </div>
+            )}
+            {dep.location?.address && !dep.location?.governorate && (
               <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
                 <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" />
                 <span className="truncate">{dep.location.address}</span>
+              </div>
+            )}
+            {dep.requirements && (
+              <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
+                <FileText className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{dep.requirements}</span>
               </div>
             )}
             {dep.applicantServiceFee > 0 && !needsPayment && (
@@ -808,8 +858,20 @@ export default function NurseDeploymentsPage() {
                 <Briefcase className={`w-5 h-5 ${tc.text}`} />
               </div>
               <div>
-                <p className="font-bold text-sm line-clamp-1">{dep.title}</p>
-                <span className="text-[11px] text-muted-foreground">{typeLabels[dep.type] || dep.type}</span>
+                <p className="font-bold text-sm line-clamp-1">{dep.title || typeLabels[dep.type] || dep.type}</p>
+                <div className="flex items-center gap-1.5 mt-0.5">
+                  <Badge variant="secondary" className={`text-[9px] px-1.5 py-0 h-4 ${tc.bg} text-white`}>{typeLabels[dep.type] || dep.type}</Badge>
+                  {dep.gender && (
+                    <Badge variant="secondary" className={`text-[9px] px-1.5 py-0 h-4 ${dep.gender === 'male' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'}`}>
+                      {dep.gender === 'male' ? 'ذكر' : 'أنثى'}
+                    </Badge>
+                  )}
+                  {dep.department && (
+                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
+                      {departmentLabels[dep.department] || dep.department}
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
             <BadgeStatus
@@ -1102,72 +1164,60 @@ export default function NurseDeploymentsPage() {
 
               <Separator />
 
-              {/* Title */}
-              <div className="space-y-2">
-                <Label htmlFor="dep-title" className="text-sm font-medium">
-                  عنوان التكليف <span className="text-red-500">*</span>
-                </Label>
-                <Input
-                  id="dep-title"
-                  placeholder="مثال: ممرض/ة للرعاية المنزلية"
-                  value={createForm.title}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
-                />
-              </div>
-
-              {/* Description */}
-              <div className="space-y-2">
-                <Label htmlFor="dep-desc" className="text-sm font-medium">
-                  الوصف <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="dep-desc"
-                  placeholder="اكتب وصفاً تفصيلياً للتكليف..."
-                  rows={3}
-                  value={createForm.description}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-                />
-              </div>
-
-              {/* Type */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">نوع التكليف</Label>
-                <Select
-                  value={createForm.type}
-                  onValueChange={(val) => setCreateForm((p) => ({ ...p, type: val as any }))}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="اختر النوع" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(typeLabels).map(([key, label]) => (
-                      <SelectItem key={key} value={key}>{label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Specialization multi-select */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium">التخصصات المطلوبة</Label>
-                <div className="flex flex-wrap gap-2">
-                  {specializationOptions.map((spec) => {
-                    const isSelected = createForm.specialization.includes(spec.id);
-                    return (
-                      <button
-                        key={spec.id}
-                        type="button"
-                        onClick={() => toggleSpecialization(spec.id)}
-                        className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
-                          isSelected
-                            ? 'bg-nurse text-white shadow-sm'
-                            : 'bg-muted/60 text-muted-foreground hover:bg-muted'
-                        }`}
-                      >
-                        {spec.label}
-                      </button>
-                    );
-                  })}
+              {/* نوع التكليف، الجنس، القسم */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    نوع التكليف <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={createForm.type}
+                    onValueChange={(val) => setCreateForm((p) => ({ ...p, type: val as any }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="اختر النوع" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(typeLabels).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    الجنس <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={createForm.gender}
+                    onValueChange={(val) => setCreateForm((p) => ({ ...p, gender: val }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="اختر الجنس" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="male">ذكر</SelectItem>
+                      <SelectItem value="female">أنثى</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium">
+                    القسم <span className="text-red-500">*</span>
+                  </Label>
+                  <Select
+                    value={createForm.department}
+                    onValueChange={(val) => setCreateForm((p) => ({ ...p, department: val }))}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="اختر القسم" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {Object.entries(departmentLabels).map(([key, label]) => (
+                        <SelectItem key={key} value={key}>{label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
               </div>
 
@@ -1199,7 +1249,7 @@ export default function NurseDeploymentsPage() {
                 </div>
               </div>
 
-              {/* D) Commission display - Updated to show BOTH fees */}
+              {/* Commission display */}
               {createForm.amount > 0 && (
                 <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 space-y-1.5">
                   <div className="flex items-center justify-between text-xs">
@@ -1238,23 +1288,87 @@ export default function NurseDeploymentsPage() {
                 </div>
               )}
 
-              {/* Location */}
+              {/* المتطلبات - Tag cards + custom input */}
               <div className="space-y-3">
-                <Label className="text-sm font-medium">الموقع</Label>
-                <GpsLocationButton
-                  onLocationDetected={(loc) => {
-                    setCreateForm((p) => ({
-                      ...p,
-                      location: {
-                        lat: loc.latitude,
-                        lng: loc.longitude,
-                        address: loc.address || `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`,
-                      },
-                    }));
-                  }}
-                  value={createForm.location.address || ''}
-                  placeholder="حدد موقعك الجغرافي"
-                />
+                <Label className="text-sm font-medium">المتطلبات</Label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {requirementOptions.map((req) => {
+                    const isSelected = createForm.requirementTags.includes(req.id);
+                    const ReqIcon = req.icon;
+                    return (
+                      <motion.button
+                        key={req.id}
+                        type="button"
+                        whileTap={{ scale: 0.95 }}
+                        onClick={() => {
+                          setCreateForm((p) => ({
+                            ...p,
+                            requirementTags: isSelected
+                              ? p.requirementTags.filter((t) => t !== req.id)
+                              : [...p.requirementTags, req.id],
+                          }));
+                        }}
+                        className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl text-center transition-all border-2 ${
+                          isSelected
+                            ? 'bg-nurse/10 border-nurse/40 text-nurse shadow-sm'
+                            : 'bg-card border-border text-muted-foreground hover:border-nurse/30'
+                        }`}
+                      >
+                        {isSelected && (
+                          <div className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-nurse flex items-center justify-center">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                          </div>
+                        )}
+                        <ReqIcon className={`w-4 h-4 ${isSelected ? 'text-nurse' : ''}`} />
+                        <span className="text-[10px] font-semibold leading-tight">{req.label}</span>
+                      </motion.button>
+                    );
+                  })}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Input
+                    placeholder="أضف متطلباً مخصصاً..."
+                    value={customReq}
+                    onChange={(e) => setCustomReq(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && customReq.trim()) {
+                        e.preventDefault();
+                        setCreateForm((p) => ({ ...p, requirementTags: [...p.requirementTags, customReq.trim()] }));
+                        setCustomReq('');
+                      }
+                    }}
+                  />
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 gap-1"
+                    onClick={() => {
+                      if (customReq.trim()) {
+                        setCreateForm((p) => ({ ...p, requirementTags: [...p.requirementTags, customReq.trim()] }));
+                        setCustomReq('');
+                      }
+                    }}
+                  >
+                    <Plus className="w-3.5 h-3.5" /> إضافة
+                  </Button>
+                </div>
+                {createForm.requirementTags.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5">
+                    {createForm.requirementTags.map((tag, idx) => (
+                      <Badge key={idx} variant="secondary" className="gap-1 px-2 py-0.5 text-xs">
+                        {tag}
+                        <button
+                          type="button"
+                          onClick={() => setCreateForm((p) => ({ ...p, requirementTags: p.requirementTags.filter((_, i) => i !== idx) }))}
+                          className="hover:text-red-500 transition-colors"
+                        >
+                          <XCircle className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {/* Governorate & District */}
@@ -1284,18 +1398,6 @@ export default function NurseDeploymentsPage() {
                     onChange={(e) => setCreateForm((p) => ({ ...p, district: e.target.value }))}
                   />
                 </div>
-              </div>
-
-              {/* Requirements */}
-              <div className="space-y-2">
-                <Label htmlFor="dep-reqs" className="text-sm font-medium">المتطلبات</Label>
-                <Textarea
-                  id="dep-reqs"
-                  placeholder="المتطلبات اللازمة للتكليف..."
-                  rows={2}
-                  value={createForm.requirements}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, requirements: e.target.value }))}
-                />
               </div>
 
               {/* Notes */}
