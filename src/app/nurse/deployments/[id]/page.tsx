@@ -650,7 +650,7 @@ export default function NurseDeploymentDetailPage() {
               </div>
             )}
 
-            {/* E) admin_approved → payment_pending */}
+            {/* E) admin_approved → Show payment details + upload button */}
             {myApplication.status === 'admin_approved' && (
               <div className="space-y-3">
                 <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900/30">
@@ -664,6 +664,93 @@ export default function NurseDeploymentDetailPage() {
                     المبلغ المطلوب: {toArabicNum(myApplication.serviceFee)} ر.ي
                   </p>
                 </div>
+
+                {/* Payment Details Card for admin_approved */}
+                {(deployment.paymentMethod || deployment.walletNumber || deployment.walletOwnerName) && (
+                  <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 space-y-3">
+                    <div className="flex items-center gap-2 mb-2">
+                      <CreditCard className="w-4 h-4 text-blue-600" />
+                      <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                        تفاصيل الدفع
+                      </p>
+                    </div>
+                    {deployment.paymentMethod && (
+                      <div className="flex items-center justify-between py-2 border-b border-blue-100 dark:border-blue-800/30">
+                        <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                          <Wallet className="w-3 h-3" />
+                          طريقة الدفع
+                        </span>
+                        <span className="text-sm font-bold text-blue-800 dark:text-blue-200">
+                          {deployment.paymentMethod}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex items-center justify-between py-2 border-b border-blue-100 dark:border-blue-800/30">
+                      <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                        <DollarSign className="w-3 h-3" />
+                        المبلغ
+                      </span>
+                      <span className="text-sm font-bold text-blue-800 dark:text-blue-200">
+                        {toArabicNum(myApplication.serviceFee)} ر.ي
+                      </span>
+                    </div>
+                    {deployment.walletNumber && (
+                      <div className="flex items-center justify-between py-2 border-b border-blue-100 dark:border-blue-800/30">
+                        <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                          <Phone className="w-3 h-3" />
+                          رقم المحفظة
+                        </span>
+                        <span className="text-sm font-bold font-mono text-blue-800 dark:text-blue-200" dir="ltr">
+                          {deployment.walletNumber}
+                        </span>
+                      </div>
+                    )}
+                    {deployment.walletOwnerName && (
+                      <div className="flex items-center justify-between py-2">
+                        <span className="text-xs text-blue-600 dark:text-blue-400 flex items-center gap-1.5">
+                          <User className="w-3 h-3" />
+                          اسم صاحب المحفظة
+                        </span>
+                        <span className="text-sm font-bold text-blue-800 dark:text-blue-200">
+                          {deployment.walletOwnerName}
+                        </span>
+                      </div>
+                    )}
+                    {deployment.walletNumber && (
+                      <div className="flex gap-2 pt-2">
+                        <a
+                          href={`https://wa.me/${deployment.walletNumber.replace(/^0+/, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-xs font-medium transition-colors"
+                        >
+                          <MessageSquare className="w-3.5 h-3.5" /> تحويل واتساب
+                        </a>
+                        <button
+                          onClick={() => {
+                            navigator.clipboard.writeText(deployment.walletNumber);
+                            toast.success('تم نسخ رقم المحفظة');
+                          }}
+                          className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-medium transition-colors"
+                        >
+                          نسخ الرقم
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <Button
+                  className="w-full gap-2 bg-orange-600 hover:bg-orange-700 text-white"
+                  onClick={() => {
+                    setShowPaymentModal(true);
+                    setPaymentProof('');
+                    setPaymentProofImage('');
+                  }}
+                >
+                  <Upload className="w-4 h-4" />
+                  تقديم إثبات الدفع
+                </Button>
               </div>
             )}
 

@@ -81,8 +81,28 @@ export async function PATCH(
       }
     }
 
-    // ── Set deployment status to creator_selected ──
-    deployment.status = 'creator_selected';
+    // ── Check if admin created this deployment → auto-approve (skip creator_selected step) ──
+    const isCreatorAdmin = deployment.creatorRole === 'admin';
+    const feeResponsible = deployment.feeResponsible || 'applicant';
+
+    if (isCreatorAdmin && isAdminOrSubadmin) {
+      // Admin selecting on their own deployment → auto-approve, skip admin-approve step
+      if (feeResponsible === 'creator') {
+        // Creator pays fees → go directly to accepted/assigned
+        application.status = 'accepted';
+        deployment.status = 'assigned';
+        deployment.assignedTo = application.applicantId;
+        deployment.assignedAt = new Date();
+        deployment.contactRevealed = true;
+      } else {
+        // Applicant pays fees → need payment
+        application.status = 'payment_pending';
+        deployment.status = 'admin_approved';
+      }
+    } else {
+      // Nurse-created deployment or admin selecting on nurse's deployment → needs admin approval
+      deployment.status = 'creator_selected';
+    }
 
     await deployment.save();
 
@@ -94,89 +114,173 @@ export async function PATCH(
       const creatorNurse = await Nurse.findById(deployment.createdBy).select('name').lean();
       const creatorName = creatorNurse?.name || 'المستخدم';
 
-      // ── Notify admins with voice notification ──
-      const adminVoiceText = `الممرض ${creatorName} اختار ${application.applicantName} للتكليف ${deployment.title}. يرجى الموافقة`;
-      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
-      for (const admin of admins) {
-        const adminRole = (admin as any).role || 'admin';
+      if (isCreatorAdmin && isAdminOrSubadmin) {
+        // ── Admin auto-approved: notify applicant directly ──
+        if (feeResponsible === 'creator') {
+          // Accepted directly - no payment needed
+          const applicantVoiceText = `تم قبولك على التكليف ${deployment.title}. يمكنك الآن التواصل مع صاحب التكليف`;
+          notificationPromises.push(
+            Notification.create({
+              userId: application.applicantId,
+              userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
+              titleAr: '✅ تم قبولك على التكليف',
+              bodyAr: `تم قبولك على التكليف "${deployment.title}". يمكنك الآن التواصل مع صاحب التكليف`,
+              type: 'deployment',
+              priority: 'urgent',
+              data: {
+                deploymentId: id,
+                applicationId,
+                status: 'accepted',
+                voiceAlert: true,
+                voiceText: applicantVoiceText,
+              },
+              actionUrl: '/nurse/deployments',
+              voiceEnabled: true,
+            }),
+            sendPushToUser(application.applicantId.toString(), {
+              title: '✅ تم قبولك على التكليف',
+              body: `تم قبولك على التكليف "${deployment.title}". يمكنك الآن التواصل مع صاحب التكليف`,
+              type: 'deployment',
+              priority: 'urgent',
+              url: '/nurse/deployments',
+              userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
+              sound: true,
+              data: {
+                deploymentId: id,
+                applicationId,
+                status: 'accepted',
+                voiceAlert: true,
+                voiceText: applicantVoiceText,
+              },
+            })
+          );
+        } else {
+          // Need to pay
+          const fee = application.serviceFee || deployment.serviceFee || 0;
+          const applicantVoiceText = `تمت الموافقة على التكليف ${deployment.title}. يرجى دفع رسوم التقديم بمبلغ ${fee} ريال`;
+          notificationPromises.push(
+            Notification.create({
+              userId: application.applicantId,
+              userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
+              titleAr: '✅ تمت الموافقة الإدارية على التكليف',
+              bodyAr: `تمت الموافقة على اختيارك للتكليف "${deployment.title}". يرجى دفع رسوم التقديم بمبلغ ${fee} ريال`,
+              type: 'deployment',
+              priority: 'urgent',
+              data: {
+                deploymentId: id,
+                applicationId,
+                status: 'payment_pending',
+                fee,
+                voiceAlert: true,
+                voiceText: applicantVoiceText,
+              },
+              actionUrl: '/nurse/deployments',
+              voiceEnabled: true,
+            }),
+            sendPushToUser(application.applicantId.toString(), {
+              title: '✅ تمت الموافقة الإدارية على التكليف',
+              body: `تمت الموافقة على اختيارك للتكليف "${deployment.title}". يرجى دفع رسوم التقديم`,
+              type: 'deployment',
+              priority: 'urgent',
+              url: '/nurse/deployments',
+              userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
+              sound: true,
+              data: {
+                deploymentId: id,
+                applicationId,
+                status: 'payment_pending',
+                fee,
+                voiceAlert: true,
+                voiceText: applicantVoiceText,
+              },
+            })
+          );
+        }
+      } else {
+        // ── Nurse-created deployment: notify admins for approval ──
+        const adminVoiceText = `الممرض ${creatorName} اختار ${application.applicantName} للتكليف ${deployment.title}. يرجى الموافقة`;
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
+        for (const admin of admins) {
+          const adminRole = (admin as any).role || 'admin';
+          notificationPromises.push(
+            Notification.create({
+              userId: admin._id,
+              userRole: adminRole,
+              titleAr: '📋 اختيار متقدم للتكليف',
+              bodyAr: `اختار ${creatorName} المتقدم ${application.applicantName} للتكليف "${deployment.title}". يرجى الموافقة`,
+              type: 'deployment',
+              priority: 'high',
+              data: {
+                deploymentId: id,
+                applicationId,
+                applicantId: application.applicantId.toString(),
+                applicantName: application.applicantName,
+                creatorName,
+                status: 'creator_selected',
+                voiceAlert: true,
+                voiceText: adminVoiceText,
+              },
+              actionUrl: '/admin/deployments',
+              voiceEnabled: true,
+            }),
+            sendPushToUser(admin._id.toString(), {
+              title: '📋 اختيار متقدم للتكليف',
+              body: `اختار ${creatorName} المتقدم ${application.applicantName} للتكليف "${deployment.title}"`,
+              type: 'deployment',
+              priority: 'high',
+              url: '/admin/deployments',
+              userRole: adminRole,
+              sound: true,
+              data: {
+                deploymentId: id,
+                applicationId,
+                applicantId: application.applicantId.toString(),
+                status: 'creator_selected',
+                voiceAlert: true,
+                voiceText: adminVoiceText,
+              },
+            })
+          );
+        }
+
+        // ── Notify selected applicant ──
+        const applicantVoiceText = `تم اختيارك للتكليف ${deployment.title}. بانتظار موافقة الإدارة`;
         notificationPromises.push(
           Notification.create({
-            userId: admin._id,
-            userRole: adminRole,
-            titleAr: '📋 اختيار متقدم للتكليف',
-            bodyAr: `اختار ${creatorName} المتقدم ${application.applicantName} للتكليف "${deployment.title}". يرجى الموافقة`,
+            userId: application.applicantId,
+            userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
+            titleAr: '🎯 تم اختيارك للتكليف!',
+            bodyAr: `تم اختيارك للتكليف "${deployment.title}". بانتظار موافقة الإدارة`,
             type: 'deployment',
             priority: 'high',
             data: {
               deploymentId: id,
               applicationId,
-              applicantId: application.applicantId.toString(),
-              applicantName: application.applicantName,
-              creatorName,
-              status: 'creator_selected',
+              status: 'selected_by_creator',
               voiceAlert: true,
-              voiceText: adminVoiceText,
+              voiceText: applicantVoiceText,
             },
-            actionUrl: '/admin/deployments',
+            actionUrl: '/nurse/deployments',
             voiceEnabled: true,
           }),
-          sendPushToUser(admin._id.toString(), {
-            title: '📋 اختيار متقدم للتكليف',
-            body: `اختار ${creatorName} المتقدم ${application.applicantName} للتكليف "${deployment.title}"`,
+          sendPushToUser(application.applicantId.toString(), {
+            title: '🎯 تم اختيارك للتكليف!',
+            body: `تم اختيارك للتكليف "${deployment.title}". بانتظار موافقة الإدارة`,
             type: 'deployment',
             priority: 'high',
-            url: '/admin/deployments',
-            userRole: adminRole,
+            url: '/nurse/deployments',
+            userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
             sound: true,
             data: {
               deploymentId: id,
               applicationId,
-              applicantId: application.applicantId.toString(),
-              status: 'creator_selected',
+              status: 'selected_by_creator',
               voiceAlert: true,
-              voiceText: adminVoiceText,
+              voiceText: applicantVoiceText,
             },
           })
         );
       }
-
-      // ── Notify selected applicant with voice notification ──
-      const applicantVoiceText = `تم اختيارك للتكليف ${deployment.title}. بانتظار موافقة الإدارة`;
-      notificationPromises.push(
-        Notification.create({
-          userId: application.applicantId,
-          userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
-          titleAr: '🎯 تم اختيارك للتكليف!',
-          bodyAr: `تم اختيارك للتكليف "${deployment.title}". بانتظار موافقة الإدارة`,
-          type: 'deployment',
-          priority: 'high',
-          data: {
-            deploymentId: id,
-            applicationId,
-            status: 'selected_by_creator',
-            voiceAlert: true,
-            voiceText: applicantVoiceText,
-          },
-          actionUrl: '/nurse/deployments',
-          voiceEnabled: true,
-        }),
-        sendPushToUser(application.applicantId.toString(), {
-          title: '🎯 تم اختيارك للتكليف!',
-          body: `تم اختيارك للتكليف "${deployment.title}". بانتظار موافقة الإدارة`,
-          type: 'deployment',
-          priority: 'high',
-          url: '/nurse/deployments',
-          userRole: application.applicantRole === 'lab_tech' ? 'nurse' : application.applicantRole,
-          sound: true,
-          data: {
-            deploymentId: id,
-            applicationId,
-            status: 'selected_by_creator',
-            voiceAlert: true,
-            voiceText: applicantVoiceText,
-          },
-        })
-      );
 
       // ── Notify rejected applicants ──
       for (let i = 0; i < deployment.applications.length; i++) {
@@ -224,6 +328,11 @@ export async function PATCH(
     // Fire ALL notifications in parallel
     await Promise.allSettled(notificationPromises);
 
+    // ── Response based on auto-approve or not ──
+    const autoApproved = isCreatorAdmin && isAdminOrSubadmin;
+    const responseAppStatus = application.status;
+    const responseDepStatus = deployment.status;
+
     return Response.json({
       success: true,
       data: {
@@ -231,10 +340,15 @@ export async function PATCH(
         applicationId,
         selectedApplicantId: application.applicantId.toString(),
         selectedApplicantName: application.applicantName,
-        applicationStatus: 'selected_by_creator',
-        deploymentStatus: 'creator_selected',
+        applicationStatus: responseAppStatus,
+        deploymentStatus: responseDepStatus,
+        autoApproved,
       },
-      message: `تم اختيار ${application.applicantName} للتكليف. بانتظار موافقة الإدارة`,
+      message: autoApproved
+        ? (feeResponsible === 'creator'
+          ? `تم اختيار وقبول ${application.applicantName} على التكليف مباشرة`
+          : `تم اختيار ${application.applicantName} والموافقة الإدارية. بانتظار الدفع`)
+        : `تم اختيار ${application.applicantName} للتكليف. بانتظار موافقة الإدارة`,
     });
   } catch (error) {
     console.error('[DEPLOYMENT SELECT APPLICANT ERROR]', error);

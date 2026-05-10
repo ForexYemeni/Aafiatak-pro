@@ -4,8 +4,9 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { Nurse } from '@/models/mongoose';
+import { Nurse, Notification, User } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { sendPushToUser } from '@/lib/notifications/push-service';
 
 export async function POST(request: NextRequest) {
   try {
@@ -69,6 +70,59 @@ export async function POST(request: NextRequest) {
         await Nurse.findByIdAndUpdate(user.userId, { verificationStatus: 'pending' });
       }
 
+      // ═══ NOTIFY: Send voice & push notifications to admins when nurse uploads documents ═══
+      const docLabel = documentType === 'identity' ? 'الهوية الوطنية' : 'مزاولة المهنة';
+      try {
+        const nurseName = nurse.name || 'ممرض';
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
+        const voiceText = `قام الممرض ${nurseName} برفع ${docLabel}. يرجى المراجعة`;
+        const notificationPromises: Promise<any>[] = [];
+
+        for (const admin of admins) {
+          const adminRole = (admin as any).role || 'admin';
+          notificationPromises.push(
+            Notification.create({
+              userId: admin._id,
+              userRole: adminRole,
+              titleAr: '📄 رفع مستندات ممرض',
+              bodyAr: `قام ${nurseName} برفع ${docLabel}${bothUploaded ? ' - اكتملت المستندات' : ''}. يرجى المراجعة`,
+              type: 'verification',
+              priority: bothUploaded ? 'high' : 'medium',
+              data: {
+                nurseId: user.userId,
+                nurseName,
+                documentType,
+                bothUploaded,
+                voiceAlert: true,
+                voiceText,
+              },
+              actionUrl: '/admin/nurses',
+              voiceEnabled: true,
+            }),
+            sendPushToUser(admin._id.toString(), {
+              title: '📄 رفع مستندات ممرض',
+              body: `قام ${nurseName} برفع ${docLabel}${bothUploaded ? ' - اكتملت المستندات' : ''}`,
+              type: 'verification',
+              priority: bothUploaded ? 'high' : 'medium',
+              url: '/admin/nurses',
+              userRole: adminRole,
+              sound: true,
+              data: {
+                nurseId: user.userId,
+                documentType,
+                bothUploaded,
+                voiceAlert: true,
+                voiceText,
+              },
+            })
+          );
+        }
+        await Promise.allSettled(notificationPromises);
+      } catch (notifError) {
+        console.error('[NURSE DOCUMENTS] Notification error:', notifError);
+        // Non-critical
+      }
+
       return Response.json({
         success: true,
         data: {
@@ -77,7 +131,7 @@ export async function POST(request: NextRequest) {
           verificationStatus: bothUploaded && nurse.verificationStatus !== 'verified' ? 'pending' : nurse.verificationStatus,
           bothUploaded,
         },
-        message: `تم رفع ${documentType === 'identity' ? 'الهوية الوطنية' : 'مزاولة المهنة'} بنجاح`,
+        message: `تم رفع ${docLabel} بنجاح`,
       });
     }
 
@@ -113,6 +167,58 @@ export async function POST(request: NextRequest) {
       await Nurse.findByIdAndUpdate(user.userId, { verificationStatus: 'pending' });
     }
 
+    // ═══ NOTIFY: Send voice & push notifications to admins (JSON path) ═══
+    const docLabel = documentType === 'identity' ? 'الهوية الوطنية' : 'مزاولة المهنة';
+    try {
+      const nurseName = nurse.name || 'ممرض';
+      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
+      const voiceText = `قام الممرض ${nurseName} برفع ${docLabel}. يرجى المراجعة`;
+      const notificationPromises: Promise<any>[] = [];
+
+      for (const admin of admins) {
+        const adminRole = (admin as any).role || 'admin';
+        notificationPromises.push(
+          Notification.create({
+            userId: admin._id,
+            userRole: adminRole,
+            titleAr: '📄 رفع مستندات ممرض',
+            bodyAr: `قام ${nurseName} برفع ${docLabel}${bothUploaded ? ' - اكتملت المستندات' : ''}. يرجى المراجعة`,
+            type: 'verification',
+            priority: bothUploaded ? 'high' : 'medium',
+            data: {
+              nurseId: user.userId,
+              nurseName,
+              documentType,
+              bothUploaded,
+              voiceAlert: true,
+              voiceText,
+            },
+            actionUrl: '/admin/nurses',
+            voiceEnabled: true,
+          }),
+          sendPushToUser(admin._id.toString(), {
+            title: '📄 رفع مستندات ممرض',
+            body: `قام ${nurseName} برفع ${docLabel}${bothUploaded ? ' - اكتملت المستندات' : ''}`,
+            type: 'verification',
+            priority: bothUploaded ? 'high' : 'medium',
+            url: '/admin/nurses',
+            userRole: adminRole,
+            sound: true,
+            data: {
+              nurseId: user.userId,
+              documentType,
+              bothUploaded,
+              voiceAlert: true,
+              voiceText,
+            },
+          })
+        );
+      }
+      await Promise.allSettled(notificationPromises);
+    } catch (notifError) {
+      console.error('[NURSE DOCUMENTS] Notification error:', notifError);
+    }
+
     return Response.json({
       success: true,
       data: {
@@ -121,7 +227,7 @@ export async function POST(request: NextRequest) {
         verificationStatus: bothUploaded && nurse.verificationStatus !== 'verified' ? 'pending' : nurse.verificationStatus,
         bothUploaded,
       },
-      message: 'تم رفع المستند بنجاح',
+      message: `تم رفع ${docLabel} بنجاح`,
     });
   } catch (error) {
     console.error('[NURSE DOCUMENTS ERROR]', error);
