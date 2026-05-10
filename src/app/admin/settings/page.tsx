@@ -5,7 +5,8 @@ import { motion } from 'framer-motion';
 import {
   Settings, Save, Loader2, Wallet, X, Percent, Moon, Shield,
   Phone, MessageSquare, FileText, Wrench, MapPin, Users,
-  Heart, Gift, Zap, Clock, AlertTriangle, Globe, Briefcase, Building2
+  Heart, Gift, Zap, Clock, AlertTriangle, Globe, Briefcase, Building2,
+  Database, CheckCircle, Eye, EyeOff, RefreshCw, AlertOctagon
 } from 'lucide-react';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { useAuthFetch } from '@/hooks/use-auth';
@@ -132,6 +133,114 @@ export default function AdminSettingsPage() {
     setSettings((prev) => ({ ...prev, [key]: value }));
   };
 
+  // ── Database Switch State ─────────────────────────────────────────
+  const [dbInfo, setDbInfo] = useState<{ maskedUri: string; databaseName: string; isConnected: boolean; connectionState: string; stats: Record<string, number> } | null>(null);
+  const [newDbUri, setNewDbUri] = useState('');
+  const [newAdminPhone, setNewAdminPhone] = useState('');
+  const [newAdminPassword, setNewAdminPassword] = useState('');
+  const [confirmAdminPassword, setConfirmAdminPassword] = useState('');
+  const [currentPasswordConfirm, setCurrentPasswordConfirm] = useState('');
+  const [isTestingDb, setIsTestingDb] = useState(false);
+  const [isSwitchingDb, setIsSwitchingDb] = useState(false);
+  const [dbTestResult, setDbTestResult] = useState<{ status: string; databaseName: string; collectionsCount: number; isEmpty: boolean } | null>(null);
+  const [dbSwitchResult, setDbSwitchResult] = useState<{ newAdminPhone: string; newDatabase: string; deploymentTriggered: boolean; nextStep: string } | null>(null);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+
+  // Fetch current database info when database section is opened
+  useEffect(() => {
+    if (activeSection === 'database' && !dbInfo) {
+      const fetchDbInfo = async () => {
+        try {
+          const res = await authFetch('/api/admin/database/current');
+          const json = await res.json();
+          if (json.success && json.data) {
+            setDbInfo(json.data);
+          }
+        } catch {
+          toast.error('فشل تحميل معلومات قاعدة البيانات');
+        }
+      };
+      void fetchDbInfo();
+    }
+  }, [activeSection, authFetch, dbInfo]);
+
+  const handleTestDbConnection = async () => {
+    if (!newDbUri.trim()) {
+      toast.error('أدخل رابط MongoDB أولاً');
+      return;
+    }
+    setIsTestingDb(true);
+    setDbTestResult(null);
+    try {
+      const res = await authFetch('/api/admin/database/validate', {
+        method: 'POST',
+        body: JSON.stringify({ uri: newDbUri.trim() }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDbTestResult(json.data);
+        toast.success('تم الاتصال بقاعدة البيانات بنجاح!');
+      } else {
+        toast.error(json.error?.message ?? 'فشل الاتصال بقاعدة البيانات');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء اختبار الاتصال');
+    } finally {
+      setIsTestingDb(false);
+    }
+  };
+
+  const handleSwitchDatabase = async () => {
+    // Validation
+    if (!newDbUri.trim()) { toast.error('أدخل رابط MongoDB الجديد'); return; }
+    if (!newAdminPhone.trim()) { toast.error('أدخل رقم هاتف الإدارة الجديد'); return; }
+    if (!newAdminPassword.trim()) { toast.error('أدخل كلمة مرور الإدارة الجديدة'); return; }
+    if (newAdminPassword !== confirmAdminPassword) { toast.error('كلمة المرور وتأكيدها غير متطابقتين'); return; }
+    if (newAdminPassword.length < 6) { toast.error('كلمة المرور يجب أن تكون 6 أحرف على الأقل'); return; }
+    if (!currentPasswordConfirm.trim()) { toast.error('أدخل كلمة مرور الإدارة الحالية للتأكيد'); return; }
+
+    // Double confirmation
+    const confirmed = window.confirm(
+      '⚠️ تحذير مهم!\n\n' +
+      'سيتم تبديل قاعدة البيانات بالكامل. هذا الإجراء لا يمكن التراجع عنه!\n\n' +
+      'هل أنت متأكد من رغبتك في المتابعة؟'
+    );
+    if (!confirmed) return;
+
+    setIsSwitchingDb(true);
+    setDbSwitchResult(null);
+    try {
+      const res = await authFetch('/api/admin/database/switch', {
+        method: 'POST',
+        body: JSON.stringify({
+          newUri: newDbUri.trim(),
+          adminPhone: newAdminPhone.trim(),
+          adminPassword: newAdminPassword,
+          currentPassword: currentPasswordConfirm,
+        }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setDbSwitchResult(json.data);
+        toast.success('تم تبديل قاعدة البيانات بنجاح!');
+        // Clear form
+        setNewDbUri('');
+        setNewAdminPhone('');
+        setNewAdminPassword('');
+        setConfirmAdminPassword('');
+        setCurrentPasswordConfirm('');
+        setDbTestResult(null);
+      } else {
+        toast.error(json.error?.message ?? 'فشل تبديل قاعدة البيانات');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء تبديل قاعدة البيانات');
+    } finally {
+      setIsSwitchingDb(false);
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -149,6 +258,7 @@ export default function AdminSettingsPage() {
     { id: 'support', label: 'أرقام التواصل', icon: Phone },
     { id: 'legal', label: 'المستندات القانونية', icon: FileText },
     { id: 'maintenance', label: 'وضع الصيانة', icon: Wrench },
+    { id: 'database', label: 'قاعدة البيانات', icon: Database },
   ];
 
   return (
@@ -883,6 +993,253 @@ export default function AdminSettingsPage() {
                     />
                   </div>
                 )}
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Database Management */}
+      {activeSection === 'database' && (
+        <motion.div variants={itemAnim} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          {/* Current Database Info */}
+          <GlassCard variant="admin">
+            <GlassCardHeader>
+              <GlassCardTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
+                  <Database className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                </div>
+                قاعدة البيانات الحالية
+              </GlassCardTitle>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="space-y-4">
+                <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50">
+                  <CheckCircle className={`w-5 h-5 shrink-0 ${dbInfo?.isConnected ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'}`} />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium">الحالة: {dbInfo?.isConnected ? 'متصلة' : 'غير متصلة'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5 truncate" dir="ltr">{dbInfo?.maskedUri || 'جارٍ التحميل...'}</p>
+                  </div>
+                  <span className="text-xs font-medium px-2 py-1 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400">{dbInfo?.databaseName || '---'}</span>
+                </div>
+                {dbInfo?.stats && Object.keys(dbInfo.stats).length > 0 && (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                    {Object.entries(dbInfo.stats).filter(([, v]) => v >= 0).map(([col, count]) => (
+                      <div key={col} className="p-2.5 rounded-xl glass">
+                        <p className="text-[10px] text-muted-foreground truncate">{col}</p>
+                        <p className="text-sm font-bold">{count}</p>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+
+          {/* Success Result */}
+          {dbSwitchResult && (
+            <GlassCard variant="admin" className="border-emerald-200 dark:border-emerald-800/50">
+              <GlassCardContent>
+                <div className="p-6 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-300 dark:border-emerald-700 text-center space-y-4">
+                  <div className="w-16 h-16 mx-auto rounded-full bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center">
+                    <CheckCircle className="w-8 h-8 text-emerald-600 dark:text-emerald-400" />
+                  </div>
+                  <h3 className="text-xl font-bold text-emerald-700 dark:text-emerald-400">تم تبديل قاعدة البيانات بنجاح!</h3>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-center justify-between max-w-xs mx-auto p-3 rounded-xl bg-white/50 dark:bg-black/20">
+                      <span className="text-muted-foreground">رقم الإدارة الجديد</span>
+                      <span className="font-bold text-lg" dir="ltr">{dbSwitchResult.newAdminPhone}</span>
+                    </div>
+                    <div className="flex items-center justify-between max-w-xs mx-auto p-3 rounded-xl bg-white/50 dark:bg-black/20">
+                      <span className="text-muted-foreground">قاعدة البيانات</span>
+                      <span className="font-medium">{dbSwitchResult.newDatabase}</span>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-2 justify-center p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50">
+                    <AlertOctagon className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                    <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">{dbSwitchResult.nextStep}</p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">احفظ بيانات الدخول الجديدة الآن! لن تظهر مرة أخرى.</p>
+                </div>
+              </GlassCardContent>
+            </GlassCard>
+          )}
+
+          {/* Switch Database Form */}
+          <GlassCard variant="admin" className="border-rose-200 dark:border-rose-900/50">
+            <GlassCardHeader>
+              <GlassCardTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-rose-100 dark:bg-rose-900/30 flex items-center justify-center">
+                  <RefreshCw className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                </div>
+                تبديل إلى قاعدة بيانات جديدة
+              </GlassCardTitle>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="space-y-6">
+                {/* Warning Banner */}
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
+                  <AlertOctagon className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-red-700 dark:text-red-400 mb-1">تحذير مهم</p>
+                    <ul className="text-xs text-red-600/80 dark:text-red-400/70 space-y-1 list-disc mr-4 leading-relaxed">
+                      <li>سيتم فقدان جميع بيانات الجلسة الحالية</li>
+                      <li>سيتم إنشاء حساب إدارة بالبيانات التي تكتبها أدناه في القاعدة الجديدة</li>
+                      <li>سيتم تحديث متغيرات Vercel وإعادة النشر تلقائياً</li>
+                      <li>الإجراء لا يمكن التراجع عنه</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* New MongoDB URI */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <Database className="w-3.5 h-3.5 text-rose-500" />
+                    رابط MongoDB الجديد
+                  </Label>
+                  <Input
+                    value={newDbUri}
+                    onChange={(e) => { setNewDbUri(e.target.value); setDbTestResult(null); }}
+                    placeholder="mongodb+srv://username:password@cluster0.xxxxx.mongodb.net/dbname"
+                    dir="ltr"
+                    className="bg-background/50 text-xs"
+                  />
+                  <p className="text-[10px] text-muted-foreground">تأكد أن IP Access List = 0.0.0.0/0 في إعدادات MongoDB Atlas</p>
+                </div>
+
+                {/* Test Connection Button */}
+                <div className="flex items-center gap-3">
+                  <Button
+                    variant="outline"
+                    onClick={handleTestDbConnection}
+                    disabled={isTestingDb || !newDbUri.trim()}
+                    className="gap-2 border-rose-200 dark:border-rose-800 hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                  >
+                    {isTestingDb ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4" />}
+                    {isTestingDb ? 'جارٍ الاختبار...' : 'اختبار الاتصال'}
+                  </Button>
+                  {dbTestResult && (
+                    <div className="flex items-center gap-2 text-sm text-emerald-600 dark:text-emerald-400">
+                      <CheckCircle className="w-4 h-4" />
+                      <span>متصل - {dbTestResult.databaseName} ({dbTestResult.collectionsCount} مجموعة)</span>
+                    </div>
+                  )}
+                </div>
+
+                <Separator />
+
+                {/* New Admin Credentials */}
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                      <Shield className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium">بيانات حساب الإدارة في القاعدة الجديدة</p>
+                      <p className="text-[10px] text-muted-foreground">اكتب بيانات الدخول التي تريدها للحساب الإداري</p>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium flex items-center gap-1.5">
+                        <Phone className="w-3.5 h-3.5 text-blue-500" />
+                        رقم هاتف الإدارة الجديد
+                      </Label>
+                      <Input
+                        value={newAdminPhone}
+                        onChange={(e) => setNewAdminPhone(e.target.value)}
+                        placeholder="700000000"
+                        dir="ltr"
+                        className="bg-background/50"
+                      />
+                      <p className="text-[10px] text-muted-foreground">9 أرقام تبدأ بـ 7</p>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">كلمة المرور الجديدة</Label>
+                      <div className="relative">
+                        <Input
+                          value={newAdminPassword}
+                          onChange={(e) => setNewAdminPassword(e.target.value)}
+                          type={showNewPassword ? 'text' : 'password'}
+                          placeholder="6 أحرف على الأقل"
+                          className="bg-background/50 pr-10"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowNewPassword(!showNewPassword)}
+                          className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        >
+                          {showNewPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-sm font-medium">تأكيد كلمة المرور</Label>
+                      <Input
+                        value={confirmAdminPassword}
+                        onChange={(e) => setConfirmAdminPassword(e.target.value)}
+                        type="password"
+                        placeholder="أعد كتابة كلمة المرور"
+                        className="bg-background/50"
+                      />
+                      {confirmAdminPassword && confirmAdminPassword !== newAdminPassword && (
+                        <p className="text-[10px] text-red-500">كلمة المرور غير متطابقة</p>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Current Password Confirmation */}
+                <div className="space-y-2 max-w-md">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-amber-500" />
+                    تأكيد بكلمة مرور الإدارة الحالية
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      value={currentPasswordConfirm}
+                      onChange={(e) => setCurrentPasswordConfirm(e.target.value)}
+                      type={showCurrentPassword ? 'text' : 'password'}
+                      placeholder="أدخل كلمة مرورك الحالية للتأكيد"
+                      className="bg-background/50 pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showCurrentPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">هذا الإجراء يتطلب تأكيدك بكلمة مرورك الحالية</p>
+                </div>
+
+                {/* Switch Button */}
+                <div className="flex items-center gap-3 pt-2">
+                  <Button
+                    onClick={handleSwitchDatabase}
+                    disabled={isSwitchingDb || !newDbUri.trim() || !newAdminPhone.trim() || !newAdminPassword.trim() || !currentPasswordConfirm.trim()}
+                    className="bg-rose-600 hover:bg-rose-700 gap-2 min-w-48 shadow-lg shadow-rose-600/20 text-white"
+                    size="lg"
+                  >
+                    {isSwitchingDb ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        جارٍ التبديل...
+                      </>
+                    ) : (
+                      <>
+                        <RefreshCw className="w-4 h-4" />
+                        تبديل قاعدة البيانات
+                      </>
+                    )}
+                  </Button>
+                  {isSwitchingDb && (
+                    <p className="text-xs text-muted-foreground">قد تستغرق هذه العملية بضع دقائق...</p>
+                  )}
+                </div>
               </div>
             </GlassCardContent>
           </GlassCard>
