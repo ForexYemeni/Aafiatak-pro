@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Noto_Sans_Arabic } from "next/font/google";
 import "./globals.css";
 import { AppProvider } from "@/components/providers/app-provider";
+import { HydrationSafeProvider } from "@/components/providers/hydration-safe-provider";
 import { Toaster } from "@/components/ui/sonner";
 import { PWAInitializer } from "@/components/providers/pwa-provider";
 import { SafeProvider } from "@/components/providers/safe-provider";
@@ -51,11 +52,13 @@ export default function RootLayout({
         className={`${notoArabic.variable} antialiased bg-background text-foreground font-sans`}
       >
         <AppProvider>
-          <SafeProvider>
-            <PWAInitializer />
-            <NotificationToastListener />
-          </SafeProvider>
-          {children}
+          <HydrationSafeProvider>
+            <SafeProvider>
+              <PWAInitializer />
+              <NotificationToastListener />
+            </SafeProvider>
+            {children}
+          </HydrationSafeProvider>
         </AppProvider>
         <Toaster
           position="top-left"
