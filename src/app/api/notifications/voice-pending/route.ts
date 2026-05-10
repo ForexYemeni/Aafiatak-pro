@@ -1,8 +1,8 @@
 // GET /api/notifications/voice-pending - Get voice-pending notifications
-// Returns notifications where voiceEnabled=true and voicePlayedAt doesn't exist
-// Automatically marks them as played to prevent re-playing
-// This is the PRIMARY delivery mechanism for voice notifications on Vercel
-// (since Socket.IO server doesn't run on Vercel serverless)
+// Returns notifications where voiceEnabled=true and voicePlayedAt doesn't exist.
+// Does NOT auto-mark as played — the CLIENT must confirm playback via
+// PATCH /api/notifications/[id]/voice-played after successfully playing sound+TTS.
+// This prevents losing voice alerts if the browser tab is throttled or audio fails.
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
@@ -16,14 +16,22 @@ export async function GET(request: NextRequest) {
     if (error) return error;
 
     // Find voice-pending notifications: voiceEnabled=true, voicePlayedAt not set, unread
+    // Also include read=false OR recently created (within 5 minutes) read notifications
+    // This ensures we don't miss notifications that were marked as read via the bell
+    // but the voice hasn't been played yet
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
     const voicePending = await Notification.find({
       userId: user.userId,
       voiceEnabled: true,
       voicePlayedAt: { $exists: false },
-      read: false,
+      $or: [
+        { read: false },
+        { read: true, createdAt: { $gte: fiveMinutesAgo } },
+      ],
     })
-      .sort({ createdAt: -1 })
-      .limit(10)
+      .sort({ priority: -1, createdAt: -1 })
+      .limit(15)
       .lean();
 
     if (!voicePending.length) {
@@ -33,16 +41,10 @@ export async function GET(request: NextRequest) {
       });
     }
 
-    // Immediately mark them as played to prevent re-playing on next poll
-    const notificationIds = voicePending.map((n: any) => n._id);
-    await Notification.updateMany(
-      { _id: { $in: notificationIds }, userId: user.userId },
-      { voicePlayedAt: new Date() }
-    );
-
-    // Return the notifications with all data needed for sound + TTS
+    // Return the notifications WITHOUT marking them as played
+    // The client must confirm playback via PATCH /api/notifications/[id]/voice-played
     const mapped = voicePending.map((n: any) => {
-      let parsedData: Record<string, string> = {};
+      let parsedData: Record<string, any> = {};
       try {
         parsedData = typeof n.data === 'string' ? JSON.parse(n.data) : (n.data || {});
       } catch {

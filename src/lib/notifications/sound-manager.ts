@@ -54,9 +54,8 @@ class SoundManager {
   };
 
   // Minimum time between identical sounds (ms) to prevent rapid duplication
-  // 5 seconds - ensures the same sound type won't repeat too quickly
-  // even if multiple sources try to trigger it (push + socket arriving close together)
-  private readonly DEBOUNCE_MS = 5000;
+  // 1 second - allows multiple notifications in quick succession while preventing echo
+  private readonly DEBOUNCE_MS = 1000;
 
   // ---- Auto-Initialization ----
 

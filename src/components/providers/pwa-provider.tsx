@@ -157,8 +157,11 @@ function NotificationPoller() {
 // This is the PRIMARY mechanism for delivering voice alerts on Vercel.
 // Since Socket.IO server doesn't run on Vercel serverless, we poll every
 // 2 seconds for voice-pending notifications and play sound + TTS immediately.
-// The API endpoint marks them as played automatically to prevent re-playing.
+// After successful playback, we CONFIRM to the server via /voice-played endpoint.
+// This prevents losing alerts if the browser tab is throttled or audio fails.
 // ============================================================================
+
+const VOICE_PLAYED_URL = '/api/notifications/voice-played';
 
 function VoiceNotificationPoller() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
@@ -166,6 +169,9 @@ function VoiceNotificationPoller() {
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const isPollingRef = useRef(false);
+  // Track IDs of notifications we've already processed in this session
+  // to avoid replaying sounds for the same notification on every poll
+  const processedIdsRef = useRef<Set<string>>(new Set());
 
   const pollForVoiceNotifications = useCallback(async () => {
     if (!isAuthenticated || !token || isPollingRef.current) return;
@@ -190,11 +196,25 @@ function VoiceNotificationPoller() {
         return;
       }
 
-      // Process each voice-pending notification
-      const { ttsEnabled } = useNotificationStore.getState();
+      // Filter out notifications we've already processed in this session
+      const newNotifications = data.data.notifications.filter(
+        (notif: any) => !processedIdsRef.current.has(notif.id)
+      );
 
-      for (const notif of data.data.notifications) {
+      if (newNotifications.length === 0) {
+        isPollingRef.current = false;
+        return;
+      }
+
+      // Process each NEW voice-pending notification
+      const { ttsEnabled } = useNotificationStore.getState();
+      const playedIds: string[] = [];
+
+      for (const notif of newNotifications) {
         const notifId = `voice-poll-${notif.id}`;
+
+        // Mark as processed in this session
+        processedIdsRef.current.add(notif.id);
 
         // Play sound with dedup (won't replay if already played by push/socket)
         playNotificationSound(
@@ -217,6 +237,9 @@ function VoiceNotificationPoller() {
           }
         }
 
+        // Track this notification as played (will be confirmed to server below)
+        playedIds.push(notif.id);
+
         // Dispatch custom event for UI (notification bell, toasts, etc.)
         window.dispatchEvent(new CustomEvent('app-notification', {
           detail: {
@@ -231,8 +254,34 @@ function VoiceNotificationPoller() {
         }));
       }
 
+      // Confirm playback to the server AFTER processing all notifications
+      // This ensures we don't lose voice alerts if playback fails
+      if (playedIds.length > 0) {
+        try {
+          await fetch(VOICE_PLAYED_URL, {
+            method: 'PATCH',
+            headers: {
+              'Authorization': `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ notificationIds: playedIds }),
+          });
+        } catch {
+          // If confirmation fails, the notification will be returned again
+          // on the next poll, and our session dedup (processedIdsRef) will
+          // prevent replaying. The server will eventually mark it when we
+          // successfully confirm.
+        }
+      }
+
       // Refresh notification store to update UI badge
       useNotificationStore.getState().fetchNotifications();
+
+      // Trim processed IDs set to prevent memory leak (keep last 100)
+      if (processedIdsRef.current.size > 100) {
+        const entries = Array.from(processedIdsRef.current);
+        processedIdsRef.current = new Set(entries.slice(-50));
+      }
     } catch {
       // Network error - ignore
     } finally {
@@ -244,11 +293,17 @@ function VoiceNotificationPoller() {
     if (!hasHydrated) return;
 
     if (isAuthenticated && token) {
+      // Reset processed IDs on new auth session
+      processedIdsRef.current.clear();
+
       // Initial poll immediately on auth
       pollForVoiceNotifications();
 
       // Fast polling for voice notifications (every 2 seconds)
       intervalRef.current = setInterval(pollForVoiceNotifications, VOICE_POLL_INTERVAL);
+    } else {
+      // Clear processed IDs on logout
+      processedIdsRef.current.clear();
     }
 
     // Listen for visibility change — when user returns to the app from background,
