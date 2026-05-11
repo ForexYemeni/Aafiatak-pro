@@ -8,7 +8,8 @@ import {
   Loader2, Upload, X, Eye, RefreshCw, Filter, Search, Navigation,
   Building2, Landmark, Hash, Percent, FileCheck, Wallet, Star,
   User, ShieldCheck, Award, BriefcaseMedical, Phone, CheckCircle,
-  CreditCard, MessageSquare, Activity, Heart, Zap, Stethoscope, XCircle
+  CreditCard, MessageSquare, Activity, Heart, Zap, Stethoscope, XCircle,
+  Tag, CircleCheck
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -156,6 +157,17 @@ const requirementOptions = [
   { id: 'medication', label: 'شاطر في إعطاء الأدوية', icon: Stethoscope },
   { id: 'patient_monitoring', label: 'شاطر في مراقبة المرضى', icon: Activity },
 ];
+
+const requirementLabelMap: Record<string, string> = {
+  license: 'يوجد مزاولة',
+  experience: 'خبرة سابقة',
+  certificates: 'شهادات علمية',
+  iv_therapy: 'شاطر في تركيب المحلول الوريدي',
+  wound_care: 'شاطر في العناية بالجروح',
+  cpr: 'شاطر في الإنعاش القلبي',
+  medication: 'شاطر في إعطاء الأدوية',
+  patient_monitoring: 'شاطر في مراقبة المرضى',
+};
 
 const governorateOptions = [
   'أمانة العاصمة', 'عدن', 'تعز', 'الحديدة', 'إب', 'ذمار', 'حضرموت',
@@ -1151,147 +1163,201 @@ export default function NurseDeploymentsPage() {
 
           {/* ── Tab 6: Create Deployment ── */}
           <TabsContent value="create" className="mt-4">
-            <GlassCard variant="nurse" className="space-y-5">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-nurse/10 flex items-center justify-center">
-                  <Plus className="w-5 h-5 text-nurse" />
+            <div className="space-y-1">
+              {/* Gradient Header */}
+              <div className="relative bg-gradient-to-l from-nurse via-nurse/90 to-teal-600 p-6 pb-5 rounded-2xl overflow-hidden">
+                <div className="absolute inset-0 opacity-10">
+                  <div className="absolute top-2 left-8 w-20 h-20 rounded-full bg-white/20 blur-xl" />
+                  <div className="absolute bottom-1 right-12 w-16 h-16 rounded-full bg-white/15 blur-lg" />
                 </div>
-                <div>
-                  <h3 className="font-bold">إنشاء تكليف جديد</h3>
-                  <p className="text-xs text-muted-foreground">أنشئ تكليفاً لعرض خدماتك على الآخرين</p>
+                <div className="relative flex items-center gap-4">
+                  <div className="w-14 h-14 rounded-2xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/20 shadow-lg">
+                    <Briefcase className="w-7 h-7 text-white" />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-xl font-black text-white mb-0.5">إنشاء تكليف جديد</h3>
+                    <p className="text-white/80 text-sm">أنشئ تكليفاً جديداً للبحث عن ممرض/ـة مناسب/ـة</p>
+                  </div>
+                  <div className="flex items-center gap-1.5 bg-white/15 backdrop-blur-sm rounded-xl px-3 py-1.5 border border-white/20">
+                    <Hash className="w-4 h-4 text-white/80" />
+                    <span className="text-xs font-bold text-white/90">تكليف جديد</span>
+                  </div>
                 </div>
               </div>
 
-              <Separator />
-
-              {/* نوع التكليف، الجنس، القسم */}
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    نوع التكليف <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={createForm.type}
-                    onValueChange={(val) => setCreateForm((p) => ({ ...p, type: val as any }))}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="اختر النوع" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(typeLabels).map(([key, label]) => (
-                        <SelectItem key={key} value={key}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* ── Step 1: نوع التكليف ── */}
+              <div className="rounded-2xl border-2 border-nurse/20 bg-gradient-to-b from-nurse/5 to-transparent p-5 space-y-4 hover:border-nurse/30 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-nurse text-white flex items-center justify-center text-sm font-black shadow-md shadow-nurse/30">١</div>
+                  <div>
+                    <h4 className="font-bold text-nurse text-base">نوع التكليف</h4>
+                    <p className="text-[11px] text-muted-foreground">اختر نوع وقسم التكليف</p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    الجنس <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={createForm.gender}
-                    onValueChange={(val) => setCreateForm((p) => ({ ...p, gender: val }))}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="اختر الجنس" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="male">ذكر</SelectItem>
-                      <SelectItem value="female">أنثى</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">
-                    القسم <span className="text-red-500">*</span>
-                  </Label>
-                  <Select
-                    value={createForm.department}
-                    onValueChange={(val) => setCreateForm((p) => ({ ...p, department: val }))}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="اختر القسم" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {Object.entries(departmentLabels).map(([key, label]) => (
-                        <SelectItem key={key} value={key}>{label}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold flex items-center gap-1.5">
+                      <Tag className="w-3.5 h-3.5 text-nurse" />
+                      نوع التكليف <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={createForm.type}
+                      onValueChange={(val) => setCreateForm((p) => ({ ...p, type: val as any }))}
+                    >
+                      <SelectTrigger className="w-full h-12 text-sm font-medium border-nurse/20 focus:border-nurse">
+                        <SelectValue placeholder="اختر نوع التكليف" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(typeLabels).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-teal-600" />
+                      القسم <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={createForm.department}
+                      onValueChange={(val) => setCreateForm((p) => ({ ...p, department: val }))}
+                    >
+                      <SelectTrigger className="w-full h-12 text-sm font-medium border-teal-200 dark:border-teal-900/50 focus:border-teal-500">
+                        <SelectValue placeholder="اختر القسم" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(departmentLabels).map(([key, label]) => (
+                          <SelectItem key={key} value={key}>{label}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold flex items-center gap-1.5">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5 text-pink-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+                      الجنس <span className="text-red-500">*</span>
+                    </Label>
+                    <Select
+                      value={createForm.gender}
+                      onValueChange={(val) => setCreateForm((p) => ({ ...p, gender: val }))}
+                    >
+                      <SelectTrigger className="w-full h-12 text-sm font-medium border-pink-200 dark:border-pink-900/50 focus:border-pink-500">
+                        <SelectValue placeholder="اختر الجنس" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="male">ذكر</SelectItem>
+                        <SelectItem value="female">أنثى</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
                 </div>
               </div>
 
-              {/* Hours & Amount row */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label htmlFor="dep-hours" className="text-sm font-medium">
-                    عدد الساعات <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="dep-hours"
-                    type="number"
-                    min={1}
-                    value={createForm.hours}
-                    onChange={(e) => setCreateForm((p) => ({ ...p, hours: parseInt(e.target.value) || 1 }))}
-                  />
+              {/* ── Step 2: الوقت والأجر ── */}
+              <div className="rounded-2xl border-2 border-emerald-200 dark:border-emerald-900/40 bg-gradient-to-b from-emerald-50/50 dark:from-emerald-950/10 to-transparent p-5 space-y-4 hover:border-emerald-300 dark:hover:border-emerald-800/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-emerald-600 text-white flex items-center justify-center text-sm font-black shadow-md shadow-emerald-600/30">٢</div>
+                  <div>
+                    <h4 className="font-bold text-emerald-700 dark:text-emerald-400 text-base">الوقت والأجر</h4>
+                    <p className="text-[11px] text-muted-foreground">حدد عدد الساعات والمبلغ</p>
+                  </div>
                 </div>
-                <div className="space-y-2">
-                  <Label htmlFor="dep-amount" className="text-sm font-medium">
-                    المبلغ (ر.ي) <span className="text-red-500">*</span>
-                  </Label>
-                  <Input
-                    id="dep-amount"
-                    type="number"
-                    min={0}
-                    value={createForm.amount}
-                    onChange={(e) => setCreateForm((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
-                  />
-                </div>
-              </div>
-
-              {/* Commission display */}
-              {createForm.amount > 0 && (
-                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-900/30 space-y-1.5">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">المبلغ الأساسي</span>
-                    <span className="font-medium">{toArabicNum(createForm.amount.toLocaleString())} ر.ي</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">نسبة العمولة ({toArabicNum(adminCommissionPercent)}%)</span>
-                    <span className="font-medium text-orange-600">
-                      {toArabicNum(Math.round((createForm.amount * adminCommissionPercent) / 100).toLocaleString())} ر.ي → للإدارة
-                    </span>
-                  </div>
-                  <Separator />
-                  <div className="flex items-center justify-between text-sm font-bold">
-                    <span>صافيك</span>
-                    <span className="text-green-600">
-                      {toArabicNum((createForm.amount - Math.round((createForm.amount * adminCommissionPercent) / 100)).toLocaleString())} ر.ي
-                    </span>
-                  </div>
-                  {creatorServiceFee > 0 && (
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">رسوم صاحب التكليف</span>
-                      <span className="font-medium text-blue-600">
-                        {toArabicNum(creatorServiceFee)} ر.ي
-                      </span>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="nurse-dep-hours" className="text-sm font-semibold flex items-center gap-1.5">
+                      <Clock className="w-3.5 h-3.5 text-emerald-600" />
+                      عدد الساعات <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="nurse-dep-hours"
+                        type="number"
+                        min={1}
+                        value={createForm.hours || ''}
+                        placeholder="0"
+                        className={`h-12 text-lg font-bold text-center border-emerald-200 dark:border-emerald-900/50 focus:border-emerald-500 ${createForm.hours === 0 ? 'text-muted-foreground/30 placeholder:text-muted-foreground/30' : 'text-emerald-700 dark:text-emerald-400'}`}
+                        onChange={(e) => setCreateForm((p) => ({ ...p, hours: parseInt(e.target.value) || 0 }))}
+                      />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-emerald-600/70 bg-emerald-50 dark:bg-emerald-900/30 px-2 py-1 rounded-md border border-emerald-200 dark:border-emerald-800/50">ساعة</span>
                     </div>
-                  )}
-                  {applicantServiceFee > 0 && (
-                    <div className="flex items-center justify-between text-xs">
-                      <span className="text-muted-foreground">رسوم المتقدم</span>
-                      <span className="font-medium text-orange-600">
-                        {toArabicNum(applicantServiceFee)} ر.ي
-                      </span>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nurse-dep-amount" className="text-sm font-semibold flex items-center gap-1.5">
+                      <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
+                      المبلغ <span className="text-red-500">*</span>
+                    </Label>
+                    <div className="relative">
+                      <Input
+                        id="nurse-dep-amount"
+                        type="number"
+                        min={0}
+                        value={createForm.amount || ''}
+                        placeholder="0"
+                        className={`h-12 text-lg font-bold text-center pl-20 border-emerald-200 dark:border-emerald-900/50 focus:border-emerald-500 ${createForm.amount === 0 ? 'text-muted-foreground/30 placeholder:text-muted-foreground/30' : 'text-emerald-700 dark:text-emerald-400'}`}
+                        onChange={(e) => setCreateForm((p) => ({ ...p, amount: parseInt(e.target.value) || 0 }))}
+                      />
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-emerald-600/70 bg-emerald-50 dark:bg-emerald-900/30 px-2.5 py-1 rounded-md border border-emerald-200 dark:border-emerald-800/50">ر.ي</span>
                     </div>
-                  )}
+                  </div>
                 </div>
-              )}
 
-              {/* المتطلبات - Tag cards + custom input */}
-              <div className="space-y-3">
-                <Label className="text-sm font-medium">المتطلبات</Label>
-                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                {/* Commission preview */}
+                {createForm.amount > 0 && (
+                  <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="overflow-hidden">
+                    <div className="p-4 rounded-xl bg-gradient-to-l from-emerald-50 to-emerald-100/50 dark:from-emerald-950/20 dark:to-emerald-900/10 border border-emerald-200 dark:border-emerald-900/40 space-y-2.5">
+                      <div className="flex items-center gap-2 mb-1">
+                        <Wallet className="w-4 h-4 text-emerald-600" />
+                        <span className="text-xs font-black text-emerald-700 dark:text-emerald-400">معاينة العمولة</span>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">المبلغ الأساسي</span>
+                          <span className="font-bold">{toArabicNum(createForm.amount.toLocaleString())} ر.ي</span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-muted-foreground">عمولة المنصة ({toArabicNum(adminCommissionPercent)}%)</span>
+                          <span className="font-bold text-orange-600">
+                            {toArabicNum(Math.round((createForm.amount * adminCommissionPercent) / 100).toLocaleString())} ر.ي
+                          </span>
+                        </div>
+                        <Separator className="bg-emerald-200 dark:bg-emerald-800/40" />
+                        <div className="flex items-center justify-between font-black text-base">
+                          <span>صافيك</span>
+                          <span className="text-nurse text-lg">
+                            {toArabicNum((createForm.amount - Math.round((createForm.amount * adminCommissionPercent) / 100)).toLocaleString())} ر.ي
+                          </span>
+                        </div>
+                        {creatorServiceFee > 0 && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">رسوم صاحب التكليف</span>
+                            <span className="font-medium text-blue-600">{toArabicNum(creatorServiceFee)} ر.ي</span>
+                          </div>
+                        )}
+                        {applicantServiceFee > 0 && (
+                          <div className="flex items-center justify-between text-xs">
+                            <span className="text-muted-foreground">رسوم المتقدم</span>
+                            <span className="font-medium text-orange-600">{toArabicNum(applicantServiceFee)} ر.ي</span>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </motion.div>
+                )}
+              </div>
+
+              {/* ── Step 3: المتطلبات اللازمة ── */}
+              <div className="rounded-2xl border-2 border-amber-200 dark:border-amber-900/40 bg-gradient-to-b from-amber-50/50 dark:from-amber-950/10 to-transparent p-5 space-y-4 hover:border-amber-300 dark:hover:border-amber-800/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-amber-500 text-white flex items-center justify-center text-sm font-black shadow-md shadow-amber-500/30">٣</div>
+                  <div>
+                    <h4 className="font-bold text-amber-700 dark:text-amber-400 text-base">المتطلبات اللازمة</h4>
+                    <p className="text-[11px] text-muted-foreground">اختياري - حدد المتطلبات المطلوبة</p>
+                  </div>
+                </div>
+
+                {/* Requirement Cards Grid */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
                   {requirementOptions.map((req) => {
                     const isSelected = createForm.requirementTags.includes(req.id);
                     const ReqIcon = req.icon;
@@ -1308,183 +1374,326 @@ export default function NurseDeploymentsPage() {
                               : [...p.requirementTags, req.id],
                           }));
                         }}
-                        className={`relative flex flex-col items-center gap-1.5 p-2.5 rounded-xl text-center transition-all border-2 ${
+                        className={`relative flex flex-col items-center gap-2 p-3 rounded-xl text-center transition-all border-2 ${
                           isSelected
-                            ? 'bg-nurse/10 border-nurse/40 text-nurse shadow-sm'
-                            : 'bg-card border-border text-muted-foreground hover:border-nurse/30'
+                            ? 'bg-nurse/10 border-nurse/40 text-nurse shadow-md shadow-nurse/10'
+                            : 'bg-card border-border text-muted-foreground hover:border-amber-300 dark:hover:border-amber-800/50 hover:bg-amber-50/50 dark:hover:bg-amber-950/10'
                         }`}
                       >
                         {isSelected && (
-                          <div className="absolute -top-1.5 -left-1.5 w-4 h-4 rounded-full bg-nurse flex items-center justify-center">
-                            <CheckCircle2 className="w-2.5 h-2.5 text-white" />
+                          <div className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-nurse flex items-center justify-center">
+                            <CheckCircle2 className="w-3.5 h-3.5 text-white" />
                           </div>
                         )}
-                        <ReqIcon className={`w-4 h-4 ${isSelected ? 'text-nurse' : ''}`} />
-                        <span className="text-[10px] font-semibold leading-tight">{req.label}</span>
+                        <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                          isSelected ? 'bg-nurse/15' : 'bg-muted/50'
+                        }`}>
+                          <ReqIcon className={`w-4.5 h-4.5 ${isSelected ? 'text-nurse' : ''}`} />
+                        </div>
+                        <span className="text-[11px] font-semibold leading-tight">{req.label}</span>
                       </motion.button>
                     );
                   })}
                 </div>
-                <div className="flex items-center gap-2">
-                  <Input
-                    placeholder="أضف متطلباً مخصصاً..."
-                    value={customReq}
-                    onChange={(e) => setCustomReq(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && customReq.trim()) {
-                        e.preventDefault();
-                        setCreateForm((p) => ({ ...p, requirementTags: [...p.requirementTags, customReq.trim()] }));
-                        setCustomReq('');
-                      }
-                    }}
-                  />
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="shrink-0 gap-1"
-                    onClick={() => {
-                      if (customReq.trim()) {
-                        setCreateForm((p) => ({ ...p, requirementTags: [...p.requirementTags, customReq.trim()] }));
-                        setCustomReq('');
-                      }
-                    }}
-                  >
-                    <Plus className="w-3.5 h-3.5" /> إضافة
-                  </Button>
-                </div>
-                {createForm.requirementTags.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {createForm.requirementTags.map((tag, idx) => (
-                      <Badge key={idx} variant="secondary" className="gap-1 px-2 py-0.5 text-xs">
-                        {tag}
-                        <button
-                          type="button"
-                          onClick={() => setCreateForm((p) => ({ ...p, requirementTags: p.requirementTags.filter((_, i) => i !== idx) }))}
-                          className="hover:text-red-500 transition-colors"
-                        >
-                          <XCircle className="w-3 h-3" />
-                        </button>
-                      </Badge>
-                    ))}
+
+                {/* Custom requirements input */}
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Input
+                      placeholder="أضف متطلباً مخصصاً..."
+                      value={customReq}
+                      onChange={(e) => setCustomReq(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && customReq.trim()) {
+                          e.preventDefault();
+                          setCreateForm((p) => ({ ...p, requirementTags: [...p.requirementTags, customReq.trim()] }));
+                          setCustomReq('');
+                        }
+                      }}
+                      className="border-amber-200 dark:border-amber-900/50 focus:border-amber-500"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="shrink-0 gap-1 border-amber-300 dark:border-amber-800/50 text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/20"
+                      onClick={() => {
+                        if (customReq.trim()) {
+                          setCreateForm((p) => ({ ...p, requirementTags: [...p.requirementTags, customReq.trim()] }));
+                          setCustomReq('');
+                        }
+                      }}
+                    >
+                      <Plus className="w-3.5 h-3.5" /> إضافة
+                    </Button>
                   </div>
-                )}
+                  {createForm.requirementTags.length > 0 && (
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {createForm.requirementTags.map((tag, idx) => (
+                        <Badge key={idx} variant="secondary" className="gap-1 px-2.5 py-1 text-xs bg-teal-100 text-teal-800 dark:bg-teal-900/30 dark:text-teal-300">
+                          {tag}
+                          <button
+                            type="button"
+                            onClick={() => setCreateForm((p) => ({ ...p, requirementTags: p.requirementTags.filter((_, i) => i !== idx) }))}
+                            className="hover:text-red-500 transition-colors"
+                          >
+                            <XCircle className="w-3 h-3" />
+                          </button>
+                        </Badge>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
 
-              {/* Governorate & District */}
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">المحافظة</Label>
-                  <Select
-                    value={createForm.governorate}
-                    onValueChange={(val) => setCreateForm((p) => ({ ...p, governorate: val }))}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="اختر المحافظة" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {governorateOptions.map((gov) => (
-                        <SelectItem key={gov} value={gov}>{gov}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+              {/* ── Step 4: الموقع وملاحظات ── */}
+              <div className="rounded-2xl border-2 border-sky-200 dark:border-sky-900/40 bg-gradient-to-b from-sky-50/50 dark:from-sky-950/10 to-transparent p-5 space-y-4 hover:border-sky-300 dark:hover:border-sky-800/50 transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-xl bg-sky-500 text-white flex items-center justify-center text-sm font-black shadow-md shadow-sky-500/30">٤</div>
+                  <div>
+                    <h4 className="font-bold text-sky-700 dark:text-sky-400 text-base">الموقع وملاحظات</h4>
+                    <p className="text-[11px] text-muted-foreground">حدد موقع التكليف وأي ملاحظات إضافية</p>
+                  </div>
                 </div>
+
+                {/* Governorate & District */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-sky-600" />
+                      المحافظة
+                    </Label>
+                    <Select
+                      value={createForm.governorate}
+                      onValueChange={(val) => setCreateForm((p) => ({ ...p, governorate: val }))}
+                    >
+                      <SelectTrigger className="w-full h-12 text-sm font-medium border-sky-200 dark:border-sky-900/50 focus:border-sky-500">
+                        <SelectValue placeholder="اختر المحافظة" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {governorateOptions.map((gov) => (
+                          <SelectItem key={gov} value={gov}>{gov}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="nurse-dep-district" className="text-sm font-semibold flex items-center gap-1.5">
+                      <Navigation className="w-3.5 h-3.5 text-sky-600" />
+                      المديرية
+                    </Label>
+                    <Input
+                      id="nurse-dep-district"
+                      placeholder="اسم المديرية"
+                      value={createForm.district}
+                      onChange={(e) => setCreateForm((p) => ({ ...p, district: e.target.value }))}
+                      className="h-12 border-sky-200 dark:border-sky-900/50 focus:border-sky-500"
+                    />
+                  </div>
+                </div>
+
+                {/* Notes */}
                 <div className="space-y-2">
-                  <Label htmlFor="dep-district" className="text-sm font-medium">المديرية</Label>
-                  <Input
-                    id="dep-district"
-                    placeholder="اسم المديرية"
-                    value={createForm.district}
-                    onChange={(e) => setCreateForm((p) => ({ ...p, district: e.target.value }))}
+                  <Label htmlFor="nurse-dep-notes" className="text-sm font-semibold flex items-center gap-1.5">
+                    <FileText className="w-3.5 h-3.5 text-sky-600" />
+                    ملاحظات
+                  </Label>
+                  <Textarea
+                    id="nurse-dep-notes"
+                    placeholder="ملاحظات إضافية..."
+                    rows={3}
+                    value={createForm.notes}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, notes: e.target.value }))}
+                    className="border-sky-200 dark:border-sky-900/50 focus:border-sky-500"
                   />
                 </div>
-              </div>
-
-              {/* Notes */}
-              <div className="space-y-2">
-                <Label htmlFor="dep-notes" className="text-sm font-medium">ملاحظات</Label>
-                <Textarea
-                  id="dep-notes"
-                  placeholder="ملاحظات إضافية..."
-                  rows={2}
-                  value={createForm.notes}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, notes: e.target.value }))}
-                />
               </div>
 
               {/* Submit */}
               <Button
-                className="w-full gap-2 bg-nurse hover:bg-nurse/90 text-white"
+                className="w-full gap-2 bg-nurse hover:bg-nurse/90 text-white h-12 text-base font-bold"
                 onClick={handleCreateDeployment}
                 disabled={isCreating}
               >
                 {isCreating ? (
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5" />
                 )}
                 إنشاء التكليف
               </Button>
-            </GlassCard>
+            </div>
           </TabsContent>
         </Tabs>
       </motion.div>
 
       {/* ═══════════════ APPLY DIALOG ═══════════════ */}
       <Dialog open={!!applyTarget} onOpenChange={(open) => { if (!open) { setApplyTarget(null); setCoverLetter(''); } }}>
-        <DialogContent dir="rtl" className="max-w-md">
+        <DialogContent dir="rtl" className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <FileText className="w-5 h-5 text-nurse" />
               التقديم على التكليف
             </DialogTitle>
             <DialogDescription>
-              {applyTarget?.title}
+              راجع تفاصيل التكليف قبل التقديم
             </DialogDescription>
           </DialogHeader>
 
-          {applyTarget && (
-            <div className="space-y-4">
-              {/* Deployment summary */}
-              <div className="p-3 rounded-xl bg-muted/40 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">النوع</span>
-                  <span className="font-medium">{typeLabels[applyTarget.type]}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">الساعات</span>
-                  <span className="font-medium">{toArabicNum(applyTarget.hours)} ساعة</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">المبلغ</span>
-                  <span className="font-medium">{toArabicNum(applyTarget.amount.toLocaleString())} ر.ي</span>
-                </div>
-                {/* Show admin commission info */}
-                <div className="flex items-center justify-between text-sm text-orange-600 dark:text-orange-400">
-                  <span>منها {toArabicNum(applyTarget.adminCommissionAmount?.toLocaleString() ?? Math.round((applyTarget.amount * adminCommissionPercent) / 100).toLocaleString())} للإدارة</span>
-                </div>
-              </div>
+          {applyTarget && (() => {
+            const tc = typeColors[applyTarget.type] || typeColors.other;
+            const reqList = applyTarget.requirements
+              ? applyTarget.requirements.split(',').map((r) => r.trim()).filter(Boolean)
+              : [];
+            const locationStr = [applyTarget.location?.governorate, applyTarget.location?.district].filter(Boolean).join(' - ');
 
-              {/* Info note: no payment at apply time */}
-              <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30">
-                <p className="text-xs text-blue-700 dark:text-blue-300">
-                  التقديم مجاني. سيتم طلب رسوم التقديم فقط عند اختيارك وموافقة الإدارة.
-                </p>
-              </div>
+            return (
+              <div className="space-y-4">
+                {/* ── Deployment Header with Badges ── */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Badge className={`text-xs px-3 py-1 ${tc.bg} text-white font-semibold`}>
+                    {typeLabels[applyTarget.type] || applyTarget.type}
+                  </Badge>
+                  {applyTarget.gender && (
+                    <Badge className={`text-xs px-3 py-1 font-semibold ${
+                      applyTarget.gender === 'male'
+                        ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+                        : 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'
+                    }`}>
+                      {applyTarget.gender === 'male' ? 'ذكر' : 'أنثى'}
+                    </Badge>
+                  )}
+                  {applyTarget.department && (
+                    <Badge className="text-xs px-3 py-1 bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 font-semibold">
+                      {departmentLabels[applyTarget.department] || applyTarget.department}
+                    </Badge>
+                  )}
+                </div>
 
-              {/* Cover letter */}
-              <div className="space-y-2">
-                <Label htmlFor="cover-letter" className="text-sm font-medium">رسالة التقديم (اختياري)</Label>
-                <Textarea
-                  id="cover-letter"
-                  placeholder="اكتب رسالة تشرح فيها لماذا أنت مناسب لهذا التكليف..."
-                  rows={3}
-                  value={coverLetter}
-                  onChange={(e) => setCoverLetter(e.target.value)}
-                />
+                {/* ── Details Grid ── */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 rounded-xl bg-muted/40 space-y-1">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Tag className="w-3.5 h-3.5" />
+                      <span className="text-[11px]">النوع</span>
+                    </div>
+                    <p className="text-sm font-bold">{typeLabels[applyTarget.type] || applyTarget.type}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-muted/40 space-y-1">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5"/><path d="M20 21a8 8 0 0 0-16 0"/></svg>
+                      <span className="text-[11px]">الجنس</span>
+                    </div>
+                    <p className="text-sm font-bold">{applyTarget.gender === 'male' ? 'ذكر' : applyTarget.gender === 'female' ? 'أنثى' : '-'}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-muted/40 space-y-1">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Building2 className="w-3.5 h-3.5" />
+                      <span className="text-[11px]">القسم</span>
+                    </div>
+                    <p className="text-sm font-bold">{applyTarget.department ? (departmentLabels[applyTarget.department] || applyTarget.department) : '-'}</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-muted/40 space-y-1">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span className="text-[11px]">عدد الساعات</span>
+                    </div>
+                    <p className="text-sm font-bold">{toArabicNum(applyTarget.hours)} ساعة</p>
+                  </div>
+                  <div className="p-3 rounded-xl bg-muted/40 space-y-1">
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <DollarSign className="w-3.5 h-3.5" />
+                      <span className="text-[11px]">المبلغ</span>
+                    </div>
+                    <p className="text-sm font-bold">{toArabicNum(applyTarget.amount.toLocaleString())} ر.ي</p>
+                  </div>
+                  {locationStr && (
+                    <div className="p-3 rounded-xl bg-muted/40 space-y-1">
+                      <div className="flex items-center gap-1.5 text-muted-foreground">
+                        <MapPin className="w-3.5 h-3.5 text-red-500" />
+                        <span className="text-[11px]">الموقع</span>
+                      </div>
+                      <p className="text-sm font-bold truncate">{locationStr}</p>
+                    </div>
+                  )}
+                </div>
+
+                {/* ── المتطلبات Section ── */}
+                {reqList.length > 0 && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-amber-600" />
+                      <span className="text-sm font-bold text-amber-700 dark:text-amber-400">المتطلبات</span>
+                    </div>
+                    <div className="space-y-1.5">
+                      {reqList.map((req, idx) => {
+                        const arabicLabel = requirementLabelMap[req] || req;
+                        const isKnown = !!requirementLabelMap[req];
+                        return (
+                          <div key={idx} className={`flex items-center gap-2.5 p-2.5 rounded-lg ${
+                            isKnown
+                              ? 'bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30'
+                              : 'bg-muted/40 border border-border'
+                          }`}>
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${
+                              isKnown
+                                ? 'bg-amber-500 text-white'
+                                : 'bg-nurse text-white'
+                            }`}>
+                              <CheckCircle2 className="w-3 h-3" />
+                            </div>
+                            <span className={`text-sm font-medium ${
+                              isKnown
+                                ? 'text-amber-800 dark:text-amber-300'
+                                : 'text-foreground'
+                            }`}>
+                              {arabicLabel}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* ── ملاحظات ── */}
+                {applyTarget.notes && (
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-2">
+                      <FileText className="w-4 h-4 text-sky-600" />
+                      <span className="text-sm font-bold text-sky-700 dark:text-sky-400">ملاحظات</span>
+                    </div>
+                    <div className="p-3 rounded-xl bg-sky-50 dark:bg-sky-900/10 border border-sky-200 dark:border-sky-900/30">
+                      <p className="text-sm text-sky-800 dark:text-sky-300 whitespace-pre-wrap">{applyTarget.notes}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* ── رسوم التقديم info box ── */}
+                <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30">
+                  <p className="text-xs text-blue-700 dark:text-blue-300">
+                    التقديم مجاني. سيتم طلب رسوم التقديم فقط عند اختيارك وموافقة الإدارة.
+                  </p>
+                </div>
+
+                {/* ── رسالة التقديم ── */}
+                <div className="space-y-2">
+                  <Label htmlFor="cover-letter" className="text-sm font-semibold flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-nurse" />
+                    رسالة التقديم (اختياري)
+                  </Label>
+                  <Textarea
+                    id="cover-letter"
+                    placeholder="اكتب رسالة تشرح فيها لماذا أنت مناسب لهذا التكليف..."
+                    rows={3}
+                    value={coverLetter}
+                    onChange={(e) => setCoverLetter(e.target.value)}
+                    className="border-nurse/20 focus:border-nurse"
+                  />
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })()}
 
           <DialogFooter className="gap-2">
             <Button
