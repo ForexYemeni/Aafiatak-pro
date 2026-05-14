@@ -48,7 +48,7 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
 
-  reactStrictMode: false,
+  reactStrictMode: true,
 
   // ============================================================================
   // Image Optimization
@@ -123,6 +123,14 @@ const nextConfig: NextConfig = {
       "recharts",
       "date-fns",
       "framer-motion",
+      "react-leaflet",
+      "react-hook-form",
+      "@tanstack/react-query",
+      "@radix-ui/react-dialog",
+      "@radix-ui/react-dropdown-menu",
+      "@radix-ui/react-select",
+      "@radix-ui/react-tabs",
+      "@radix-ui/react-toast",
     ],
   },
 

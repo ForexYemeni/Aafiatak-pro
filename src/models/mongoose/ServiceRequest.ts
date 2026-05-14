@@ -72,5 +72,9 @@ ServiceRequestSchema.index({ beneficiaryId: 1 });
 ServiceRequestSchema.index({ nurseId: 1 });
 ServiceRequestSchema.index({ status: 1 });
 ServiceRequestSchema.index({ groupId: 1 });
+  ServiceRequestSchema.index({ beneficiaryId: 1, status: 1, createdAt: -1 });
+  ServiceRequestSchema.index({ nurseId: 1, status: 1, createdAt: -1 });
+  ServiceRequestSchema.index({ status: 1, createdAt: -1 });
+  ServiceRequestSchema.index({ paymentStatus: 1, status: 1 });
 
 export const ServiceRequest = mongoose.models.ServiceRequest || mongoose.model<IServiceRequest>('ServiceRequest', ServiceRequestSchema);

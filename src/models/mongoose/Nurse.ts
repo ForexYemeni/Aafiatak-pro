@@ -68,7 +68,13 @@ const NurseSchema = new Schema({
   blockedReason: { type: String },
 });
 
-// Safe discriminator registration - prevents "Discriminator with name already exists" error
+// ── Performance Indexes ──────────────────────────────────────────────
+  NurseSchema.index({ verificationStatus: 1, isActive: 1 });
+  NurseSchema.index({ isAvailable: 1, isOnline: 1 });
+  NurseSchema.index({ governorate: 1, verificationStatus: 1 });
+  NurseSchema.index({ rating: -1, completedJobs: -1 });
+
+  // Safe discriminator registration - prevents "Discriminator with name already exists" error
 function getNurseModel() {
   // Check if model already exists in mongoose.models
   if (mongoose.models.Nurse) {

@@ -24,4 +24,8 @@ const ChatSchema = new Schema<IChat>({
   isActive: { type: Boolean, default: true },
 }, { timestamps: true });
 
-export const Chat = mongoose.models.Chat || mongoose.model<IChat>('Chat', ChatSchema);
+// ── Performance Indexes ──────────────────────────────────────────────
+  ChatSchema.index({ 'participants.userId': 1 });
+  ChatSchema.index({ isActive: 1, lastMessageAt: -1 });
+
+  export const Chat = mongoose.models.Chat || mongoose.model<IChat>('Chat', ChatSchema);

@@ -50,7 +50,11 @@ const BeneficiarySchema = new Schema({
   orderCount: { type: Number, default: 0 },
 });
 
-// Safe discriminator registration - prevents "Discriminator with name already exists" error
+// ── Performance Indexes ──────────────────────────────────────────────
+  BeneficiarySchema.index({ governorate: 1 });
+  BeneficiarySchema.index({ loyaltyTier: 1, loyaltyPoints: -1 });
+
+  // Safe discriminator registration - prevents "Discriminator with name already exists" error
 function getBeneficiaryModel() {
   // Check if model already exists in mongoose.models
   if (mongoose.models.Beneficiary) {

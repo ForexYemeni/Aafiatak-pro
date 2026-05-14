@@ -30,4 +30,9 @@ const TransactionSchema = new Schema<ITransaction>({
   processedAt: { type: Date },
 }, { timestamps: true });
 
-export const Transaction = mongoose.models.Transaction || mongoose.model<ITransaction>('Transaction', TransactionSchema);
+// ── Performance Indexes ──────────────────────────────────────────────
+  TransactionSchema.index({ beneficiaryId: 1, createdAt: -1 });
+  TransactionSchema.index({ nurseId: 1, status: 1 });
+  TransactionSchema.index({ status: 1, createdAt: -1 });
+
+  export const Transaction = mongoose.models.Transaction || mongoose.model<ITransaction>('Transaction', TransactionSchema);
