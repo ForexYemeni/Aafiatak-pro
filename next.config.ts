@@ -137,9 +137,6 @@
     // ============================================================================
 
     experimental: {
-      // View Transitions API for smooth page-to-page animations
-      viewTransition: true,
-
       optimizePackageImports: [
         // UI Icons — very large without tree-shaking
         "lucide-react",
