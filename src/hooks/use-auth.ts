@@ -110,12 +110,50 @@ export function useIsBeneficiary(): boolean {
   return role === 'beneficiary';
 }
 
+// ---- useAuthFetch GET Cache ----
+// In-memory cache for GET requests — speeds up navigation by reusing data
+// across page transitions within the same session.
+
+interface CachedResponse {
+  bodyText: string;
+  status: number;
+  ok: boolean;
+  ts: number;
+}
+
+const _GET_CACHE = new Map<string, CachedResponse>();
+const _GET_CACHE_TTL = 30_000; // 30 seconds
+
+function _getCacheKey(url: string, userId: string): string {
+  return `${url}::${userId}`;
+}
+
+function _makeResponseFromCache(cached: CachedResponse): Response {
+  return new Response(cached.bodyText, {
+    status: cached.status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+}
+
+/** Clear the GET cache for a given URL prefix (call after mutations) */
+export function invalidateAuthFetchCache(urlPrefix?: string): void {
+  if (!urlPrefix) {
+    _GET_CACHE.clear();
+    return;
+  }
+  for (const key of Array.from(_GET_CACHE.keys())) {
+    if (key.startsWith(urlPrefix)) {
+      _GET_CACHE.delete(key);
+    }
+  }
+}
+
 // ---- useAuthFetch (OPTIMIZED) ----
 
 /**
  * Hook that provides an authenticated fetch wrapper.
  * Automatically adds the Authorization header and handles token refresh.
- * OPTIMIZED: No busy-wait polling. Checks hydration synchronously.
+ * GET requests are cached for 30 seconds to speed up navigation.
  */
 export function useAuthFetch() {
   const refreshAuthToken = useAuthStore((s) => s.refreshAuthToken);
@@ -124,7 +162,7 @@ export function useAuthFetch() {
   const authFetch = useCallback(
     async (url: string, options: RequestInit = {}): Promise<Response> => {
       // Get current state synchronously (no subscription needed)
-      const { _hasHydrated, token: currentToken } = useAuthStore.getState();
+      const { _hasHydrated } = useAuthStore.getState();
 
       // Wait for hydration with a single check + short sleep (max 500ms instead of 3s)
       if (!_hasHydrated) {
@@ -137,6 +175,18 @@ export function useAuthFetch() {
       const token = useAuthStore.getState().token;
       if (!token) {
         throw new Error('غير مصادق عليه');
+      }
+
+      const isGetRequest = !options.method || options.method.toUpperCase() === 'GET';
+
+      // Check GET cache before hitting the network
+      if (isGetRequest) {
+        const userId = useAuthStore.getState().user?.id ?? 'anon';
+        const cacheKey = _getCacheKey(url, userId);
+        const cached = _GET_CACHE.get(cacheKey);
+        if (cached && Date.now() - cached.ts < _GET_CACHE_TTL) {
+          return _makeResponseFromCache(cached);
+        }
       }
 
       const headers = new Headers(options.headers);
@@ -167,6 +217,32 @@ export function useAuthFetch() {
           }
         } catch {
           logout();
+        }
+      }
+
+      // Cache successful GET responses
+      if (isGetRequest && response.ok) {
+        try {
+          const bodyText = await response.text();
+          const userId = useAuthStore.getState().user?.id ?? 'anon';
+          const cacheKey = _getCacheKey(url, userId);
+          _GET_CACHE.set(cacheKey, {
+            bodyText,
+            status: response.status,
+            ok: response.ok,
+            ts: Date.now(),
+          });
+          // Trim cache size (keep last 100 entries)
+          if (_GET_CACHE.size > 100) {
+            const firstKey = _GET_CACHE.keys().next().value;
+            if (firstKey) _GET_CACHE.delete(firstKey);
+          }
+          return new Response(bodyText, {
+            status: response.status,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        } catch {
+          // If caching fails, return original response as-is
         }
       }
 
