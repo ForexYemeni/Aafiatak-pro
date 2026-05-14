@@ -716,6 +716,50 @@ export default function NurseDeploymentsPage() {
             </div>
           )}
 
+          {/* ═══ Creator Info — revealed once admin approves (before payment) ═══ */}
+          {myApp && ['admin_approved', 'payment_pending', 'payment_submitted', 'payment_verified', 'accepted'].includes(myApp.status) && dep.createdBy && (dep.createdBy.name || dep.createdBy.phone || dep.creatorPhone) && (
+            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 space-y-2">
+              <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
+                <User className="w-3 h-3" />
+                بيانات صاحب التكليف
+              </p>
+              <div className="space-y-1.5">
+                {dep.createdBy.name && (
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-muted-foreground">الاسم</span>
+                    <span className="font-medium">{dep.createdBy.name}</span>
+                  </div>
+                )}
+                {(dep.createdBy.phone || dep.creatorPhone) && (
+                  <div className="flex items-center justify-between text-xs gap-2">
+                    <span className="text-muted-foreground shrink-0">الهاتف</span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono font-bold text-blue-800 dark:text-blue-200" dir="ltr">
+                        {dep.createdBy.phone || dep.creatorPhone}
+                      </span>
+                      <a
+                        href={`tel:${dep.createdBy.phone || dep.creatorPhone}`}
+                        className="p-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors"
+                        title="اتصال"
+                      >
+                        <Phone className="w-3 h-3" />
+                      </a>
+                      <a
+                        href={`https://wa.me/${(dep.createdBy.phone || dep.creatorPhone || '').replace(/^0/, '967')}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="p-1 rounded-md bg-green-600 hover:bg-green-700 text-white transition-colors"
+                        title="واتساب"
+                      >
+                        <MessageSquare className="w-3 h-3" />
+                      </a>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
           {/* ═══ Inline Payment Section for admin_approved / payment_pending ═══ */}
           {needsPayment && (
             <div className="space-y-3">
