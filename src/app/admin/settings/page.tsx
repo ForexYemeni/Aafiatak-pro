@@ -163,6 +163,13 @@ export default function AdminSettingsPage() {
   const [isBackingUp, setIsBackingUp] = useState(false);
   const [backupStats, setBackupStats] = useState<{ documents: number; collections: number; sizeKB: number } | null>(null);
 
+  // ── Full Backup State ─────────────────────────────────────────────
+  const [showFullBackupSection, setShowFullBackupSection] = useState(false);
+  const [fullBackupPassword, setFullBackupPassword] = useState('');
+  const [showFullBackupPassword, setShowFullBackupPassword] = useState(false);
+  const [isFullBackingUp, setIsFullBackingUp] = useState(false);
+  const [fullBackupStats, setFullBackupStats] = useState<{ documents: number; collections: number; sizeKB: number; hasSource: boolean } | null>(null);
+
   // ── Reset All Data State ──────────────────────────────────────────
   const [showResetSection, setShowResetSection] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
@@ -304,6 +311,49 @@ export default function AdminSettingsPage() {
       toast.error('حدث خطأ أثناء إنشاء النسخة الاحتياطية');
     } finally {
       setIsBackingUp(false);
+    }
+  };
+
+  // ── Full Backup Handler ───────────────────────────────────────────
+  const handleCreateFullBackup = async () => {
+    if (!fullBackupPassword.trim()) {
+      toast.error('أدخل كلمة المرور للمتابعة');
+      return;
+    }
+    setIsFullBackingUp(true);
+    setFullBackupStats(null);
+    try {
+      const res = await authFetch('/api/admin/backup/full', {
+        method: 'POST',
+        body: JSON.stringify({ password: fullBackupPassword }),
+      });
+      if (!res.ok) {
+        let msg = 'فشل إنشاء النسخة الاحتياطية الشاملة';
+        try { const j = await res.json(); msg = j.error?.message ?? j.message ?? msg; } catch {}
+        toast.error(msg);
+        return;
+      }
+      const docs = Number(res.headers.get('X-Backup-Documents') ?? 0);
+      const cols = Number(res.headers.get('X-Backup-Collections') ?? 0);
+      const sizeKB = Number(res.headers.get('X-Backup-Size-KB') ?? 0);
+      const hasSource = res.headers.get('X-Backup-Has-Source') === 'true';
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      const date = new Date().toISOString().split('T')[0];
+      a.download = `aafiatak-full-backup-${date}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setFullBackupStats({ documents: docs, collections: cols, sizeKB, hasSource });
+      setFullBackupPassword('');
+      toast.success(hasSource ? 'تم تنزيل النسخة الاحتياطية الشاملة مع الكود المصدري ✅' : 'تم تنزيل النسخة الاحتياطية (الكود المصدري غير متوفر — أضف GITHUB_TOKEN)');
+    } catch {
+      toast.error('حدث خطأ أثناء إنشاء النسخة الاحتياطية الشاملة');
+    } finally {
+      setIsFullBackingUp(false);
     }
   };
 
@@ -1477,6 +1527,158 @@ export default function AdminSettingsPage() {
           </GlassCard>
         </motion.div>
       )}
+
+      {/* ── Complete App Backup (source + DB + env) ───────────────── */}
+      <motion.div variants={itemAnim}>
+        <GlassCard className="border-blue-200 dark:border-blue-900/40">
+          <GlassCardHeader>
+            <div className="flex items-center justify-between">
+              <GlassCardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                نسخة احتياطية شاملة للتطبيق بالكامل
+              </GlassCardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setShowFullBackupSection(!showFullBackupSection); setFullBackupStats(null); setFullBackupPassword(''); }}
+                className="border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 gap-1.5"
+              >
+                {showFullBackupSection ? <X className="w-3.5 h-3.5" /> : <Shield className="w-3.5 h-3.5" />}
+                {showFullBackupSection ? 'إغلاق' : 'نسخة شاملة'}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              تشمل الكود المصدري + قاعدة البيانات + متغيرات البيئة + سكريبت الاستعادة — يمكن رفعها إلى GitHub أو إرسالها لأي ذكاء اصطناعي لإعادة التشغيل من الصفر
+            </p>
+          </GlassCardHeader>
+
+          {showFullBackupSection && (
+            <GlassCardContent className="space-y-5">
+
+              {/* What's inside */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {[
+                  { icon: FileText, label: 'source-code.zip', sub: 'كامل كود Next.js من GitHub', ok: true },
+                  { icon: Database, label: 'database/', sub: 'ملف JSON لكل مجموعة MongoDB', ok: true },
+                  { icon: Shield, label: 'environment/.env.local', sub: 'جاهز للنسخ مباشرةً', ok: true },
+                  { icon: Zap, label: 'scripts/restore-db.js', sub: 'سكريبت Node.js للاستعادة التلقائية', ok: true },
+                  { icon: FileText, label: 'DEPLOY_GUIDE.md', sub: 'دليل النشر خطوة بخطوة', ok: true },
+                  { icon: CheckCircle, label: 'meta.json', sub: 'معلومات النسخة والإحصائيات', ok: true },
+                ].map(({ icon: Icon, label, sub }) => (
+                  <div key={label} className="flex items-center gap-3 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 p-3">
+                    <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
+                      <Icon className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    <div>
+                      <p className="text-xs font-mono font-semibold text-blue-800 dark:text-blue-300">{label}</p>
+                      <p className="text-[10px] text-blue-600/70 dark:text-blue-500">{sub}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Note about GITHUB_TOKEN */}
+              <div className="flex items-start gap-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 p-4">
+                <TriangleAlert className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                <div className="text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                  <p className="font-semibold">لتضمين الكود المصدري تلقائياً</p>
+                  <p>أضف <code className="bg-amber-100 dark:bg-amber-900/30 px-1 rounded font-mono">GITHUB_TOKEN</code> إلى متغيرات بيئة Vercel — وإلا ستجد تعليمات استنساخ المستودع داخل الـ ZIP بدلاً من ذلك.</p>
+                </div>
+              </div>
+
+              {/* Steps to restore */}
+              <div className="rounded-xl bg-muted/30 border border-border/50 p-4 space-y-2">
+                <p className="text-xs font-semibold text-foreground">كيفية استعادة التطبيق من هذا الملف:</p>
+                <ol className="text-xs text-muted-foreground space-y-1 list-decimal list-inside">
+                  <li>فك ضغط الملف</li>
+                  <li>ارفع <code className="font-mono bg-muted px-1 rounded">source-code.zip</code> إلى GitHub مستودع جديد</li>
+                  <li>أنشئ قاعدة بيانات MongoDB جديدة وشغّل <code className="font-mono bg-muted px-1 rounded">node restore-db.js</code></li>
+                  <li>انسخ <code className="font-mono bg-muted px-1 rounded">.env.local</code> إلى المشروع وعدّل الروابط</li>
+                  <li>انشر على Vercel — التطبيق يعمل كاملاً</li>
+                </ol>
+              </div>
+
+              <Separator className="border-blue-100 dark:border-blue-900/30" />
+
+              {/* Success result */}
+              {fullBackupStats && (
+                <div className="flex items-start gap-3 rounded-xl bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800/50 p-4">
+                  <CheckCircle className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
+                  <div>
+                    <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                      {fullBackupStats.hasSource ? 'نسخة شاملة مع الكود المصدري ✅' : 'نسخة البيانات + البيئة (الكود غير متوفر)'}
+                    </p>
+                    <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
+                      {fullBackupStats.documents.toLocaleString('ar')} وثيقة · {fullBackupStats.collections} مجموعة
+                      {fullBackupStats.sizeKB > 0 && ` · ${fullBackupStats.sizeKB > 1024 ? (fullBackupStats.sizeKB / 1024).toFixed(1) + ' MB' : fullBackupStats.sizeKB.toFixed(0) + ' KB'}`}
+                    </p>
+                    {!fullBackupStats.hasSource && (
+                      <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
+                        أضف GITHUB_TOKEN إلى Vercel env وأعد المحاولة لتضمين الكود المصدري
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Password */}
+              <div className="space-y-2">
+                <Label className="text-sm font-medium flex items-center gap-1.5">
+                  <Shield className="w-3.5 h-3.5 text-blue-600 dark:text-blue-400" />
+                  كلمة مرور حساب الإدارة
+                </Label>
+                <div className="relative">
+                  <Input
+                    type={showFullBackupPassword ? 'text' : 'password'}
+                    value={fullBackupPassword}
+                    onChange={(e) => setFullBackupPassword(e.target.value)}
+                    onKeyDown={(e) => { if (e.key === 'Enter') handleCreateFullBackup(); }}
+                    placeholder="أدخل كلمة مرورك للتأكيد"
+                    dir="ltr"
+                    className="bg-background/50 pl-10"
+                    disabled={isFullBackingUp}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowFullBackupPassword(!showFullBackupPassword)}
+                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                  >
+                    {showFullBackupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+
+              {/* Download button */}
+              <div className="flex items-center gap-3">
+                <Button
+                  onClick={handleCreateFullBackup}
+                  disabled={isFullBackingUp || !fullBackupPassword.trim()}
+                  className="bg-blue-600 hover:bg-blue-700 disabled:opacity-40 gap-2 min-w-52 shadow-lg shadow-blue-600/20 text-white"
+                  size="lg"
+                >
+                  {isFullBackingUp ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      جارٍ تجميع التطبيق بالكامل...
+                    </>
+                  ) : (
+                    <>
+                      <Shield className="w-4 h-4" />
+                      تنزيل النسخة الشاملة
+                    </>
+                  )}
+                </Button>
+                {isFullBackingUp && (
+                  <p className="text-xs text-muted-foreground">قد يستغرق هذا دقيقة حسب حجم المشروع...</p>
+                )}
+              </div>
+
+            </GlassCardContent>
+          )}
+        </GlassCard>
+      </motion.div>
 
       {/* ── Full Backup ──────────────────────────────────────────── */}
       <motion.div variants={itemAnim}>
