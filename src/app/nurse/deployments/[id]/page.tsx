@@ -269,7 +269,10 @@ export default function NurseDeploymentDetailPage() {
 
   /* ── C) Submit payment proof (updated with image) ── */
   const handleSubmitPayment = async () => {
-    if (!paymentProof && !paymentProofImage) return;
+    if (!paymentProofImage) {
+      toast.error('لقطة الشاشة إلزامية — يرجى رفع صورة إثبات الدفع');
+      return;
+    }
     setIsSubmittingPayment(true);
     try {
       const res = await authFetch(`/api/deployments/${deploymentId}/submit-payment`, {
@@ -1361,7 +1364,7 @@ export default function NurseDeploymentDetailPage() {
             <Button
               className="gap-2 bg-orange-600 hover:bg-orange-700 text-white"
               onClick={handleSubmitPayment}
-              disabled={isSubmittingPayment || (!paymentProof && !paymentProofImage)}
+              disabled={isSubmittingPayment || !paymentProofImage}
             >
               {isSubmittingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
               إرسال إثبات الدفع
