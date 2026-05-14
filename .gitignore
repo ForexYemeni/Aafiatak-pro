@@ -89,3 +89,8 @@ worklog.md
 agent-ctx/
 workflow
 .env
+
+# Internal development files
+worklog.md
+agent-ctx/
+.zscripts/dev.pid
