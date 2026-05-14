@@ -44,7 +44,12 @@ const UserSchema = new Schema<IUser>({
   lastLoginAt: { type: Date },
 }, { timestamps: true, discriminatorKey: 'role' });
 
-export const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
+// ── Performance Indexes ──────────────────────────────────────────────
+  UserSchema.index({ role: 1, isActive: 1 });
+  UserSchema.index({ isBlocked: 1, isActive: 1 });
+  UserSchema.index({ lastLoginAt: -1 });
+
+  export const User = mongoose.models.User || mongoose.model<IUser>('User', UserSchema);
 
 // Register discriminators for all roles that don't have extra fields
 // This is required because Mongoose with discriminatorKey expects a discriminator
