@@ -206,6 +206,8 @@ export default function AdminDeploymentDetailPage() {
   const [isAccepting, setIsAccepting] = useState(false);
   const [viewingPayment, setViewingPayment] = useState<DeploymentApplication | null>(null);
   const [paymentZoom, setPaymentZoom] = useState(1);
+  const [rejectReason, setRejectReason] = useState('');
+  const [showRejectReason, setShowRejectReason] = useState(false);
 
   // Admin approve state
   const [showApproveDialog, setShowApproveDialog] = useState(false);
@@ -306,6 +308,8 @@ export default function AdminDeploymentDetailPage() {
     } finally {
       setIsVerifying(false);
       setVerifyingApp(null);
+      setRejectReason('');
+      setShowRejectReason(false);
     }
   };
 
@@ -415,6 +419,43 @@ export default function AdminDeploymentDetailPage() {
           size="md"
         />
       </motion.div>
+
+      {/* ── PAYMENT SUBMITTED REVIEW BANNER ── */}
+      {deployment.applications.some((a) => a.status === 'payment_submitted') && (
+        <motion.div variants={itemAnim}>
+          <div className="p-4 rounded-xl bg-green-50 dark:bg-green-900/20 border border-green-300 dark:border-green-800/50">
+            <div className="flex items-center justify-between gap-4 flex-wrap">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-xl bg-green-100 dark:bg-green-900/40 flex items-center justify-center shrink-0">
+                  <CreditCard className="w-6 h-6 text-green-600 dark:text-green-400" />
+                </div>
+                <div>
+                  <p className="font-bold text-green-800 dark:text-green-300">
+                    💰 إثبات دفع بانتظار المراجعة
+                  </p>
+                  <p className="text-sm text-green-600 dark:text-green-400 mt-0.5">
+                    قدّم{' '}
+                    <span className="font-semibold">
+                      {deployment.applications.find((a) => a.status === 'payment_submitted')?.applicantName}
+                    </span>
+                    {' '}إثبات دفع. راجع الصورة وأقرّ أو ارفض.
+                  </p>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                className="gap-2 bg-green-600 hover:bg-green-700 text-white shrink-0"
+                onClick={() => {
+                  const app = deployment.applications.find((a) => a.status === 'payment_submitted');
+                  if (app) { setVerifyingApp(app); setShowRejectReason(false); setRejectReason(''); }
+                }}
+              >
+                <Eye className="w-4 h-4" /> مراجعة إثبات الدفع
+              </Button>
+            </div>
+          </div>
+        </motion.div>
+      )}
 
       {/* ── APPROVE SELECTION BANNER ── */}
       {deployment.status === 'creator_selected' && (
@@ -1009,70 +1050,167 @@ export default function AdminDeploymentDetailPage() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ═══════════════ VERIFY PAYMENT DIALOG ═══════════════ */}
-      <Dialog open={!!verifyingApp} onOpenChange={(open) => { if (!open) setVerifyingApp(null); }}>
-        <DialogContent dir="rtl" className="max-w-md">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-green-600" />
-              التحقق من الدفع
-            </DialogTitle>
-            <DialogDescription>
-              هل تريد التحقق من دفع {verifyingApp?.applicantName}؟ سيتم تعيينه على التكليف وكشف معلومات التواصل.
-            </DialogDescription>
-          </DialogHeader>
+      {/* ═══════════════ VERIFY PAYMENT DIALOG (Professional) ═══════════════ */}
+      <Dialog open={!!verifyingApp} onOpenChange={(open) => { if (!open) { setVerifyingApp(null); setShowRejectReason(false); setRejectReason(''); } }}>
+        <DialogContent dir="rtl" className="max-w-lg p-0 overflow-hidden">
+          {/* Header */}
+          <div className="flex items-center gap-3 p-5 border-b bg-muted/30">
+            <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
+              <CreditCard className="w-5 h-5 text-green-600 dark:text-green-400" />
+            </div>
+            <div className="flex-1">
+              <DialogTitle className="text-base font-bold">مراجعة إثبات الدفع</DialogTitle>
+              <DialogDescription className="text-xs mt-0.5">
+                {verifyingApp?.applicantName} — رسوم التقديم:{' '}
+                <span className="font-semibold text-foreground">{toArabicNum(verifyingApp?.serviceFee ?? 0)} ر.ي</span>
+              </DialogDescription>
+            </div>
+            <BadgeStatus status="payment_submitted" label="بانتظار المراجعة" size="sm" />
+          </div>
 
-          {verifyingApp && (
-            <div className="space-y-3">
-              <div className="p-3 rounded-xl bg-muted/40 space-y-2">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">المتقدم</span>
-                  <span className="font-medium">{verifyingApp.applicantName}</span>
-                </div>
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">رسوم التقديم</span>
-                  <span className="font-medium">{toArabicNum(verifyingApp.serviceFee)} ر.ي</span>
+          <div className="p-5 space-y-4">
+            {/* Payment meta */}
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="p-2.5 rounded-lg bg-muted/50 space-y-0.5">
+                <p className="text-muted-foreground">اسم المتقدم</p>
+                <p className="font-semibold">{verifyingApp?.applicantName}</p>
+              </div>
+              <div className="p-2.5 rounded-lg bg-muted/50 space-y-0.5">
+                <p className="text-muted-foreground">تاريخ التقديم</p>
+                <p className="font-semibold">{verifyingApp?.paymentSubmittedAt ? formatDate(verifyingApp.paymentSubmittedAt) : '—'}</p>
+              </div>
+            </div>
+
+            {/* Payment proof image — full-width, professional viewer */}
+            {(verifyingApp?.paymentProofImage || verifyingApp?.paymentProofData) && (
+              <div className="space-y-2">
+                <p className="text-xs font-semibold text-muted-foreground flex items-center gap-1.5">
+                  <Eye className="w-3.5 h-3.5" /> صورة إثبات الدفع
+                </p>
+                <div className="relative rounded-xl border-2 border-dashed border-green-300 dark:border-green-700/50 bg-muted/20 overflow-hidden">
+                  {/* Zoom controls overlay */}
+                  <div className="absolute top-2 left-2 flex gap-1 z-10">
+                    <button
+                      onClick={() => setPaymentZoom(Math.max(0.5, paymentZoom - 0.25))}
+                      className="w-7 h-7 rounded-lg bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+                    >
+                      <ZoomOut className="w-3.5 h-3.5" />
+                    </button>
+                    <span className="px-2 h-7 rounded-lg bg-black/60 text-white text-[11px] font-medium flex items-center">
+                      {Math.round(paymentZoom * 100)}%
+                    </span>
+                    <button
+                      onClick={() => setPaymentZoom(Math.min(4, paymentZoom + 0.25))}
+                      className="w-7 h-7 rounded-lg bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+                    >
+                      <ZoomIn className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      onClick={() => setPaymentZoom(1)}
+                      className="px-2 h-7 rounded-lg bg-black/60 hover:bg-black/80 text-white text-[10px] font-medium flex items-center"
+                    >
+                      إعادة
+                    </button>
+                  </div>
+                  {/* Download button */}
+                  <button
+                    onClick={() => {
+                      const imgSrc = verifyingApp?.paymentProofImage || verifyingApp?.paymentProofData;
+                      if (imgSrc) {
+                        const link = document.createElement('a');
+                        link.href = imgSrc.startsWith('data:') ? imgSrc : `data:image/jpeg;base64,${imgSrc}`;
+                        link.download = `payment-proof-${verifyingApp?.applicantName || 'unknown'}.jpg`;
+                        link.click();
+                      }
+                    }}
+                    className="absolute top-2 right-2 z-10 w-7 h-7 rounded-lg bg-black/60 hover:bg-black/80 text-white flex items-center justify-center transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </button>
+                  <div className="overflow-auto max-h-[50vh] flex items-center justify-center p-3 min-h-[180px]">
+                    <img
+                      src={(() => {
+                        const src = verifyingApp?.paymentProofImage || verifyingApp?.paymentProofData || '';
+                        return src.startsWith('data:') ? src : `data:image/jpeg;base64,${src}`;
+                      })()}
+                      alt="إثبات الدفع"
+                      className="rounded-lg shadow-md transition-transform duration-200 max-w-full"
+                      style={{ transform: `scale(${paymentZoom})`, transformOrigin: 'center' }}
+                    />
+                  </div>
                 </div>
               </div>
-              {/* Payment proof image */}
-              {verifyingApp.paymentProofImage && (
-                <div className="space-y-1.5">
-                  <p className="text-[10px] text-muted-foreground font-medium">صورة إثبات الدفع</p>
-                  <img
-                    src={verifyingApp.paymentProofImage}
-                    alt="إثبات الدفع"
-                    className="max-w-full rounded-lg border"
-                  />
-                </div>
-              )}
-              {verifyingApp.paymentProofData && (
-                <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30">
-                  <p className="text-[10px] text-muted-foreground mb-1 font-medium">إثبات الدفع</p>
-                  <p className="text-sm">{verifyingApp.paymentProofData}</p>
-                </div>
-              )}
-            </div>
-          )}
+            )}
 
-          <DialogFooter className="gap-2">
-            <Button
-              variant="outline"
-              className="border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
-              onClick={() => handleVerifyPayment(false)}
-              disabled={isVerifying}
-            >
-              {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldX className="w-4 h-4" />}
-              رفض
-            </Button>
-            <Button
-              className="gap-2 bg-green-600 hover:bg-green-700 text-white"
-              onClick={() => handleVerifyPayment(true)}
-              disabled={isVerifying}
-            >
-              {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-              تحقق وقبول الدفع
-            </Button>
-          </DialogFooter>
+            {/* Text-only payment data */}
+            {!verifyingApp?.paymentProofImage && !verifyingApp?.paymentProofData && (
+              <div className="p-4 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30 text-center">
+                <p className="text-sm text-amber-700 dark:text-amber-400">لا توجد صورة إثبات دفع مرفقة</p>
+              </div>
+            )}
+
+            {/* Rejection reason input (shown when reject is clicked) */}
+            {showRejectReason && (
+              <div className="space-y-2 p-3 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30">
+                <p className="text-xs font-semibold text-red-700 dark:text-red-400 flex items-center gap-1.5">
+                  <ShieldX className="w-3.5 h-3.5" /> سبب الرفض (اختياري)
+                </p>
+                <textarea
+                  value={rejectReason}
+                  onChange={(e) => setRejectReason(e.target.value)}
+                  placeholder="مثال: الصورة غير واضحة، المبلغ غير مطابق..."
+                  rows={3}
+                  className="w-full text-sm rounded-lg border border-red-200 dark:border-red-800/40 bg-white dark:bg-background p-2 resize-none focus:outline-none focus:ring-2 focus:ring-red-400"
+                  dir="rtl"
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Action Buttons */}
+          <div className="p-5 pt-0 space-y-2">
+            {!showRejectReason ? (
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  className="h-11 gap-2 border-red-300 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 font-medium"
+                  onClick={() => setShowRejectReason(true)}
+                  disabled={isVerifying}
+                >
+                  <ShieldX className="w-4 h-4" />
+                  رفض الدفع
+                </Button>
+                <Button
+                  className="h-11 gap-2 bg-green-600 hover:bg-green-700 text-white font-medium shadow-sm"
+                  onClick={() => handleVerifyPayment(true)}
+                  disabled={isVerifying}
+                >
+                  {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                  قبول الدفع ✓
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-3">
+                <Button
+                  variant="outline"
+                  className="h-11 gap-2"
+                  onClick={() => setShowRejectReason(false)}
+                  disabled={isVerifying}
+                >
+                  <X className="w-4 h-4" />
+                  إلغاء
+                </Button>
+                <Button
+                  className="h-11 gap-2 bg-red-600 hover:bg-red-700 text-white font-medium"
+                  onClick={() => handleVerifyPayment(false)}
+                  disabled={isVerifying}
+                >
+                  {isVerifying ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldX className="w-4 h-4" />}
+                  تأكيد الرفض
+                </Button>
+              </div>
+            )}
+          </div>
         </DialogContent>
       </Dialog>
 
