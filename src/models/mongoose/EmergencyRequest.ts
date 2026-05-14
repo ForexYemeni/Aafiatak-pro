@@ -52,4 +52,11 @@ const EmergencyRequestSchema = new Schema<IEmergencyRequest>({
   paymentStatus: { type: String, enum: ['pending', 'paid', 'verified', 'rejected'], default: 'pending' },
 }, { timestamps: true });
 
-export const EmergencyRequest = mongoose.models.EmergencyRequest || mongoose.model<IEmergencyRequest>('EmergencyRequest', EmergencyRequestSchema);
+// ── Performance Indexes ──────────────────────────────────────────────
+  EmergencyRequestSchema.index({ status: 1, createdAt: -1 });
+  EmergencyRequestSchema.index({ beneficiaryId: 1, createdAt: -1 });
+  EmergencyRequestSchema.index({ nurseId: 1, status: 1 });
+  EmergencyRequestSchema.index({ priority: 1, status: 1 });
+  EmergencyRequestSchema.index({ paymentStatus: 1 });
+
+  export const EmergencyRequest = mongoose.models.EmergencyRequest || mongoose.model<IEmergencyRequest>('EmergencyRequest', EmergencyRequestSchema);
