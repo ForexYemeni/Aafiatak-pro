@@ -900,29 +900,54 @@ export default function NurseDeploymentDetailPage() {
         </motion.div>
       )}
 
-      {/* B) Contact reveal section */}
+      {/* B) Contact reveal section — UNLOCKED */}
       {isAssignedToMe && deployment.contactRevealed && (
         <motion.div variants={itemAnim}>
-          <GlassCard variant="nurse" className="space-y-4">
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <Phone className="w-4 h-4 text-nurse" />
-              بيانات التواصل
-            </h3>
-            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">اسم صاحب التكليف</span>
-                <span className="font-medium">{deployment.createdBy?.name || 'غير معروف'}</span>
+          <GlassCard variant="nurse" className="overflow-hidden p-0">
+            {/* Header gradient */}
+            <div className="bg-gradient-to-r from-emerald-500 to-teal-500 px-4 py-3 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <Phone className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm">بيانات التواصل مكشوفة</p>
+                <p className="text-emerald-100 text-[10px]">تم التحقق من دفعك — تواصل الآن</p>
+              </div>
+              <div className="mr-auto">
+                <CheckCircle2 className="w-5 h-5 text-white" />
+              </div>
+            </div>
+            <div className="p-4 space-y-3">
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30">
+                <div className="w-10 h-10 rounded-full bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                  <User className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div>
+                  <p className="text-[10px] text-muted-foreground">صاحب التكليف</p>
+                  <p className="font-bold text-sm">{deployment.createdBy?.name || 'غير معروف'}</p>
+                </div>
               </div>
               {deployment.creatorPhone && (
                 <>
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">رقم الهاتف</span>
-                    <span className="font-medium font-mono" dir="ltr">{deployment.creatorPhone}</span>
+                  <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border">
+                    <div className="flex items-center gap-2">
+                      <Phone className="w-4 h-4 text-nurse" />
+                      <span className="text-sm text-muted-foreground">رقم الهاتف</span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="font-bold font-mono text-sm" dir="ltr">{deployment.creatorPhone}</span>
+                      <button
+                        onClick={() => { navigator.clipboard.writeText(deployment.creatorPhone!); toast.success('تم نسخ رقم الهاتف'); }}
+                        className="w-7 h-7 rounded-lg bg-muted flex items-center justify-center hover:bg-muted/80 transition-colors"
+                      >
+                        <Copy className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                    </div>
                   </div>
-                  <div className="flex gap-2 pt-2">
+                  <div className="grid grid-cols-2 gap-2">
                     <a
                       href={`tel:${deployment.creatorPhone}`}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-green-600 hover:bg-green-700 text-white text-sm font-medium transition-colors"
+                      className="flex items-center justify-center gap-2 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold transition-colors shadow-sm shadow-emerald-600/30"
                     >
                       <Phone className="w-4 h-4" /> اتصال
                     </a>
@@ -930,7 +955,7 @@ export default function NurseDeploymentDetailPage() {
                       href={`https://wa.me/${deployment.creatorPhone.replace(/^0+/, '')}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-medium transition-colors"
+                      className="flex items-center justify-center gap-2 py-3 rounded-xl bg-[#25D366] hover:bg-[#1ebe5d] text-white text-sm font-semibold transition-colors shadow-sm shadow-green-600/30"
                     >
                       <MessageSquare className="w-4 h-4" /> واتساب
                     </a>
@@ -942,28 +967,52 @@ export default function NurseDeploymentDetailPage() {
         </motion.div>
       )}
 
-      {/* If assigned to me, show assignment details */}
+      {/* If assigned to me but contact NOT yet revealed — show locked state with payment steps */}
       {isAssignedToMe && !deployment.contactRevealed && (
         <motion.div variants={itemAnim}>
-          <GlassCard variant="nurse" className="space-y-4">
-            <h3 className="font-semibold text-sm flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-nurse" />
-              تم تعيينك على هذا التكليف
-            </h3>
-            <div className="p-3 rounded-xl bg-green-50 dark:bg-green-900/10 border border-green-200 dark:border-green-900/30 space-y-2">
-              {deployment.assignedAt && (
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-muted-foreground">تاريخ التعيين</span>
-                  <span className="font-medium">{formatDate(deployment.assignedAt)}</span>
+          <GlassCard variant="nurse" className="overflow-hidden p-0">
+            {/* Locked header */}
+            <div className="bg-gradient-to-r from-slate-500 to-slate-600 px-4 py-3 flex items-center gap-2">
+              <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
+                <Eye className="w-4 h-4 text-white" />
+              </div>
+              <div>
+                <p className="text-white font-semibold text-sm">بيانات التواصل مقفلة</p>
+                <p className="text-slate-200 text-[10px]">أكمل خطوات الدفع لإظهار رقم الهاتف</p>
+              </div>
+            </div>
+            <div className="p-4 space-y-3">
+              {/* Blurred phone placeholder */}
+              <div className="flex items-center justify-between p-3 rounded-xl bg-muted/40 border border-border">
+                <div className="flex items-center gap-2">
+                  <Phone className="w-4 h-4 text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">رقم الهاتف</span>
                 </div>
-              )}
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">الحالة</span>
-                <BadgeStatus
-                  status={deploymentStatusMap[deployment.status] || 'pending'}
-                  label={deploymentStatusLabel[deployment.status] || deployment.status}
-                  size="sm"
-                />
+                <span className="font-mono text-sm font-bold tracking-widest text-muted-foreground/40 select-none">
+                  ••• ••• •••
+                </span>
+              </div>
+
+              {/* Steps */}
+              <div className="space-y-2 pt-1">
+                <p className="text-[10px] text-muted-foreground font-medium mb-1.5">الخطوات المطلوبة لكشف بيانات الاتصال:</p>
+                {[
+                  { label: 'ادفع رسوم التقديم', done: ['payment_submitted', 'payment_verified', 'accepted'].includes(myApplication?.status ?? '') },
+                  { label: 'يراجع الإدارة إثبات دفعك', done: ['payment_verified', 'accepted'].includes(myApplication?.status ?? '') },
+                  { label: 'تُكشف بيانات الاتصال', done: myApplication?.status === 'accepted' },
+                ].map((step, i) => (
+                  <div key={i} className={`flex items-center gap-2.5 p-2.5 rounded-lg border ${step.done ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/30' : 'bg-muted/30 border-border'}`}>
+                    <div className={`w-5 h-5 rounded-full flex items-center justify-center shrink-0 ${step.done ? 'bg-emerald-500' : 'bg-muted-foreground/20'}`}>
+                      {step.done
+                        ? <CheckCircle2 className="w-3 h-3 text-white" />
+                        : <span className="text-[10px] font-bold text-muted-foreground">{i + 1}</span>
+                      }
+                    </div>
+                    <span className={`text-xs font-medium ${step.done ? 'text-emerald-700 dark:text-emerald-300 line-through' : 'text-foreground'}`}>
+                      {step.label}
+                    </span>
+                  </div>
+                ))}
               </div>
             </div>
           </GlassCard>
