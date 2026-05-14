@@ -156,13 +156,6 @@ export default function AdminSettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 
-  // ── Backup State ──────────────────────────────────────────────────
-  const [showBackupSection, setShowBackupSection] = useState(false);
-  const [backupPassword, setBackupPassword] = useState('');
-  const [showBackupPassword, setShowBackupPassword] = useState(false);
-  const [isBackingUp, setIsBackingUp] = useState(false);
-  const [backupStats, setBackupStats] = useState<{ documents: number; collections: number; sizeKB: number } | null>(null);
-
   // ── Full Backup State ─────────────────────────────────────────────
   const [showFullBackupSection, setShowFullBackupSection] = useState(false);
   const [fullBackupPassword, setFullBackupPassword] = useState('');
@@ -269,48 +262,6 @@ export default function AdminSettingsPage() {
       toast.error('حدث خطأ أثناء تبديل قاعدة البيانات');
     } finally {
       setIsSwitchingDb(false);
-    }
-  };
-
-  // ── Backup Handler ────────────────────────────────────────────────
-  const handleCreateBackup = async () => {
-    if (!backupPassword.trim()) {
-      toast.error('أدخل كلمة المرور للمتابعة');
-      return;
-    }
-    setIsBackingUp(true);
-    setBackupStats(null);
-    try {
-      const res = await authFetch('/api/admin/backup', {
-        method: 'POST',
-        body: JSON.stringify({ password: backupPassword }),
-      });
-      if (!res.ok) {
-        let msg = 'فشل إنشاء النسخة الاحتياطية';
-        try { const j = await res.json(); msg = j.error?.message ?? j.message ?? msg; } catch {}
-        toast.error(msg);
-        return;
-      }
-      const docs = Number(res.headers.get('X-Backup-Documents') ?? 0);
-      const cols = Number(res.headers.get('X-Backup-Collections') ?? 0);
-      const sizeKB = Number(res.headers.get('X-Backup-Size-KB') ?? 0);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      const date = new Date().toISOString().split('T')[0];
-      a.download = `aafiatak-backup-${date}.zip`;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      URL.revokeObjectURL(url);
-      setBackupStats({ documents: docs, collections: cols, sizeKB });
-      setBackupPassword('');
-      toast.success('تم تنزيل ملف ZIP بنجاح');
-    } catch {
-      toast.error('حدث خطأ أثناء إنشاء النسخة الاحتياطية');
-    } finally {
-      setIsBackingUp(false);
     }
   };
 
@@ -1675,137 +1626,6 @@ export default function AdminSettingsPage() {
               </div>
 
             </GlassCardContent>
-        </GlassCard>
-      </motion.div>
-
-      {/* ── Full Backup (Data Only) ───────────────────────────────── */}
-      <motion.div variants={itemAnim}>
-        <GlassCard className="border-emerald-200 dark:border-emerald-900/40">
-          <GlassCardHeader>
-            <div className="flex items-center justify-between">
-              <GlassCardTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
-                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
-                  <Database className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-                </div>
-                نسخة احتياطية كاملة من الألف إلى الياء
-              </GlassCardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { setShowBackupSection(!showBackupSection); setBackupStats(null); setBackupPassword(''); }}
-                className="border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 gap-1.5"
-              >
-                {showBackupSection ? <X className="w-3.5 h-3.5" /> : <Database className="w-3.5 h-3.5" />}
-                {showBackupSection ? 'إغلاق' : 'إنشاء نسخة'}
-              </Button>
-            </div>
-          </GlassCardHeader>
-
-          {showBackupSection && (
-            <GlassCardContent className="space-y-5">
-
-              {/* What's included */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {[
-                  { icon: Users, label: 'جميع المستخدمين', sub: 'مستفيدون، ممرضون، مشرفون' },
-                  { icon: FileText, label: 'الطلبات والتكليفات', sub: 'جميع طلبات الخدمة والتكليفات' },
-                  { icon: MessageSquare, label: 'المحادثات والرسائل', sub: 'جميع الدردشات والإشعارات' },
-                  { icon: Wallet, label: 'المعاملات المالية', sub: 'طلبات السحب والكوبونات' },
-                  { icon: AlertTriangle, label: 'حالات الطوارئ', sub: 'طلبات الطوارئ والإسناد' },
-                  { icon: Settings, label: 'إعدادات المنصة', sub: 'جميع إعدادات النظام' },
-                  { icon: Shield, label: 'متغيرات Vercel', sub: 'MONGODB_URI, JWT_SECRET وغيرها' },
-                  { icon: Zap, label: 'الخدمات والتقييمات', sub: 'قوائم الخدمات وتقييمات المستخدمين' },
-                ].map(({ icon: Icon, label, sub }) => (
-                  <div
-                    key={label}
-                    className="flex items-center gap-3 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 p-3"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center shrink-0">
-                      <Icon className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">{label}</p>
-                      <p className="text-[10px] text-emerald-600/70 dark:text-emerald-500">{sub}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              <Separator className="border-emerald-100 dark:border-emerald-900/30" />
-
-              {/* Success result */}
-              {backupStats && (
-                <div className="flex items-start gap-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 p-4">
-                  <CheckCircle className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
-                  <div>
-                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
-                      تم تنزيل النسخة الاحتياطية بنجاح
-                    </p>
-                    <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">
-                      {backupStats.documents.toLocaleString('ar')} وثيقة من {backupStats.collections} مجموعة
-                      {backupStats.sizeKB > 0 && ` · ${backupStats.sizeKB > 1024 ? (backupStats.sizeKB / 1024).toFixed(1) + ' MB' : backupStats.sizeKB.toFixed(0) + ' KB'}`}
-                    </p>
-                  </div>
-                </div>
-              )}
-
-              {/* Password field */}
-              <div className="space-y-2">
-                <Label className="text-sm font-medium flex items-center gap-1.5">
-                  <Shield className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  كلمة مرور حساب الإدارة
-                </Label>
-                <div className="relative">
-                  <Input
-                    type={showBackupPassword ? 'text' : 'password'}
-                    value={backupPassword}
-                    onChange={(e) => setBackupPassword(e.target.value)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') handleCreateBackup(); }}
-                    placeholder="أدخل كلمة مرورك للتأكيد قبل التنزيل"
-                    dir="ltr"
-                    className="bg-background/50 pl-10"
-                    disabled={isBackingUp}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowBackupPassword(!showBackupPassword)}
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    {showBackupPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-                <p className="text-[10px] text-muted-foreground">
-                  النسخة الاحتياطية تحتوي على بيانات حساسة — تأكد من حفظها في مكان آمن
-                </p>
-              </div>
-
-              {/* Download button */}
-              <div className="flex items-center gap-3">
-                <Button
-                  onClick={handleCreateBackup}
-                  disabled={isBackingUp || !backupPassword.trim()}
-                  className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 gap-2 min-w-52 shadow-lg shadow-emerald-600/20 text-white"
-                  size="lg"
-                >
-                  {isBackingUp ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      جارٍ تجميع البيانات...
-                    </>
-                  ) : (
-                    <>
-                      <Database className="w-4 h-4" />
-                      تنزيل النسخة الاحتياطية
-                    </>
-                  )}
-                </Button>
-                {isBackingUp && (
-                  <p className="text-xs text-muted-foreground">قد يستغرق هذا بضع ثوانٍ حسب حجم البيانات...</p>
-                )}
-              </div>
-
-            </GlassCardContent>
-          )}
         </GlassCard>
       </motion.div>
 
