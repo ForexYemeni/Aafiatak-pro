@@ -37,7 +37,7 @@ import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { Currency } from '@/components/common/currency';
 import { DateFormatter, toArabicNum } from '@/components/common/date-formatter';
-import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthFetch, _GET_CACHE_readSync } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -114,10 +114,21 @@ const item = {
 export default function AdminDashboardPage() {
   const authFetch = useAuthFetch();
   const router = useRouter();
-  const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>([]);
+
+  // Read from in-memory cache synchronously — no skeleton if cache is warm
+  const [dashboard, setDashboard] = useState<DashboardData | null>(() => {
+    const c = _GET_CACHE_readSync<{ success: boolean; data: DashboardData }>('/api/admin/dashboard');
+    return c?.success && c.data ? c.data : null;
+  });
+  const [recentOrders, setRecentOrders] = useState<RecentOrder[]>(() => {
+    const c = _GET_CACHE_readSync<{ success: boolean; data: { orders?: RecentOrder[] } }>('/api/admin/orders?limit=5&page=1');
+    return c?.success && c.data?.orders ? c.data.orders : [];
+  });
   const [recentRegistrations, setRecentRegistrations] = useState<RecentRegistration[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    const c = _GET_CACHE_readSync('/api/admin/dashboard');
+    return !(c as any)?.success;
+  });
   const [error, setError] = useState<string | null>(null);
 
   // Quick search state
