@@ -11,8 +11,9 @@ import { NotificationToastListener } from "@/components/common/notification-toas
 const notoArabic = Noto_Sans_Arabic({
   variable: "--font-noto-arabic",
   subsets: ["arabic"],
-  weight: ["400", "600", "700"],
+  weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
+  preload: true,
 });
 
 export const metadata: Metadata = {
@@ -42,11 +43,13 @@ export default function RootLayout({
   return (
     <html lang="ar" dir="rtl" suppressHydrationWarning>
       <head>
-        <meta name="theme-color" content="#9333ea" />
+        <meta name="theme-color" content="#7c3aed" />
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="عافيتك" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
+        {/* Prefetch hint for faster navigation */}
+        <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
       </head>
       <body
         className={`${notoArabic.variable} antialiased bg-background text-foreground font-sans`}
@@ -64,7 +67,8 @@ export default function RootLayout({
           position="top-left"
           dir="rtl"
           toastOptions={{
-            className: "text-right",
+            className: "text-right font-sans",
+            style: { fontFamily: 'var(--font-noto-arabic)' },
           }}
         />
       </body>

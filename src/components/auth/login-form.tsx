@@ -22,13 +22,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { UserRole } from '@/types';
 import { cn } from '@/lib/utils';
@@ -329,7 +322,7 @@ export function LoginForm({ onRegisterClick, className }: LoginFormProps) {
 
         {/* Form */}
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
-          {/* Role Selector */}
+          {/* Role Selector — Card-based */}
           <motion.div
             initial={{ opacity: 0, x: 20 }}
             animate={{ opacity: 1, x: 0 }}
@@ -337,43 +330,42 @@ export function LoginForm({ onRegisterClick, className }: LoginFormProps) {
             className="space-y-2"
           >
             <Label className="text-sm font-semibold">نوع الحساب</Label>
-            <Select
-              defaultValue="beneficiary"
-              onValueChange={(value) => setValue('role', value as UserRole)}
-            >
-              <SelectTrigger className={cn(
-                'text-right h-12 rounded-xl border-2 transition-all duration-300',
-                'bg-white/60 dark:bg-slate-800/60',
-                'hover:border-teal-300 dark:hover:border-teal-700',
-                'focus:ring-2 focus:ring-teal-400/20 focus:border-teal-400',
-                errors.role && 'border-red-400',
-              )}>
-                <div className="flex items-center gap-2">
-                  <RoleIcon className={cn('w-4.5 h-4.5', roleColors.text)} />
-                  <SelectValue placeholder="اختر نوع الحساب" />
-                </div>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="beneficiary">
-                  <div className="flex items-center gap-2">
-                    <User className="w-4 h-4 text-violet-500" />
-                    <span>مستفيد/ـة</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="nurse">
-                  <div className="flex items-center gap-2">
-                    <Stethoscope className="w-4 h-4 text-sky-500" />
-                    <span>ممرض/ـة</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value="admin">
-                  <div className="flex items-center gap-2">
-                    <Shield className="w-4 h-4 text-amber-500" />
-                    <span>مدير</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="grid grid-cols-3 gap-2">
+              {([
+                { value: 'beneficiary', label: 'مستفيد', sublabel: 'طلب خدمة', icon: User, gradient: 'from-violet-500 to-purple-600', ring: 'ring-violet-400/50', bg: 'bg-violet-50 dark:bg-violet-900/20', text: 'text-violet-600 dark:text-violet-400' },
+                { value: 'nurse', label: 'ممرض', sublabel: 'تقديم رعاية', icon: Stethoscope, gradient: 'from-sky-500 to-teal-600', ring: 'ring-sky-400/50', bg: 'bg-sky-50 dark:bg-sky-900/20', text: 'text-sky-600 dark:text-sky-400' },
+                { value: 'admin', label: 'مدير', sublabel: 'إدارة النظام', icon: Shield, gradient: 'from-amber-500 to-orange-600', ring: 'ring-amber-400/50', bg: 'bg-amber-50 dark:bg-amber-900/20', text: 'text-amber-600 dark:text-amber-400' },
+              ] as const).map((role) => {
+                const Icon = role.icon;
+                const isSelected = selectedRole === role.value;
+                return (
+                  <button
+                    key={role.value}
+                    type="button"
+                    onClick={() => setValue('role', role.value as UserRole, { shouldValidate: true })}
+                    className={cn(
+                      'relative flex flex-col items-center gap-1.5 p-3 rounded-xl border-2 transition-all duration-200',
+                      'focus:outline-none focus-visible:ring-2',
+                      isSelected
+                        ? cn('border-current ring-2', role.ring, role.text, role.bg)
+                        : 'border-border bg-background/60 text-muted-foreground hover:border-border/80 hover:bg-muted/50 active:scale-95'
+                    )}
+                  >
+                    {isSelected && (
+                      <div className={cn('absolute inset-0 rounded-[10px] bg-gradient-to-br opacity-10', role.gradient)} />
+                    )}
+                    <div className={cn(
+                      'w-9 h-9 rounded-lg flex items-center justify-center transition-all duration-200',
+                      isSelected ? cn('bg-gradient-to-br', role.gradient, 'shadow-md') : 'bg-muted'
+                    )}>
+                      <Icon className={cn('w-4.5 h-4.5 transition-colors', isSelected ? 'text-white' : '')} />
+                    </div>
+                    <span className={cn('text-xs font-semibold leading-tight', isSelected ? role.text : '')}>{role.label}</span>
+                    <span className={cn('text-[10px] leading-tight opacity-70', isSelected ? role.text : 'text-muted-foreground')}>{role.sublabel}</span>
+                  </button>
+                );
+              })}
+            </div>
             <AnimatePresence mode="wait">
               {errors.role && (
                 <motion.p

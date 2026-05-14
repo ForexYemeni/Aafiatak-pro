@@ -27,7 +27,6 @@ import {
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
-import { Separator } from '@/components/ui/separator';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { UserRole, SubAdminPermission } from '@/types';
 
@@ -36,64 +35,72 @@ interface NavItem {
   href: string;
   icon: React.ElementType;
   badge?: number;
-  /** Permission required for subadmins. If not set, only admin can see this item. */
   permission?: SubAdminPermission;
-  /** Whether this item is always visible to subadmins (like dashboard) */
   alwaysVisibleToSubadmin?: boolean;
-  /** Whether this item is ONLY visible to admin role (never shown to subadmin) */
   adminOnly?: boolean;
+  group?: string;
 }
 
 const adminNavItems: NavItem[] = [
-  { label: 'لوحة التحكم', href: '/admin', icon: LayoutDashboard, alwaysVisibleToSubadmin: true },
-  { label: 'الخدمات', href: '/admin/services', icon: Heart, permission: 'manage_services' },
-  { label: 'الممرضون', href: '/admin/nurses', icon: Stethoscope, permission: 'manage_nurses' },
-  { label: 'المستفيدون', href: '/admin/beneficiaries', icon: Users, permission: 'manage_beneficiaries' },
-  { label: 'الطلبات', href: '/admin/orders', icon: ClipboardList, permission: 'manage_orders' },
-  { label: 'الطوارئ', href: '/admin/emergencies', icon: AlertTriangle, permission: 'manage_emergencies', badge: 0 },
-  { label: 'التكليفات', href: '/admin/deployments', icon: Briefcase, permission: 'manage_orders' },
-  { label: 'المدفوعات', href: '/admin/payments', icon: CreditCard, permission: 'manage_payments' },
-  { label: 'الكوبونات', href: '/admin/coupons', icon: Tags, permission: 'manage_payments' },
-  { label: 'التقييمات', href: '/admin/ratings', icon: Star, permission: 'view_reports' },
-  { label: 'الشكاوى', href: '/admin/complaints', icon: MessageSquare, permission: 'manage_chat' },
-  { label: 'المحادثات', href: '/admin/chat', icon: MessageSquare, permission: 'manage_chat' },
-  { label: 'المديرون الفرعيون', href: '/admin/subadmins', icon: Shield, adminOnly: true },
-  { label: 'سجل النشاط', href: '/admin/activity/page', icon: ScrollText, permission: 'view_reports' },
-  { label: 'الملف الشخصي', href: '/admin/subadmin-settings', icon: UserCircle, alwaysVisibleToSubadmin: true },
-  { label: 'الإعدادات', href: '/admin/settings', icon: Settings, adminOnly: true },
+  { label: 'لوحة التحكم', href: '/admin', icon: LayoutDashboard, alwaysVisibleToSubadmin: true, group: 'overview' },
+  { label: 'الخدمات', href: '/admin/services', icon: Heart, permission: 'manage_services', group: 'management' },
+  { label: 'الممرضون', href: '/admin/nurses', icon: Stethoscope, permission: 'manage_nurses', group: 'management' },
+  { label: 'المستفيدون', href: '/admin/beneficiaries', icon: Users, permission: 'manage_beneficiaries', group: 'management' },
+  { label: 'الطلبات', href: '/admin/orders', icon: ClipboardList, permission: 'manage_orders', group: 'operations' },
+  { label: 'الطوارئ', href: '/admin/emergencies', icon: AlertTriangle, permission: 'manage_emergencies', badge: 0, group: 'operations' },
+  { label: 'التكليفات', href: '/admin/deployments', icon: Briefcase, permission: 'manage_orders', group: 'operations' },
+  { label: 'المدفوعات', href: '/admin/payments', icon: CreditCard, permission: 'manage_payments', group: 'finance' },
+  { label: 'الكوبونات', href: '/admin/coupons', icon: Tags, permission: 'manage_payments', group: 'finance' },
+  { label: 'التقييمات', href: '/admin/ratings', icon: Star, permission: 'view_reports', group: 'reports' },
+  { label: 'الشكاوى', href: '/admin/complaints', icon: MessageSquare, permission: 'manage_chat', group: 'reports' },
+  { label: 'المحادثات', href: '/admin/chat', icon: MessageSquare, permission: 'manage_chat', group: 'reports' },
+  { label: 'المديرون الفرعيون', href: '/admin/subadmins', icon: Shield, adminOnly: true, group: 'system' },
+  { label: 'سجل النشاط', href: '/admin/activity/page', icon: ScrollText, permission: 'view_reports', group: 'system' },
+  { label: 'الملف الشخصي', href: '/admin/subadmin-settings', icon: UserCircle, alwaysVisibleToSubadmin: true, group: 'system' },
+  { label: 'الإعدادات', href: '/admin/settings', icon: Settings, adminOnly: true, group: 'system' },
 ];
 
 const nurseNavItems: NavItem[] = [
-  { label: 'لوحة التحكم', href: '/nurse', icon: LayoutDashboard },
-  { label: 'الطلبات المتاحة', href: '/nurse/requests', icon: ClipboardList },
-  { label: 'طلباتي', href: '/nurse/my-requests', icon: Stethoscope },
-  { label: 'التكليفات', href: '/nurse/deployments', icon: Briefcase },
-  { label: 'التقييمات', href: '/nurse/ratings', icon: Star },
-  { label: 'المحادثات', href: '/nurse/chat', icon: MessageSquare },
-  { label: 'الأرباح', href: '/nurse/earnings', icon: CreditCard },
-  { label: 'الملف الشخصي', href: '/nurse/profile', icon: Users },
+  { label: 'لوحة التحكم', href: '/nurse', icon: LayoutDashboard, group: 'overview' },
+  { label: 'الطلبات المتاحة', href: '/nurse/requests', icon: ClipboardList, group: 'work' },
+  { label: 'طلباتي', href: '/nurse/my-requests', icon: Stethoscope, group: 'work' },
+  { label: 'التكليفات', href: '/nurse/deployments', icon: Briefcase, group: 'work' },
+  { label: 'التقييمات', href: '/nurse/ratings', icon: Star, group: 'work' },
+  { label: 'المحادثات', href: '/nurse/chat', icon: MessageSquare, group: 'communication' },
+  { label: 'الأرباح', href: '/nurse/earnings', icon: CreditCard, group: 'finance' },
+  { label: 'الملف الشخصي', href: '/nurse/profile', icon: Users, group: 'account' },
 ];
 
 const beneficiaryNavItems: NavItem[] = [
-  { label: 'الرئيسية', href: '/beneficiary', icon: LayoutDashboard },
-  { label: 'الخدمات', href: '/beneficiary', icon: Stethoscope },
-  { label: 'طلباتي', href: '/beneficiary/orders', icon: ClipboardList },
-  { label: 'المحادثات', href: '/beneficiary/chat', icon: MessageSquare },
-  { label: 'الطوارئ', href: '/beneficiary/emergency', icon: AlertTriangle },
-  { label: 'نقاط الولاء', href: '/beneficiary/loyalty', icon: Heart },
-  { label: 'الملف الشخصي', href: '/beneficiary/profile', icon: Users },
+  { label: 'الرئيسية', href: '/beneficiary', icon: LayoutDashboard, group: 'overview' },
+  { label: 'الخدمات', href: '/beneficiary', icon: Stethoscope, group: 'services' },
+  { label: 'طلباتي', href: '/beneficiary/orders', icon: ClipboardList, group: 'services' },
+  { label: 'المحادثات', href: '/beneficiary/chat', icon: MessageSquare, group: 'communication' },
+  { label: 'الطوارئ', href: '/beneficiary/emergency', icon: AlertTriangle, group: 'services' },
+  { label: 'نقاط الولاء', href: '/beneficiary/loyalty', icon: Heart, group: 'account' },
+  { label: 'الملف الشخصي', href: '/beneficiary/profile', icon: Users, group: 'account' },
 ];
+
+const groupLabels: Record<string, string> = {
+  overview: 'عام',
+  management: 'إدارة',
+  operations: 'العمليات',
+  finance: 'المالية',
+  reports: 'التقارير',
+  system: 'النظام',
+  work: 'العمل',
+  communication: 'التواصل',
+  services: 'الخدمات',
+  account: 'الحساب',
+};
 
 function getNavItems(role: UserRole, permissions?: SubAdminPermission[]): NavItem[] {
   switch (role) {
     case 'admin':
       return adminNavItems;
     case 'subadmin': {
-      // Filter items based on subadmin permissions
-      // adminOnly items are NEVER shown to subadmins
       const nonAdminOnlyItems = adminNavItems.filter(item => !item.adminOnly);
       if (!permissions || permissions.length === 0) {
-        // Subadmin with no permissions only sees dashboard
         return nonAdminOnlyItems.filter(item => item.alwaysVisibleToSubadmin);
       }
       return nonAdminOnlyItems.filter(item =>
@@ -127,13 +134,27 @@ function getRoleActiveColor(role: UserRole): string {
   switch (role) {
     case 'admin':
     case 'subadmin':
-      return 'bg-admin/15 text-admin border-admin/30';
+      return 'bg-admin/12 text-admin';
     case 'nurse':
-      return 'bg-nurse/15 text-nurse border-nurse/30';
+      return 'bg-nurse/12 text-nurse';
     case 'beneficiary':
-      return 'bg-beneficiary/15 text-beneficiary border-beneficiary/30';
+      return 'bg-beneficiary/12 text-beneficiary';
     default:
-      return 'bg-primary/15 text-primary border-primary/30';
+      return 'bg-primary/12 text-primary';
+  }
+}
+
+function getRoleAccentBar(role: UserRole): string {
+  switch (role) {
+    case 'admin':
+    case 'subadmin':
+      return 'bg-admin';
+    case 'nurse':
+      return 'bg-nurse';
+    case 'beneficiary':
+      return 'bg-beneficiary';
+    default:
+      return 'bg-primary';
   }
 }
 
@@ -149,7 +170,6 @@ export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
   const logout = useAuthStore((s) => s.logout);
   const [collapsed, setCollapsed] = useState(false);
 
-  // Get subadmin permissions from user object
   const subadminPermissions = (user as any)?.permissions as SubAdminPermission[] | undefined;
   const navItems = useMemo(() => getNavItems(role, subadminPermissions), [role, subadminPermissions]);
 
@@ -160,28 +180,40 @@ export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
     beneficiary: 'مستفيد/ـة',
   };
 
+  // Group items
+  const groupedItems = useMemo(() => {
+    const groups: Record<string, NavItem[]> = {};
+    for (const item of navItems) {
+      const g = item.group ?? 'other';
+      if (!groups[g]) groups[g] = [];
+      groups[g].push(item);
+    }
+    return groups;
+  }, [navItems]);
+
   return (
     <aside
       className={cn(
-        'h-full glass-strong flex flex-col transition-all duration-300 border-l border-border',
-        collapsed ? 'w-20' : 'w-64'
+        'h-full flex flex-col transition-all duration-300 border-l border-border relative',
+        'bg-card/80 backdrop-blur-xl',
+        collapsed ? 'w-[68px]' : 'w-64'
       )}
     >
       {/* Logo Section */}
-      <div className="p-4 flex items-center gap-3">
-        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center', getRoleColor(role))}>
+      <div className={cn('flex items-center gap-3 p-4 border-b border-border/60', collapsed && 'justify-center px-2')}>
+        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm', getRoleColor(role))}>
           <Heart className="w-5 h-5" />
         </div>
         {!collapsed && (
-          <div className="flex flex-col">
-            <span className="font-bold text-lg leading-tight">عافيتك</span>
-            <span className="text-xs text-muted-foreground">Aafiatak</span>
+          <div className="flex flex-col flex-1 min-w-0">
+            <span className="font-bold text-base leading-tight">عافيتك</span>
+            <span className="text-[11px] text-muted-foreground">Aafiatak</span>
           </div>
         )}
         <Button
           variant="ghost"
           size="icon"
-          className="mr-auto w-8 h-8"
+          className={cn('w-7 h-7 rounded-lg shrink-0 text-muted-foreground hover:text-foreground', collapsed && 'mt-0')}
           onClick={() => setCollapsed(!collapsed)}
         >
           {collapsed ? (
@@ -192,58 +224,100 @@ export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
         </Button>
       </div>
 
-      <Separator />
-
-      {/* Navigation Items */}
-      <nav className="flex-1 p-3 space-y-1 overflow-y-auto custom-scrollbar">
-        {navItems.map((item) => {
-          const isActive = pathname === item.href || pathname.startsWith(item.href + '/');
-          const Icon = item.icon;
-
-          return (
-            <Link key={item.href} href={item.href}>
-              <div
-                className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 relative',
-                  isActive
-                    ? getRoleActiveColor(role)
-                    : 'text-muted-foreground hover:text-foreground hover:bg-accent'
-                )}
-              >
-                {isActive && (
-                  <div
-                    className="absolute right-0 top-1/2 -translate-y-1/2 w-1 h-6 rounded-l-full bg-current"
-                  />
-                )}
-                <Icon className="w-5 h-5 shrink-0" />
-                {!collapsed && (
-                  <span className="text-sm font-medium">{item.label}</span>
-                )}
-                {!collapsed && item.badge !== undefined && item.badge > 0 && (
-                  <span className="mr-auto bg-destructive text-destructive-foreground text-xs px-2 py-0.5 rounded-full">
-                    {item.badge}
-                  </span>
-                )}
+      {/* Navigation Items - Grouped */}
+      <nav className="flex-1 overflow-y-auto custom-scrollbar py-3 px-2 space-y-0.5">
+        {Object.entries(groupedItems).map(([groupKey, items], groupIndex) => (
+          <div key={groupKey}>
+            {/* Group label (only when not collapsed) */}
+            {!collapsed && groupIndex > 0 && (
+              <div className="px-3 pt-4 pb-1">
+                <span className="text-[10px] font-semibold text-muted-foreground/60 uppercase tracking-wider">
+                  {groupLabels[groupKey] ?? groupKey}
+                </span>
               </div>
-            </Link>
-          );
-        })}
+            )}
+            {collapsed && groupIndex > 0 && (
+              <div className="my-2 mx-3 h-px bg-border/60" />
+            )}
+
+            {items.map((item) => {
+              const isExact = item.href === '/admin' || item.href === '/nurse' || item.href === '/beneficiary';
+              const isActive = isExact
+                ? pathname === item.href
+                : pathname === item.href || pathname.startsWith(item.href + '/');
+              const Icon = item.icon;
+
+              return (
+                <Link key={item.href} href={item.href} prefetch={true}>
+                  <div
+                    className={cn(
+                      'relative flex items-center gap-3 rounded-xl transition-all duration-150 group',
+                      collapsed ? 'px-0 py-2.5 justify-center mx-1' : 'px-3 py-2.5 mx-0',
+                      isActive
+                        ? getRoleActiveColor(role)
+                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
+                    )}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    {/* Active left-side accent bar */}
+                    {isActive && !collapsed && (
+                      <div
+                        className={cn(
+                          'absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-l-full',
+                          getRoleAccentBar(role)
+                        )}
+                      />
+                    )}
+                    {isActive && collapsed && (
+                      <div
+                        className={cn(
+                          'absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-l-full',
+                          getRoleAccentBar(role)
+                        )}
+                      />
+                    )}
+
+                    <Icon
+                      className={cn(
+                        'shrink-0 transition-all duration-150',
+                        collapsed ? 'w-5 h-5' : 'w-[18px] h-[18px]',
+                        isActive ? '' : 'group-hover:scale-110'
+                      )}
+                    />
+                    {!collapsed && (
+                      <span className="text-sm font-medium flex-1 truncate">{item.label}</span>
+                    )}
+                    {!collapsed && item.badge !== undefined && item.badge > 0 && (
+                      <span className="mr-auto bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none">
+                        {item.badge}
+                      </span>
+                    )}
+                    {collapsed && item.badge !== undefined && item.badge > 0 && (
+                      <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
+                    )}
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        ))}
       </nav>
 
-      <Separator />
-
       {/* User Info & Logout */}
-      <div className="p-3">
+      <div className="border-t border-border/60 p-3 space-y-1">
         {!collapsed && user && (
-          <div className="flex items-center gap-3 px-3 py-2 mb-2">
-            <Avatar className="w-9 h-9">
-              <AvatarFallback className={cn('text-sm', getRoleColor(role))}>
+          <div className={cn(
+            'flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1',
+            'bg-muted/50'
+          )}>
+            <Avatar className="w-8 h-8 shrink-0">
+              <AvatarFallback className={cn('text-xs font-semibold', getRoleColor(role))}>
                 {user.name.slice(0, 2)}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{user.name}</p>
-              <p className="text-xs text-muted-foreground">{roleLabelMap[role]}</p>
+              <p className="text-sm font-semibold truncate leading-tight">{user.name}</p>
+              <p className="text-[11px] text-muted-foreground">{roleLabelMap[role]}</p>
             </div>
           </div>
         )}
@@ -251,12 +325,12 @@ export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
         <Button
           variant="ghost"
           className={cn(
-            'w-full justify-start gap-3 text-muted-foreground hover:text-destructive',
-            collapsed && 'justify-center px-2'
+            'w-full text-muted-foreground hover:text-destructive hover:bg-destructive/8 rounded-xl transition-all duration-150',
+            collapsed ? 'justify-center px-0 h-10' : 'justify-start gap-3 h-10'
           )}
           onClick={logout}
         >
-          <LogOut className="w-5 h-5 shrink-0" />
+          <LogOut className="w-4 h-4 shrink-0" />
           {!collapsed && <span className="text-sm">تسجيل الخروج</span>}
         </Button>
       </div>

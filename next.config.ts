@@ -39,10 +39,6 @@
   // ============================================================================
 
   const nextConfig: NextConfig = {
-    // "standalone" output is for Docker / self-hosted deployments.
-    // Vercel automatically detects Next.js and does not need this flag.
-    // output: "standalone",
-
     typescript: {
       ignoreBuildErrors: true,
     },
@@ -53,7 +49,6 @@
     poweredByHeader: false,
 
     // Enable gzip/brotli compression for all responses (~30-60% smaller bundles)
-    // Critical for users on slow Yemeni mobile connections
     compress: true,
 
     // ============================================================================
@@ -92,7 +87,6 @@
     // ============================================================================
     // Server External Packages
     // Keep heavy server-only packages out of the serverless function bundle.
-    // This reduces cold-start time on Vercel significantly.
     // ============================================================================
 
     serverExternalPackages: [
@@ -143,6 +137,9 @@
     // ============================================================================
 
     experimental: {
+      // View Transitions API for smooth page-to-page animations
+      viewTransition: true,
+
       optimizePackageImports: [
         // UI Icons — very large without tree-shaking
         "lucide-react",

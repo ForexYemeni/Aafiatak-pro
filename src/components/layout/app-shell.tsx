@@ -1,11 +1,11 @@
 'use client';
 
 import { useState, type ReactNode } from 'react';
-import { Menu, X } from 'lucide-react';
+import { Menu } from 'lucide-react';
 import { Sidebar } from './sidebar';
 import { BottomNav } from './bottom-nav';
 import { TopHeader } from './top-header';
-import { useIsMobile } from '@/hooks/use-mobile';
+import { NavProgress } from '@/components/common/nav-progress';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { PushNotificationSetup } from '@/components/common/push-notification-setup';
 import type { UserRole } from '@/types';
@@ -15,7 +15,6 @@ interface AppShellProps {
 }
 
 export function AppShell({ children }: AppShellProps) {
-  const isMobile = useIsMobile();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
 
@@ -23,6 +22,9 @@ export function AppShell({ children }: AppShellProps) {
 
   return (
     <div className="min-h-screen flex flex-col" dir="rtl" lang="ar">
+      {/* Navigation progress bar */}
+      <NavProgress />
+
       {/* Push Notification Auto-Setup */}
       <PushNotificationSetup />
 
@@ -33,42 +35,46 @@ export function AppShell({ children }: AppShellProps) {
       />
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Desktop Sidebar */}
-        {!isMobile && (
+        {/* Desktop Sidebar — CSS-driven, no JS breakpoint detection */}
+        <div className="hidden md:block">
           <Sidebar
             role={role}
             isOpen={true}
             onToggle={() => setSidebarOpen(!sidebarOpen)}
           />
-        )}
+        </div>
 
-        {/* Mobile Sidebar Overlay - CSS transitions instead of framer-motion */}
-        {isMobile && sidebarOpen && (
+        {/* Mobile Sidebar Overlay */}
+        {sidebarOpen && (
           <>
             <div
-              className="fixed inset-0 bg-black/50 z-40 animate-in fade-in duration-200"
+              className="fixed inset-0 bg-black/50 z-40 md:hidden animate-in fade-in duration-200"
               onClick={() => setSidebarOpen(false)}
             />
-            <div className="fixed right-0 top-0 bottom-0 z-50 w-80 animate-in slide-in-from-right duration-200">
-              <Sidebar
-                role={role}
-                isOpen={true}
-                onToggle={() => setSidebarOpen(false)}
-              />
+            <div className="fixed right-0 top-0 bottom-0 z-50 w-72 md:hidden animate-in slide-in-from-right duration-200">
+              <div className="h-full">
+                <Sidebar
+                  role={role}
+                  isOpen={true}
+                  onToggle={() => setSidebarOpen(false)}
+                />
+              </div>
             </div>
           </>
         )}
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto custom-scrollbar pb-20 md:pb-0">
+        <main className="flex-1 overflow-y-auto custom-scrollbar pb-24 md:pb-6">
           <div className="p-4 md:p-6 max-w-7xl mx-auto">
             {children}
           </div>
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation */}
-      {isMobile && <BottomNav role={role} />}
+      {/* Mobile Bottom Navigation — CSS-driven */}
+      <div className="md:hidden">
+        <BottomNav role={role} />
+      </div>
     </div>
   );
 }

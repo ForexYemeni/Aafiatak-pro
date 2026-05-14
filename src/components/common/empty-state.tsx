@@ -13,36 +13,103 @@ interface EmptyStateProps {
     label: string;
     onClick: () => void;
   };
+  secondaryAction?: {
+    label: string;
+    onClick: () => void;
+  };
   className?: string;
+  variant?: 'default' | 'admin' | 'nurse' | 'beneficiary';
 }
 
-export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
+function getVariantClasses(variant: EmptyStateProps['variant']) {
+  switch (variant) {
+    case 'admin':
+      return { iconBg: 'bg-admin/10', iconRing: 'ring-admin/20', iconText: 'text-admin', btn: 'bg-admin hover:bg-admin/90 text-admin-foreground' };
+    case 'nurse':
+      return { iconBg: 'bg-nurse/10', iconRing: 'ring-nurse/20', iconText: 'text-nurse', btn: 'bg-nurse hover:bg-nurse/90 text-nurse-foreground' };
+    case 'beneficiary':
+      return { iconBg: 'bg-beneficiary/10', iconRing: 'ring-beneficiary/20', iconText: 'text-beneficiary', btn: 'bg-beneficiary hover:bg-beneficiary/90 text-beneficiary-foreground' };
+    default:
+      return { iconBg: 'bg-muted', iconRing: 'ring-border', iconText: 'text-muted-foreground', btn: '' };
+  }
+}
+
+export function EmptyState({
+  icon,
+  title,
+  description,
+  action,
+  secondaryAction,
+  className,
+  variant = 'default',
+}: EmptyStateProps) {
+  const colors = getVariantClasses(variant);
+
   return (
     <motion.div
-      initial={{ opacity: 0, scale: 0.95 }}
-      animate={{ opacity: 1, scale: 1 }}
-      transition={{ duration: 0.3 }}
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: 'easeOut' }}
       className={cn(
-        'flex flex-col items-center justify-center py-16 px-4 text-center',
+        'flex flex-col items-center justify-center py-16 px-6 text-center',
         className
       )}
     >
       {icon && (
         <motion.div
-          initial={{ y: -10 }}
-          animate={{ y: 0 }}
-          transition={{ duration: 0.5, repeat: Infinity, repeatType: 'reverse' }}
-          className="w-20 h-20 rounded-2xl bg-muted flex items-center justify-center mb-6"
+          initial={{ scale: 0.85, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          transition={{ duration: 0.4, delay: 0.1, ease: 'easeOut' }}
+          className={cn(
+            'w-20 h-20 rounded-2xl flex items-center justify-center mb-5 ring-1 shadow-sm',
+            colors.iconBg,
+            colors.iconRing,
+            colors.iconText
+          )}
         >
           {icon}
         </motion.div>
       )}
-      <h3 className="text-lg font-semibold mb-2">{title}</h3>
-      {description && (
-        <p className="text-muted-foreground text-sm max-w-sm mb-6">{description}</p>
-      )}
-      {action && (
-        <Button onClick={action.onClick}>{action.label}</Button>
+
+      <motion.div
+        initial={{ opacity: 0, y: 8 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.35, delay: 0.15 }}
+        className="space-y-2 mb-6"
+      >
+        <h3 className="text-base font-semibold text-foreground">{title}</h3>
+        {description && (
+          <p className="text-sm text-muted-foreground max-w-xs mx-auto leading-relaxed">{description}</p>
+        )}
+      </motion.div>
+
+      {(action || secondaryAction) && (
+        <motion.div
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.25 }}
+          className="flex flex-col sm:flex-row gap-2 items-center"
+        >
+          {action && (
+            <Button
+              onClick={action.onClick}
+              className={cn('px-6', colors.btn || '')}
+              size="sm"
+            >
+              {action.label}
+            </Button>
+          )}
+          {secondaryAction && (
+            <Button
+              onClick={secondaryAction.onClick}
+              variant="outline"
+              size="sm"
+              className="px-6"
+            >
+              {secondaryAction.label}
+            </Button>
+          )}
+        </motion.div>
       )}
     </motion.div>
   );

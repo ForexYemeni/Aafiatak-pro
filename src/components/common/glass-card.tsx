@@ -9,6 +9,7 @@ interface GlassCardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: GlassCardVariant;
   children: ReactNode;
   noPadding?: boolean;
+  hoverable?: boolean;
 }
 
 const variantClasses: Record<GlassCardVariant, string> = {
@@ -22,6 +23,7 @@ export function GlassCard({
   variant = 'default',
   children,
   noPadding = false,
+  hoverable = false,
   className,
   ...props
 }: GlassCardProps) {
@@ -30,7 +32,8 @@ export function GlassCard({
       className={cn(
         'rounded-2xl shadow-sm transition-all duration-200',
         variantClasses[variant],
-        !noPadding && 'p-6',
+        !noPadding && 'p-5',
+        hoverable && 'hover:shadow-md hover:-translate-y-0.5 cursor-pointer',
         className
       )}
       {...props}
@@ -58,7 +61,7 @@ interface GlassCardTitleProps extends HTMLAttributes<HTMLHeadingElement> {
 
 export function GlassCardTitle({ children, className, ...props }: GlassCardTitleProps) {
   return (
-    <h3 className={cn('text-lg font-semibold leading-tight', className)} {...props}>
+    <h3 className={cn('text-base font-semibold leading-tight', className)} {...props}>
       {children}
     </h3>
   );
