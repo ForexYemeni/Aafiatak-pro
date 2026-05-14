@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   Phone,
   Lock,
@@ -13,8 +13,11 @@ import {
   Stethoscope,
   User,
   CreditCard,
-  MapPin,
   ArrowRight,
+  AlertCircle,
+  Sparkles,
+  Shield,
+  Activity,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -30,10 +33,6 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { YEMEN_GOVERNORATES } from '@/lib/constants/governorates';
 import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { cn } from '@/lib/utils';
-
-// ============================================================================
-// Validation Schema
-// ============================================================================
 
 const nurseRegisterSchema = z
   .object({
@@ -61,10 +60,6 @@ const nurseRegisterSchema = z
 
 type NurseRegisterFormValues = z.infer<typeof nurseRegisterSchema>;
 
-// ============================================================================
-// Nurse Registration Form Component
-// ============================================================================
-
 interface RegisterNurseFormProps {
   onBack?: () => void;
   className?: string;
@@ -82,6 +77,53 @@ const specializations = [
   { value: 'post_surgery', label: 'رعاية ما بعد الجراحة' },
   { value: 'emergency', label: 'الطوارئ' },
 ];
+
+function FloatingParticles() {
+  return (
+    <div className="absolute inset-0 overflow-hidden pointer-events-none">
+      {[
+        { x: '8%', y: '12%', size: 12, delay: 0, duration: 7 },
+        { x: '88%', y: '20%', size: 9, delay: 1.4, duration: 6 },
+        { x: '80%', y: '72%', size: 11, delay: 0.7, duration: 8 },
+        { x: '15%', y: '80%', size: 8, delay: 2.2, duration: 5.5 },
+        { x: '50%', y: '6%', size: 10, delay: 3.1, duration: 6.5 },
+      ].map((p, i) => (
+        <motion.div
+          key={i}
+          className="absolute text-sky-400/10 dark:text-sky-400/8"
+          style={{ left: p.x, top: p.y, fontSize: p.size }}
+          animate={{ y: [0, -14, 0], rotate: [0, 90, 180, 270, 360], opacity: [0.12, 0.28, 0.12] }}
+          transition={{ duration: p.duration, repeat: Infinity, ease: 'easeInOut', delay: p.delay }}
+        >
+          +
+        </motion.div>
+      ))}
+      {[
+        { x: '14%', y: '44%', size: 4, delay: 0.5 },
+        { x: '92%', y: '56%', size: 3, delay: 1.3 },
+        { x: '60%', y: '86%', size: 5, delay: 2.6 },
+        { x: '36%', y: '20%', size: 3, delay: 0.3 },
+      ].map((p, i) => (
+        <motion.div
+          key={`dot-${i}`}
+          className="absolute rounded-full bg-sky-400/8"
+          style={{ left: p.x, top: p.y, width: p.size, height: p.size }}
+          animate={{ y: [0, -10, 0], opacity: [0.08, 0.22, 0.08] }}
+          transition={{ duration: 5 + i, repeat: Infinity, ease: 'easeInOut', delay: p.delay }}
+        />
+      ))}
+    </div>
+  );
+}
+
+const inputClass = cn(
+  'pr-11 pl-4 text-right h-12 rounded-xl text-[15px] transition-all duration-200',
+  'bg-white/60 dark:bg-slate-800/60',
+  'border-2 border-slate-200/80 dark:border-slate-700/80',
+  'hover:border-sky-300 dark:hover:border-sky-700',
+  'focus:ring-2 focus:ring-sky-400/20 focus:border-sky-400 dark:focus:border-sky-500',
+  'placeholder:text-muted-foreground/40',
+);
 
 export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps) {
   const [showPassword, setShowPassword] = useState(false);
@@ -125,200 +167,341 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
     }
   };
 
+  const fieldAnim = (delay: number) => ({
+    initial: { opacity: 0, x: 20 },
+    animate: { opacity: 1, x: 0 },
+    transition: { delay, duration: 0.4 },
+  });
+
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
-      animate={{ opacity: 1, x: 0 }}
-      exit={{ opacity: 0, x: 20 }}
-      transition={{ duration: 0.3 }}
-      className={cn('glass rounded-2xl p-6 sm:p-8 w-full max-w-md mx-auto', className)}
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      className={cn(
+        'relative overflow-hidden rounded-3xl w-full max-w-md mx-auto',
+        'bg-white/80 dark:bg-slate-900/80',
+        'backdrop-blur-2xl',
+        'border border-white/40 dark:border-white/10',
+        'shadow-2xl shadow-black/5 dark:shadow-black/30',
+        className,
+      )}
     >
-      {/* Header */}
-      <div className="text-center mb-6">
-        <div className="w-14 h-14 rounded-2xl bg-nurse/10 text-nurse mx-auto mb-3 flex items-center justify-center">
-          <Stethoscope className="w-7 h-7" />
-        </div>
-        <h2 className="text-xl font-bold">تسجيل ممرض/ـة</h2>
-        <p className="text-sm text-muted-foreground mt-1">
-          أنشئ حسابك كممرض/ـة معتمد/ـة
-        </p>
-      </div>
+      <div className="absolute inset-0 bg-gradient-to-br from-sky-50/50 via-transparent to-teal-50/50 dark:from-sky-950/30 dark:via-transparent dark:to-teal-950/30 pointer-events-none" />
+      <FloatingParticles />
+      <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-l from-sky-500 to-teal-600" />
 
-      {/* Error Message */}
-      {error && (
-        <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          className="bg-destructive/10 text-destructive text-sm rounded-xl p-3 mb-4"
-        >
-          {error}
-        </motion.div>
-      )}
-
-      {/* Form */}
-      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-        {/* Name */}
-        <div className="space-y-2">
-          <Label htmlFor="nurse-name">الاسم الكامل</Label>
-          <div className="relative">
-            <User className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              id="nurse-name"
-              placeholder="الاسم الكامل"
-              className="pr-10 text-right"
-              {...register('name')}
-            />
-          </div>
-          {errors.name && (
-            <p className="text-xs text-destructive">{errors.name.message}</p>
-          )}
-        </div>
-
-        {/* Phone */}
-        <div className="space-y-2">
-          <Label htmlFor="nurse-phone">رقم الهاتف</Label>
-          <div className="relative">
-            <Phone className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              id="nurse-phone"
-              type="tel"
-              placeholder="7XXXXXXXX"
-              className="pr-10 text-right"
-              dir="ltr"
-              {...register('phone')}
-            />
-          </div>
-          {errors.phone && (
-            <p className="text-xs text-destructive">{errors.phone.message}</p>
-          )}
-        </div>
-
-        {/* Specialization */}
-        <div className="space-y-2">
-          <Label>التخصص</Label>
-          <Select onValueChange={(value) => setValue('specialization', value)}>
-            <SelectTrigger className="text-right">
-              <SelectValue placeholder="اختر التخصص" />
-            </SelectTrigger>
-            <SelectContent>
-              {specializations.map((spec) => (
-                <SelectItem key={spec.value} value={spec.value}>
-                  {spec.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {errors.specialization && (
-            <p className="text-xs text-destructive">{errors.specialization.message}</p>
-          )}
-        </div>
-
-        {/* License Number */}
-        <div className="space-y-2">
-          <Label htmlFor="nurse-license">رقم الترخيص</Label>
-          <div className="relative">
-            <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              id="nurse-license"
-              placeholder="رقم ترخيص المهنة"
-              className="pr-10 text-right"
-              {...register('licenseNumber')}
-            />
-          </div>
-          {errors.licenseNumber && (
-            <p className="text-xs text-destructive">{errors.licenseNumber.message}</p>
-          )}
-        </div>
-
-        {/* Location - GPS Auto-Detect */}
-        <div className="space-y-2">
-          <Label>الموقع</Label>
-          <GpsLocationButton
-            onLocationDetected={(loc) => {
-              if (loc.governorateValue) {
-                setValue('governorate', loc.governorateValue);
-              }
-            }}
-            placeholder='اضغط "تحديد موقعي" لرفع موقعك الجغرافي'
-            label="تحديد موقعي"
-          />
-        </div>
-
-        {/* Password */}
-        <div className="space-y-2">
-          <Label htmlFor="nurse-password">كلمة المرور</Label>
-          <div className="relative">
-            <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              id="nurse-password"
-              type={showPassword ? 'text' : 'password'}
-              placeholder="••••••"
-              className="pr-10 pl-10 text-right"
-              dir="ltr"
-              {...register('password')}
-            />
-            <button
-              type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          {errors.password && (
-            <p className="text-xs text-destructive">{errors.password.message}</p>
-          )}
-        </div>
-
-        {/* Confirm Password */}
-        <div className="space-y-2">
-          <Label htmlFor="nurse-confirm-password">تأكيد كلمة المرور</Label>
-          <div className="relative">
-            <Lock className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-            <Input
-              id="nurse-confirm-password"
-              type={showConfirmPassword ? 'text' : 'password'}
-              placeholder="••••••"
-              className="pr-10 pl-10 text-right"
-              dir="ltr"
-              {...register('confirmPassword')}
-            />
-            <button
-              type="button"
-              onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-              className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-            >
-              {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-            </button>
-          </div>
-          {errors.confirmPassword && (
-            <p className="text-xs text-destructive">{errors.confirmPassword.message}</p>
-          )}
-        </div>
-
-        {/* Submit */}
-        <Button
-          type="submit"
-          className="w-full bg-nurse hover:bg-nurse/90 text-nurse-foreground"
-          disabled={isLoading}
-        >
-          {isLoading ? 'جارٍ إنشاء الحساب...' : 'إنشاء حساب'}
-        </Button>
-      </form>
-
-      {/* Back to Login */}
-      {onBack && (
-        <div className="mt-6 text-center">
-          <button
-            type="button"
-            onClick={onBack}
-            className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1 justify-center transition-colors"
+      <div className="relative p-6 sm:p-8">
+        {/* Header */}
+        <div className="text-center mb-7">
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ type: 'spring', stiffness: 260, damping: 20, delay: 0.1 }}
+            className="relative inline-block mb-4"
           >
-            <ArrowRight className="w-4 h-4" />
-            العودة لتسجيل الدخول
-          </button>
+            <div className="absolute inset-0 blur-xl rounded-2xl bg-sky-400/20" />
+            <div className="relative w-16 h-16 rounded-2xl mx-auto flex items-center justify-center bg-gradient-to-br from-sky-500 to-teal-600 shadow-lg shadow-sky-500/25">
+              <Stethoscope className="w-8 h-8 text-white" />
+            </div>
+          </motion.div>
+          <motion.h1
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.5 }}
+            className="text-2xl font-black tracking-tight mb-1"
+          >
+            إنشاء حساب ممرض
+          </motion.h1>
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.3, duration: 0.5 }}
+            className="text-sm text-muted-foreground flex items-center justify-center gap-1.5"
+          >
+            <Activity className="w-3.5 h-3.5 text-sky-500" />
+            انضم كممرض/ـة معتمد/ـة على منصة عافيتك
+          </motion.p>
         </div>
-      )}
+
+        {/* Error */}
+        <AnimatePresence mode="wait">
+          {error && (
+            <motion.div
+              initial={{ opacity: 0, height: 0, y: -10 }}
+              animate={{ opacity: 1, height: 'auto', y: 0 }}
+              exit={{ opacity: 0, height: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="overflow-hidden mb-4"
+            >
+              <div className="flex items-center gap-2.5 bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400 text-sm rounded-xl p-3 border border-red-200/50 dark:border-red-800/50">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{error}</span>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
+          {/* Name */}
+          <motion.div {...fieldAnim(0.35)} className="space-y-2">
+            <Label htmlFor="nurse-name" className="text-sm font-semibold">الاسم الكامل</Label>
+            <div className="relative">
+              <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground/60 pointer-events-none" />
+              <Input
+                id="nurse-name"
+                placeholder="أدخل اسمك الكامل"
+                className={cn(inputClass, errors.name && 'border-red-400 dark:border-red-500 focus:border-red-500 focus:ring-red-400/20')}
+                {...register('name')}
+              />
+            </div>
+            <AnimatePresence mode="wait">
+              {errors.name && (
+                <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-xs text-destructive mr-1">
+                  {errors.name.message}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Phone */}
+          <motion.div {...fieldAnim(0.4)} className="space-y-2">
+            <Label htmlFor="nurse-phone" className="text-sm font-semibold">رقم الهاتف</Label>
+            <div className="relative">
+              <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground/60 pointer-events-none" />
+              <Input
+                id="nurse-phone"
+                type="tel"
+                placeholder="7XXXXXXXX"
+                className={cn(inputClass, 'pl-4', errors.phone && 'border-red-400 dark:border-red-500 focus:border-red-500 focus:ring-red-400/20')}
+                dir="ltr"
+                {...register('phone')}
+              />
+            </div>
+            <AnimatePresence mode="wait">
+              {errors.phone && (
+                <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-xs text-destructive mr-1">
+                  {errors.phone.message}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Specialization + License in a row */}
+          <motion.div {...fieldAnim(0.43)} className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label className="text-sm font-semibold">التخصص</Label>
+              <Select onValueChange={(value) => setValue('specialization', value, { shouldValidate: true })}>
+                <SelectTrigger
+                  className={cn(
+                    'text-right h-12 rounded-xl text-[14px]',
+                    'bg-white/60 dark:bg-slate-800/60',
+                    'border-2 border-slate-200/80 dark:border-slate-700/80',
+                    'hover:border-sky-300 dark:hover:border-sky-700',
+                    'focus:ring-2 focus:ring-sky-400/20 focus:border-sky-400',
+                    'transition-all duration-200',
+                    errors.specialization && 'border-red-400',
+                  )}
+                >
+                  <SelectValue placeholder="اختر" />
+                </SelectTrigger>
+                <SelectContent>
+                  {specializations.map((spec) => (
+                    <SelectItem key={spec.value} value={spec.value}>
+                      {spec.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <AnimatePresence mode="wait">
+                {errors.specialization && (
+                  <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-xs text-destructive mr-1">
+                    {errors.specialization.message}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="nurse-license" className="text-sm font-semibold">رقم الترخيص</Label>
+              <div className="relative">
+                <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
+                <Input
+                  id="nurse-license"
+                  placeholder="رقم الترخيص"
+                  className={cn(
+                    'pr-10 text-right h-12 rounded-xl text-[14px]',
+                    'bg-white/60 dark:bg-slate-800/60',
+                    'border-2 border-slate-200/80 dark:border-slate-700/80',
+                    'hover:border-sky-300 dark:hover:border-sky-700',
+                    'focus:ring-2 focus:ring-sky-400/20 focus:border-sky-400',
+                    'placeholder:text-muted-foreground/40 transition-all duration-200',
+                    errors.licenseNumber && 'border-red-400',
+                  )}
+                  {...register('licenseNumber')}
+                />
+              </div>
+              <AnimatePresence mode="wait">
+                {errors.licenseNumber && (
+                  <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-xs text-destructive mr-1">
+                    {errors.licenseNumber.message}
+                  </motion.p>
+                )}
+              </AnimatePresence>
+            </div>
+          </motion.div>
+
+          {/* Location GPS */}
+          <motion.div {...fieldAnim(0.46)} className="space-y-2">
+            <Label className="text-sm font-semibold">الموقع</Label>
+            <GpsLocationButton
+              onLocationDetected={(loc) => {
+                if (loc.governorateValue) {
+                  setValue('governorate', loc.governorateValue);
+                }
+              }}
+              placeholder='اضغط "تحديد موقعي" لرفع موقعك الجغرافي'
+              label="تحديد موقعي"
+            />
+          </motion.div>
+
+          {/* Password */}
+          <motion.div {...fieldAnim(0.49)} className="space-y-2">
+            <Label htmlFor="nurse-password" className="text-sm font-semibold">كلمة المرور</Label>
+            <div className="relative">
+              <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground/60 pointer-events-none" />
+              <Input
+                id="nurse-password"
+                type={showPassword ? 'text' : 'password'}
+                placeholder="••••••"
+                className={cn(inputClass, 'pl-11', errors.password && 'border-red-400 dark:border-red-500 focus:border-red-500 focus:ring-red-400/20')}
+                dir="ltr"
+                {...register('password')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors p-1"
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {showPassword ? (
+                    <motion.div key="off" initial={{ scale: 0.5, opacity: 0, rotate: -90 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={{ scale: 0.5, opacity: 0, rotate: 90 }} transition={{ duration: 0.15 }}>
+                      <EyeOff className="w-[18px] h-[18px]" />
+                    </motion.div>
+                  ) : (
+                    <motion.div key="on" initial={{ scale: 0.5, opacity: 0, rotate: -90 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={{ scale: 0.5, opacity: 0, rotate: 90 }} transition={{ duration: 0.15 }}>
+                      <Eye className="w-[18px] h-[18px]" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </button>
+            </div>
+            <AnimatePresence mode="wait">
+              {errors.password && (
+                <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-xs text-destructive mr-1">
+                  {errors.password.message}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Confirm Password */}
+          <motion.div {...fieldAnim(0.52)} className="space-y-2">
+            <Label htmlFor="nurse-confirm-password" className="text-sm font-semibold">تأكيد كلمة المرور</Label>
+            <div className="relative">
+              <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground/60 pointer-events-none" />
+              <Input
+                id="nurse-confirm-password"
+                type={showConfirmPassword ? 'text' : 'password'}
+                placeholder="••••••"
+                className={cn(inputClass, 'pl-11', errors.confirmPassword && 'border-red-400 dark:border-red-500 focus:border-red-500 focus:ring-red-400/20')}
+                dir="ltr"
+                {...register('confirmPassword')}
+              />
+              <button
+                type="button"
+                onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-foreground transition-colors p-1"
+              >
+                <AnimatePresence mode="wait" initial={false}>
+                  {showConfirmPassword ? (
+                    <motion.div key="off" initial={{ scale: 0.5, opacity: 0, rotate: -90 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={{ scale: 0.5, opacity: 0, rotate: 90 }} transition={{ duration: 0.15 }}>
+                      <EyeOff className="w-[18px] h-[18px]" />
+                    </motion.div>
+                  ) : (
+                    <motion.div key="on" initial={{ scale: 0.5, opacity: 0, rotate: -90 }} animate={{ scale: 1, opacity: 1, rotate: 0 }} exit={{ scale: 0.5, opacity: 0, rotate: 90 }} transition={{ duration: 0.15 }}>
+                      <Eye className="w-[18px] h-[18px]" />
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </button>
+            </div>
+            <AnimatePresence mode="wait">
+              {errors.confirmPassword && (
+                <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-xs text-destructive mr-1">
+                  {errors.confirmPassword.message}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* Submit */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.57, duration: 0.4 }}
+          >
+            <Button
+              type="submit"
+              className={cn(
+                'w-full h-12 rounded-xl text-[15px] font-bold transition-all duration-300',
+                'bg-gradient-to-l from-sky-500 to-teal-600',
+                'shadow-lg shadow-sky-500/25',
+                'hover:shadow-xl hover:scale-[1.01] active:scale-[0.99]',
+                'disabled:opacity-60 disabled:hover:scale-100',
+              )}
+              disabled={isLoading}
+            >
+              <AnimatePresence mode="wait">
+                {isLoading ? (
+                  <motion.div key="loading" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
+                    <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    <span>جارٍ إنشاء الحساب...</span>
+                  </motion.div>
+                ) : (
+                  <motion.span key="idle" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4" />
+                    إنشاء الحساب
+                  </motion.span>
+                )}
+              </AnimatePresence>
+            </Button>
+          </motion.div>
+        </form>
+
+        {/* Back to Login */}
+        {onBack && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.6, duration: 0.4 }}
+            className="mt-5 text-center"
+          >
+            <button
+              type="button"
+              onClick={onBack}
+              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 justify-center transition-colors group"
+            >
+              <ArrowRight className="w-4 h-4 group-hover:translate-x-0.5 transition-transform" />
+              العودة لتسجيل الدخول
+            </button>
+          </motion.div>
+        )}
+
+        <div className="mt-5 flex items-center justify-center gap-1.5 text-muted-foreground/30">
+          <Shield className="w-3 h-3" />
+          <span className="text-[10px]">بياناتك مشفرة ومحمية</span>
+        </div>
+      </div>
     </motion.div>
   );
 }
