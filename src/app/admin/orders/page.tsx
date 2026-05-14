@@ -13,7 +13,7 @@ import {
 import { PageHeader } from '@/components/layout/page-header';
 import { SearchInput } from '@/components/common/search-input';
 import { Currency, formatYemeniRial } from '@/components/common/currency';
-import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthFetch, _GET_CACHE_readSync } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
@@ -140,8 +140,15 @@ function timeAgo(date: string): string {
 
 export default function AdminOrdersPage() {
   const authFetch = useAuthFetch();
-  const [orders, setOrders] = useState<OrderItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Read from in-memory cache synchronously — no skeleton if cache is warm
+  const [orders, setOrders] = useState<OrderItem[]>(() => {
+    const c = _GET_CACHE_readSync<{ success: boolean; data: { orders?: OrderItem[] } }>('/api/admin/orders?page=1&limit=20&search=');
+    return c?.success && Array.isArray(c.data?.orders) ? c.data.orders : [];
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    const c = _GET_CACHE_readSync('/api/admin/orders?page=1&limit=20&search=');
+    return !(c as any)?.success;
+  });
   const [statusTab, setStatusTab] = useState('all');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
