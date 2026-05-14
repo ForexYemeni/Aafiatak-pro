@@ -12,15 +12,32 @@ import jwt from 'jsonwebtoken';
 const SALT_ROUNDS = 12;
 const JWT_EXPIRY = process.env.JWT_EXPIRY ?? '7d';
 const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY ?? '30d';
-const JWT_SECRET = process.env.JWT_SECRET;
-const JWT_REFRESH_SECRET = process.env.JWT_REFRESH_SECRET;
 
-if (!JWT_SECRET) {
-  console.error('[AUTH FATAL] JWT_SECRET environment variable is not set! Authentication will not work.');
+// ── JWT Secrets — REQUIRED. Crash immediately if missing. ──────────────────
+// A missing secret means every JWT would be signed with `undefined`, which
+// node-jsonwebtoken converts to the string "undefined" — trivially forgeable.
+// Failing fast here is far safer than silently allowing broken auth.
+if (!process.env.JWT_SECRET) {
+  const msg =
+    '[AUTH FATAL] JWT_SECRET is not set. ' +
+    'Set it in your .env file or deployment environment variables. ' +
+    'The server will not start without it.';
+  console.error(msg);
+  // In Next.js API routes (Node runtime) throw will bubble up as a 500.
+  // In edge runtime (middleware), throw terminates the process cleanly.
+  throw new Error(msg);
 }
-if (!JWT_REFRESH_SECRET) {
-  console.error('[AUTH FATAL] JWT_REFRESH_SECRET environment variable is not set! Token refresh will not work.');
+if (!process.env.JWT_REFRESH_SECRET) {
+  const msg =
+    '[AUTH FATAL] JWT_REFRESH_SECRET is not set. ' +
+    'Set it in your .env file or deployment environment variables. ' +
+    'The server will not start without it.';
+  console.error(msg);
+  throw new Error(msg);
 }
+
+const JWT_SECRET: string = process.env.JWT_SECRET;
+const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET;
 
 // ---- Password Hashing ----
 
@@ -29,8 +46,7 @@ if (!JWT_REFRESH_SECRET) {
  */
 export async function hashPassword(password: string): Promise<string> {
   const salt = await bcrypt.genSalt(SALT_ROUNDS);
-  const hash = await bcrypt.hash(password, salt);
-  return hash;
+  return bcrypt.hash(password, salt);
 }
 
 /**
@@ -46,7 +62,6 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  * Generate a JWT access token.
  */
 export function generateToken(payload: { userId: string; phone: string; role: string }): string {
-  // Parse expiry - handle both string ("7d") and number formats
   const expiresIn = parseExpiry(JWT_EXPIRY);
   return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
@@ -60,20 +75,14 @@ export function generateRefreshToken(payload: { userId: string; phone: string; r
 }
 
 /**
- * Parse JWT expiry value - converts string like "7d" to seconds or returns as-is
+ * Parse JWT expiry value - converts string like "7d" to seconds or returns as-is.
  */
 function parseExpiry(value: string): string | number {
-  // If it's already a number string, return as number
-  if (/^\d+$/.test(value)) {
-    return parseInt(value, 10);
-  }
-  // If it's a timespan string like "7d", "30d", "24h", etc - return as string
-  // jwt.sign supports timespan strings like "7d", "2 days", "10h", etc.
+  if (/^\d+$/.test(value)) return parseInt(value, 10);
   if (/^\d+\s*(ms|s|m|h|d|w|y|seconds?|minutes?|hours?|days?|weeks?|years?)$/i.test(value.trim())) {
     return value.trim();
   }
-  // Default to 7 days in seconds if unrecognizable
-  console.warn(`[Auth] Unrecognized JWT expiry format: ${value}. Defaulting to 7d.`);
+  console.warn(`[Auth] Unrecognized JWT expiry format: "${value}". Defaulting to 7d.`);
   return '7d';
 }
 
@@ -84,11 +93,7 @@ function parseExpiry(value: string): string | number {
 export function verifyToken(token: string): { userId: string; phone: string; role: string } | null {
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; phone: string; role: string };
-    return {
-      userId: decoded.userId,
-      phone: decoded.phone,
-      role: decoded.role,
-    };
+    return { userId: decoded.userId, phone: decoded.phone, role: decoded.role };
   } catch {
     return null;
   }
@@ -101,11 +106,7 @@ export function verifyToken(token: string): { userId: string; phone: string; rol
 export function verifyRefreshToken(token: string): { userId: string; phone: string; role: string } | null {
   try {
     const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as { userId: string; phone: string; role: string };
-    return {
-      userId: decoded.userId,
-      phone: decoded.phone,
-      role: decoded.role,
-    };
+    return { userId: decoded.userId, phone: decoded.phone, role: decoded.role };
   } catch {
     return null;
   }
@@ -139,16 +140,13 @@ export function normalizeYemeniPhone(phone: string): string {
  * Format a Yemen phone number to international format: +967XXXXXXXXX
  */
 export function formatYemeniPhone(phone: string): string {
-  const normalized = normalizeYemeniPhone(phone);
-  return `+967${normalized}`;
+  return `+967${normalizeYemeniPhone(phone)}`;
 }
 
 // ---- Cookie Helpers ----
 
 /**
  * Create a Set-Cookie header value for the auth token.
- * Uses SameSite=Lax for better compatibility (allows top-level navigations).
- * Only sets Secure flag on HTTPS origins to ensure cookies work in development.
  */
 export function createAuthCookie(token: string, maxAge: number = 7 * 24 * 60 * 60): string {
   const isProduction = process.env.NODE_ENV === 'production';
@@ -171,22 +169,22 @@ export function createClearAuthCookie(): string {
  * Create a standard error response.
  */
 export function createErrorResponse(message: string, status: number, code: string): Response {
-  return Response.json(
-    { success: false, error: { message, code } },
-    { status }
-  );
+  return Response.json({ success: false, error: { message, code } }, { status });
 }
 
 // ---- Referral Code Generator ----
 
 /**
- * Generate a unique referral code with prefix AFK-.
+ * Generate a cryptographically secure referral code with prefix AFK-.
+ * Uses crypto.getRandomValues() instead of Math.random() for unpredictability.
  */
 export function generateReferralCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const bytes = new Uint8Array(6);
+  crypto.getRandomValues(bytes);
   let code = 'AFK-';
   for (let i = 0; i < 6; i++) {
-    code += chars.charAt(Math.floor(Math.random() * chars.length));
+    code += chars[bytes[i] % chars.length];
   }
   return code;
 }
