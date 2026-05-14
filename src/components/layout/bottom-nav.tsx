@@ -132,6 +132,7 @@ export function BottomNav({ role }: BottomNavProps) {
               <Link
                 key={item.href}
                 href={item.href}
+                prefetch={true}
                 className="relative flex flex-col items-center justify-end pb-2 -mt-5 w-16"
                 style={{ WebkitTapHighlightColor: 'transparent' }}
               >
@@ -159,6 +160,7 @@ export function BottomNav({ role }: BottomNavProps) {
             <Link
               key={item.href}
               href={item.href}
+              prefetch={true}
               className="relative flex flex-col items-center justify-center gap-0.5 w-16 h-full touch-target group"
               style={{ WebkitTapHighlightColor: 'transparent' }}
             >

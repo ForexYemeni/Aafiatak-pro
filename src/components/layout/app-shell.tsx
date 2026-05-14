@@ -6,6 +6,7 @@ import { Sidebar } from './sidebar';
 import { BottomNav } from './bottom-nav';
 import { TopHeader } from './top-header';
 import { NavProgress } from '@/components/common/nav-progress';
+import { RolePrefetcher } from '@/components/common/role-prefetcher';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { PushNotificationSetup } from '@/components/common/push-notification-setup';
 import type { UserRole } from '@/types';
@@ -24,6 +25,9 @@ export function AppShell({ children }: AppShellProps) {
     <div className="min-h-screen flex flex-col" dir="rtl" lang="ar">
       {/* Navigation progress bar */}
       <NavProgress />
+
+      {/* Eagerly prefetch all pages for this role → instant navigation */}
+      <RolePrefetcher role={role} />
 
       {/* Push Notification Auto-Setup */}
       <PushNotificationSetup />
