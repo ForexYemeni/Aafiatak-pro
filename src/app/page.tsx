@@ -769,7 +769,7 @@ function LoginPageContent() {
   // ============================================================================
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden" dir="rtl" lang="ar">
+    <div className="min-h-screen flex items-center justify-center relative overflow-hidden py-8" dir="rtl" lang="ar">
       {/* Post-login loading screen */}
       <AnimatePresence>
         {showLoadingScreen && user && (
@@ -780,107 +780,105 @@ function LoginPageContent() {
         )}
       </AnimatePresence>
 
-      {/* Background */}
-      <div className="fixed inset-0 bg-gradient-to-br from-[#0a0f1e] via-[#0d1525] to-[#0a1628]" />
+      {/* === PREMIUM DEEP BACKGROUND === */}
+      <div className="fixed inset-0" style={{ background: 'linear-gradient(145deg, #020711 0%, #04091a 45%, #020610 100%)' }} />
 
-      {/* Animated mesh gradient orbs */}
+      {/* Mesh gradient orbs */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        <div
-          className="absolute w-[600px] h-[600px] rounded-full login-mesh-orb-1"
-          style={{
-            top: '-15%',
-            right: '-10%',
-            background: 'radial-gradient(circle, rgba(20,184,166,0.15) 0%, rgba(20,184,166,0.03) 40%, transparent 70%)',
-            filter: 'blur(80px)',
-          }}
-        />
-        <div
-          className="absolute w-[500px] h-[500px] rounded-full login-mesh-orb-2"
-          style={{
-            bottom: '-10%',
-            left: '-8%',
-            background: 'radial-gradient(circle, rgba(139,92,246,0.12) 0%, rgba(139,92,246,0.02) 40%, transparent 70%)',
-            filter: 'blur(70px)',
-          }}
-        />
-        <div
-          className="absolute w-[400px] h-[400px] rounded-full login-mesh-orb-3"
-          style={{
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            background: 'radial-gradient(circle, rgba(59,130,246,0.08) 0%, transparent 70%)',
-            filter: 'blur(60px)',
-          }}
-        />
+        {/* Teal — top right */}
+        <div className="absolute rounded-full login-mesh-orb-1" style={{ width: 740, height: 740, top: '-20%', right: '-14%', background: 'radial-gradient(circle, rgba(20,184,166,0.26) 0%, rgba(16,185,129,0.09) 36%, transparent 62%)', filter: 'blur(100px)' }} />
+        {/* Violet — bottom left */}
+        <div className="absolute rounded-full login-mesh-orb-2" style={{ width: 640, height: 640, bottom: '-16%', left: '-12%', background: 'radial-gradient(circle, rgba(139,92,246,0.22) 0%, rgba(124,58,237,0.07) 36%, transparent 62%)', filter: 'blur(90px)' }} />
+        {/* Cyan — center */}
+        <div className="absolute rounded-full login-mesh-orb-3" style={{ width: 480, height: 480, top: '48%', left: '50%', transform: 'translate(-50%,-50%)', background: 'radial-gradient(circle, rgba(34,211,238,0.08) 0%, transparent 62%)', filter: 'blur(75px)' }} />
+        {/* Emerald accent — bottom right */}
+        <div className="absolute rounded-full" style={{ width: 400, height: 400, bottom: '6%', right: '3%', background: 'radial-gradient(circle, rgba(16,185,129,0.11) 0%, transparent 62%)', filter: 'blur(65px)' }} />
+        {/* Dot grid overlay */}
+        <div className="absolute inset-0 opacity-[0.024]" style={{ backgroundImage: 'radial-gradient(rgba(255,255,255,0.85) 1px, transparent 1px)', backgroundSize: '30px 30px' }} />
       </div>
 
-      {/* Subtle noise overlay */}
-      <div className="fixed inset-0 pointer-events-none opacity-[0.015]" style={{
-        backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")`,
-      }} />
+      {/* Noise texture */}
+      <div className="fixed inset-0 pointer-events-none opacity-[0.012]" style={{ backgroundImage: `url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")` }} />
 
-      {/* Main Card */}
+      {/* === MAIN CARD === */}
       <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        initial={{ opacity: 0, y: 26, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.8, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 w-full max-w-[480px] mx-4 sm:mx-auto login-glass-card rounded-3xl"
+        transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
+        className="relative z-10 w-full max-w-[500px] mx-4 sm:mx-auto"
+        style={{
+          background: 'linear-gradient(160deg, rgba(255,255,255,0.068) 0%, rgba(255,255,255,0.028) 100%)',
+          backdropFilter: 'blur(36px) saturate(170%)',
+          WebkitBackdropFilter: 'blur(36px) saturate(170%)',
+          borderRadius: 28,
+          border: '1px solid rgba(255,255,255,0.11)',
+          boxShadow: '0 44px 130px -22px rgba(0,0,0,0.78), inset 0 1px 0 rgba(255,255,255,0.13), inset 0 -1px 0 rgba(0,0,0,0.15)',
+        }}
       >
-        <div className="p-6 sm:p-8 lg:p-10 safe-bottom">
-          {/* Logo Section */}
+        {/* Inner top highlight line */}
+        <div className="absolute top-0 inset-x-10 h-px rounded-full" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)' }} />
+
+        <div className="p-7 sm:p-9 safe-bottom">
+
+          {/* === BRAND HEADER === */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
+            initial={{ opacity: 0, scale: 0.86 }}
             animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 0.1, duration: 0.5 }}
-            className="text-center mb-8"
+            transition={{ delay: 0.12, duration: 0.58, ease: [0.16, 1, 0.3, 1] }}
+            className="text-center mb-9"
           >
-            <motion.div
-              animate={{ scale: [1, 1.05, 1] }}
-              transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-              className="w-16 h-16 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-gradient-to-br from-teal-500 to-emerald-500 shadow-lg shadow-teal-500/25"
+            {/* Icon with pulse ring */}
+            <div className="relative inline-block mb-5">
+              <motion.div
+                animate={{ scale: [1, 1.07, 1] }}
+                transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                className="relative w-[76px] h-[76px] rounded-[22px] mx-auto flex items-center justify-center"
+                style={{
+                  background: 'linear-gradient(135deg, #0d9488 0%, #10b981 55%, #06b6d4 100%)',
+                  boxShadow: '0 20px 48px -10px rgba(20,184,166,0.45), 0 4px 16px -4px rgba(20,184,166,0.3)',
+                }}
+              >
+                <Heart className="w-[36px] h-[36px] text-white" fill="currentColor" />
+              </motion.div>
+              <motion.div
+                className="absolute inset-0 rounded-[22px]"
+                animate={{ boxShadow: ['0 0 0 0 rgba(20,184,166,0.35)', '0 0 0 16px rgba(20,184,166,0)', '0 0 0 0 rgba(20,184,166,0)'] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: 'easeOut', delay: 0.5 }}
+              />
+            </div>
+            {/* Brand name */}
+            <h1
+              className="text-[34px] font-black mb-2 leading-none"
+              style={{ background: 'linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.78) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
             >
-              <Heart className="w-8 h-8 text-white" fill="currentColor" />
-            </motion.div>
-            <h1 className="text-3xl font-black text-white mb-1">عافيتك</h1>
-            <p className="text-sm text-white/40">رعاية صحية منزلية بلمسة زر</p>
+              عافيتك
+            </h1>
+            <p className="text-[13px] font-medium tracking-wide" style={{ color: 'rgba(255,255,255,0.32)' }}>رعاية صحية منزلية بلمسة زر</p>
           </motion.div>
 
-          {/* Tab Switcher */}
+          {/* === TAB SWITCHER === */}
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="relative flex bg-white/[0.04] rounded-xl p-1 mb-6 border border-white/[0.06]"
+            transition={{ delay: 0.22 }}
+            className="relative flex p-[5px] mb-7 rounded-2xl"
+            style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <motion.div
-              className="absolute top-1 bottom-1 rounded-lg bg-gradient-to-l from-teal-500/80 to-emerald-500/80"
-              initial={false}
-              animate={{
-                x: activeTab === 'login' ? '0%' : '100%',
-                width: '50%',
+              className="absolute rounded-[13px]"
+              style={{
+                top: 5, bottom: 5,
+                background: 'linear-gradient(135deg, rgba(13,148,136,0.92) 0%, rgba(16,185,129,0.92) 100%)',
+                boxShadow: '0 4px 20px -4px rgba(20,184,166,0.5)',
               }}
-              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-              style={{ right: activeTab === 'login' ? '50%' : '0%' }}
+              initial={false}
+              animate={{ right: activeTab === 'login' ? '50%' : 5, left: activeTab === 'login' ? 5 : '50%' }}
+              transition={{ type: 'spring', stiffness: 380, damping: 34 }}
             />
-            <button
-              type="button"
-              onClick={() => { setActiveTab('login'); clearError(); }}
-              className={cn(
-                'relative z-10 flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors duration-200 min-h-[44px]',
-                activeTab === 'login' ? 'text-white' : 'text-white/40 hover:text-white/60'
-              )}
-            >
+            <button type="button" onClick={() => { setActiveTab('login'); clearError(); }} className={cn('relative z-10 flex-1 py-3 text-[13px] font-bold rounded-[13px] transition-colors duration-200 min-h-[46px]', activeTab === 'login' ? 'text-white' : 'text-white/32 hover:text-white/55')}>
               تسجيل دخول
             </button>
-            <button
-              type="button"
-              onClick={() => { setActiveTab('register'); clearError(); }}
-              className={cn(
-                'relative z-10 flex-1 py-2.5 text-sm font-bold rounded-lg transition-colors duration-200 min-h-[44px]',
-                activeTab === 'register' ? 'text-white' : 'text-white/40 hover:text-white/60'
-              )}
-            >
+            <button type="button" onClick={() => { setActiveTab('register'); clearError(); }} className={cn('relative z-10 flex-1 py-3 text-[13px] font-bold rounded-[13px] transition-colors duration-200 min-h-[46px]', activeTab === 'register' ? 'text-white' : 'text-white/32 hover:text-white/55')}>
               إنشاء حساب
             </button>
           </motion.div>
@@ -890,139 +888,126 @@ function LoginPageContent() {
             {error && (
               <motion.div
                 initial={{ opacity: 0, height: 0, marginBottom: 0 }}
-                animate={{ opacity: 1, height: 'auto', marginBottom: 16 }}
+                animate={{ opacity: 1, height: 'auto', marginBottom: 20 }}
                 exit={{ opacity: 0, height: 0, marginBottom: 0 }}
                 className="overflow-hidden"
               >
-                <div className="bg-red-500/10 border border-red-500/20 rounded-xl p-3 flex items-center gap-2 text-sm text-red-300">
-                  <AlertTriangle className="w-4 h-4 shrink-0" />
-                  <span>{error}</span>
+                <div className="flex items-start gap-3 p-4 rounded-2xl text-[13px] text-red-300" style={{ background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.22)' }}>
+                  <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
+                  <span className="leading-relaxed">{error}</span>
                 </div>
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* ====== Login Form ====== */}
+          {/* ====== LOGIN FORM ====== */}
           <AnimatePresence mode="wait">
             {activeTab === 'login' && (
               <motion.form
                 key="login-form"
-                initial={{ opacity: 0, x: -15 }}
+                initial={{ opacity: 0, x: -18 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: 15 }}
-                transition={{ duration: 0.25 }}
+                exit={{ opacity: 0, x: 18 }}
+                transition={{ duration: 0.28 }}
                 onSubmit={loginForm.handleSubmit(onLoginSubmit)}
                 className="space-y-4"
               >
-                {/* Phone input with +967 prefix */}
-                <div className="space-y-1.5">
-                  <div className="relative">
-                    <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] z-10 pointer-events-none text-white/30" />
+                {/* Phone */}
+                <div className="space-y-2">
+                  <label className="block text-[11.5px] font-bold tracking-wider uppercase mr-0.5" style={{ color: 'rgba(255,255,255,0.42)' }}>رقم الهاتف</label>
+                  <div className="relative group">
+                    <Phone className="absolute right-4 top-1/2 -translate-y-1/2 w-[17px] h-[17px] z-10 pointer-events-none transition-colors duration-200" style={{ color: 'rgba(255,255,255,0.38)' }} />
                     <Input
                       id="login-phone"
                       type="tel"
-                      placeholder="رقم الهاتف"
+                      placeholder="7XXXXXXXX"
                       dir="ltr"
-                      className={cn(
-                        'peer h-12 pr-11 pl-[105px] text-right rounded-xl text-[15px]',
-                        'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/25',
-                        'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                        'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
-                        loginForm.formState.errors.phone && 'border-red-400/50 focus:border-red-400/70',
-                        'transition-all duration-200'
-                      )}
+                      className="h-[54px] pr-11 pl-[114px] text-right rounded-2xl text-[15px] text-white placeholder-white/22 border-0 transition-all duration-200 focus:outline-none focus:ring-0"
+                      style={{
+                        background: loginForm.formState.errors.phone ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.07)',
+                        border: `1.5px solid ${loginForm.formState.errors.phone ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.12)'}`,
+                        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+                      }}
+                      onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.border = '1.5px solid rgba(20,184,166,0.65)'; e.currentTarget.style.boxShadow = '0 0 0 4px rgba(20,184,166,0.13), inset 0 1px 0 rgba(255,255,255,0.06)'; }}
+                      onBlur={(e) => { e.currentTarget.style.background = loginForm.formState.errors.phone ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.border = `1.5px solid ${loginForm.formState.errors.phone ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.12)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.06)'; }}
                       {...loginForm.register('phone')}
                     />
-                    <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white/[0.06] border border-white/[0.08] pointer-events-none">
+                    <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl pointer-events-none" style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}>
                       <YemenFlag />
-                      <span className="text-white/50 text-[13px] font-semibold tracking-wide">+967</span>
+                      <span className="text-[12px] font-bold" style={{ color: 'rgba(255,255,255,0.48)' }}>+967</span>
                     </div>
                   </div>
                   {loginForm.formState.errors.phone && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -3 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-xs text-red-400 mr-1"
-                    >
-                      {loginForm.formState.errors.phone.message}
+                    <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="text-[11px] text-red-400 mr-1 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />{loginForm.formState.errors.phone.message}
                     </motion.p>
                   )}
                 </div>
 
-                {/* Password input */}
-                <div className="space-y-1.5">
+                {/* Password */}
+                <div className="space-y-2">
+                  <label className="block text-[11.5px] font-bold tracking-wider uppercase mr-0.5" style={{ color: 'rgba(255,255,255,0.42)' }}>كلمة المرور</label>
                   <div className="relative">
-                    <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] z-10 pointer-events-none text-white/30" />
+                    <Lock className="absolute right-4 top-1/2 -translate-y-1/2 w-[17px] h-[17px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.38)' }} />
                     <Input
                       id="login-password"
                       type={showPassword ? 'text' : 'password'}
-                      placeholder="كلمة المرور"
+                      placeholder="••••••••"
                       dir="ltr"
-                      className={cn(
-                        'peer h-12 pr-11 pl-11 text-right rounded-xl text-[15px]',
-                        'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/25',
-                        'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                        'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
-                        loginForm.formState.errors.password && 'border-red-400/50 focus:border-red-400/70',
-                        'transition-all duration-200'
-                      )}
+                      className="h-[54px] pr-11 pl-12 text-right rounded-2xl text-[15px] text-white placeholder-white/22 border-0 transition-all duration-200 focus:outline-none focus:ring-0"
+                      style={{
+                        background: loginForm.formState.errors.password ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.07)',
+                        border: `1.5px solid ${loginForm.formState.errors.password ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.12)'}`,
+                        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.06)',
+                      }}
+                      onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.10)'; e.currentTarget.style.border = '1.5px solid rgba(20,184,166,0.65)'; e.currentTarget.style.boxShadow = '0 0 0 4px rgba(20,184,166,0.13), inset 0 1px 0 rgba(255,255,255,0.06)'; }}
+                      onBlur={(e) => { e.currentTarget.style.background = loginForm.formState.errors.password ? 'rgba(239,68,68,0.08)' : 'rgba(255,255,255,0.07)'; e.currentTarget.style.border = `1.5px solid ${loginForm.formState.errors.password ? 'rgba(239,68,68,0.45)' : 'rgba(255,255,255,0.12)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.06)'; }}
                       {...loginForm.register('password')}
                     />
-                    <button
-                      type="button"
-                      onClick={() => setShowPassword(!showPassword)}
-                      className="absolute left-3.5 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors z-10 min-w-[44px] min-h-[44px] flex items-center justify-center -my-1"
+                    <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-4 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.35)' }}
+                      onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.65)'}
+                      onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(255,255,255,0.35)'}
                     >
                       {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                     </button>
                   </div>
                   {loginForm.formState.errors.password && (
-                    <motion.p
-                      initial={{ opacity: 0, y: -3 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="text-xs text-red-400 mr-1"
-                    >
-                      {loginForm.formState.errors.password.message}
+                    <motion.p initial={{ opacity: 0, y: -4 }} animate={{ opacity: 1, y: 0 }} className="text-[11px] text-red-400 mr-1 flex items-center gap-1.5">
+                      <AlertTriangle className="w-3 h-3 shrink-0" />{loginForm.formState.errors.password.message}
                     </motion.p>
                   )}
                   <PasswordStrengthBar password={loginPasswordValue} />
                 </div>
 
-                {/* Remember me & forgot password */}
-                <div className="flex items-center justify-between">
+                {/* Remember & Forgot */}
+                <div className="flex items-center justify-between pt-0.5">
                   <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="remember"
-                      className="w-4 h-4 rounded border-white/20 bg-white/[0.06] text-teal-500 focus:ring-teal-400/30 focus:ring-offset-0 cursor-pointer"
-                    />
-                    <Label htmlFor="remember" className="text-xs font-normal cursor-pointer text-white/40">تذكرني</Label>
+                    <input type="checkbox" id="remember" className="w-4 h-4 rounded border-white/20 bg-white/[0.06] text-teal-500 focus:ring-teal-400/30 focus:ring-offset-0 cursor-pointer" />
+                    <Label htmlFor="remember" className="text-[12px] font-normal cursor-pointer" style={{ color: 'rgba(255,255,255,0.38)' }}>تذكرني</Label>
                   </div>
-                  <button type="button" className="text-xs text-teal-400/70 hover:text-teal-400 transition-colors font-medium">
+                  <button type="button" className="text-[12px] font-semibold transition-colors duration-200" style={{ color: 'rgba(20,184,166,0.6)' }}
+                    onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(20,184,166,1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(20,184,166,0.6)'}
+                  >
                     نسيت كلمة المرور؟
                   </button>
                 </div>
 
-                {/* Submit button */}
-                <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="pt-1">
+                {/* Submit */}
+                <motion.div whileHover={{ scale: 1.016 }} whileTap={{ scale: 0.984 }} className="pt-1">
                   <button
                     type="submit"
                     disabled={isLoading}
-                    className={cn(
-                      'login-shimmer-btn relative w-full h-12 rounded-xl font-bold text-[15px] text-white overflow-hidden',
-                      'bg-gradient-to-l from-teal-500 via-emerald-500 to-cyan-500',
-                      'shadow-lg shadow-teal-500/20',
-                      'hover:shadow-xl hover:shadow-teal-500/25',
-                      'disabled:opacity-60 disabled:cursor-not-allowed',
-                      'transition-all duration-300'
-                    )}
+                    className="login-shimmer-btn relative w-full h-[54px] rounded-2xl font-bold text-[15px] text-white overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                    style={{
+                      background: 'linear-gradient(135deg, #0d9488 0%, #0ea57a 40%, #06b6d4 100%)',
+                      boxShadow: '0 10px 36px -8px rgba(20,184,166,0.55), 0 2px 10px -2px rgba(20,184,166,0.3)',
+                    }}
                   >
-                    {isLoading ? (
-                      <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                    ) : (
-                      <span className="flex items-center gap-2 justify-center">
+                    {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
+                      <span className="flex items-center gap-2.5 justify-center">
                         تسجيل الدخول
-                        <svg className="w-4 h-4 rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+                        <svg className="w-4 h-4 rotate-180" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
                       </span>
                     )}
                   </button>
@@ -1031,283 +1016,188 @@ function LoginPageContent() {
             )}
           </AnimatePresence>
 
-          {/* ====== Register Forms ====== */}
+          {/* ====== REGISTER FORMS ====== */}
           <AnimatePresence mode="wait">
             {activeTab === 'register' && (
               <motion.div
                 key="register-container"
-                initial={{ opacity: 0, x: 15 }}
+                initial={{ opacity: 0, x: 18 }}
                 animate={{ opacity: 1, x: 0 }}
-                exit={{ opacity: 0, x: -15 }}
-                transition={{ duration: 0.25 }}
+                exit={{ opacity: 0, x: -18 }}
+                transition={{ duration: 0.28 }}
                 className="space-y-4"
               >
-                {/* Role selector */}
+                {/* === ROLE SELECTOR === */}
                 <div className="grid grid-cols-2 gap-3">
+                  {/* Beneficiary card */}
                   <motion.button
                     type="button"
-                    whileTap={{ scale: 0.97 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => { setRegisterRole('beneficiary'); clearError(); }}
-                    className={cn(
-                      'relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border min-h-[100px]',
-                      registerRole === 'beneficiary'
-                        ? 'border-teal-400/30 bg-white/[0.08] shadow-lg shadow-teal-500/10'
-                        : 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/[0.1]'
-                    )}
+                    className="relative rounded-[22px] p-5 text-center transition-all duration-300 overflow-hidden min-h-[122px]"
+                    style={{
+                      background: registerRole === 'beneficiary' ? 'rgba(20,184,166,0.11)' : 'rgba(255,255,255,0.035)',
+                      border: `1.5px solid ${registerRole === 'beneficiary' ? 'rgba(20,184,166,0.48)' : 'rgba(255,255,255,0.08)'}`,
+                      boxShadow: registerRole === 'beneficiary' ? '0 10px 36px -10px rgba(20,184,166,0.28), inset 0 1px 0 rgba(20,184,166,0.22)' : 'none',
+                    }}
                   >
                     {registerRole === 'beneficiary' && (
-                      <div className="absolute inset-0 bg-gradient-to-br from-teal-500/10 to-emerald-500/5" />
+                      <div className="absolute inset-0 rounded-[22px]" style={{ background: 'linear-gradient(135deg, rgba(20,184,166,0.13) 0%, rgba(16,185,129,0.05) 100%)' }} />
                     )}
                     <div className="relative z-10">
-                      <div className={cn(
-                        'w-12 h-12 rounded-xl mx-auto mb-2.5 flex items-center justify-center transition-all duration-300',
-                        registerRole === 'beneficiary'
-                          ? 'bg-gradient-to-br from-teal-500 to-emerald-500 text-white shadow-lg shadow-teal-500/25'
-                          : 'bg-white/[0.08] text-white/30'
-                      )}>
-                        <User className="w-5 h-5" />
+                      <div className="w-[52px] h-[52px] rounded-2xl mx-auto mb-3 flex items-center justify-center transition-all duration-300"
+                        style={{
+                          background: registerRole === 'beneficiary' ? 'linear-gradient(135deg, #14b8a6, #10b981)' : 'rgba(255,255,255,0.08)',
+                          boxShadow: registerRole === 'beneficiary' ? '0 10px 28px -6px rgba(20,184,166,0.55)' : 'none',
+                        }}
+                      >
+                        <User className={cn('w-[22px] h-[22px] transition-colors', registerRole === 'beneficiary' ? 'text-white' : 'text-white/25')} />
                       </div>
-                      <span className={cn(
-                        'text-sm font-bold transition-colors duration-300',
-                        registerRole === 'beneficiary' ? 'text-white' : 'text-white/40'
-                      )}>
-                        مستفيد/ـة
-                      </span>
-                      <p className="text-[11px] mt-0.5 text-white/25">رعاية منزلية</p>
+                      <span className={cn('block text-[13px] font-bold mb-0.5 transition-colors', registerRole === 'beneficiary' ? 'text-white' : 'text-white/35')}>مستفيد/ـة</span>
+                      <p className={cn('text-[11px] transition-colors', registerRole === 'beneficiary' ? 'text-teal-300/55' : 'text-white/20')}>رعاية منزلية</p>
                     </div>
                   </motion.button>
 
+                  {/* Nurse card */}
                   <motion.button
                     type="button"
-                    whileTap={{ scale: 0.97 }}
+                    whileTap={{ scale: 0.95 }}
                     onClick={() => { setRegisterRole('nurse'); clearError(); }}
-                    className={cn(
-                      'relative rounded-2xl p-4 text-center transition-all duration-300 overflow-hidden border min-h-[100px]',
-                      registerRole === 'nurse'
-                        ? 'border-sky-400/30 bg-white/[0.08] shadow-lg shadow-sky-500/10'
-                        : 'border-white/[0.06] bg-white/[0.03] hover:bg-white/[0.05] hover:border-white/[0.1]'
-                    )}
+                    className="relative rounded-[22px] p-5 text-center transition-all duration-300 overflow-hidden min-h-[122px]"
+                    style={{
+                      background: registerRole === 'nurse' ? 'rgba(14,165,233,0.10)' : 'rgba(255,255,255,0.035)',
+                      border: `1.5px solid ${registerRole === 'nurse' ? 'rgba(14,165,233,0.46)' : 'rgba(255,255,255,0.08)'}`,
+                      boxShadow: registerRole === 'nurse' ? '0 10px 36px -10px rgba(14,165,233,0.26), inset 0 1px 0 rgba(14,165,233,0.2)' : 'none',
+                    }}
                   >
                     {registerRole === 'nurse' && (
-                      <div className="absolute inset-0 bg-gradient-to-br from-sky-500/10 to-cyan-500/5" />
+                      <div className="absolute inset-0 rounded-[22px]" style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.13) 0%, rgba(6,182,212,0.05) 100%)' }} />
                     )}
                     <div className="relative z-10">
-                      <div className={cn(
-                        'w-12 h-12 rounded-xl mx-auto mb-2.5 flex items-center justify-center transition-all duration-300',
-                        registerRole === 'nurse'
-                          ? 'bg-gradient-to-br from-sky-500 to-cyan-500 text-white shadow-lg shadow-sky-500/25'
-                          : 'bg-white/[0.08] text-white/30'
-                      )}>
-                        <Stethoscope className="w-5 h-5" />
+                      <div className="w-[52px] h-[52px] rounded-2xl mx-auto mb-3 flex items-center justify-center transition-all duration-300"
+                        style={{
+                          background: registerRole === 'nurse' ? 'linear-gradient(135deg, #0ea5e9, #06b6d4)' : 'rgba(255,255,255,0.08)',
+                          boxShadow: registerRole === 'nurse' ? '0 10px 28px -6px rgba(14,165,233,0.5)' : 'none',
+                        }}
+                      >
+                        <Stethoscope className={cn('w-[22px] h-[22px] transition-colors', registerRole === 'nurse' ? 'text-white' : 'text-white/25')} />
                       </div>
-                      <span className={cn(
-                        'text-sm font-bold transition-colors duration-300',
-                        registerRole === 'nurse' ? 'text-white' : 'text-white/40'
-                      )}>
-                        ممرض/ـة
-                      </span>
-                      <p className="text-[11px] mt-0.5 text-white/25">ممرض معتمد</p>
+                      <span className={cn('block text-[13px] font-bold mb-0.5 transition-colors', registerRole === 'nurse' ? 'text-white' : 'text-white/35')}>ممرض/ـة</span>
+                      <p className={cn('text-[11px] transition-colors', registerRole === 'nurse' ? 'text-sky-300/55' : 'text-white/20')}>ممرض معتمد</p>
                     </div>
                   </motion.button>
                 </div>
 
-                {/* Beneficiary Registration Form */}
+                {/* ===== BENEFICIARY FORM ===== */}
                 <AnimatePresence mode="wait">
                   {registerRole === 'beneficiary' && (
                     <motion.form
                       key="beneficiary-form"
-                      initial={{ opacity: 0, x: -10 }}
+                      initial={{ opacity: 0, x: -12 }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 10 }}
-                      transition={{ duration: 0.2 }}
+                      exit={{ opacity: 0, x: 12 }}
+                      transition={{ duration: 0.22 }}
                       onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)}
                       className="space-y-3"
                     >
-                      {/* Personal info section */}
-                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                      {/* Personal Info */}
+                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(20,184,166,0.16)', border: '1px solid rgba(20,184,166,0.28)' }}>
                             <User className="w-3.5 h-3.5 text-teal-400" />
                           </div>
-                          <span className="text-xs font-semibold text-teal-400">المعلومات الشخصية</span>
+                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(20,184,166,0.75)' }}>المعلومات الشخصية</span>
                         </div>
-
+                        {/* Name */}
                         <div className="space-y-1.5">
                           <div className="relative">
-                            <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
-                            <Input
-                              id="ben-name"
-                              placeholder="الاسم الكامل"
-                              className={cn(
-                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
-                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
-                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                                'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
-                                beneficiaryForm.formState.errors.name && 'border-red-400/50',
-                                'transition-all duration-200'
-                              )}
-                              {...beneficiaryForm.register('name')}
-                            />
+                            <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="ben-name" placeholder="الاسم الكامل" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.name ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.name ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...beneficiaryForm.register('name')} />
                           </div>
-                          {beneficiaryForm.formState.errors.name && (
-                            <p className="text-xs text-red-400 mr-1">{beneficiaryForm.formState.errors.name.message}</p>
-                          )}
+                          {beneficiaryForm.formState.errors.name && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.name.message}</p>}
                         </div>
-
+                        {/* Phone */}
                         <div className="space-y-1.5">
                           <div className="relative">
-                            <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
-                            <Input
-                              id="ben-phone"
-                              type="tel"
-                              placeholder="رقم الهاتف"
-                              dir="ltr"
-                              className={cn(
-                                'h-11 pr-10 pl-[105px] text-right rounded-xl text-sm',
-                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
-                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                                'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
-                                beneficiaryForm.formState.errors.phone && 'border-red-400/50',
-                                'transition-all duration-200'
-                              )}
-                              {...beneficiaryForm.register('phone')}
-                            />
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.06] border border-white/[0.08] pointer-events-none">
-                              <YemenFlag />
-                              <span className="text-white/40 text-[12px] font-semibold">+967</span>
+                            <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="ben-phone" type="tel" placeholder="رقم الهاتف" dir="ltr" className="h-[46px] pr-10 pl-[108px] text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.phone ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.phone ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...beneficiaryForm.register('phone')} />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2 py-1 rounded-[8px] pointer-events-none" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                              <YemenFlag /><span className="text-[11px] font-bold" style={{ color: 'rgba(255,255,255,0.4)' }}>+967</span>
                             </div>
                           </div>
-                          {beneficiaryForm.formState.errors.phone && (
-                            <p className="text-xs text-red-400 mr-1">{beneficiaryForm.formState.errors.phone.message}</p>
-                          )}
+                          {beneficiaryForm.formState.errors.phone && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.phone.message}</p>}
                         </div>
                       </div>
 
-                      {/* Location section */}
-                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                      {/* Location */}
+                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(20,184,166,0.16)', border: '1px solid rgba(20,184,166,0.28)' }}>
                             <MapPin className="w-3.5 h-3.5 text-teal-400" />
                           </div>
-                          <span className="text-xs font-semibold text-teal-400">معلومات الموقع</span>
+                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(20,184,166,0.75)' }}>معلومات الموقع</span>
                         </div>
-
-                        <GpsLocationButton
-                          onLocationDetected={(loc) => {
-                            if (loc.governorate && loc.governorateValue) {
-                              beneficiaryForm.setValue('governorate', loc.governorateValue);
-                            }
-                            if (loc.address || loc.district) {
-                              beneficiaryForm.setValue('address', loc.district || loc.address);
-                            }
-                          }}
-                        />
-
+                        <GpsLocationButton onLocationDetected={(loc) => {
+                          if (loc.governorate && loc.governorateValue) beneficiaryForm.setValue('governorate', loc.governorateValue);
+                          if (loc.address || loc.district) beneficiaryForm.setValue('address', loc.district || loc.address);
+                        }} />
+                        {/* Address */}
                         <div className="space-y-1.5">
                           <div className="relative">
-                            <MapPin className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
-                            <Input
-                              id="ben-address"
-                              placeholder="العنوان"
-                              className={cn(
-                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
-                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
-                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                                'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
-                                beneficiaryForm.formState.errors.address && 'border-red-400/50',
-                                'transition-all duration-200'
-                              )}
-                              {...beneficiaryForm.register('address')}
-                            />
+                            <MapPin className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="ben-address" placeholder="العنوان التفصيلي" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.address ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.address ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...beneficiaryForm.register('address')} />
                           </div>
-                          {beneficiaryForm.formState.errors.address && (
-                            <p className="text-xs text-red-400 mr-1">{beneficiaryForm.formState.errors.address.message}</p>
-                          )}
+                          {beneficiaryForm.formState.errors.address && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.address.message}</p>}
                         </div>
-
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <Sparkles className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
-                            <Input
-                              id="ben-referral"
-                              placeholder="كود الإحالة (اختياري)"
-                              dir="ltr"
-                              className={cn(
-                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
-                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
-                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                                'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
-                                'transition-all duration-200'
-                              )}
-                              {...beneficiaryForm.register('referralCode')}
-                            />
-                          </div>
+                        {/* Referral */}
+                        <div className="relative">
+                          <Sparkles className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                          <Input id="ben-referral" placeholder="كود الإحالة (اختياري)" dir="ltr" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                            onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                            onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                            {...beneficiaryForm.register('referralCode')} />
                         </div>
                       </div>
 
-                      {/* Security section */}
-                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                      {/* Security */}
+                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(251,191,36,0.13)', border: '1px solid rgba(251,191,36,0.24)' }}>
                             <Lock className="w-3.5 h-3.5 text-amber-400" />
                           </div>
-                          <span className="text-xs font-semibold text-amber-400">الأمان</span>
+                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(251,191,36,0.75)' }}>الأمان</span>
                         </div>
-
                         <div className="space-y-1.5">
                           <div className="relative">
-                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
-                            <Input
-                              id="ben-password"
-                              type={showPassword ? 'text' : 'password'}
-                              placeholder="كلمة المرور"
-                              dir="ltr"
-                              className={cn(
-                                'h-11 pr-10 pl-10 text-right rounded-xl text-sm',
-                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
-                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                                'focus:bg-white/[0.1] focus:border-teal-400/50 focus:ring-2 focus:ring-teal-400/15',
-                                beneficiaryForm.formState.errors.password && 'border-red-400/50',
-                                'transition-all duration-200'
-                              )}
-                              {...beneficiaryForm.register('password')}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                            >
+                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="ben-password" type={showPassword ? 'text' : 'password'} placeholder="كلمة المرور (٦ أحرف على الأقل)" dir="ltr" className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.password ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.password ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...beneficiaryForm.register('password')} />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
                               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                           </div>
-                          {beneficiaryForm.formState.errors.password && (
-                            <p className="text-xs text-red-400 mr-1">{beneficiaryForm.formState.errors.password.message}</p>
-                          )}
+                          {beneficiaryForm.formState.errors.password && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.password.message}</p>}
                           <PasswordStrengthBar password={beneficiaryPasswordValue} />
                         </div>
                       </div>
 
-                      {/* Submit button */}
-                      <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="pt-1">
-                        <button
-                          type="submit"
-                          disabled={isLoading}
-                          className={cn(
-                            'login-shimmer-btn relative w-full h-12 rounded-xl font-bold text-[15px] text-white overflow-hidden',
-                            'bg-gradient-to-l from-teal-500 via-emerald-500 to-cyan-500',
-                            'shadow-lg shadow-teal-500/20',
-                            'hover:shadow-xl hover:shadow-teal-500/25',
-                            'disabled:opacity-60 disabled:cursor-not-allowed',
-                            'transition-all duration-300'
-                          )}
-                        >
-                          {isLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                          ) : (
-                            <span className="flex items-center gap-2 justify-center">
-                              <CheckCircle2 className="w-4 h-4" />
-                              إنشاء حساب مستفيد
-                            </span>
+                      {/* Submit */}
+                      <motion.div whileHover={{ scale: 1.016 }} whileTap={{ scale: 0.984 }} className="pt-1">
+                        <button type="submit" disabled={isLoading} className="login-shimmer-btn relative w-full h-[54px] rounded-2xl font-bold text-[15px] text-white overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                          style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0ea57a 40%, #06b6d4 100%)', boxShadow: '0 10px 36px -8px rgba(20,184,166,0.55), 0 2px 10px -2px rgba(20,184,166,0.3)' }}>
+                          {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
+                            <span className="flex items-center gap-2 justify-center"><CheckCircle2 className="w-4 h-4" />إنشاء حساب مستفيد</span>
                           )}
                         </button>
                       </motion.div>
@@ -1315,102 +1205,59 @@ function LoginPageContent() {
                   )}
                 </AnimatePresence>
 
-                {/* Nurse Registration Form */}
+                {/* ===== NURSE FORM ===== */}
                 <AnimatePresence mode="wait">
                   {registerRole === 'nurse' && (
                     <motion.form
                       key="nurse-form"
-                      initial={{ opacity: 0, x: 10 }}
+                      initial={{ opacity: 0, x: 12 }}
                       animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -10 }}
-                      transition={{ duration: 0.2 }}
+                      exit={{ opacity: 0, x: -12 }}
+                      transition={{ duration: 0.22 }}
                       onSubmit={nurseForm.handleSubmit(onNurseRegister)}
                       className="space-y-3"
                     >
-                      {/* Personal info section */}
-                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                      {/* Professional Info */}
+                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(14,165,233,0.16)', border: '1px solid rgba(14,165,233,0.28)' }}>
                             <Stethoscope className="w-3.5 h-3.5 text-sky-400" />
                           </div>
-                          <span className="text-xs font-semibold text-sky-400">المعلومات المهنية</span>
+                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(14,165,233,0.75)' }}>المعلومات المهنية</span>
                         </div>
 
-                        {/* Name with shake animation */}
+                        {/* Name */}
                         <div className="space-y-1.5">
                           <div className={cn('relative', nurseNameShake && 'animate-shake')}>
-                            <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
-                            <Input
-                              id="nurse-name"
-                              placeholder="الاسم الرباعي (أربع كلمات)"
-                              className={cn(
-                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
-                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
-                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                                'focus:bg-white/[0.1] focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15',
-                                (nurseForm.formState.errors.name || nurseNameWarning) && 'border-amber-400/50',
-                                'transition-all duration-200'
-                              )}
-                              {...nurseForm.register('name')}
-                            />
+                            <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="nurse-name" placeholder="الاسم الرباعي (أربع كلمات)" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${(nurseForm.formState.errors.name || nurseNameWarning) ? 'rgba(251,191,36,0.45)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(14,165,233,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${(nurseForm.formState.errors.name || nurseNameWarning) ? 'rgba(251,191,36,0.45)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...nurseForm.register('name')} />
                           </div>
-                          {nurseNameWarning && (
-                            <motion.p
-                              initial={{ opacity: 0, y: -3 }}
-                              animate={{ opacity: 1, y: 0 }}
-                              className="text-xs text-amber-400 mr-1"
-                            >
-                              يجب إدخال الاسم الرباعي (٤ كلمات على الأقل)
-                            </motion.p>
-                          )}
-                          {nurseForm.formState.errors.name && !nurseNameWarning && (
-                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.name.message}</p>
-                          )}
+                          {nurseNameWarning && <motion.p initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} className="text-[11px] text-amber-400 mr-1">يجب إدخال الاسم الرباعي (٤ كلمات على الأقل)</motion.p>}
+                          {nurseForm.formState.errors.name && !nurseNameWarning && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.name.message}</p>}
                         </div>
 
                         {/* Phone */}
                         <div className="space-y-1.5">
                           <div className="relative">
-                            <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
-                            <Input
-                              id="nurse-phone"
-                              type="tel"
-                              placeholder="رقم الهاتف"
-                              dir="ltr"
-                              className={cn(
-                                'h-11 pr-10 pl-[105px] text-right rounded-xl text-sm',
-                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
-                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                                'focus:bg-white/[0.1] focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15',
-                                nurseForm.formState.errors.phone && 'border-red-400/50',
-                                'transition-all duration-200'
-                              )}
-                              {...nurseForm.register('phone')}
-                            />
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2 py-1 rounded-md bg-white/[0.06] border border-white/[0.08] pointer-events-none">
-                              <YemenFlag />
-                              <span className="text-white/40 text-[12px] font-semibold">+967</span>
+                            <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="nurse-phone" type="tel" placeholder="رقم الهاتف" dir="ltr" className="h-[46px] pr-10 pl-[108px] text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.phone ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(14,165,233,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.phone ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...nurseForm.register('phone')} />
+                            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2 py-1 rounded-[8px] pointer-events-none" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
+                              <YemenFlag /><span className="text-[11px] font-bold" style={{ color: 'rgba(255,255,255,0.4)' }}>+967</span>
                             </div>
                           </div>
-                          {nurseForm.formState.errors.phone && (
-                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.phone.message}</p>
-                          )}
+                          {nurseForm.formState.errors.phone && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.phone.message}</p>}
                         </div>
 
                         {/* Specialization select */}
                         <div className="space-y-1.5">
-                          <Select
-                            onValueChange={(value) => nurseForm.setValue('specialization', value)}
-                            defaultValue={nurseForm.getValues('specialization')}
-                          >
-                            <SelectTrigger className={cn(
-                              'h-11 rounded-xl text-sm',
-                              'bg-white/[0.06] border-white/[0.08] text-white',
-                              'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                              'focus:ring-sky-400/15',
-                              nurseForm.formState.errors.specialization && 'border-red-400/50',
-                              'transition-all duration-200'
-                            )}>
+                          <Select onValueChange={(value) => nurseForm.setValue('specialization', value)} defaultValue={nurseForm.getValues('specialization')}>
+                            <SelectTrigger className="h-[46px] rounded-[12px] text-sm text-white border-0 focus:ring-0 focus:outline-none transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.specialization ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
                               <SelectValue placeholder="اختر التخصص" />
                             </SelectTrigger>
                             <SelectContent className="bg-[#1a2235] border-white/[0.1] max-h-60">
@@ -1433,133 +1280,70 @@ function LoginPageContent() {
                         {/* License number */}
                         <div className="space-y-1.5">
                           <div className="relative">
-                            <Shield className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
-                            <Input
-                              id="nurse-license"
-                              placeholder="رقم الترخيص"
-                              className={cn(
-                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
-                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
-                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                                'focus:bg-white/[0.1] focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15',
-                                nurseForm.formState.errors.licenseNumber && 'border-red-400/50',
-                                'transition-all duration-200'
-                              )}
-                              {...nurseForm.register('licenseNumber')}
-                            />
+                            <Shield className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="nurse-license" placeholder="رقم الترخيص المهني" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.licenseNumber ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(14,165,233,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.licenseNumber ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...nurseForm.register('licenseNumber')} />
                           </div>
-                          {nurseForm.formState.errors.licenseNumber && (
-                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.licenseNumber.message}</p>
-                          )}
+                          {nurseForm.formState.errors.licenseNumber && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.licenseNumber.message}</p>}
                         </div>
                       </div>
 
-                      {/* Location section */}
-                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
-                            <MapPin className="w-3.5 h-3.5 text-sky-400" />
+                      {/* Location */}
+                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(20,184,166,0.16)', border: '1px solid rgba(20,184,166,0.28)' }}>
+                            <MapPin className="w-3.5 h-3.5 text-teal-400" />
                           </div>
-                          <span className="text-xs font-semibold text-sky-400">معلومات الموقع</span>
+                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(20,184,166,0.75)' }}>الموقع</span>
                         </div>
-
-                        <GpsLocationButton
-                          onLocationDetected={(loc) => {
-                            if (loc.governorate && loc.governorateValue) {
-                              nurseForm.setValue('governorate', loc.governorateValue);
-                            }
-                            if (loc.address || loc.district) {
-                              nurseForm.setValue('address', loc.district || loc.address);
-                            }
-                          }}
-                        />
-
+                        <GpsLocationButton onLocationDetected={(loc) => {
+                          if (loc.governorate && loc.governorateValue) nurseForm.setValue('governorate', loc.governorateValue);
+                          if (loc.address || loc.district) nurseForm.setValue('address', loc.district || loc.address);
+                        }} />
                         <div className="space-y-1.5">
                           <div className="relative">
-                            <MapPin className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
-                            <Input
-                              id="nurse-address"
-                              placeholder="العنوان التفصيلي"
-                              className={cn(
-                                'h-11 pr-10 pl-4 text-right rounded-xl text-sm',
-                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
-                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                                'focus:bg-white/[0.1] focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15',
-                                nurseForm.formState.errors.address && 'border-red-400/50',
-                                'transition-all duration-200'
-                              )}
-                              {...nurseForm.register('address')}
-                            />
+                            <MapPin className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="nurse-address" placeholder="العنوان التفصيلي" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.address ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.address ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...nurseForm.register('address')} />
                           </div>
-                          {nurseForm.formState.errors.address && (
-                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.address.message}</p>
-                          )}
+                          {nurseForm.formState.errors.address && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.address.message}</p>}
                         </div>
                       </div>
 
-                      {/* Security section */}
-                      <div className="bg-white/[0.03] border border-white/[0.06] rounded-2xl p-4 space-y-3">
-                        <div className="flex items-center gap-2 mb-1">
-                          <div className="w-6 h-6 rounded-lg bg-white/[0.06] flex items-center justify-center">
+                      {/* Security */}
+                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(251,191,36,0.13)', border: '1px solid rgba(251,191,36,0.24)' }}>
                             <Lock className="w-3.5 h-3.5 text-amber-400" />
                           </div>
-                          <span className="text-xs font-semibold text-amber-400">الأمان</span>
+                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(251,191,36,0.75)' }}>الأمان</span>
                         </div>
-
                         <div className="space-y-1.5">
                           <div className="relative">
-                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[16px] h-[16px] z-10 pointer-events-none text-white/25" />
-                            <Input
-                              id="nurse-password"
-                              type={showPassword ? 'text' : 'password'}
-                              placeholder="كلمة المرور"
-                              dir="ltr"
-                              className={cn(
-                                'h-11 pr-10 pl-10 text-right rounded-xl text-sm',
-                                'bg-white/[0.06] border-white/[0.08] text-white placeholder-white/20',
-                                'hover:bg-white/[0.08] hover:border-white/[0.12]',
-                                'focus:bg-white/[0.1] focus:border-sky-400/50 focus:ring-2 focus:ring-sky-400/15',
-                                nurseForm.formState.errors.password && 'border-red-400/50',
-                                'transition-all duration-200'
-                              )}
-                              {...nurseForm.register('password')}
-                            />
-                            <button
-                              type="button"
-                              onClick={() => setShowPassword(!showPassword)}
-                              className="absolute left-3 top-1/2 -translate-y-1/2 text-white/25 hover:text-white/50 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center"
-                            >
+                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="nurse-password" type={showPassword ? 'text' : 'password'} placeholder="كلمة المرور (٦ أحرف على الأقل)" dir="ltr" className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.password ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.password ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...nurseForm.register('password')} />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
                               {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                             </button>
                           </div>
-                          {nurseForm.formState.errors.password && (
-                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.password.message}</p>
-                          )}
+                          {nurseForm.formState.errors.password && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.password.message}</p>}
                           <PasswordStrengthBar password={nursePasswordValue} />
                         </div>
                       </div>
 
-                      {/* Submit button */}
-                      <motion.div whileHover={{ scale: 1.01 }} whileTap={{ scale: 0.99 }} className="pt-1">
-                        <button
-                          type="submit"
-                          disabled={isLoading}
-                          className={cn(
-                            'login-shimmer-btn relative w-full h-12 rounded-xl font-bold text-[15px] text-white overflow-hidden',
-                            'bg-gradient-to-l from-sky-500 via-cyan-500 to-teal-500',
-                            'shadow-lg shadow-sky-500/20',
-                            'hover:shadow-xl hover:shadow-sky-500/25',
-                            'disabled:opacity-60 disabled:cursor-not-allowed',
-                            'transition-all duration-300'
-                          )}
-                        >
-                          {isLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin mx-auto" />
-                          ) : (
-                            <span className="flex items-center gap-2 justify-center">
-                              <CheckCircle2 className="w-4 h-4" />
-                              إنشاء حساب ممرض/ـة
-                            </span>
+                      {/* Submit */}
+                      <motion.div whileHover={{ scale: 1.016 }} whileTap={{ scale: 0.984 }} className="pt-1">
+                        <button type="submit" disabled={isLoading} className="login-shimmer-btn relative w-full h-[54px] rounded-2xl font-bold text-[15px] text-white overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
+                          style={{ background: 'linear-gradient(135deg, #0369a1 0%, #0ea5e9 45%, #06b6d4 100%)', boxShadow: '0 10px 36px -8px rgba(14,165,233,0.55), 0 2px 10px -2px rgba(14,165,233,0.3)' }}>
+                          {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
+                            <span className="flex items-center gap-2 justify-center"><CheckCircle2 className="w-4 h-4" />إنشاء حساب ممرض/ـة</span>
                           )}
                         </button>
                       </motion.div>
@@ -1574,12 +1358,14 @@ function LoginPageContent() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="mt-6 flex items-center justify-center gap-2 text-white/15 text-[11px]"
+            transition={{ delay: 0.65 }}
+            className="mt-7 flex items-center justify-center gap-2"
+            style={{ color: 'rgba(255,255,255,0.18)' }}
           >
             <Shield className="w-3 h-3" />
-            <span>بياناتك مشفرة ومحمية بتقنيات متقدمة</span>
+            <span className="text-[11px]">بياناتك مشفرة ومحمية بالكامل</span>
           </motion.div>
+
         </div>
       </motion.div>
     </div>
