@@ -27,7 +27,7 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('رقم الهاتف غير صالح. يجب أن يبدأ بـ 7 ويتكون من 9 أرقام', 400, 'VALIDATION_ERROR');
     }
 
-    if (password.length < 6) {
+    if (password.length < 8) {
       return createErrorResponse('كلمة المرور يجب أن تكون 6 أحرف على الأقل', 400, 'VALIDATION_ERROR');
     }
 
