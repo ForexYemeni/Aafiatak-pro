@@ -122,7 +122,7 @@ interface CachedResponse {
 }
 
 const _GET_CACHE = new Map<string, CachedResponse>();
-const _GET_CACHE_TTL = 30_000; // 30 seconds
+const _GET_CACHE_TTL = 180_000; // 3 minutes
 
 function _getCacheKey(url: string, userId: string): string {
   return `${url}::${userId}`;
@@ -133,6 +133,43 @@ function _makeResponseFromCache(cached: CachedResponse): Response {
     status: cached.status,
     headers: { 'Content-Type': 'application/json' },
   });
+}
+
+/**
+ * Pre-warm the GET cache by firing authenticated requests for the given endpoints.
+ * Called by RolePrefetcher after shell mount so pages load data instantly.
+ */
+export async function _GET_CACHE_warmUp(endpoints: string[]): Promise<void> {
+  const { token, user, _hasHydrated } = useAuthStore.getState();
+  if (!_hasHydrated || !token || !user) return;
+
+  const userId = user.id ?? 'anon';
+
+  for (const url of endpoints) {
+    const cacheKey = `${url}::${userId}`;
+    const existing = _GET_CACHE.get(cacheKey);
+    if (existing && Date.now() - existing.ts < _GET_CACHE_TTL) continue; // already warm
+
+    try {
+      const headers = new Headers();
+      headers.set('Authorization', `Bearer ${token}`);
+      headers.set('Content-Type', 'application/json');
+      const res = await fetch(url, { headers });
+      if (res.ok) {
+        const bodyText = await res.text();
+        _GET_CACHE.set(cacheKey, { bodyText, status: res.status, ok: true, ts: Date.now() });
+        if (_GET_CACHE.size > 100) {
+          const firstKey = _GET_CACHE.keys().next().value;
+          if (firstKey) _GET_CACHE.delete(firstKey);
+        }
+      }
+    } catch {
+      // silent — warm-up is best-effort
+    }
+
+    // Small pause between requests to avoid overwhelming the server
+    await new Promise((r) => setTimeout(r, 200));
+  }
 }
 
 /** Clear the GET cache for a given URL prefix (call after mutations) */
