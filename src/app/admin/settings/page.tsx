@@ -409,6 +409,7 @@ export default function AdminSettingsPage() {
     { id: 'legal', label: 'المستندات القانونية', icon: FileText },
     { id: 'maintenance', label: 'وضع الصيانة', icon: Wrench },
     { id: 'database', label: 'قاعدة البيانات', icon: Database },
+    { id: 'backup-admin', label: 'النسخ الاحتياطية والإدارة', icon: Shield },
   ];
 
   return (
@@ -1528,7 +1529,11 @@ export default function AdminSettingsPage() {
         </motion.div>
       )}
 
-      {/* ── Complete App Backup (source + DB + env) ───────────────── */}
+      {/* ── Backup & Administration Section ───────────────────────── */}
+      {activeSection === 'backup-admin' && (
+        <>
+
+      {/* ── Instant Comprehensive App Backup (source + DB + env) ── */}
       <motion.div variants={itemAnim}>
         <GlassCard className="border-blue-200 dark:border-blue-900/40">
           <GlassCardHeader>
@@ -1537,24 +1542,18 @@ export default function AdminSettingsPage() {
                 <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
                   <Shield className="w-4 h-4 text-blue-600 dark:text-blue-400" />
                 </div>
-                نسخة احتياطية شاملة للتطبيق بالكامل
+                نسخة احتياطية شاملة فورية — آخر إصدار من التطبيق
               </GlassCardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => { setShowFullBackupSection(!showFullBackupSection); setFullBackupStats(null); setFullBackupPassword(''); }}
-                className="border-blue-200 dark:border-blue-800 text-blue-700 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 gap-1.5"
-              >
-                {showFullBackupSection ? <X className="w-3.5 h-3.5" /> : <Shield className="w-3.5 h-3.5" />}
-                {showFullBackupSection ? 'إغلاق' : 'نسخة شاملة'}
-              </Button>
+              <span className="text-[10px] px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400 font-medium border border-blue-200 dark:border-blue-800/50 flex items-center gap-1">
+                <Zap className="w-3 h-3" />
+                فوري
+              </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              تشمل الكود المصدري + قاعدة البيانات + متغيرات البيئة + سكريبت الاستعادة — يمكن رفعها إلى GitHub أو إرسالها لأي ذكاء اصطناعي لإعادة التشغيل من الصفر
+              نسخة فورية من آخر تحديث للتطبيق — تشمل الكود المصدري + قاعدة البيانات + متغيرات البيئة + سكريبت الاستعادة
             </p>
           </GlassCardHeader>
 
-          {showFullBackupSection && (
             <GlassCardContent className="space-y-5">
 
               {/* What's inside */}
@@ -1676,11 +1675,10 @@ export default function AdminSettingsPage() {
               </div>
 
             </GlassCardContent>
-          )}
         </GlassCard>
       </motion.div>
 
-      {/* ── Full Backup ──────────────────────────────────────────── */}
+      {/* ── Full Backup (Data Only) ───────────────────────────────── */}
       <motion.div variants={itemAnim}>
         <GlassCard className="border-emerald-200 dark:border-emerald-900/40">
           <GlassCardHeader>
@@ -1987,6 +1985,9 @@ export default function AdminSettingsPage() {
           )}
         </GlassCard>
       </motion.div>
+
+        </>
+      )}
 
       {/* Fixed Save Button at Bottom */}
       <motion.div variants={itemAnim} className="flex justify-end pb-4">
