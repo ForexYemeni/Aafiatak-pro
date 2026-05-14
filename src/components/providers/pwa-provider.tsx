@@ -10,6 +10,7 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { useNotificationStore } from '@/lib/stores/notification-store';
 import { socketService } from '@/lib/socket';
 import { getActiveChatId } from '@/components/providers/socket-provider';
+import { useSocket } from '@/hooks/use-socket';
 
 const OfflineWrapper = dynamic(
   () => import('@/components/common/offline-wrapper').then(mod => mod.OfflineWrapper),
@@ -395,6 +396,18 @@ function VoiceNotificationPoller() {
   useEffect(() => {
     if (!hasHydrated) return;
 
+    // Declare in outer scope so the cleanup function can always reference them
+    const getInterval = () => document.hidden ? VOICE_POLL_INTERVAL_HIDDEN : VOICE_POLL_INTERVAL_VISIBLE;
+
+    const handleVisibilityForInterval = () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        if (isAuthenticated && token) {
+          intervalRef.current = setInterval(pollForVoiceNotifications, getInterval());
+        }
+      }
+    };
+
     if (isAuthenticated && token) {
       // Reset processed IDs on new auth session
       processedIdsRef.current.clear();
@@ -402,21 +415,9 @@ function VoiceNotificationPoller() {
       // Initial poll immediately on auth
       pollForVoiceNotifications();
 
-      // Adaptive polling: faster when visible, slower when hidden
-      const getInterval = () => document.hidden ? VOICE_POLL_INTERVAL_HIDDEN : VOICE_POLL_INTERVAL_VISIBLE;
-
       intervalRef.current = setInterval(pollForVoiceNotifications, getInterval());
 
       // Update interval when visibility changes
-      const handleVisibilityForInterval = () => {
-        if (intervalRef.current) {
-          clearInterval(intervalRef.current);
-          if (isAuthenticated && token) {
-            intervalRef.current = setInterval(pollForVoiceNotifications, getInterval());
-          }
-        }
-      };
-
       document.addEventListener('visibilitychange', handleVisibilityForInterval);
     } else {
       // Clear processed IDs on logout
@@ -961,9 +962,34 @@ function EmergencySoundPlayer() {
   return null;
 }
 
+// ============================================================================
+// Socket Connector — ensures the global socketService singleton is connected
+// whenever the user is authenticated.
+//
+// Background: Two separate socket systems exist in this codebase:
+//   1. SocketProvider (socket-provider.tsx) — creates its own io() connection
+//      used for chat typing events, active chat tracking, etc.
+//   2. socketService (lib/socket.ts) — a singleton used by useNotifications,
+//      EmergencySoundPlayer, ChatSoundPlayer, and VoiceNotificationPoller.
+//
+// socketService.connect() is only called from useSocket(). If no component on
+// the current page calls useSocket(), socketService is NEVER connected and all
+// socket-based notifications, sounds and emergency alerts silently fail.
+//
+// SocketConnector mounts once inside PWAInitializer (which lives at the root
+// layout level) and calls useSocket() globally, guaranteeing socketService is
+// always alive for authenticated users regardless of which page they are on.
+// ============================================================================
+
+function SocketConnector() {
+  useSocket();
+  return null;
+}
+
 export function PWAInitializer() {
   return (
     <>
+      <SocketConnector />
       <ServiceWorkerRegistrar />
       <EmergencySoundPlayer />
       <VoiceNotificationPoller />
