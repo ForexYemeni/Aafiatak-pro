@@ -6,7 +6,8 @@ import {
   Settings, Save, Loader2, Wallet, X, Percent, Moon, Shield,
   Phone, MessageSquare, FileText, Wrench, MapPin, Users,
   Heart, Gift, Zap, Clock, AlertTriangle, Globe, Briefcase, Building2,
-  Database, CheckCircle, Eye, EyeOff, RefreshCw, AlertOctagon, CreditCard
+  Database, CheckCircle, Eye, EyeOff, RefreshCw, AlertOctagon, CreditCard,
+  Trash2, TriangleAlert
 } from 'lucide-react';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { useAuthFetch } from '@/hooks/use-auth';
@@ -155,6 +156,14 @@ export default function AdminSettingsPage() {
   const [showNewPassword, setShowNewPassword] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
 
+  // ── Reset All Data State ──────────────────────────────────────────
+  const [showResetSection, setShowResetSection] = useState(false);
+  const [resetPassword, setResetPassword] = useState('');
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const [showResetPassword, setShowResetPassword] = useState(false);
+  const [isResetting, setIsResetting] = useState(false);
+  const [resetResult, setResetResult] = useState<{ totalDeleted: number; summary: Record<string, number> } | null>(null);
+
   // Fetch current database info when database section is opened
   useEffect(() => {
     if (activeSection === 'database' && !dbInfo) {
@@ -246,6 +255,40 @@ export default function AdminSettingsPage() {
       toast.error('حدث خطأ أثناء تبديل قاعدة البيانات');
     } finally {
       setIsSwitchingDb(false);
+    }
+  };
+
+  // ── Reset All Data Handler ────────────────────────────────────────
+  const handleResetAllData = async () => {
+    if (resetConfirmText !== 'احذف') {
+      toast.error('اكتب كلمة "احذف" بالضبط في حقل التأكيد');
+      return;
+    }
+    if (!resetPassword.trim()) {
+      toast.error('أدخل كلمة المرور للتأكيد');
+      return;
+    }
+
+    setIsResetting(true);
+    setResetResult(null);
+    try {
+      const res = await authFetch('/api/admin/reset-data', {
+        method: 'POST',
+        body: JSON.stringify({ password: resetPassword, confirmText: resetConfirmText }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        setResetResult(json.data);
+        setResetPassword('');
+        setResetConfirmText('');
+        toast.success('تم حذف جميع البيانات بنجاح');
+      } else {
+        toast.error(json.error?.message ?? json.message ?? 'فشل حذف البيانات');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء حذف البيانات');
+    } finally {
+      setIsResetting(false);
     }
   };
 
@@ -1385,6 +1428,183 @@ export default function AdminSettingsPage() {
           </GlassCard>
         </motion.div>
       )}
+
+      {/* ── Danger Zone: Reset All Data ─────────────────────────── */}
+      <motion.div variants={itemAnim}>
+        <GlassCard className="border-red-200 dark:border-red-900/50">
+          <GlassCardHeader>
+            <div className="flex items-center justify-between">
+              <GlassCardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                  <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                </div>
+                منطقة الخطر — حذف جميع البيانات
+              </GlassCardTitle>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => { setShowResetSection(!showResetSection); setResetResult(null); setResetPassword(''); setResetConfirmText(''); }}
+                className="border-red-200 dark:border-red-800 text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 gap-1.5"
+              >
+                {showResetSection ? <X className="w-3.5 h-3.5" /> : <Trash2 className="w-3.5 h-3.5" />}
+                {showResetSection ? 'إغلاق' : 'إظهار'}
+              </Button>
+            </div>
+          </GlassCardHeader>
+
+          {showResetSection && (
+            <GlassCardContent className="space-y-5">
+
+              {/* Warning Banner */}
+              <div className="flex items-start gap-3 rounded-xl bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800/50 p-4">
+                <TriangleAlert className="w-5 h-5 text-red-500 mt-0.5 shrink-0" />
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-red-700 dark:text-red-300">تحذير: هذا الإجراء لا يمكن التراجع عنه</p>
+                  <p className="text-xs text-red-600/80 dark:text-red-400/80 leading-relaxed">
+                    سيتم حذف جميع البيانات التالية نهائياً وبشكل دائم:
+                  </p>
+                  <ul className="text-xs text-red-600/70 dark:text-red-400/70 space-y-0.5 mt-2 list-none">
+                    {[
+                      'جميع حسابات المستفيدين',
+                      'جميع حسابات الممرضين',
+                      'جميع حسابات المشرفين الفرعيين',
+                      'جميع الطلبات والتكليفات',
+                      'جميع الإشعارات',
+                      'جميع المحادثات والرسائل',
+                      'جميع المعاملات المالية',
+                      'جميع طلبات السحب',
+                      'جميع حالات الطوارئ',
+                      'جميع التقييمات والشكاوى',
+                      'جميع الكوبونات والمكافآت',
+                      'سجلات النشاط',
+                    ].map((item) => (
+                      <li key={item} className="flex items-center gap-1.5">
+                        <span className="w-1 h-1 rounded-full bg-red-400 shrink-0" />
+                        {item}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-xs font-semibold text-emerald-600 dark:text-emerald-400 mt-2">
+                    ✓ سيبقى فقط: حساب الإدارة الرئيسي + إعدادات المنصة
+                  </p>
+                </div>
+              </div>
+
+              <Separator className="border-red-100 dark:border-red-900/30" />
+
+              {/* Result Banner */}
+              {resetResult && (
+                <div className="flex items-start gap-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800/50 p-4">
+                  <CheckCircle className="w-5 h-5 text-emerald-500 mt-0.5 shrink-0" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                      تم الحذف بنجاح — {resetResult.totalDeleted.toLocaleString('ar')} وثيقة محذوفة
+                    </p>
+                    <div className="flex flex-wrap gap-1.5 mt-2">
+                      {Object.entries(resetResult.summary).map(([col, count]) => (
+                        <span
+                          key={col}
+                          className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-900/40 text-emerald-700 dark:text-emerald-300"
+                        >
+                          {col}: {count}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Confirmation Steps */}
+              <div className="space-y-4">
+                {/* Step 1: Type confirmation word */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 text-xs flex items-center justify-center font-bold">١</span>
+                    اكتب كلمة التأكيد
+                  </Label>
+                  <Input
+                    value={resetConfirmText}
+                    onChange={(e) => setResetConfirmText(e.target.value)}
+                    placeholder='اكتب "احذف" بالعربية للتأكيد'
+                    dir="rtl"
+                    className={`bg-background/50 border transition-colors ${
+                      resetConfirmText === 'احذف'
+                        ? 'border-red-400 dark:border-red-600 focus:ring-red-300'
+                        : 'border-input'
+                    }`}
+                    disabled={isResetting}
+                  />
+                  {resetConfirmText.length > 0 && resetConfirmText !== 'احذف' && (
+                    <p className="text-[10px] text-red-500">اكتب بالضبط: احذف</p>
+                  )}
+                  {resetConfirmText === 'احذف' && (
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+                      <CheckCircle className="w-3 h-3" /> صحيح
+                    </p>
+                  )}
+                </div>
+
+                {/* Step 2: Password */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <span className="w-5 h-5 rounded-full bg-red-100 dark:bg-red-900/40 text-red-600 dark:text-red-400 text-xs flex items-center justify-center font-bold">٢</span>
+                    كلمة مرور حساب الإدارة
+                  </Label>
+                  <div className="relative">
+                    <Input
+                      type={showResetPassword ? 'text' : 'password'}
+                      value={resetPassword}
+                      onChange={(e) => setResetPassword(e.target.value)}
+                      placeholder="أدخل كلمة مرورك الحالية"
+                      dir="ltr"
+                      className="bg-background/50 pl-10"
+                      disabled={isResetting}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowResetPassword(!showResetPassword)}
+                      className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showResetPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">مطلوبة للتحقق من هويتك قبل تنفيذ الحذف</p>
+                </div>
+              </div>
+
+              {/* Delete Button */}
+              <div className="flex items-center gap-3 pt-1">
+                <Button
+                  onClick={handleResetAllData}
+                  disabled={
+                    isResetting ||
+                    resetConfirmText !== 'احذف' ||
+                    !resetPassword.trim()
+                  }
+                  className="bg-red-600 hover:bg-red-700 disabled:opacity-40 gap-2 min-w-52 shadow-lg shadow-red-600/20 text-white"
+                  size="lg"
+                >
+                  {isResetting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      جارٍ حذف البيانات...
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 className="w-4 h-4" />
+                      حذف جميع البيانات نهائياً
+                    </>
+                  )}
+                </Button>
+                {isResetting && (
+                  <p className="text-xs text-muted-foreground">قد تستغرق هذه العملية لحظات...</p>
+                )}
+              </div>
+
+            </GlassCardContent>
+          )}
+        </GlassCard>
+      </motion.div>
 
       {/* Fixed Save Button at Bottom */}
       <motion.div variants={itemAnim} className="flex justify-end pb-4">
