@@ -31,7 +31,7 @@ export async function GET(
     }
 
     // Serialize with fallback for unpopulated references
-    const serialized = {
+    const serialized: any = {
       ...deployment,
       id: deployment._id.toString(),
       createdBy: deployment.createdBy && typeof deployment.createdBy === 'object' && (deployment.createdBy as any)._id
@@ -50,6 +50,23 @@ export async function GET(
         paymentVerifiedBy: a.paymentVerifiedBy?.toString(),
       })),
     };
+
+    // ── Security: hide creator contact info unless payment is verified + approved ──
+    // Only reveal createdBy.phone and creatorPhone when:
+    //   1. contactRevealed flag is true on the deployment, AND
+    //   2. the requesting user is the assigned nurse, OR user is admin/subadmin
+    const isAdmin = ['admin', 'subadmin'].includes(user.role);
+    const assignedToId = serialized.assignedTo?.id;
+    const isAssignee = assignedToId && assignedToId === user.userId;
+    const shouldRevealContact = isAdmin || (serialized.contactRevealed && isAssignee);
+
+    if (!shouldRevealContact) {
+      if (serialized.createdBy && typeof serialized.createdBy === 'object') {
+        const { phone: _phone, ...createdByWithoutPhone } = serialized.createdBy;
+        serialized.createdBy = createdByWithoutPhone;
+      }
+      delete serialized.creatorPhone;
+    }
 
     return Response.json({
       success: true,
