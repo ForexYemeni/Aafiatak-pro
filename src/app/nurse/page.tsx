@@ -42,7 +42,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { PageHeader } from '@/components/layout/page-header';
-import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthFetch, _GET_CACHE_readSync } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOrderUpdates } from '@/hooks/use-socket';
 import { formatDateOnly, formatTimeOnly, toArabicNum } from '@/components/common/date-formatter';
@@ -187,12 +187,25 @@ const itemVariants = {
 
 export default function NurseTasksPage() {
   const [activeTab, setActiveTab] = useState<TabType>('new');
-  const [assignments, setAssignments] = useState<Assignment[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Read from in-memory cache synchronously — no skeleton if cache is warm
+  const [assignments, setAssignments] = useState<Assignment[]>(() => {
+    const c = _GET_CACHE_readSync<{ success: boolean; data?: Assignment[] }>('/api/nurse/assignments?status=pending&limit=50');
+    return c?.success && Array.isArray(c.data) ? c.data : [];
+  });
+  const [isLoading, setIsLoading] = useState<boolean>(() => {
+    const c = _GET_CACHE_readSync('/api/nurse/assignments?status=pending&limit=50');
+    return !(c as any)?.success;
+  });
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  const [counts, setCounts] = useState({ new: 0, active: 0, completed: 0 });
-  const [verificationStatus, setVerificationStatus] = useState<string | null>(null);
+  const [counts, setCounts] = useState<{ new: number; active: number; completed: number }>(() => {
+    const c = _GET_CACHE_readSync<{ success: boolean; data?: { new: number; active: number; completed: number } }>('/api/nurse/assignments?counts=true');
+    return c?.success && c.data ? c.data : { new: 0, active: 0, completed: 0 };
+  });
+  const [verificationStatus, setVerificationStatus] = useState<string | null>(() => {
+    const c = _GET_CACHE_readSync<{ success: boolean; data?: { verificationStatus?: string } }>('/api/nurse/profile');
+    return c?.success && c.data?.verificationStatus ? c.data.verificationStatus : null;
+  });
   const [profileCompleteness, setProfileCompleteness] = useState(0);
   const [ratingSummary, setRatingSummary] = useState<{ averageRating: number; reviewCount: number; completedJobs: number } | null>(null);
   const authFetch = useAuthFetch();
