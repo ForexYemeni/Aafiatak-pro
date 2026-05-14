@@ -167,8 +167,26 @@ export async function _GET_CACHE_warmUp(endpoints: string[]): Promise<void> {
       // silent — warm-up is best-effort
     }
 
-    // Small pause between requests to avoid overwhelming the server
-    await new Promise((r) => setTimeout(r, 200));
+    // Small pause between requests
+    await new Promise((r) => setTimeout(r, 50));
+  }
+}
+
+/**
+ * Read a cached GET response synchronously.
+ * Safe to call outside React (no hooks).
+ * Returns parsed JSON or null if not cached / expired.
+ */
+export function _GET_CACHE_readSync<T = unknown>(url: string): T | null {
+  const { user } = useAuthStore.getState();
+  const userId = user?.id ?? 'anon';
+  const cacheKey = _getCacheKey(url, userId);
+  const cached = _GET_CACHE.get(cacheKey);
+  if (!cached || Date.now() - cached.ts >= _GET_CACHE_TTL) return null;
+  try {
+    return JSON.parse(cached.bodyText) as T;
+  } catch {
+    return null;
   }
 }
 
