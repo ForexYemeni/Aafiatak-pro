@@ -605,32 +605,33 @@ export default function NurseDeploymentsPage() {
     const myApp = getMyApplication(dep);
     const needsPayment = myApp && (myApp.status === 'admin_approved' || myApp.status === 'payment_pending');
     const isPaymentTarget = paymentTarget?.id === dep.id;
+    // Contact is only truly revealed after accepted status (API enforces this, UI mirrors it)
+    const contactVisible = myApp?.status === 'accepted' && dep.contactRevealed && !!(dep.createdBy?.phone || dep.creatorPhone);
 
     return (
-      <motion.div key={dep.id} variants={itemAnim} className="rounded-2xl border bg-card shadow-sm hover:shadow-md transition-all">
-        <div className={`h-1.5 rounded-t-2xl ${tc.bg}`} />
+      <motion.div key={dep.id} variants={itemAnim} className="rounded-2xl border bg-card shadow-sm hover:shadow-md transition-all overflow-hidden">
+        {/* Colored type bar */}
+        <div className={`h-1 ${tc.bg}`} />
         <div className="p-4 space-y-3">
           {/* Header */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <div className={`w-10 h-10 rounded-xl ${tc.icon} flex items-center justify-center`}>
-                <Briefcase className={`w-5 h-5 ${tc.text}`} />
-              </div>
-              <div>
-                <p className="font-bold text-sm line-clamp-1">{dep.title || typeLabels[dep.type] || dep.type}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <Badge variant="secondary" className={`text-[9px] px-1.5 py-0 h-4 ${tc.bg} text-white`}>{typeLabels[dep.type] || dep.type}</Badge>
-                  {dep.gender && (
-                    <Badge variant="secondary" className={`text-[9px] px-1.5 py-0 h-4 ${dep.gender === 'male' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'}`}>
-                      {dep.gender === 'male' ? 'ذكر' : 'أنثى'}
-                    </Badge>
-                  )}
-                  {dep.department && (
-                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
-                      {departmentLabels[dep.department] || dep.department}
-                    </Badge>
-                  )}
-                </div>
+          <div className="flex items-start gap-3">
+            <div className={`w-11 h-11 rounded-xl ${tc.icon} flex items-center justify-center shrink-0`}>
+              <Briefcase className={`w-5 h-5 ${tc.text}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm line-clamp-1 leading-tight">{dep.title || typeLabels[dep.type] || dep.type}</p>
+              <div className="flex flex-wrap items-center gap-1 mt-1">
+                <span className={`inline-flex items-center text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${tc.bg} text-white`}>{typeLabels[dep.type] || dep.type}</span>
+                {dep.gender && (
+                  <span className={`inline-flex items-center text-[9px] px-1.5 py-0.5 rounded-full font-medium ${dep.gender === 'male' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'}`}>
+                    {dep.gender === 'male' ? '♂ ذكر' : '♀ أنثى'}
+                  </span>
+                )}
+                {dep.department && (
+                  <span className="inline-flex items-center text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
+                    {departmentLabels[dep.department] || dep.department}
+                  </span>
+                )}
               </div>
             </div>
             <BadgeStatus
@@ -640,122 +641,94 @@ export default function NurseDeploymentsPage() {
             />
           </div>
 
-          {/* Details */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Clock className="w-3.5 h-3.5" />
-              <span>{toArabicNum(dep.hours)} ساعة</span>
+          {/* Key metrics strip */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40">
+              <DollarSign className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <div>
+                <p className="text-[9px] text-muted-foreground leading-none">الأجر</p>
+                <p className="text-xs font-bold leading-tight">{toArabicNum(dep.amount.toLocaleString())} ر.ي</p>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <DollarSign className="w-3.5 h-3.5" />
-              <span>{toArabicNum(dep.amount.toLocaleString())} ر.ي</span>
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40">
+              <Clock className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+              <div>
+                <p className="text-[9px] text-muted-foreground leading-none">المدة</p>
+                <p className="text-xs font-bold leading-tight">{toArabicNum(dep.hours)} ساعة</p>
+              </div>
             </div>
+          </div>
+
+          {/* Location + fee info */}
+          <div className="space-y-1">
             {(dep.location?.governorate || dep.location?.district) && (
-              <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
-                <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" />
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <MapPin className="w-3 h-3 text-red-400 shrink-0" />
                 <span className="truncate">{[dep.location.governorate, dep.location.district].filter(Boolean).join(' - ')}</span>
               </div>
             )}
             {dep.location?.address && !dep.location?.governorate && (
-              <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
-                <MapPin className="w-3.5 h-3.5 text-red-500 shrink-0" />
+              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+                <MapPin className="w-3 h-3 text-red-400 shrink-0" />
                 <span className="truncate">{dep.location.address}</span>
               </div>
             )}
-            {dep.requirements && (
-              <div className="flex items-center gap-1.5 text-muted-foreground col-span-2">
-                <FileText className="w-3.5 h-3.5 shrink-0" />
-                <span className="truncate">{dep.requirements}</span>
-              </div>
-            )}
             {dep.applicantServiceFee > 0 && !needsPayment && (
-              <div className="flex items-center gap-1.5 text-orange-600 dark:text-orange-400 col-span-2">
-                <Wallet className="w-3.5 h-3.5" />
-                <span>رسوم المتقدم: {toArabicNum(dep.applicantServiceFee)} ر.ي</span>
+              <div className="flex items-center gap-1.5 text-xs text-orange-600 dark:text-orange-400">
+                <Wallet className="w-3 h-3 shrink-0" />
+                <span>رسوم التقديم: {toArabicNum(dep.applicantServiceFee)} ر.ي</span>
               </div>
             )}
           </div>
 
-          {/* My application status */}
+          {/* My application status chip */}
           {(showActions === 'view' || showActions === 'payment') && myApp && (
-            <div className="p-2 rounded-lg bg-muted/40">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] text-muted-foreground">حالة تقديمك</span>
+            <div className={`flex items-center justify-between px-3 py-2 rounded-xl border text-xs ${
+              myApp.status === 'accepted'      ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-200 dark:border-emerald-800/30' :
+              myApp.status === 'rejected'      ? 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-800/30' :
+              myApp.status === 'payment_pending' || myApp.status === 'admin_approved' ? 'bg-orange-50 dark:bg-orange-900/10 border-orange-200 dark:border-orange-800/30' :
+              myApp.status === 'payment_submitted' ? 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800/30' :
+              myApp.status === 'selected_by_creator' ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800/30' :
+              'bg-muted/40 border-border'
+            }`}>
+              <span className="text-muted-foreground">حالة تقديمك</span>
+              <div className="flex items-center gap-1.5">
                 <BadgeStatus
                   status={applicationStatusMap[myApp.status] || 'pending'}
                   label={applicationStatusLabel[myApp.status] || myApp.status}
                   size="sm"
                 />
+                {myApp.status === 'accepted' && <CheckCircle2 className="w-3 h-3 text-emerald-500" />}
               </div>
-              {/* Show status-specific messages */}
-              {myApp.status === 'selected_by_creator' && (
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1 font-medium">
-                  تم اختيارك! بانتظار موافقة الإدارة
-                </p>
-              )}
-              {myApp.status === 'payment_submitted' && (
-                <p className="text-[11px] text-blue-600 dark:text-blue-400 mt-1 font-medium">
-                  تم تقديم إثبات الدفع. جارٍ المراجعة...
-                </p>
-              )}
-              {myApp.status === 'payment_verified' && (
-                <p className="text-[11px] text-green-600 dark:text-green-400 mt-1 font-medium">
-                  تم التحقق من الدفع. بانتظار القبول...
-                </p>
-              )}
-              {myApp.status === 'accepted' && (
-                <p className="text-[11px] text-green-600 dark:text-green-400 mt-1 font-medium">
-                  تم قبولك! يمكنك التواصل مع صاحب التكليف
-                </p>
-              )}
-              {myApp.status === 'rejected' && (
-                <p className="text-[11px] text-red-600 dark:text-red-400 mt-1 font-medium">
-                  {myApp.rejectedReason || 'تم رفض التقديم'}
-                </p>
-              )}
             </div>
           )}
 
-          {/* ═══ Creator Info — revealed once admin approves (before payment) ═══ */}
-          {myApp && ['admin_approved', 'payment_pending', 'payment_submitted', 'payment_verified', 'accepted'].includes(myApp.status) && dep.createdBy && (dep.createdBy.name || dep.createdBy.phone || dep.creatorPhone) && (
-            <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 space-y-2">
-              <p className="text-[10px] font-semibold text-blue-700 dark:text-blue-400 flex items-center gap-1.5">
-                <User className="w-3 h-3" />
-                بيانات صاحب التكليف
+          {/* ═══ Creator contact — ONLY shown when API actually returns phone (status=accepted + contactRevealed) ═══ */}
+          {contactVisible && (
+            <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800/30 space-y-2">
+              <p className="text-[10px] font-semibold text-emerald-700 dark:text-emerald-400 flex items-center gap-1.5">
+                <Phone className="w-3 h-3" />
+                بيانات صاحب التكليف — مكشوفة
               </p>
-              <div className="space-y-1.5">
-                {dep.createdBy.name && (
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">الاسم</span>
-                    <span className="font-medium">{dep.createdBy.name}</span>
-                  </div>
-                )}
-                {(dep.createdBy.phone || dep.creatorPhone) && (
-                  <div className="flex items-center justify-between text-xs gap-2">
-                    <span className="text-muted-foreground shrink-0">الهاتف</span>
-                    <div className="flex items-center gap-1.5">
-                      <span className="font-mono font-bold text-blue-800 dark:text-blue-200" dir="ltr">
-                        {dep.createdBy.phone || dep.creatorPhone}
-                      </span>
-                      <a
-                        href={`tel:${dep.createdBy.phone || dep.creatorPhone}`}
-                        className="p-1 rounded-md bg-blue-600 hover:bg-blue-700 text-white transition-colors"
-                        title="اتصال"
-                      >
-                        <Phone className="w-3 h-3" />
-                      </a>
-                      <a
-                        href={`https://wa.me/${(dep.createdBy.phone || dep.creatorPhone || '').replace(/^0/, '967')}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="p-1 rounded-md bg-green-600 hover:bg-green-700 text-white transition-colors"
-                        title="واتساب"
-                      >
-                        <MessageSquare className="w-3 h-3" />
-                      </a>
-                    </div>
-                  </div>
-                )}
+              {dep.createdBy?.name && (
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-muted-foreground">الاسم</span>
+                  <span className="font-medium">{dep.createdBy.name}</span>
+                </div>
+              )}
+              <div className="flex items-center justify-between text-xs gap-2">
+                <span className="text-muted-foreground shrink-0">الهاتف</span>
+                <div className="flex items-center gap-1.5">
+                  <span className="font-mono font-bold text-emerald-800 dark:text-emerald-200 text-xs" dir="ltr">
+                    {dep.createdBy?.phone || dep.creatorPhone}
+                  </span>
+                  <a href={`tel:${dep.createdBy?.phone || dep.creatorPhone}`} className="p-1 rounded-md bg-emerald-600 hover:bg-emerald-700 text-white transition-colors" title="اتصال">
+                    <Phone className="w-3 h-3" />
+                  </a>
+                  <a href={`https://wa.me/${(dep.createdBy?.phone || dep.creatorPhone || '').replace(/^0/, '967')}`} target="_blank" rel="noopener noreferrer" className="p-1 rounded-md bg-[#25D366] hover:bg-[#1ebe5d] text-white transition-colors" title="واتساب">
+                    <MessageSquare className="w-3 h-3" />
+                  </a>
+                </div>
               </div>
             </div>
           )}
@@ -901,33 +874,40 @@ export default function NurseDeploymentsPage() {
   const renderCreatedDeploymentCard = (dep: DeploymentItem) => {
     const tc = typeColors[dep.type] || typeColors.other;
     const pendingCount = dep.applications.filter((a) => a.status === 'pending').length;
-    const selectedApp = dep.applications.find((a) => a.status === 'selected_by_creator' || a.status === 'admin_approved' || a.status === 'payment_pending' || a.status === 'payment_submitted' || a.status === 'payment_verified' || a.status === 'accepted');
+    const selectedApp = dep.applications.find((a) => ['selected_by_creator','admin_approved','payment_pending','payment_submitted','payment_verified','accepted'].includes(a.status));
+
+    const statusBand = dep.status === 'open'
+      ? { bg: 'bg-emerald-50 dark:bg-emerald-900/10', border: 'border-emerald-200 dark:border-emerald-800/30', text: 'text-emerald-700 dark:text-emerald-300', icon: <CircleCheck className="w-3.5 h-3.5 text-emerald-600" />, label: 'مفتوح للتقديم' }
+      : dep.status === 'creator_selected'
+      ? { bg: 'bg-amber-50 dark:bg-amber-900/10', border: 'border-amber-200 dark:border-amber-800/30', text: 'text-amber-700 dark:text-amber-300', icon: <Clock className="w-3.5 h-3.5 text-amber-600" />, label: 'بانتظار موافقة الإدارة' }
+      : dep.status === 'admin_approved'
+      ? { bg: 'bg-blue-50 dark:bg-blue-900/10', border: 'border-blue-200 dark:border-blue-800/30', text: 'text-blue-700 dark:text-blue-300', icon: <Wallet className="w-3.5 h-3.5 text-blue-600" />, label: 'بانتظار دفع المكلف' }
+      : dep.status === 'assigned'
+      ? { bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-200 dark:border-purple-800/30', text: 'text-purple-700 dark:text-purple-300', icon: <CheckCircle2 className="w-3.5 h-3.5 text-purple-600" />, label: 'تم التعيين' }
+      : dep.status === 'in_progress'
+      ? { bg: 'bg-teal-50 dark:bg-teal-900/10', border: 'border-teal-200 dark:border-teal-800/30', text: 'text-teal-700 dark:text-teal-300', icon: <Activity className="w-3.5 h-3.5 text-teal-600" />, label: 'قيد التنفيذ' }
+      : dep.status === 'completed'
+      ? { bg: 'bg-slate-50 dark:bg-slate-900/10', border: 'border-slate-200 dark:border-slate-800/30', text: 'text-slate-700 dark:text-slate-300', icon: <CheckCircle className="w-3.5 h-3.5 text-slate-600" />, label: 'مكتمل' }
+      : { bg: 'bg-red-50 dark:bg-red-900/10', border: 'border-red-200 dark:border-red-800/30', text: 'text-red-700 dark:text-red-300', icon: <XCircle className="w-3.5 h-3.5 text-red-600" />, label: 'ملغي' };
 
     return (
-      <motion.div key={dep.id} variants={itemAnim} className="rounded-2xl border bg-card shadow-sm hover:shadow-md transition-all">
-        <div className={`h-1.5 rounded-t-2xl ${tc.bg}`} />
+      <motion.div key={dep.id} variants={itemAnim} className="rounded-2xl border bg-card shadow-sm hover:shadow-md transition-all overflow-hidden">
+        <div className={`h-1 ${tc.bg}`} />
         <div className="p-4 space-y-3">
           {/* Header */}
-          <div className="flex items-start justify-between gap-2">
-            <div className="flex items-center gap-2.5">
-              <div className={`w-10 h-10 rounded-xl ${tc.icon} flex items-center justify-center`}>
-                <Briefcase className={`w-5 h-5 ${tc.text}`} />
-              </div>
-              <div>
-                <p className="font-bold text-sm line-clamp-1">{dep.title || typeLabels[dep.type] || dep.type}</p>
-                <div className="flex items-center gap-1.5 mt-0.5">
-                  <Badge variant="secondary" className={`text-[9px] px-1.5 py-0 h-4 ${tc.bg} text-white`}>{typeLabels[dep.type] || dep.type}</Badge>
-                  {dep.gender && (
-                    <Badge variant="secondary" className={`text-[9px] px-1.5 py-0 h-4 ${dep.gender === 'male' ? 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400' : 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400'}`}>
-                      {dep.gender === 'male' ? 'ذكر' : 'أنثى'}
-                    </Badge>
-                  )}
-                  {dep.department && (
-                    <Badge variant="secondary" className="text-[9px] px-1.5 py-0 h-4 bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
-                      {departmentLabels[dep.department] || dep.department}
-                    </Badge>
-                  )}
-                </div>
+          <div className="flex items-start gap-3">
+            <div className={`w-11 h-11 rounded-xl ${tc.icon} flex items-center justify-center shrink-0`}>
+              <Briefcase className={`w-5 h-5 ${tc.text}`} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-bold text-sm line-clamp-1 leading-tight">{dep.title || typeLabels[dep.type] || dep.type}</p>
+              <div className="flex flex-wrap items-center gap-1 mt-1">
+                <span className={`inline-flex items-center text-[9px] px-1.5 py-0.5 rounded-full font-semibold ${tc.bg} text-white`}>{typeLabels[dep.type] || dep.type}</span>
+                {dep.department && (
+                  <span className="inline-flex items-center text-[9px] px-1.5 py-0.5 rounded-full font-medium bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400">
+                    {departmentLabels[dep.department] || dep.department}
+                  </span>
+                )}
               </div>
             </div>
             <BadgeStatus
@@ -937,77 +917,44 @@ export default function NurseDeploymentsPage() {
             />
           </div>
 
-          {/* Details */}
-          <div className="grid grid-cols-2 gap-2 text-xs">
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <DollarSign className="w-3.5 h-3.5" />
-              <span>{toArabicNum(dep.amount.toLocaleString())} ر.ي</span>
+          {/* Metrics */}
+          <div className="grid grid-cols-2 gap-2">
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40">
+              <DollarSign className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+              <div>
+                <p className="text-[9px] text-muted-foreground leading-none">الأجر</p>
+                <p className="text-xs font-bold leading-tight">{toArabicNum(dep.amount.toLocaleString())} ر.ي</p>
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 text-muted-foreground">
-              <Clock className="w-3.5 h-3.5" />
-              <span>{toArabicNum(dep.hours)} ساعة</span>
+            <div className="flex items-center gap-2 p-2 rounded-xl bg-muted/40">
+              <User className="w-3.5 h-3.5 text-nurse shrink-0" />
+              <div>
+                <p className="text-[9px] text-muted-foreground leading-none">المتقدمون</p>
+                <p className="text-xs font-bold leading-tight">
+                  {toArabicNum(dep.applications.length)}
+                  {pendingCount > 0 && <span className="text-amber-500"> ({toArabicNum(pendingCount)} جديد)</span>}
+                </p>
+              </div>
             </div>
           </div>
 
-          {/* Applicants summary */}
-          <div className="p-2 rounded-lg bg-muted/40 space-y-1.5">
-            <div className="flex items-center justify-between text-xs">
-              <span className="text-muted-foreground">عدد المتقدمين</span>
-              <span className="font-medium">{toArabicNum(dep.applications.length)}</span>
-            </div>
-            {pendingCount > 0 && (
-              <div className="flex items-center justify-between text-xs">
-                <span className="text-yellow-600 dark:text-yellow-400">بانتظار الاختيار</span>
-                <span className="font-medium text-yellow-600 dark:text-yellow-400">{toArabicNum(pendingCount)}</span>
-              </div>
+          {/* Status band */}
+          <div className={`flex items-center gap-2 px-3 py-2.5 rounded-xl border ${statusBand.bg} ${statusBand.border}`}>
+            {statusBand.icon}
+            <p className={`text-xs font-medium ${statusBand.text}`}>{statusBand.label}</p>
+            {selectedApp && (
+              <span className={`mr-auto text-[10px] font-medium ${statusBand.text} opacity-80`}>
+                {selectedApp.applicantName}
+              </span>
             )}
           </div>
 
-          {/* Status messages for created deployments */}
-          {dep.status === 'creator_selected' && (
-            <div className="p-2 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-900/30">
-              <div className="flex items-center gap-1.5">
-                <Clock className="w-3.5 h-3.5 text-amber-600" />
-                <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">بانتظار موافقة الإدارة</p>
-              </div>
-              {selectedApp && (
-                <p className="text-[11px] text-amber-600 dark:text-amber-400 mt-1">
-                  المكلف: {selectedApp.applicantName}
-                </p>
-              )}
-            </div>
-          )}
-          {dep.status === 'admin_approved' && (
-            <div className="p-2 rounded-lg bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-900/30">
-              <div className="flex items-center gap-1.5">
-                <Wallet className="w-3.5 h-3.5 text-emerald-600" />
-                <p className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">بانتظار دفع المكلف</p>
-              </div>
-              {selectedApp && (
-                <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1">
-                  المكلف: {selectedApp.applicantName}
-                </p>
-              )}
-            </div>
-          )}
-          {dep.status === 'assigned' && selectedApp && (
-            <div className="p-2 rounded-lg bg-purple-50 dark:bg-purple-900/10 border border-purple-200 dark:border-purple-900/30">
-              <div className="flex items-center gap-1.5">
-                <CheckCircle2 className="w-3.5 h-3.5 text-purple-600" />
-                <p className="text-xs text-purple-700 dark:text-purple-300 font-medium">
-                  تم التعيين: {selectedApp.applicantName}
-                  {dep.contactRevealed && ' • تم الكشف عن بيانات التواصل'}
-                </p>
-              </div>
-            </div>
-          )}
-
           {/* Actions */}
-          <div className="flex gap-2 pt-1">
+          <div className="flex gap-2 pt-0.5">
             <Button
               size="sm"
               variant="ghost"
-              className="h-8 text-xs gap-1 flex-1"
+              className="h-8 text-xs gap-1.5 flex-1 border border-border"
               onClick={() => router.push(`/nurse/deployments/${dep.id}`)}
             >
               <Eye className="w-3.5 h-3.5" /> التفاصيل
@@ -1015,10 +962,10 @@ export default function NurseDeploymentsPage() {
             {dep.status === 'open' && dep.applications.length > 0 && (
               <Button
                 size="sm"
-                className="h-8 text-xs gap-1 flex-1 bg-nurse hover:bg-nurse/90 text-white"
+                className="h-8 text-xs gap-1.5 flex-1 bg-nurse hover:bg-nurse/90 text-white"
                 onClick={() => setManageTarget(dep)}
               >
-                <User className="w-3.5 h-3.5" /> إدارة المتقدمين ({toArabicNum(dep.applications.length)})
+                <User className="w-3.5 h-3.5" /> إدارة ({toArabicNum(dep.applications.length)})
               </Button>
             )}
           </div>
