@@ -51,14 +51,20 @@ export async function GET(
       })),
     };
 
-    // ── Security: hide creator contact info unless payment is verified + approved ──
-    // Only reveal createdBy.phone and creatorPhone when:
-    //   1. contactRevealed flag is true on the deployment, AND
-    //   2. the requesting user is the assigned nurse, OR user is admin/subadmin
+    // ── Security: hide creator contact info unless payment is verified + admin-approved ──
+    // Contact is revealed ONLY when ALL of the following are true for a nurse:
+    //   1. contactRevealed flag is true on the deployment (set by admin on payment verification)
+    //   2. The requesting nurse is the assigned person on this deployment
+    //   3. The nurse's own application has status 'accepted' (set when admin verifies payment)
+    // Admins always see full contact info.
     const isAdmin = ['admin', 'subadmin'].includes(user.role);
     const assignedToId = serialized.assignedTo?.id;
-    const isAssignee = assignedToId && assignedToId === user.userId;
-    const shouldRevealContact = isAdmin || (serialized.contactRevealed && isAssignee);
+    const isAssignee = !!(assignedToId && assignedToId === user.userId);
+    const myApplication = isAssignee
+      ? (serialized.applications as any[])?.find((app: any) => app.applicantId === user.userId)
+      : null;
+    const nursePaymentAccepted = myApplication?.status === 'accepted';
+    const shouldRevealContact = isAdmin || (isAssignee && nursePaymentAccepted && serialized.contactRevealed);
 
     if (!shouldRevealContact) {
       if (serialized.createdBy && typeof serialized.createdBy === 'object') {
