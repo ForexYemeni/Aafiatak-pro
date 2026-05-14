@@ -23,7 +23,7 @@ const ROLE_PAGES: Record<UserRole, string[]> = {
     '/admin/subadmins',
     '/admin/settings',
     '/admin/subadmin-settings',
-    '/admin/activity/page',
+    '/admin/activity',
   ],
   subadmin: [
     '/admin',
