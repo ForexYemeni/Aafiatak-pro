@@ -96,73 +96,138 @@ const VOICE_POLL_INTERVAL_HIDDEN = 60000; // 60 seconds when tab is hidden (incr
 const VOICE_POLL_URL = '/api/notifications/voice-pending';
 
 function NotificationPoller() {
-  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
-  const token = useAuthStore((s) => s.token);
-  const hasHydrated = useAuthStore((s) => s._hasHydrated);
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const isPollingRef = useRef(false);
+    const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+    const token = useAuthStore((s) => s.token);
+    const hasHydrated = useAuthStore((s) => s._hasHydrated);
+    const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+    const isPollingRef = useRef(false);
+    // Track IDs seen this session to detect NEW notifications on each poll
+    const seenIdsRef = useRef<Set<string>>(new Set());
+    const isFirstPollRef = useRef(true);
 
-  const pollForNotifications = useCallback(async () => {
-    if (!isAuthenticated || !token || isPollingRef.current) return;
+    const pollForNotifications = useCallback(async () => {
+      if (!isAuthenticated || !token || isPollingRef.current) return;
 
-    isPollingRef.current = true;
-    try {
-      const response = await fetch('/api/notifications?limit=5&unread=true', {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      isPollingRef.current = true;
+      try {
+        const response = await fetch('/api/notifications?limit=20&unread=true', {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+        });
 
-      if (!response.ok) {
-        isPollingRef.current = false;
-        return;
-      }
+        if (!response.ok) { isPollingRef.current = false; return; }
 
-      const data = await response.json();
-      if (!data.success || !data.data?.notifications) {
-        isPollingRef.current = false;
-        return;
-      }
+        const data = await response.json();
+        if (!data.success || !data.data?.notifications) { isPollingRef.current = false; return; }
 
-      // Silently update the store if unread count changed
-      if (typeof data.data.unreadCount === 'number') {
-        const store = useNotificationStore.getState();
-        if (store.unreadCount !== data.data.unreadCount) {
-          store.fetchNotifications(); // Silent refresh - no sounds
+        const notifications: any[] = data.data.notifications || [];
+
+        if (isFirstPollRef.current) {
+          // Seed seen IDs on first poll — no sounds for already-existing notifications
+          isFirstPollRef.current = false;
+          for (const n of notifications) seenIdsRef.current.add(n._id || n.id);
+          useNotificationStore.getState().fetchNotifications();
+        } else {
+          // Detect NEW notifications not seen in previous polls
+          const newNotifs = notifications.filter(
+            (n: any) => !seenIdsRef.current.has(n._id || n.id)
+          );
+
+          if (newNotifs.length > 0) {
+            useNotificationStore.getState().fetchNotifications();
+            const { ttsEnabled } = useNotificationStore.getState();
+
+            for (const notif of newNotifs) {
+              const notifId = notif._id || notif.id;
+              seenIdsRef.current.add(notifId);
+
+              // Play sound (all priorities — not just high/urgent)
+              playNotificationSound(
+                notif.type || 'system',
+                notif.priority || 'medium',
+                `poll-${notifId}`
+              );
+
+              // TTS for voice-enabled notifications
+              if (notif.voiceEnabled && ttsEnabled) {
+                try {
+                  const parsedData = typeof notif.data === 'string'
+                    ? JSON.parse(notif.data || '{}') : (notif.data || {});
+                  if (parsedData.voiceText) {
+                    voiceManager.init();
+                    voiceManager.speak(parsedData.voiceText, {
+                      priority: notif.priority === 'urgent' ? 'urgent'
+                        : notif.priority === 'high' ? 'high' : 'medium',
+                      rate: 1.1,
+                      volume: 1.0,
+                    });
+                  }
+                } catch { /* ignore parse errors */ }
+              }
+
+              // Dispatch in-app event → shows toast popup
+              window.dispatchEvent(new CustomEvent('app-notification', {
+                detail: {
+                  id: notifId,
+                  title: notif.titleAr || notif.titleEn || '',
+                  body: notif.bodyAr || notif.bodyEn || '',
+                  type: notif.type,
+                  priority: notif.priority,
+                  data: typeof notif.data === 'string'
+                    ? JSON.parse(notif.data || '{}') : (notif.data || {}),
+                  clickAction: notif.actionUrl,
+                },
+              }));
+            }
+
+            // Trim seenIds to prevent memory leak
+            if (seenIdsRef.current.size > 200) {
+              seenIdsRef.current = new Set(Array.from(seenIdsRef.current).slice(-100));
+            }
+          } else {
+            // No new notifications — silently sync unread count
+            if (typeof data.data.unreadCount === 'number') {
+              const store = useNotificationStore.getState();
+              if (store.unreadCount !== data.data.unreadCount) store.fetchNotifications();
+            }
+          }
         }
+      } catch {
+        // Network error - ignore
+      } finally {
+        isPollingRef.current = false;
       }
-    } catch {
-      // Network error - ignore
-    } finally {
-      isPollingRef.current = false;
-    }
-  }, [isAuthenticated, token]);
+    }, [isAuthenticated, token]);
 
-  useEffect(() => {
-    if (!hasHydrated) return;
+    useEffect(() => {
+      if (!hasHydrated) return;
 
-    if (isAuthenticated && token) {
-      // Initial fetch - just populate the store, NO sounds
-      const store = useNotificationStore.getState();
-      store.fetchNotifications();
+      if (isAuthenticated && token) {
+        // Reset state on each new auth session
+        seenIdsRef.current.clear();
+        isFirstPollRef.current = true;
 
-      // Start polling (UI-only, no sounds)
-      intervalRef.current = setInterval(pollForNotifications, POLL_INTERVAL);
-    }
+        // Immediate first poll
+        pollForNotifications();
 
-    return () => {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
+        // Poll every 15 seconds (was 30s) for faster notification delivery
+        intervalRef.current = setInterval(pollForNotifications, 15000);
       }
-    };
-  }, [hasHydrated, isAuthenticated, token, pollForNotifications]);
 
-  return null;
-}
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+      };
+    }, [hasHydrated, isAuthenticated, token, pollForNotifications]);
 
-// ============================================================================
+    return null;
+  }
+
+  // ============================================================================
 // Voice Notification Poller - FAST polling for voice-pending notifications
 // This is the PRIMARY mechanism for delivering voice alerts on Vercel.
 // Since Socket.IO server doesn't run on Vercel serverless, we poll every
