@@ -161,7 +161,7 @@ export default function AdminSettingsPage() {
   const [backupPassword, setBackupPassword] = useState('');
   const [showBackupPassword, setShowBackupPassword] = useState(false);
   const [isBackingUp, setIsBackingUp] = useState(false);
-  const [backupStats, setBackupStats] = useState<{ documents: number; collections: number } | null>(null);
+  const [backupStats, setBackupStats] = useState<{ documents: number; collections: number; sizeKB: number } | null>(null);
 
   // ── Reset All Data State ──────────────────────────────────────────
   const [showResetSection, setShowResetSection] = useState(false);
@@ -286,19 +286,20 @@ export default function AdminSettingsPage() {
       }
       const docs = Number(res.headers.get('X-Backup-Documents') ?? 0);
       const cols = Number(res.headers.get('X-Backup-Collections') ?? 0);
+      const sizeKB = Number(res.headers.get('X-Backup-Size-KB') ?? 0);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
       const date = new Date().toISOString().split('T')[0];
-      a.download = `aafiatak-backup-${date}.json`;
+      a.download = `aafiatak-backup-${date}.zip`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-      setBackupStats({ documents: docs, collections: cols });
+      setBackupStats({ documents: docs, collections: cols, sizeKB });
       setBackupPassword('');
-      toast.success('تم إنشاء النسخة الاحتياطية وتحميلها بنجاح');
+      toast.success('تم تنزيل ملف ZIP بنجاح');
     } catch {
       toast.error('حدث خطأ أثناء إنشاء النسخة الاحتياطية');
     } finally {
@@ -1541,7 +1542,8 @@ export default function AdminSettingsPage() {
                       تم تنزيل النسخة الاحتياطية بنجاح
                     </p>
                     <p className="text-xs text-emerald-600/80 dark:text-emerald-400/80 mt-1">
-                      {backupStats.documents.toLocaleString('ar')} وثيقة من {backupStats.collections} مجموعة — ملف JSON يمكن استخدامه لاستعادة البيانات
+                      {backupStats.documents.toLocaleString('ar')} وثيقة من {backupStats.collections} مجموعة
+                      {backupStats.sizeKB > 0 && ` · ${backupStats.sizeKB > 1024 ? (backupStats.sizeKB / 1024).toFixed(1) + ' MB' : backupStats.sizeKB.toFixed(0) + ' KB'}`}
                     </p>
                   </div>
                 </div>
