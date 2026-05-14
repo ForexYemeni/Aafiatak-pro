@@ -2,10 +2,10 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuthStore } from '@/lib/stores/auth-store';
+import { _GET_CACHE_warmUp } from '@/hooks/use-auth';
 import type { UserRole } from '@/types';
 
-// All navigable pages per role — prefetched eagerly on shell mount
-// so every page loads instantly regardless of device/viewport
 const ROLE_PAGES: Record<UserRole, string[]> = {
   admin: [
     '/admin',
@@ -62,14 +62,57 @@ const ROLE_PAGES: Record<UserRole, string[]> = {
   ],
 };
 
+// API endpoints to pre-warm per role — maps to the main data each page needs
+const ROLE_API_ENDPOINTS: Record<UserRole, string[]> = {
+  admin: [
+    '/api/admin/dashboard',
+    '/api/admin/orders?page=1&limit=20',
+    '/api/admin/nurses?page=1&limit=20',
+    '/api/admin/beneficiaries?page=1&limit=20',
+    '/api/admin/services',
+    '/api/admin/payments?page=1&limit=20',
+    '/api/admin/emergencies?page=1&limit=20',
+    '/api/admin/deployments?page=1&limit=20',
+    '/api/admin/ratings?page=1&limit=20',
+    '/api/admin/complaints?page=1&limit=20',
+    '/api/admin/coupons',
+  ],
+  subadmin: [
+    '/api/admin/dashboard',
+    '/api/admin/orders?page=1&limit=20',
+    '/api/admin/nurses?page=1&limit=20',
+    '/api/admin/beneficiaries?page=1&limit=20',
+    '/api/admin/services',
+    '/api/admin/payments?page=1&limit=20',
+    '/api/admin/emergencies?page=1&limit=20',
+    '/api/admin/deployments?page=1&limit=20',
+  ],
+  nurse: [
+    '/api/nurse/dashboard',
+    '/api/nurse/requests?page=1&limit=20',
+    '/api/nurse/my-requests?page=1&limit=20',
+    '/api/nurse/deployments?page=1&limit=20',
+    '/api/nurse/ratings?page=1&limit=20',
+    '/api/nurse/earnings',
+    '/api/nurse/notifications?page=1&limit=20',
+    '/api/nurse/schedule',
+  ],
+  beneficiary: [
+    '/api/beneficiary/dashboard',
+    '/api/beneficiary/orders?page=1&limit=20',
+    '/api/beneficiary/notifications?page=1&limit=20',
+  ],
+};
+
 interface RolePrefetcherProps {
   role: UserRole;
 }
 
 /**
- * Eagerly prefetches all pages for the current user role as soon as
- * the AppShell mounts — done in a staggered fashion so it doesn't
- * block the main thread on initial render.
+ * Eagerly prefetches:
+ * 1. All page bundles (JS) for fast route transitions
+ * 2. All main API endpoints to warm up the in-memory GET cache
+ *    so every page shows data instantly without waiting for the server.
  */
 export function RolePrefetcher({ role }: RolePrefetcherProps) {
   const router = useRouter();
@@ -78,20 +121,29 @@ export function RolePrefetcher({ role }: RolePrefetcherProps) {
     const pages = ROLE_PAGES[role] ?? [];
     let i = 0;
 
-    // Stagger prefetch calls so the browser prioritises the current page first
     function prefetchNext() {
       if (i >= pages.length) return;
       router.prefetch(pages[i]);
       i++;
-      // Space them out: first 3 immediately, rest every 120ms
       const delay = i <= 3 ? 0 : 120;
       setTimeout(prefetchNext, delay);
     }
 
-    // Start after a short idle window so initial render isn't affected
     const idle = setTimeout(prefetchNext, 400);
     return () => clearTimeout(idle);
   }, [role, router]);
+
+  // Pre-warm API data cache after a short delay so the current page loads first
+  useEffect(() => {
+    const endpoints = ROLE_API_ENDPOINTS[role] ?? [];
+    if (!endpoints.length) return;
+
+    const timer = setTimeout(() => {
+      void _GET_CACHE_warmUp(endpoints);
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [role]);
 
   return null;
 }
