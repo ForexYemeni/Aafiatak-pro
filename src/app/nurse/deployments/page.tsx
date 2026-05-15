@@ -2009,108 +2009,103 @@ export default function NurseDeploymentsPage() {
           <Dialog open={true} onOpenChange={() => {}}>
             <DialogContent
               dir="rtl"
-              className="max-w-sm p-0 overflow-hidden [&>button]:hidden"
+              className="max-w-xs gap-0 p-0 overflow-hidden [&>button]:hidden"
               onPointerDownOutside={(e) => e.preventDefault()}
               onEscapeKeyDown={(e) => e.preventDefault()}
               onInteractOutside={(e) => e.preventDefault()}
             >
-              {/* Colored header banner */}
-              <div className="bg-gradient-to-br from-amber-500 to-orange-500 p-5 text-white relative overflow-hidden">
-                <div className="absolute inset-0 opacity-10">
-                  <div className="absolute -top-4 -left-4 w-24 h-24 rounded-full bg-white" />
-                  <div className="absolute -bottom-6 -right-6 w-32 h-32 rounded-full bg-white" />
+              {/* Slim header row */}
+              <div className="flex items-center gap-2.5 px-3 py-2.5 border-b bg-muted/30">
+                <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                  <CreditCard className="w-4 h-4 text-amber-600" />
                 </div>
-                <div className="relative flex flex-col items-center gap-3 text-center">
-                  <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center shadow-lg backdrop-blur-sm">
-                    <CreditCard className="w-7 h-7 text-white" />
-                  </div>
-                  <div>
-                    <DialogTitle className="text-lg font-black text-white">رسوم التقديم مطلوبة</DialogTitle>
-                    <DialogDescription className="text-amber-100 text-sm mt-1">
-                      تمت الموافقة على تقديمك — يجب دفع الرسوم للمتابعة
-                    </DialogDescription>
-                  </div>
-                  {/* Fee badge */}
-                  <div className="bg-white/25 backdrop-blur-sm rounded-xl px-4 py-2 border border-white/30">
-                    <p className="text-[11px] text-amber-100 mb-0.5">المبلغ المطلوب</p>
-                    <p className="text-2xl font-black tracking-tight">{toArabicNum(fee)} ر.ي</p>
-                  </div>
+                <div className="flex-1 min-w-0">
+                  <DialogTitle className="text-sm font-bold leading-none text-foreground">رسوم التقديم مطلوبة</DialogTitle>
+                  <p className="text-[10px] text-muted-foreground mt-0.5 truncate">{mandatoryPaymentDep.title || typeLabels[mandatoryPaymentDep.type] || 'تكليف'}</p>
                 </div>
+                <span className="shrink-0 text-sm font-black text-amber-600 dark:text-amber-400 tabular-nums">
+                  {toArabicNum(fee)} ر.ي
+                </span>
               </div>
 
-              <div className="p-4 space-y-4">
-                {/* Deployment info */}
-                <div className="p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40 space-y-1.5">
-                  <p className="text-[10px] text-amber-700 dark:text-amber-400 font-semibold uppercase tracking-wide">التكليف</p>
-                  <p className="text-sm font-bold text-foreground">{mandatoryPaymentDep.title}</p>
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1"><Clock className="w-3 h-3" />{toArabicNum(mandatoryPaymentDep.hours)} ساعة</span>
-                    <span className="flex items-center gap-1"><DollarSign className="w-3 h-3" />{toArabicNum(mandatoryPaymentDep.amount.toLocaleString())} ر.ي</span>
-                  </div>
-                </div>
-
-                {/* Payment method */}
-                {(mandatoryPaymentDep.paymentMethod || mandatoryPaymentDep.walletNumber) && (
-                  <div className="p-3 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/40 space-y-2">
-                    <p className="text-[10px] text-blue-700 dark:text-blue-400 font-semibold uppercase tracking-wide flex items-center gap-1.5">
-                      <Wallet className="w-3 h-3" /> بيانات الدفع
-                    </p>
+              <div className="p-3 space-y-3">
+                {/* Payment info list */}
+                {(mandatoryPaymentDep.paymentMethod || mandatoryPaymentDep.walletNumber || mandatoryPaymentDep.walletOwnerName) && (
+                  <div className="rounded-lg border bg-muted/50 divide-y divide-border text-xs">
                     {mandatoryPaymentDep.paymentMethod && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">طريقة الدفع</span>
-                        <span className="font-bold text-blue-700 dark:text-blue-300">{mandatoryPaymentDep.paymentMethod}</span>
+                      <div className="flex items-center justify-between px-3 py-2">
+                        <span className="text-muted-foreground flex items-center gap-1.5"><Wallet className="w-3 h-3" />طريقة الدفع</span>
+                        <span className="font-semibold">{mandatoryPaymentDep.paymentMethod}</span>
                       </div>
                     )}
                     {mandatoryPaymentDep.walletNumber && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">رقم المحفظة</span>
-                        <span className="font-bold font-mono tracking-wider select-all">{mandatoryPaymentDep.walletNumber}</span>
+                      <div className="flex items-center justify-between px-3 py-2">
+                        <span className="text-muted-foreground flex items-center gap-1.5"><Phone className="w-3 h-3" />رقم المحفظة</span>
+                        <span className="font-semibold font-mono select-all" dir="ltr">{mandatoryPaymentDep.walletNumber}</span>
                       </div>
                     )}
                     {mandatoryPaymentDep.walletOwnerName && (
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">اسم صاحب الحساب</span>
-                        <span className="font-bold">{mandatoryPaymentDep.walletOwnerName}</span>
+                      <div className="flex items-center justify-between px-3 py-2">
+                        <span className="text-muted-foreground flex items-center gap-1.5"><User className="w-3 h-3" />اسم الحساب</span>
+                        <span className="font-semibold">{mandatoryPaymentDep.walletOwnerName}</span>
                       </div>
                     )}
-                    <div className="flex items-center justify-between text-sm border-t border-blue-100 dark:border-blue-800/40 pt-2">
-                      <span className="text-muted-foreground font-medium">المبلغ</span>
-                      <span className="font-black text-base text-amber-600 dark:text-amber-400">{toArabicNum(fee)} ر.ي</span>
+                    <div className="flex items-center justify-between px-3 py-2">
+                      <span className="text-muted-foreground flex items-center gap-1.5"><DollarSign className="w-3 h-3" />المبلغ</span>
+                      <span className="font-bold text-amber-600 dark:text-amber-400">{toArabicNum(fee)} ر.ي</span>
                     </div>
+                    {mandatoryPaymentDep.walletNumber && (
+                      <div className="flex gap-2 px-3 py-2">
+                        <a
+                          href={`https://wa.me/${mandatoryPaymentDep.walletNumber.replace(/^0+/, '')}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 flex items-center justify-center gap-1 py-1 rounded-md bg-green-600 hover:bg-green-700 text-white text-[10px] font-medium transition-colors"
+                        >
+                          <MessageSquare className="w-3 h-3" /> واتساب
+                        </a>
+                        <button
+                          onClick={() => { navigator.clipboard.writeText(mandatoryPaymentDep.walletNumber); toast.success('تم نسخ الرقم'); }}
+                          className="flex-1 flex items-center justify-center gap-1 py-1 rounded-md bg-muted hover:bg-muted/80 text-foreground text-[10px] font-medium border transition-colors"
+                        >
+                          نسخ الرقم
+                        </button>
+                      </div>
+                    )}
                   </div>
                 )}
 
                 {/* Upload proof section */}
                 <div className="space-y-2">
-                  <p className="text-sm font-semibold flex items-center gap-1.5">
-                    <Upload className="w-4 h-4 text-nurse" />
+                  <p className="text-xs font-semibold flex items-center gap-1.5 text-muted-foreground">
+                    <Upload className="w-3.5 h-3.5" />
                     رفع إثبات الدفع
                   </p>
 
                   {mandatoryPaymentProofImage ? (
-                    <div className="relative rounded-xl overflow-hidden border-2 border-nurse/40">
+                    <div className="relative rounded-lg overflow-hidden border">
                       <img
                         src={mandatoryPaymentProofImage}
                         alt="إثبات الدفع"
-                        className="w-full h-32 object-cover"
+                        className="w-full h-20 object-cover"
                       />
                       <button
                         onClick={() => { setMandatoryPaymentProofImage(''); if (mandatoryFileInputRef.current) mandatoryFileInputRef.current.value = ''; }}
-                        className="absolute top-2 left-2 w-6 h-6 rounded-full bg-red-500 text-white flex items-center justify-center"
+                        className="absolute top-1.5 left-1.5 w-5 h-5 rounded-full bg-red-500 text-white flex items-center justify-center"
                       >
-                        <X className="w-3 h-3" />
+                        <X className="w-2.5 h-2.5" />
                       </button>
-                      <div className="absolute bottom-2 right-2 bg-green-500 text-white text-[10px] px-2 py-0.5 rounded-full flex items-center gap-1">
-                        <CheckCircle className="w-2.5 h-2.5" /> تم الرفع
+                      <div className="absolute bottom-1.5 right-1.5 bg-green-500 text-white text-[9px] px-1.5 py-0.5 rounded-full flex items-center gap-1">
+                        <CheckCircle className="w-2 h-2" /> تم الرفع
                       </div>
                     </div>
                   ) : (
                     <button
                       onClick={() => mandatoryFileInputRef.current?.click()}
-                      className="w-full h-24 rounded-xl border-2 border-dashed border-nurse/40 bg-nurse/5 hover:bg-nurse/10 transition-colors flex flex-col items-center justify-center gap-2 text-nurse"
+                      className="w-full h-16 rounded-lg border-2 border-dashed border-border hover:border-amber-400 bg-muted/30 hover:bg-amber-50 dark:hover:bg-amber-900/10 transition-colors flex flex-col items-center justify-center gap-1.5 text-muted-foreground hover:text-amber-600"
                     >
-                      <Upload className="w-6 h-6" />
-                      <span className="text-xs font-medium">اضغط لرفع صورة إثبات الدفع</span>
+                      <Upload className="w-4 h-4" />
+                      <span className="text-[10px] font-medium">اضغط لرفع صورة إثبات الدفع</span>
                     </button>
                   )}
                   <input
@@ -2121,39 +2116,34 @@ export default function NurseDeploymentsPage() {
                     onChange={handleMandatoryImageUpload}
                   />
 
-                  {/* Text proof fallback */}
                   {!mandatoryPaymentProofImage && (
-                    <div>
-                      <p className="text-[10px] text-muted-foreground mb-1">أو أدخل رقم المعاملة / ملاحظة</p>
-                      <Textarea
-                        placeholder="رقم المعاملة أو تفاصيل إضافية (اختياري إن كانت الصورة مرفوعة)"
-                        value={mandatoryPaymentProof}
-                        onChange={(e) => setMandatoryPaymentProof(e.target.value)}
-                        rows={2}
-                        className="text-sm resize-none"
-                        dir="rtl"
-                      />
-                    </div>
+                    <Textarea
+                      placeholder="أو أدخل رقم المعاملة / ملاحظة"
+                      value={mandatoryPaymentProof}
+                      onChange={(e) => setMandatoryPaymentProof(e.target.value)}
+                      rows={2}
+                      className="text-xs resize-none"
+                      dir="rtl"
+                    />
                   )}
                 </div>
 
-                {/* Important notice */}
-                <div className="p-3 rounded-xl bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30">
-                  <p className="text-[11px] text-red-600 dark:text-red-400 leading-relaxed">
-                    ⚠️ <strong>يجب إتمام الدفع وإرفاق الإثبات</strong> لتأكيد التكليف والحصول على بيانات التواصل. لا يمكن إغلاق هذه النافذة حتى إتمام الدفع.
-                  </p>
-                </div>
+                {/* Notice */}
+                <p className="text-[10px] text-muted-foreground leading-relaxed border-r-2 border-amber-400 pr-2">
+                  يجب إرفاق إثبات الدفع لتأكيد التكليف والحصول على بيانات التواصل. لا يمكن إغلاق هذه النافذة قبل الإرسال.
+                </p>
 
                 {/* Submit button */}
                 <Button
+                  size="sm"
                   onClick={handleSubmitMandatoryPayment}
                   disabled={isSubmittingMandatoryPayment || (!mandatoryPaymentProof && !mandatoryPaymentProofImage)}
-                  className="w-full h-12 gap-2 bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white font-bold text-base shadow-lg shadow-amber-200 dark:shadow-amber-900/30"
+                  className="w-full h-9 gap-1.5 bg-amber-500 hover:bg-amber-600 text-white font-semibold"
                 >
                   {isSubmittingMandatoryPayment ? (
-                    <><Loader2 className="w-5 h-5 animate-spin" /> جاري الإرسال...</>
+                    <><Loader2 className="w-3.5 h-3.5 animate-spin" /> جاري الإرسال...</>
                   ) : (
-                    <><Upload className="w-5 h-5" /> تقديم إثبات الدفع</>
+                    <><Upload className="w-3.5 h-3.5" /> تقديم إثبات الدفع</>
                   )}
                 </Button>
               </div>
