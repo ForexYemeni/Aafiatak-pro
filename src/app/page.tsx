@@ -917,10 +917,10 @@ function LoginPageContent() {
                 }}
                 onClick={handleHeartClick}
               >
-                <Heart className="w-[36px] h-[36px] text-white" fill="currentColor" />
+                <Heart className="w-[36px] h-[36px] text-white pointer-events-none" fill="currentColor" />
                 {/* Click progress dots */}
                 {heartClickCount > 0 && (
-                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-[3px]">
+                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-[3px] pointer-events-none">
                     {Array.from({ length: 10 }).map((_, i) => (
                       <div
                         key={i}
@@ -935,7 +935,7 @@ function LoginPageContent() {
                 )}
               </motion.div>
               <motion.div
-                className="absolute inset-0 rounded-[22px]"
+                className="absolute inset-0 rounded-[22px] pointer-events-none"
                 animate={{ boxShadow: ['0 0 0 0 rgba(20,184,166,0.35)', '0 0 0 16px rgba(20,184,166,0)', '0 0 0 0 rgba(20,184,166,0)'] }}
                 transition={{ duration: 2.8, repeat: Infinity, ease: 'easeOut', delay: 0.5 }}
               />
