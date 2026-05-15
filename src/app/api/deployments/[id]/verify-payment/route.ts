@@ -1,6 +1,8 @@
 // ============================================================================
 // PATCH /api/deployments/[id]/verify-payment - Admin verifies payment proof
-// NEW FLOW: When verified=true → app status = accepted, deployment status = assigned, contactRevealed = true
+// NEW FLOW: When verified=true → app status = accepted, contactRevealed = true (unlocks all contact data)
+//           When verified=false → app status = payment_pending (nurse can re-upload proof)
+//           Deployment is already 'assigned' since the new flow assigns immediately.
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 // ============================================================================
 

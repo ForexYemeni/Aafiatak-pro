@@ -58,6 +58,17 @@ const steps: StepInfo[] = [
   { number: 5, title: 'تأكيد الطلب', icon: CheckCircle2 },
 ];
 
+const stepVariants = {
+  active: { scale: 1, transition: { ease: 'easeOut' as const } },
+  completed: { scale: 1, transition: { ease: 'easeOut' as const } },
+  inactive: { scale: 0.95, transition: { ease: 'easeOut' as const } },
+} as const;
+
+const lineVariants = {
+  active: { scaleX: 1, transition: { duration: 0.4, ease: 'easeOut' as const } },
+  inactive: { scaleX: 0, transition: { duration: 0.2, ease: 'easeOut' as const } },
+} as const;
+
 const serviceIconMap: Record<string, React.ElementType> = {
   Stethoscope, Heart, Activity, Baby, Syringe, Pill, Ambulance, Brain,
 };
@@ -421,28 +432,59 @@ export default function MultiServiceRequestPage() {
         </div>
       </motion.div>
 
-      {/* Step Progress */}
-      <div className="flex items-center gap-2 overflow-x-auto scrollbar-none pb-2">
-        {steps.map((step, index) => {
-          const Icon = step.icon;
-          const isActive = index === currentStep;
-          const isCompleted = index < currentStep;
-          return (
-            <div key={step.number} className="flex items-center gap-2 shrink-0">
-              <button
-                onClick={() => index <= currentStep && setCurrentStep(index)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-medium transition-all ${
-                  isActive ? 'bg-beneficiary text-beneficiary-foreground' : isCompleted ? 'bg-beneficiary/10 text-beneficiary' : 'glass text-muted-foreground'
-                }`}
-              >
-                <Icon className="w-4 h-4" />
-                <span className="hidden sm:inline">{step.title}</span>
-                <span className="sm:hidden">{step.number}</span>
-              </button>
-              {index < steps.length - 1 && <ChevronLeft className="w-4 h-4 text-muted-foreground shrink-0" />}
-            </div>
-          );
-        })}
+      {/* Modern Step Progress with animated progress line */}
+      <div className="relative px-2">
+        <div className="flex items-center justify-between relative">
+          {/* Background progress line */}
+          <div className="absolute top-5 right-[10%] left-[10%] h-0.5 bg-muted rounded-full" />
+          {/* Active progress line */}
+          <motion.div
+            className="absolute top-5 right-[10%] h-0.5 bg-gradient-to-l from-beneficiary to-rose-400 rounded-full origin-right"
+            initial={{ width: '0%' }}
+            animate={{ width: `${(currentStep / (steps.length - 1)) * 80}%` }}
+            transition={{ duration: 0.5, ease: 'easeOut' as const }}
+          />
+          {steps.map((step, index) => {
+            const Icon = step.icon;
+            const isActive = index === currentStep;
+            const isCompleted = index < currentStep;
+            return (
+              <div key={step.number} className="flex flex-col items-center gap-1.5 z-10">
+                <motion.button
+                  onClick={() => index <= currentStep && setCurrentStep(index)}
+                  variants={stepVariants}
+                  animate={isActive ? 'active' : isCompleted ? 'completed' : 'inactive'}
+                  className={`relative w-10 h-10 rounded-2xl flex items-center justify-center transition-all shadow-sm ${
+                    isActive
+                      ? 'bg-gradient-to-bl from-beneficiary to-rose-500 text-white shadow-lg shadow-beneficiary/30'
+                      : isCompleted
+                      ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                      : 'bg-muted text-muted-foreground'
+                  }`}
+                >
+                  {isCompleted ? (
+                    <CheckCircle2 className="w-5 h-5" />
+                  ) : (
+                    <Icon className="w-4.5 h-4.5" />
+                  )}
+                  {isActive && (
+                    <motion.div
+                      className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-beneficiary"
+                      layoutId="beneficiaryStepDot"
+                      transition={{ type: 'spring', bounce: 0.3, duration: 0.5 }}
+                    />
+                  )}
+                </motion.button>
+                <span className={`text-[10px] font-bold leading-tight text-center ${
+                  isActive ? 'text-beneficiary' : isCompleted ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
+                }`}>
+                  <span className="hidden sm:inline">{step.title}</span>
+                  <span className="sm:hidden">{toArabicNum(step.number)}</span>
+                </span>
+              </div>
+            );
+          })}
+        </div>
       </div>
 
       {/* Step Content */}

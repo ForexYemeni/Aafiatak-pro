@@ -33,6 +33,8 @@ import {
   Lock,
   CreditCard,
   Unlock,
+  Sparkles,
+  TrendingUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -178,20 +180,24 @@ const containerVariants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
-    transition: { staggerChildren: 0.08 },
+    transition: { staggerChildren: 0.07, ease: 'easeOut' as const },
   },
-};
+} as const;
 
 const itemVariants = {
-  hidden: { opacity: 0, y: 20 },
-  visible: { opacity: 1, y: 0, transition: { duration: 0.3 } },
-};
+  hidden: { opacity: 0, y: 20, scale: 0.97 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.35, ease: 'easeOut' as const } },
+} as const;
+
+const heroVariants = {
+  hidden: { opacity: 0, y: -20 },
+  visible: { opacity: 1, y: 0, transition: { duration: 0.5, ease: 'easeOut' as const } },
+} as const;
 
 // ---- Component ----
 
 export default function NurseTasksPage() {
   const [activeTab, setActiveTab] = useState<TabType>('new');
-  // Read from in-memory cache synchronously — no skeleton if cache is warm
   const [assignments, setAssignments] = useState<Assignment[]>(() => {
     const c = _GET_CACHE_readSync<{ success: boolean; data?: Assignment[] }>('/api/nurse/assignments?status=pending&limit=50');
     return c?.success && Array.isArray(c.data) ? c.data : [];
@@ -216,13 +222,11 @@ export default function NurseTasksPage() {
   const user = useAuthStore((s) => s.user);
   const orderUpdates = useOrderUpdates();
 
-  // ── Resolve Emergency Dialog State ──
   const [resolveDialogOpen, setResolveDialogOpen] = useState(false);
   const [resolvingEmergency, setResolvingEmergency] = useState<Assignment | null>(null);
   const [selectedOutcome, setSelectedOutcome] = useState<string>('');
   const [resolveNotes, setResolveNotes] = useState('');
 
-  // Fetch nurse verification status from profile API
   const fetchVerificationStatus = useCallback(async () => {
     try {
       const res = await authFetch('/api/nurse/profile');
@@ -230,8 +234,6 @@ export default function NurseTasksPage() {
       if (data.success && data.data) {
         const status = data.data.verificationStatus || 'unverified';
         setVerificationStatus(status);
-        
-        // Calculate profile completeness
         const fields = [
           !!data.data.name,
           !!data.data.phone,
@@ -246,7 +248,6 @@ export default function NurseTasksPage() {
         setProfileCompleteness(Math.round((filled / fields.length) * 100));
       }
     } catch {
-      // If profile fetch fails, default to unverified from auth store
       const storedStatus = (user as Record<string, unknown>)?.verificationStatus as string | undefined;
       setVerificationStatus(storedStatus || 'unverified');
     }
@@ -284,7 +285,6 @@ export default function NurseTasksPage() {
     }
   }, [authFetch, activeTab]);
 
-  // OPTIMIZED: Run all initial API calls in parallel instead of sequentially
   useEffect(() => {
     setIsLoading(true);
     Promise.allSettled([
@@ -296,9 +296,8 @@ export default function NurseTasksPage() {
       // fetchAssignments sets isLoading=false internally
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeTab]); // Only re-fetch when tab changes
+  }, [activeTab]);
 
-  // Refresh on real-time order updates
   useEffect(() => {
     if (orderUpdates.latestOrderUpdate) {
       fetchAssignments();
@@ -509,14 +508,11 @@ export default function NurseTasksPage() {
 
   const isEmergency = (a: Assignment) => a.assignmentType === 'emergency' || a.request?.isEmergency;
 
-  // Payment gate: beneficiary contact data only shown after admin confirms payment
-  // Applies to ALL payment methods (including cash). Only emergencies bypass this.
   const isPaymentConfirmed = (a: Assignment) => {
-    if (isEmergency(a)) return true; // Emergency: always accessible
-    return a.request?.paymentStatus === 'completed'; // All others: must be confirmed by admin
+    if (isEmergency(a)) return true;
+    return a.request?.paymentStatus === 'completed';
   };
 
-  // Fetch rating summary
   const fetchRatingSummary = useCallback(async () => {
     try {
       const res = await authFetch('/api/nurse/ratings?limit=1');
@@ -529,50 +525,87 @@ export default function NurseTasksPage() {
     }
   }, [authFetch]);
 
-  // Get verification config for current status
   const vConfig = verificationStatus ? verificationConfig[verificationStatus] : null;
 
   return (
-    <div className="space-y-4">
-      {/* Nurse Hero Header */}
+    <div className="space-y-5">
+      {/* ══════════════ Hero Header with Animated Gradient ══════════════ */}
       <motion.div
-        initial={{ opacity: 0, y: -15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.4, ease: 'easeOut' }}
-        className="relative overflow-hidden rounded-2xl bg-gradient-to-bl from-sky-600 via-nurse to-teal-600 p-5 text-white shadow-lg shadow-nurse/20"
+        variants={heroVariants}
+        initial="hidden"
+        animate="visible"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-bl from-sky-500 via-nurse to-teal-500 p-6 text-white shadow-xl shadow-nurse/25"
       >
+        {/* Animated background shapes */}
+        <motion.div
+          animate={{ rotate: 360 }}
+          transition={{ duration: 25, repeat: Infinity, ease: 'linear' }}
+          className="absolute -top-10 -left-10 w-32 h-32 rounded-full bg-white/8 blur-sm"
+        />
+        <motion.div
+          animate={{ rotate: -360 }}
+          transition={{ duration: 30, repeat: Infinity, ease: 'linear' }}
+          className="absolute -bottom-8 -right-8 w-28 h-28 rounded-full bg-white/6"
+        />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-48 h-48 rounded-full bg-white/5 blur-2xl" />
+        
         <div className="relative z-10 flex items-center justify-between">
           <div>
-            <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70 mb-1">بوابة الممرض</p>
-            <h2 className="text-xl font-black leading-snug">مرحباً، {user?.name?.split(' ')[0] ?? 'الممرض/ـة'}</h2>
-            <p className="text-xs opacity-80 mt-1">إدارة المهام والطلبات الموكلة إليك</p>
+            <div className="flex items-center gap-2 mb-2">
+              <Sparkles className="w-4 h-4 opacity-70" />
+              <p className="text-[11px] font-bold uppercase tracking-[0.2em] opacity-80">بوابة الممرض</p>
+            </div>
+            <h2 className="text-2xl font-black leading-tight">مرحباً، {user?.name?.split(' ')[0] ?? 'الممرض/ـة'}</h2>
+            <p className="text-sm opacity-80 mt-1.5 leading-relaxed">إدارة المهام والطلبات الموكلة إليك</p>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center shrink-0">
-            <ClipboardList className="w-6 h-6 text-white" />
+          <motion.div
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="w-14 h-14 rounded-2xl bg-white/15 border border-white/25 backdrop-blur-sm flex items-center justify-center shrink-0 shadow-lg"
+          >
+            <ClipboardList className="w-7 h-7 text-white" />
+          </motion.div>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="relative z-10 grid grid-cols-3 gap-3 mt-5">
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/10">
+            <p className="text-xl font-black">{toArabicNum(counts.new)}</p>
+            <p className="text-[10px] opacity-80 font-medium">جديدة</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/10">
+            <p className="text-xl font-black">{toArabicNum(counts.active)}</p>
+            <p className="text-[10px] opacity-80 font-medium">نشطة</p>
+          </div>
+          <div className="bg-white/10 backdrop-blur-sm rounded-xl p-2.5 text-center border border-white/10">
+            <p className="text-xl font-black">{toArabicNum(counts.completed)}</p>
+            <p className="text-[10px] opacity-80 font-medium">مكتملة</p>
           </div>
         </div>
-        <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-white/8 blur-sm" />
-        <div className="absolute -bottom-4 -right-4 w-20 h-20 rounded-full bg-white/8" />
       </motion.div>
 
-      {/* Verification Warning Banner */}
+      {/* ══════════════ Verification Warning Banner ══════════════ */}
       <AnimatePresence>
         {verificationStatus && verificationStatus !== 'verified' && vConfig && (
           <motion.div
             initial={{ opacity: 0, y: -10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.98 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
+            transition={{ duration: 0.3, ease: 'easeOut' as const }}
           >
             <Link href="/nurse/profile" className="block">
               <GlassCard
                 variant="nurse"
-                className={`p-4 cursor-pointer hover:shadow-md transition-all duration-300 border ${vConfig.borderColor} bg-gradient-to-l ${vConfig.bgGradient}`}
+                className={`p-4 cursor-pointer hover:shadow-lg transition-all duration-300 border-2 ${vConfig.borderColor} bg-gradient-to-l ${vConfig.bgGradient}`}
               >
                 <div className="flex items-center gap-3">
-                  <div className={`w-11 h-11 rounded-xl ${vConfig.iconBg} flex items-center justify-center shrink-0`}>
-                    <vConfig.icon className={`w-5 h-5 ${vConfig.iconColor}`} />
-                  </div>
+                  <motion.div
+                    animate={{ scale: [1, 1.05, 1] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' as const }}
+                    className={`w-12 h-12 rounded-2xl ${vConfig.iconBg} flex items-center justify-center shrink-0`}
+                  >
+                    <vConfig.icon className={`w-6 h-6 ${vConfig.iconColor}`} />
+                  </motion.div>
                   <div className="flex-1 min-w-0">
                     <p className={`font-bold text-sm ${vConfig.iconColor} mb-0.5`}>
                       {vConfig.title}
@@ -580,20 +613,43 @@ export default function NurseTasksPage() {
                     <p className="text-xs text-muted-foreground leading-relaxed">
                       {vConfig.description}
                     </p>
-                    <div className="mt-2">
-                      <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1">
-                        <span>اكتمال الملف</span>
-                        <span className="font-bold">{toArabicNum(profileCompleteness)}%</span>
+                    {/* Progress Steps */}
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-1.5">
+                        <span className="font-semibold">اكتمال الملف</span>
+                        <span className="font-black">{toArabicNum(profileCompleteness)}%</span>
                       </div>
-                      <div className="w-full h-1.5 rounded-full bg-muted overflow-hidden">
+                      <div className="w-full h-2 rounded-full bg-muted overflow-hidden">
                         <motion.div
                           initial={{ width: 0 }}
                           animate={{ width: `${profileCompleteness}%` }}
-                          transition={{ duration: 0.8, ease: 'easeOut' }}
+                          transition={{ duration: 1, ease: 'easeOut' as const }}
                           className={`h-full rounded-full ${
-                            profileCompleteness >= 70 ? 'bg-amber-500' : 'bg-red-500'
+                            profileCompleteness >= 70
+                              ? 'bg-gradient-to-l from-amber-400 to-amber-500'
+                              : 'bg-gradient-to-l from-red-400 to-red-500'
                           }`}
                         />
+                      </div>
+                      {/* Verification Steps */}
+                      <div className="flex items-center gap-1 mt-2.5">
+                        {[
+                          { label: 'الهوية', done: profileCompleteness >= 25 },
+                          { label: 'المزاولة', done: profileCompleteness >= 50 },
+                          { label: 'البيانات', done: profileCompleteness >= 75 },
+                          { label: 'المراجعة', done: profileCompleteness >= 100 },
+                        ].map((step, i) => (
+                          <div key={i} className="flex items-center gap-1 flex-1">
+                            <div className={`w-5 h-5 rounded-full flex items-center justify-center text-[8px] font-bold border-2 transition-all ${
+                              step.done
+                                ? 'bg-emerald-500 border-emerald-400 text-white'
+                                : 'bg-muted border-border text-muted-foreground'
+                            }`}>
+                              {step.done ? <CheckCircle2 className="w-3 h-3" /> : toArabicNum(i + 1)}
+                            </div>
+                            {i < 3 && <div className={`flex-1 h-0.5 rounded-full ${step.done ? 'bg-emerald-400' : 'bg-muted'}`} />}
+                          </div>
+                        ))}
                       </div>
                     </div>
                   </div>
@@ -605,48 +661,57 @@ export default function NurseTasksPage() {
         )}
       </AnimatePresence>
 
-      {/* Rating Summary Card */}
+      {/* ══════════════ Rating Summary Card ══════════════ */}
       <Link href="/nurse/ratings" className="block">
-        <GlassCard variant="nurse" className="p-4 cursor-pointer hover:shadow-md transition-all duration-300 border-amber-200/50 dark:border-amber-800/30 bg-gradient-to-l from-amber-50/60 to-yellow-50/40 dark:from-amber-900/10 dark:to-yellow-900/5">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
-              <Star className="w-6 h-6 text-amber-500 fill-amber-400" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <h3 className="font-bold text-sm">تقييماتي</h3>
-                <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+        <motion.div
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3, delay: 0.1, ease: 'easeOut' as const }}
+        >
+          <GlassCard variant="nurse" className="p-4 cursor-pointer hover:shadow-lg transition-all duration-300 border border-amber-200/50 dark:border-amber-800/30 bg-gradient-to-l from-amber-50/60 to-yellow-50/40 dark:from-amber-900/10 dark:to-yellow-900/5">
+            <div className="flex items-center gap-4">
+              <div className="w-13 h-13 rounded-2xl bg-gradient-to-bl from-amber-400 to-amber-500 flex items-center justify-center shrink-0 shadow-lg shadow-amber-500/25">
+                <Star className="w-6 h-6 text-white fill-white" />
               </div>
-              <div className="flex items-center gap-3">
-                <span className="text-2xl font-bold text-amber-600">{toArabicNum(ratingSummary?.averageRating?.toFixed(1) ?? '0.0')}</span>
-                <div className="flex items-center gap-0.5">
-                  {[1, 2, 3, 4, 5].map((s) => (
-                    <Star
-                      key={s}
-                      className={`w-4 h-4 ${s <= Math.round(ratingSummary?.averageRating ?? 0) ? 'text-amber-400 fill-amber-400' : 'text-gray-300'}`}
-                    />
-                  ))}
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <h3 className="font-bold text-sm">تقييماتي</h3>
+                  <ChevronLeft className="w-4 h-4 text-muted-foreground" />
                 </div>
-                <span className="text-xs text-muted-foreground">
-                  {toArabicNum(ratingSummary?.reviewCount ?? 0)} تقييم
-                </span>
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl font-black text-amber-600">{toArabicNum(ratingSummary?.averageRating?.toFixed(1) ?? '0.0')}</span>
+                  <div className="flex items-center gap-0.5">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <Star
+                        key={s}
+                        className={`w-3.5 h-3.5 ${s <= Math.round(ratingSummary?.averageRating ?? 0) ? 'text-amber-400 fill-amber-400' : 'text-gray-300 dark:text-gray-600'}`}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    {toArabicNum(ratingSummary?.reviewCount ?? 0)} تقييم
+                  </span>
+                </div>
+              </div>
+              <div className="text-left">
+                <p className="text-[10px] text-muted-foreground font-medium">خدمة مكتملة</p>
+                <div className="flex items-center gap-1">
+                  <TrendingUp className="w-3.5 h-3.5 text-nurse" />
+                  <p className="text-lg font-black text-nurse">{toArabicNum(ratingSummary?.completedJobs ?? 0)}</p>
+                </div>
               </div>
             </div>
-            <div className="text-left">
-              <p className="text-[10px] text-muted-foreground">خدمة مكتملة</p>
-              <p className="text-lg font-bold text-nurse">{toArabicNum(ratingSummary?.completedJobs ?? 0)}</p>
-            </div>
-          </div>
-        </GlassCard>
+          </GlassCard>
+        </motion.div>
       </Link>
 
-      {/* Verified Badge (shown when verified) */}
+      {/* ══════════════ Verified Badge ══════════════ */}
       <AnimatePresence>
         {verificationStatus === 'verified' && (
           <motion.div
             initial={{ opacity: 0, y: -10, scale: 0.98 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ duration: 0.3, ease: 'easeOut' }}
+            transition={{ duration: 0.3, ease: 'easeOut' as const }}
           >
             <GlassCard variant="nurse" className="p-3 border-emerald-200 dark:border-emerald-800/50 bg-gradient-to-l from-emerald-50/80 to-teal-50/50 dark:from-emerald-900/10 dark:to-teal-900/5">
               <div className="flex items-center gap-2.5">
@@ -667,31 +732,43 @@ export default function NurseTasksPage() {
         )}
       </AnimatePresence>
 
-      {/* Tabs */}
+      {/* ══════════════ Modern Tabs with Animated Indicator ══════════════ */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
-        <TabsList className="w-full grid grid-cols-3">
-          <TabsTrigger value="new" className="gap-1">
+        <TabsList className="w-full grid grid-cols-3 h-12 bg-muted/50 p-1 rounded-2xl">
+          <TabsTrigger value="new" className="gap-1.5 rounded-xl text-xs font-bold transition-all data-[state=active]:bg-gradient-to-l data-[state=active]:from-sky-500 data-[state=active]:to-nurse data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-nurse/20">
             الجديدة
             {counts.new > 0 && (
-              <Badge variant="destructive" className="h-5 min-w-[20px] p-0 text-[10px] flex items-center justify-center">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-black rounded-full bg-red-500 text-white"
+              >
                 {toArabicNum(counts.new)}
-              </Badge>
+              </motion.span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="active" className="gap-1">
+          <TabsTrigger value="active" className="gap-1.5 rounded-xl text-xs font-bold transition-all data-[state=active]:bg-gradient-to-l data-[state=active]:from-sky-500 data-[state=active]:to-nurse data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-nurse/20">
             النشطة
             {counts.active > 0 && (
-              <Badge className="h-5 min-w-[20px] p-0 text-[10px] flex items-center justify-center bg-sky-600">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-black rounded-full bg-sky-600 text-white"
+              >
                 {toArabicNum(counts.active)}
-              </Badge>
+              </motion.span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="completed" className="gap-1">
+          <TabsTrigger value="completed" className="gap-1.5 rounded-xl text-xs font-bold transition-all data-[state=active]:bg-gradient-to-l data-[state=active]:from-sky-500 data-[state=active]:to-nurse data-[state=active]:text-white data-[state=active]:shadow-lg data-[state=active]:shadow-nurse/20">
             المكتملة
             {counts.completed > 0 && (
-              <Badge variant="secondary" className="h-5 min-w-[20px] p-0 text-[10px] flex items-center justify-center">
+              <motion.span
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                className="inline-flex items-center justify-center h-5 min-w-[20px] px-1 text-[10px] font-black rounded-full bg-emerald-600 text-white"
+              >
                 {toArabicNum(counts.completed)}
-              </Badge>
+              </motion.span>
             )}
           </TabsTrigger>
         </TabsList>
@@ -706,7 +783,7 @@ export default function NurseTasksPage() {
               </div>
             ) : assignments.length === 0 ? (
               <EmptyState
-                icon={<ClipboardList className="w-10 h-10 text-muted-foreground" />}
+                icon={<ClipboardList className="w-12 h-12 text-muted-foreground" />}
                 title={
                   activeTab === 'new' ? 'لا توجد مهام جديدة' :
                   activeTab === 'active' ? 'لا توجد مهام نشطة' :
@@ -723,7 +800,7 @@ export default function NurseTasksPage() {
                 variants={containerVariants}
                 initial="hidden"
                 animate="visible"
-                className="space-y-3"
+                className="space-y-4"
               >
                 <AnimatePresence mode="popLayout">
                   {assignments.map((assignment) => (
@@ -735,29 +812,39 @@ export default function NurseTasksPage() {
                     >
                       <GlassCard
                         variant="nurse"
-                        className={`p-4 ${isEmergency(assignment) ? 'border-red-200 dark:border-red-900/40 ring-1 ring-red-100 dark:ring-red-900/20' : ''}`}
+                        className={`p-5 overflow-hidden relative ${isEmergency(assignment) ? 'border-2 border-red-300 dark:border-red-800/60 ring-2 ring-red-100 dark:ring-red-900/30' : 'border border-border/60'}`}
                       >
+                        {/* Gradient accent bar */}
+                        <div className={`absolute top-0 right-0 w-1 h-full rounded-l-full ${
+                          isEmergency(assignment)
+                            ? 'bg-gradient-to-b from-red-400 to-red-600'
+                            : 'bg-gradient-to-b from-nurse to-sky-400'
+                        }`} />
+
                         {/* Service & Status Row */}
                         <div className="flex items-start justify-between mb-3">
                           <div className="flex items-center gap-3">
-                            <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
-                              isEmergency(assignment)
-                                ? assignment.status === 'assigned'
-                                  ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 animate-pulse'
-                                  : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                                : 'bg-nurse/10 text-nurse'
-                            }`}>
+                            <motion.div
+                              whileHover={{ scale: 1.05 }}
+                              className={`w-11 h-11 rounded-2xl flex items-center justify-center ${
+                                isEmergency(assignment)
+                                  ? assignment.status === 'assigned'
+                                    ? 'bg-gradient-to-bl from-red-400 to-red-600 text-white shadow-lg shadow-red-500/30 animate-pulse'
+                                    : 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                                  : 'bg-gradient-to-bl from-nurse to-sky-400 text-white shadow-lg shadow-nurse/20'
+                              }`}
+                            >
                               {isEmergency(assignment)
                                 ? <AlertTriangle className="w-5 h-5" />
                                 : assignment.request?.service
                                   ? getServiceIcon(assignment.request.service.category)
                                   : <ClipboardList className="w-5 h-5" />}
-                            </div>
+                            </motion.div>
                             <div>
-                              <h3 className="font-semibold text-sm">
+                              <h3 className="font-bold text-sm">
                                 {assignment.request?.service?.nameAr || 'طلب خدمة'}
                               </h3>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground mt-0.5">
                                 {isEmergency(assignment)
                                   ? assignment.status === 'assigned'
                                     ? 'بانتظار قبولك - حالة عاجلة'
@@ -774,7 +861,7 @@ export default function NurseTasksPage() {
                           </div>
                           <div className="flex items-center gap-2">
                             {isEmergency(assignment) && (
-                              <Badge variant="destructive" className={`text-[10px] gap-1 ${assignment.status === 'assigned' ? 'animate-pulse' : ''}`}>
+                              <Badge variant="destructive" className={`text-[10px] gap-1 font-bold ${assignment.status === 'assigned' ? 'animate-pulse' : ''}`}>
                                 <AlertTriangle className="w-3 h-3" />
                                 طوارئ
                               </Badge>
@@ -785,8 +872,8 @@ export default function NurseTasksPage() {
 
                         {/* Emergency Description */}
                         {isEmergency(assignment) && assignment.request?.emergencyDescription && (
-                          <div className="mb-3 p-2.5 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-900/30">
-                            <p className="text-[10px] text-red-500 font-medium mb-0.5">وصف الطوارئ</p>
+                          <div className="mb-3 p-3 rounded-xl bg-gradient-to-l from-red-50 to-red-100/50 dark:from-red-900/20 dark:to-red-900/10 border border-red-200 dark:border-red-900/30">
+                            <p className="text-[10px] text-red-500 font-bold mb-0.5">وصف الطوارئ</p>
                             <p className="text-xs text-foreground leading-relaxed">{assignment.request.emergencyDescription}</p>
                           </div>
                         )}
@@ -821,7 +908,7 @@ export default function NurseTasksPage() {
                               <UserRound className="w-4 h-4 text-muted-foreground" />
                               <span className="font-medium">{assignment.request.beneficiary.name}</span>
                               {isPaymentConfirmed(assignment) && assignment.request.beneficiary.phone && (
-                                <a href={`tel:${assignment.request.beneficiary.phone}`} className="flex items-center gap-1 text-xs text-sky-600 bg-sky-50 dark:bg-sky-900/20 px-2 py-0.5 rounded-full border border-sky-200 dark:border-sky-800/40">
+                                <a href={`tel:${assignment.request.beneficiary.phone}`} className="flex items-center gap-1 text-xs text-sky-600 bg-sky-50 dark:bg-sky-900/20 px-2 py-0.5 rounded-full border border-sky-200 dark:border-sky-800/40 hover:bg-sky-100 dark:hover:bg-sky-900/30 transition-colors">
                                   <Phone className="w-3 h-3" />
                                   <span dir="ltr">{assignment.request.beneficiary.phone}</span>
                                 </a>
@@ -841,7 +928,7 @@ export default function NurseTasksPage() {
                                   href={`https://www.google.com/maps?q=${assignment.request.beneficiaryLat},${assignment.request.beneficiaryLng}`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="flex items-center gap-1.5 text-xs text-blue-600 font-medium"
+                                  className="flex items-center gap-1.5 text-xs text-nurse font-semibold hover:underline"
                                 >
                                   <Navigation className="w-3 h-3" />
                                   عرض الموقع على الخريطة
@@ -849,8 +936,13 @@ export default function NurseTasksPage() {
                               )}
                             </>
                           ) : (
-                            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40">
-                              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0 mt-0.5">
+                            <motion.div
+                              initial={{ opacity: 0.8 }}
+                              animate={{ opacity: 1 }}
+                              transition={{ duration: 1, repeat: Infinity, repeatType: 'reverse', ease: 'easeOut' as const }}
+                              className="flex items-start gap-3 p-3 rounded-xl bg-gradient-to-l from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-900/10 border border-amber-200 dark:border-amber-800/40"
+                            >
+                              <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
                                 <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
                               </div>
                               <div className="flex-1 min-w-0">
@@ -865,7 +957,7 @@ export default function NurseTasksPage() {
                                   </span>
                                 </div>
                               </div>
-                            </div>
+                            </motion.div>
                           )}
                         </div>
 
@@ -889,12 +981,12 @@ export default function NurseTasksPage() {
 
                         {/* ── Earnings Row ── */}
                         <div className="flex items-center gap-2 pt-3 border-t border-border mb-3">
-                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
-                            <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                            <span className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">
+                          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-l from-emerald-50 to-emerald-100/50 dark:from-emerald-900/20 dark:to-emerald-900/10 border border-emerald-200 dark:border-emerald-800/40">
+                            <DollarSign className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                            <span className="text-xs text-emerald-700 dark:text-emerald-300 font-semibold">
                               {isEmergency(assignment) ? 'رسوم الطوارئ:' : 'أرباحك:'}
                             </span>
-                            <Currency amount={assignment.request?.nursePayout || assignment.request?.basePrice || 0} className="font-bold text-emerald-700 dark:text-emerald-300" />
+                            <Currency amount={assignment.request?.nursePayout || assignment.request?.basePrice || 0} className="font-black text-emerald-700 dark:text-emerald-300" />
                           </div>
                         </div>
 
@@ -903,54 +995,56 @@ export default function NurseTasksPage() {
                           <div className="space-y-3">
                             {/* Step Progress Tracker */}
                             {!isEmergency(assignment) ? (
-                              <div className="p-3 rounded-xl bg-muted/30 border border-border/60">
-                                <p className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest mb-2.5">مسار إجراءات الحالة</p>
+                              <div className="p-3.5 rounded-2xl bg-muted/30 border border-border/60">
+                                <p className="text-[10px] font-black text-muted-foreground/60 uppercase tracking-[0.15em] mb-3">مسار إجراءات الحالة</p>
                                 <div className="flex items-center">
                                   {/* Step 1 */}
                                   <div className="flex flex-col items-center gap-1">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
-                                      assignment.status === 'assigned'
-                                        ? 'bg-amber-500 border-amber-400 text-white shadow-md shadow-amber-500/40 scale-110'
-                                        : 'bg-emerald-500 border-emerald-400 text-white'
-                                    }`}>
-                                      {assignment.status === 'assigned' ? '١' : <CheckCircle2 className="w-4 h-4" />}
-                                    </div>
+                                    <motion.div
+                                      animate={assignment.status === 'assigned' ? { scale: [1, 1.1, 1] } : {}}
+                                      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' as const }}
+                                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                        assignment.status === 'assigned'
+                                          ? 'bg-gradient-to-bl from-amber-400 to-amber-500 border-amber-400 text-white shadow-lg shadow-amber-500/30'
+                                          : 'bg-emerald-500 border-emerald-400 text-white'
+                                      }`}
+                                    >
+                                      {assignment.status === 'assigned' ? toArabicNum(1) : <CheckCircle2 className="w-4 h-4" />}
+                                    </motion.div>
                                     <span className={`text-[9px] font-bold ${
                                       assignment.status === 'assigned' ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
                                     }`}>قبول</span>
                                   </div>
-                                  {/* Line */}
-                                  <div className={`flex-1 h-1 mx-1 rounded-full ${
-                                    assignment.status !== 'assigned' ? 'bg-nurse' : 'bg-muted'
+                                  <div className={`flex-1 h-1 mx-1.5 rounded-full ${
+                                    assignment.status !== 'assigned' ? 'bg-gradient-to-l from-nurse to-emerald-400' : 'bg-muted'
                                   }`} />
                                   {/* Step 2 */}
                                   <div className="flex flex-col items-center gap-1">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
                                       assignment.status === 'accepted'
-                                        ? 'bg-sky-500 border-sky-400 text-white shadow-md shadow-sky-500/40 scale-110'
+                                        ? 'bg-gradient-to-bl from-sky-400 to-sky-500 border-sky-400 text-white shadow-lg shadow-sky-500/30 scale-110'
                                         : assignment.status === 'in_progress'
                                           ? 'bg-emerald-500 border-emerald-400 text-white'
                                           : 'bg-muted border-border text-muted-foreground'
                                     }`}>
-                                      {assignment.status === 'in_progress' ? <CheckCircle2 className="w-4 h-4" /> : '٢'}
+                                      {assignment.status === 'in_progress' ? <CheckCircle2 className="w-4 h-4" /> : toArabicNum(2)}
                                     </div>
                                     <span className={`text-[9px] font-bold ${
                                       assignment.status === 'accepted' ? 'text-sky-600 dark:text-sky-400' :
                                       assignment.status === 'in_progress' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
                                     }`}>تنفيذ</span>
                                   </div>
-                                  {/* Line */}
-                                  <div className={`flex-1 h-1 mx-1 rounded-full ${
-                                    assignment.status === 'in_progress' ? 'bg-nurse' : 'bg-muted'
+                                  <div className={`flex-1 h-1 mx-1.5 rounded-full ${
+                                    assignment.status === 'in_progress' ? 'bg-gradient-to-l from-nurse to-emerald-400' : 'bg-muted'
                                   }`} />
                                   {/* Step 3 */}
                                   <div className="flex flex-col items-center gap-1">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
                                       assignment.status === 'in_progress'
-                                        ? 'bg-green-500 border-green-400 text-white shadow-md shadow-green-500/40 scale-110'
+                                        ? 'bg-gradient-to-bl from-green-400 to-green-500 border-green-400 text-white shadow-lg shadow-green-500/30 scale-110'
                                         : 'bg-muted border-border text-muted-foreground'
                                     }`}>
-                                      ٣
+                                      {toArabicNum(3)}
                                     </div>
                                     <span className={`text-[9px] font-bold ${
                                       assignment.status === 'in_progress' ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'
@@ -959,39 +1053,49 @@ export default function NurseTasksPage() {
                                 </div>
                               </div>
                             ) : (
-                              <div className="p-3 rounded-xl bg-red-50/50 dark:bg-red-900/10 border border-red-200/60 dark:border-red-900/30">
-                                <p className="text-[10px] font-bold text-red-500/70 uppercase tracking-widest mb-2.5">مسار إجراءات الطوارئ</p>
+                              <div className="p-3.5 rounded-2xl bg-gradient-to-l from-red-50/50 to-red-100/30 dark:from-red-900/10 dark:to-red-900/5 border border-red-200/60 dark:border-red-900/30">
+                                <p className="text-[10px] font-black text-red-500/60 uppercase tracking-[0.15em] mb-3">مسار إجراءات الطوارئ</p>
                                 <div className="flex items-center">
                                   <div className="flex flex-col items-center gap-1">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
-                                      assignment.status === 'assigned'
-                                        ? 'bg-red-500 border-red-400 text-white shadow-md shadow-red-500/40 scale-110 animate-pulse'
-                                        : 'bg-emerald-500 border-emerald-400 text-white'
-                                    }`}>
-                                      {assignment.status === 'assigned' ? '١' : <CheckCircle2 className="w-4 h-4" />}
-                                    </div>
+                                    <motion.div
+                                      animate={assignment.status === 'assigned' ? { scale: [1, 1.1, 1] } : {}}
+                                      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' as const }}
+                                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                        assignment.status === 'assigned'
+                                          ? 'bg-gradient-to-bl from-red-400 to-red-600 border-red-400 text-white shadow-lg shadow-red-500/30 animate-pulse'
+                                          : 'bg-emerald-500 border-emerald-400 text-white'
+                                      }`}
+                                    >
+                                      {assignment.status === 'assigned' ? toArabicNum(1) : <CheckCircle2 className="w-4 h-4" />}
+                                    </motion.div>
                                     <span className="text-[9px] font-bold text-red-600 dark:text-red-400">قبول</span>
                                   </div>
-                                  <div className={`flex-1 h-1 mx-1 rounded-full ${assignment.status !== 'assigned' ? 'bg-orange-400' : 'bg-muted'}`} />
+                                  <div className={`flex-1 h-1 mx-1.5 rounded-full ${assignment.status !== 'assigned' ? 'bg-gradient-to-l from-orange-400 to-orange-500' : 'bg-muted'}`} />
                                   <div className="flex flex-col items-center gap-1">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                    <div className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
                                       assignment.status === 'accepted'
-                                        ? 'bg-orange-500 border-orange-400 text-white shadow-md shadow-orange-500/40 scale-110 animate-pulse'
+                                        ? 'bg-gradient-to-bl from-orange-400 to-orange-500 border-orange-400 text-white shadow-lg shadow-orange-500/30 scale-110 animate-pulse'
                                         : assignment.status === 'in_progress'
                                           ? 'bg-emerald-500 border-emerald-400 text-white'
                                           : 'bg-muted border-border text-muted-foreground'
                                     }`}>
-                                      {assignment.status === 'in_progress' ? <CheckCircle2 className="w-4 h-4" /> : '٢'}
+                                      {assignment.status === 'in_progress' ? <CheckCircle2 className="w-4 h-4" /> : toArabicNum(2)}
                                     </div>
                                     <span className="text-[9px] font-bold text-orange-600 dark:text-orange-400">انطلاق</span>
                                   </div>
-                                  <div className={`flex-1 h-1 mx-1 rounded-full ${assignment.status === 'in_progress' ? 'bg-green-500' : 'bg-muted'}`} />
+                                  <div className={`flex-1 h-1 mx-1.5 rounded-full ${assignment.status === 'in_progress' ? 'bg-gradient-to-l from-green-400 to-green-500' : 'bg-muted'}`} />
                                   <div className="flex flex-col items-center gap-1">
-                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
-                                      assignment.status === 'in_progress'
-                                        ? 'bg-green-500 border-green-400 text-white shadow-md shadow-green-500/40 scale-110 animate-pulse'
-                                        : 'bg-muted border-border text-muted-foreground'
-                                    }`}>٣</div>
+                                    <motion.div
+                                      animate={assignment.status === 'in_progress' ? { scale: [1, 1.05, 1] } : {}}
+                                      transition={{ duration: 1.5, repeat: Infinity, ease: 'easeOut' as const }}
+                                      className={`w-9 h-9 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                        assignment.status === 'in_progress'
+                                          ? 'bg-gradient-to-bl from-green-400 to-green-500 border-green-400 text-white shadow-lg shadow-green-500/30 animate-pulse'
+                                          : 'bg-muted border-border text-muted-foreground'
+                                      }`}
+                                    >
+                                      {toArabicNum(3)}
+                                    </motion.div>
                                     <span className="text-[9px] font-bold text-green-600 dark:text-green-400">إنهاء</span>
                                   </div>
                                 </div>
@@ -1003,11 +1107,11 @@ export default function NurseTasksPage() {
                               <>
                                 {activeTab === 'new' && assignment.status === 'assigned' && (
                                   <div className="space-y-2">
-                                    <p className="text-[11px] text-center text-red-600 dark:text-red-400 font-semibold">⚡ حالة طوارئ عاجلة — حدد قرارك فوراً</p>
+                                    <p className="text-[11px] text-center text-red-600 dark:text-red-400 font-bold">⚡ حالة طوارئ عاجلة — حدد قرارك فوراً</p>
                                     <div className="grid grid-cols-2 gap-2">
                                       <Button
                                         variant="outline"
-                                        className="h-11 w-full text-destructive border-destructive/40 hover:bg-destructive/10 font-semibold gap-1.5"
+                                        className="h-12 w-full text-destructive border-destructive/40 hover:bg-destructive/10 font-bold gap-1.5 rounded-xl"
                                         disabled={actionLoading === assignment.id}
                                         onClick={() => handleEmergencyReject(assignment.id)}
                                       >
@@ -1015,7 +1119,7 @@ export default function NurseTasksPage() {
                                         رفض التكليف
                                       </Button>
                                       <Button
-                                        className="h-11 w-full bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5 shadow-lg shadow-red-600/30"
+                                        className="h-12 w-full bg-gradient-to-l from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white font-black gap-1.5 shadow-lg shadow-red-600/30 rounded-xl"
                                         disabled={actionLoading === assignment.id}
                                         onClick={() => handleEmergencyAccept(assignment.id)}
                                       >
@@ -1027,24 +1131,24 @@ export default function NurseTasksPage() {
                                 )}
                                 {activeTab === 'active' && assignment.status === 'accepted' && (
                                   <div className="space-y-2">
-                                    <div className="p-2.5 rounded-lg bg-orange-50 dark:bg-orange-900/15 border border-orange-200/70 dark:border-orange-800/30 text-center">
+                                    <div className="p-3 rounded-2xl bg-gradient-to-l from-orange-50 to-orange-100/50 dark:from-orange-900/15 dark:to-orange-900/5 border border-orange-200/70 dark:border-orange-800/30 text-center">
                                       <p className="text-xs font-bold text-orange-700 dark:text-orange-400">الخطوة الثانية — الانطلاق للموقع</p>
                                       <p className="text-[10px] text-muted-foreground mt-0.5">انطلق الآن ثم اضغط "وصلت للموقع" عند الوصول</p>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
                                       {assignment.request?.beneficiary?.phone && (
-                                        <Button variant="outline" className="h-10 gap-1.5 font-medium text-sm" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
+                                        <Button variant="outline" className="h-11 gap-1.5 font-medium text-sm rounded-xl" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
                                           <Phone className="w-4 h-4" />اتصال بالمريض
                                         </Button>
                                       )}
                                       {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
-                                        <Button className="h-10 bg-red-600 hover:bg-red-700 text-white gap-1.5 font-medium text-sm" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`, '_blank')}>
+                                        <Button className="h-11 bg-gradient-to-l from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 text-white gap-1.5 font-medium text-sm shadow-md shadow-red-600/20 rounded-xl" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`, '_blank')}>
                                           <Navigation className="w-4 h-4" />اذهب الآن
                                         </Button>
                                       )}
                                     </div>
                                     <Button
-                                      className="w-full h-12 bg-sky-600 hover:bg-sky-700 text-white font-bold gap-2 shadow-lg shadow-sky-600/25 text-[15px]"
+                                      className="w-full h-13 bg-gradient-to-l from-nurse to-sky-500 hover:from-sky-600 hover:to-sky-600 text-white font-black gap-2 shadow-lg shadow-nurse/30 text-[15px] rounded-xl"
                                       disabled={actionLoading === assignment.id}
                                       onClick={() => handleEmergencyArrive(assignment.id)}
                                     >
@@ -1055,17 +1159,17 @@ export default function NurseTasksPage() {
                                 )}
                                 {activeTab === 'active' && assignment.status === 'in_progress' && (
                                   <div className="space-y-2">
-                                    <div className="p-2.5 rounded-lg bg-green-50 dark:bg-green-900/15 border border-green-200/70 dark:border-green-800/30 text-center">
+                                    <div className="p-3 rounded-2xl bg-gradient-to-l from-green-50 to-green-100/50 dark:from-green-900/15 dark:to-green-900/5 border border-green-200/70 dark:border-green-800/30 text-center">
                                       <p className="text-xs font-bold text-green-700 dark:text-green-400">الخطوة الثالثة — إنهاء الحالة</p>
                                       <p className="text-[10px] text-muted-foreground mt-0.5">سجّل نتيجة الحالة عند الانتهاء من التعامل معها</p>
                                     </div>
                                     {assignment.request?.beneficiary?.phone && (
-                                      <Button variant="outline" className="w-full h-10 gap-1.5 font-medium" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
+                                      <Button variant="outline" className="w-full h-11 gap-1.5 font-medium rounded-xl" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
                                         <Phone className="w-4 h-4" />اتصال بالمريض
                                       </Button>
                                     )}
                                     <Button
-                                      className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold gap-2 shadow-lg shadow-green-600/25 text-[15px]"
+                                      className="w-full h-13 bg-gradient-to-l from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 text-white font-black gap-2 shadow-lg shadow-green-600/25 text-[15px] rounded-xl"
                                       disabled={actionLoading === assignment.id}
                                       onClick={() => handleOpenResolveDialog(assignment)}
                                     >
@@ -1079,21 +1183,21 @@ export default function NurseTasksPage() {
                               <>
                                 {activeTab === 'new' && (
                                   <div className="space-y-2">
-                                    <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/15 border border-amber-200/70 dark:border-amber-800/30 text-center">
+                                    <div className="p-3 rounded-2xl bg-gradient-to-l from-amber-50 to-amber-100/50 dark:from-amber-900/15 dark:to-amber-900/5 border border-amber-200/70 dark:border-amber-800/30 text-center">
                                       <p className="text-xs font-bold text-amber-700 dark:text-amber-400">الخطوة الأولى — قبول التكليف</p>
                                       <p className="text-[10px] text-muted-foreground mt-0.5">راجع التفاصيل أعلاه ثم حدد قرارك</p>
                                     </div>
                                     <div className="grid grid-cols-2 gap-2">
                                       <Button
                                         variant="outline"
-                                        className="h-11 w-full text-destructive border-destructive/40 hover:bg-destructive/10 font-semibold gap-1.5"
+                                        className="h-12 w-full text-destructive border-destructive/40 hover:bg-destructive/10 font-bold gap-1.5 rounded-xl"
                                         disabled={actionLoading === assignment.id}
                                         onClick={() => handleReject(assignment.id)}
                                       >
                                         <XCircle className="w-4 h-4" />رفض التكليف
                                       </Button>
                                       <Button
-                                        className="h-11 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-lg shadow-emerald-600/25"
+                                        className="h-12 w-full bg-gradient-to-l from-emerald-500 to-emerald-600 hover:from-emerald-600 hover:to-emerald-700 text-white font-black gap-1.5 shadow-lg shadow-emerald-600/25 rounded-xl"
                                         disabled={actionLoading === assignment.id}
                                         onClick={() => handleAccept(assignment.id)}
                                       >
@@ -1105,11 +1209,10 @@ export default function NurseTasksPage() {
                                 )}
                                 {activeTab === 'active' && assignment.status === 'accepted' && (
                                   <div className="space-y-2.5">
-                                    {/* Payment gate banner for step 2 */}
                                     {!isPaymentConfirmed(assignment) ? (
-                                      <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800/50">
-                                        <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
-                                          <Lock className="w-4.5 h-4.5 text-amber-600 dark:text-amber-400" />
+                                      <div className="flex items-center gap-3 p-4 rounded-2xl bg-gradient-to-l from-amber-50 to-amber-100/50 dark:from-amber-900/20 dark:to-amber-900/5 border-2 border-amber-200 dark:border-amber-800/50">
+                                        <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+                                          <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
                                         </div>
                                         <div>
                                           <p className="text-xs font-bold text-amber-700 dark:text-amber-400">لا يمكن البدء — لم يؤكَّد الدفع بعد</p>
@@ -1118,7 +1221,7 @@ export default function NurseTasksPage() {
                                       </div>
                                     ) : (
                                       <>
-                                        <div className="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-900/15 border border-sky-200/70 dark:border-sky-800/30 text-center">
+                                        <div className="p-3 rounded-2xl bg-gradient-to-l from-sky-50 to-sky-100/50 dark:from-sky-900/15 dark:to-sky-900/5 border border-sky-200/70 dark:border-sky-800/30 text-center">
                                           <div className="flex items-center justify-center gap-2 mb-0.5">
                                             <Unlock className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
                                             <p className="text-xs font-bold text-sky-700 dark:text-sky-400">الخطوة الثانية — تنفيذ التكليف</p>
@@ -1126,17 +1229,17 @@ export default function NurseTasksPage() {
                                           <p className="text-[10px] text-muted-foreground">تم تأكيد الدفع — انطلق للموقع وابدأ الخدمة</p>
                                         </div>
                                         {assignment.request?.beneficiary?.phone && (
-                                          <Button variant="outline" className="w-full h-10 gap-1.5 font-medium text-sky-700 border-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
+                                          <Button variant="outline" className="w-full h-11 gap-1.5 font-medium text-sky-700 border-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-xl" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
                                             <Phone className="w-4 h-4" />الاتصال بالمستفيد
                                           </Button>
                                         )}
                                         {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
-                                          <Button variant="outline" className="w-full h-10 gap-1.5 font-medium" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`, '_blank')}>
+                                          <Button variant="outline" className="w-full h-11 gap-1.5 font-medium rounded-xl" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`, '_blank')}>
                                             <Navigation className="w-4 h-4" />الاتجاه للموقع
                                           </Button>
                                         )}
                                         <Button
-                                          className="w-full h-13 bg-gradient-to-l from-sky-600 to-sky-500 hover:from-sky-700 hover:to-sky-600 text-white font-bold gap-2 shadow-lg shadow-sky-600/30 text-[15px] rounded-xl"
+                                          className="w-full h-13 bg-gradient-to-l from-nurse to-sky-500 hover:from-sky-600 hover:to-sky-600 text-white font-black gap-2 shadow-lg shadow-nurse/30 text-[15px] rounded-xl"
                                           disabled={actionLoading === assignment.id}
                                           onClick={() => handleStartService(assignment.id)}
                                         >
@@ -1149,7 +1252,7 @@ export default function NurseTasksPage() {
                                 )}
                                 {activeTab === 'active' && assignment.status === 'in_progress' && (
                                   <div className="space-y-2.5">
-                                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-200/70 dark:border-emerald-800/30 text-center">
+                                    <div className="p-3 rounded-2xl bg-gradient-to-l from-emerald-50 to-emerald-100/50 dark:from-emerald-900/15 dark:to-emerald-900/5 border border-emerald-200/70 dark:border-emerald-800/30 text-center">
                                       <div className="flex items-center justify-center gap-2 mb-0.5">
                                         <Activity className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
                                         <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">الخطوة الثالثة — إكمال التكليف</p>
@@ -1157,12 +1260,12 @@ export default function NurseTasksPage() {
                                       <p className="text-[10px] text-muted-foreground">الخدمة جارية — اضغط عند الانتهاء لتأكيد إكمال التكليف</p>
                                     </div>
                                     {assignment.request?.beneficiary?.phone && (
-                                      <Button variant="outline" className="w-full h-10 gap-1.5 font-medium text-sky-700 border-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
+                                      <Button variant="outline" className="w-full h-11 gap-1.5 font-medium text-sky-700 border-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20 rounded-xl" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
                                         <Phone className="w-4 h-4" />الاتصال بالمستفيد
                                       </Button>
                                     )}
                                     <Button
-                                      className="w-full h-13 bg-gradient-to-l from-emerald-600 to-green-500 hover:from-emerald-700 hover:to-green-600 text-white font-bold gap-2 shadow-lg shadow-emerald-600/30 text-[15px] rounded-xl"
+                                      className="w-full h-13 bg-gradient-to-l from-emerald-500 to-green-600 hover:from-emerald-600 hover:to-green-700 text-white font-black gap-2 shadow-lg shadow-emerald-600/30 text-[15px] rounded-xl"
                                       disabled={actionLoading === assignment.id}
                                       onClick={() => handleCompleteService(assignment.id)}
                                     >
@@ -1179,7 +1282,12 @@ export default function NurseTasksPage() {
                         {activeTab === 'completed' && (
                           <div className="flex items-center gap-3 pt-2">
                             <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
-                              <div className="h-full w-full bg-gradient-to-l from-emerald-500 to-teal-500 rounded-full" />
+                              <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: '100%' }}
+                                transition={{ duration: 0.8, ease: 'easeOut' as const }}
+                                className="h-full bg-gradient-to-l from-emerald-500 to-teal-500 rounded-full"
+                              />
                             </div>
                             <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 gap-1 px-3 py-1">
                               <CheckCircle2 className="w-3.5 h-3.5" />
@@ -1199,10 +1307,10 @@ export default function NurseTasksPage() {
 
       {/* ── Resolve Emergency Dialog ── */}
       <Dialog open={resolveDialogOpen} onOpenChange={setResolveDialogOpen}>
-        <DialogContent dir="rtl" className="max-w-sm">
+        <DialogContent dir="rtl" className="max-w-sm rounded-2xl">
           <DialogHeader>
-            <DialogTitle>إنهاء حالة الطوارئ</DialogTitle>
-            <DialogDescription>
+            <DialogTitle className="text-lg font-black">إنهاء حالة الطوارئ</DialogTitle>
+            <DialogDescription className="text-sm">
               ماذا حدث مع حالة الطوارئ؟ حدد النتيجة وأضف ملاحظاتك
             </DialogDescription>
           </DialogHeader>
@@ -1210,18 +1318,20 @@ export default function NurseTasksPage() {
           <div className="space-y-4 mt-2">
             {/* Outcome Selection */}
             <div className="space-y-2">
-              <p className="text-sm font-medium">نتيجة الحالة *</p>
+              <p className="text-sm font-bold">نتيجة الحالة *</p>
               <div className="space-y-2">
                 {Object.entries(outcomeConfig).map(([key, config]) => {
                   const IconComp = config.icon;
                   return (
-                    <button
+                    <motion.button
                       key={key}
                       type="button"
                       onClick={() => setSelectedOutcome(key)}
+                      whileHover={{ scale: 1.01 }}
+                      whileTap={{ scale: 0.99 }}
                       className={`w-full flex items-center gap-3 p-3 rounded-xl border-2 transition-all text-right ${
                         selectedOutcome === key
-                          ? `${config.bg} border-current ${config.color}`
+                          ? `${config.bg} border-current ${config.color} shadow-sm`
                           : 'border-border hover:border-muted-foreground/30'
                       }`}
                     >
@@ -1232,7 +1342,7 @@ export default function NurseTasksPage() {
                       {selectedOutcome === key && (
                         <CheckCircle2 className={`w-4 h-4 mr-auto ${config.color}`} />
                       )}
-                    </button>
+                    </motion.button>
                   );
                 })}
               </div>
@@ -1240,7 +1350,7 @@ export default function NurseTasksPage() {
 
             {/* Notes */}
             <div className="space-y-2">
-              <p className="text-sm font-medium">ملاحظات إضافية</p>
+              <p className="text-sm font-bold">ملاحظات إضافية</p>
               <textarea
                 value={resolveNotes}
                 onChange={(e) => setResolveNotes(e.target.value)}
@@ -1252,7 +1362,7 @@ export default function NurseTasksPage() {
 
             {/* Submit */}
             <Button
-              className="w-full bg-green-600 hover:bg-green-700 h-11"
+              className="w-full bg-gradient-to-l from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 h-12 rounded-xl font-bold"
               disabled={!selectedOutcome || actionLoading === resolvingEmergency?.id}
               onClick={handleEmergencyResolve}
             >
