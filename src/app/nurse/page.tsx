@@ -41,7 +41,6 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { EmptyState } from '@/components/common/empty-state';
 import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
-import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch, _GET_CACHE_readSync } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOrderUpdates } from '@/hooks/use-socket';
@@ -523,10 +522,26 @@ export default function NurseTasksPage() {
 
   return (
     <div className="space-y-4">
-      <PageHeader
-        title={`مرحباً، ${user?.name?.split(' ')[0] ?? 'الممرض/ـة'}`}
-        description="إدارة المهام والطلبات الموكلة إليك"
-      />
+      {/* Nurse Hero Header */}
+      <motion.div
+        initial={{ opacity: 0, y: -15 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.4, ease: 'easeOut' }}
+        className="relative overflow-hidden rounded-2xl bg-gradient-to-bl from-sky-600 via-nurse to-teal-600 p-5 text-white shadow-lg shadow-nurse/20"
+      >
+        <div className="relative z-10 flex items-center justify-between">
+          <div>
+            <p className="text-[10px] font-semibold uppercase tracking-widest opacity-70 mb-1">بوابة الممرض</p>
+            <h2 className="text-xl font-black leading-snug">مرحباً، {user?.name?.split(' ')[0] ?? 'الممرض/ـة'}</h2>
+            <p className="text-xs opacity-80 mt-1">إدارة المهام والطلبات الموكلة إليك</p>
+          </div>
+          <div className="w-12 h-12 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center shrink-0">
+            <ClipboardList className="w-6 h-6 text-white" />
+          </div>
+        </div>
+        <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-white/8 blur-sm" />
+        <div className="absolute -bottom-4 -right-4 w-20 h-20 rounded-full bg-white/8" />
+      </motion.div>
 
       {/* Verification Warning Banner */}
       <AnimatePresence>
@@ -837,212 +852,275 @@ export default function NurseTasksPage() {
                           )}
                         </div>
 
-                        {/* Price Row */}
-                        <div className="flex items-center justify-between pt-3 border-t border-border">
-                          <div className="flex items-center gap-1.5">
-                            <DollarSign className="w-4 h-4 text-green-600" />
-                            <span className="text-xs text-muted-foreground">
+                        {/* ── Earnings Row ── */}
+                        <div className="flex items-center gap-2 pt-3 border-t border-border mb-3">
+                          <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/40">
+                            <DollarSign className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span className="text-xs text-emerald-700 dark:text-emerald-300 font-medium">
                               {isEmergency(assignment) ? 'رسوم الطوارئ:' : 'أرباحك:'}
                             </span>
-                            <Currency amount={assignment.request?.nursePayout || assignment.request?.basePrice || 0} className="text-green-600" />
+                            <Currency amount={assignment.request?.nursePayout || assignment.request?.basePrice || 0} className="font-bold text-emerald-700 dark:text-emerald-300" />
                           </div>
+                        </div>
 
-                          {/* Action Buttons */}
-                          {isEmergency(assignment) ? (
-                            <div className="flex items-center gap-2 flex-wrap justify-end">
-                              {/* NEW tab - dispatched (assigned) emergency */}
-                              {activeTab === 'new' && assignment.status === 'assigned' && (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8"
-                                    disabled={actionLoading === assignment.id}
-                                    onClick={() => handleEmergencyReject(assignment.id)}
-                                  >
-                                    {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4 me-1" />}
-                                    رفض
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="bg-red-600 hover:bg-red-700 h-8 text-white gap-1"
-                                    disabled={actionLoading === assignment.id}
-                                    onClick={() => handleEmergencyAccept(assignment.id)}
-                                  >
-                                    {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 me-1" />}
-                                    قبول
-                                  </Button>
-                                </>
-                              )}
-
-                              {/* ACTIVE tab - accepted emergency (on the way) */}
-                              {activeTab === 'active' && assignment.status === 'accepted' && (
-                                <>
-                                  {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
-                                    <Button
-                                      size="sm"
-                                      className="bg-red-600 hover:bg-red-700 h-8 text-white gap-1"
-                                      onClick={() => {
-                                        window.open(
-                                          `https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`,
-                                          '_blank'
-                                        );
-                                      }}
-                                    >
-                                      <Navigation className="w-4 h-4" />
-                                      اذهب الآن
-                                    </Button>
-                                  )}
-                                  {assignment.request?.beneficiary?.phone && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-8 gap-1"
-                                      onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}
-                                    >
-                                      <Phone className="w-4 h-4" />
-                                      اتصال
-                                    </Button>
-                                  )}
-                                  <Button
-                                    size="sm"
-                                    className="bg-sky-600 hover:bg-sky-700 h-8 gap-1"
-                                    disabled={actionLoading === assignment.id}
-                                    onClick={() => handleEmergencyArrive(assignment.id)}
-                                  >
-                                    {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <MapPin className="w-4 h-4 me-1" />}
-                                    وصلت للموقع
-                                  </Button>
-                                </>
-                              )}
-
-                              {/* ACTIVE tab - in_progress emergency */}
-                              {activeTab === 'active' && assignment.status === 'in_progress' && (
-                                <>
-                                  {assignment.request?.beneficiary?.phone && (
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-8 gap-1"
-                                      onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}
-                                    >
-                                      <Phone className="w-4 h-4" />
-                                      اتصال
-                                    </Button>
-                                  )}
-                                  <Button
-                                    size="sm"
-                                    className="bg-green-600 hover:bg-green-700 h-8 gap-1"
-                                    disabled={actionLoading === assignment.id}
-                                    onClick={() => handleOpenResolveDialog(assignment)}
-                                  >
-                                    {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4 me-1" />}
-                                    إنهاء الحالة
-                                  </Button>
-                                </>
-                              )}
-
-                              {/* COMPLETED tab */}
-                              {activeTab === 'completed' && (
-                                <Badge variant="secondary" className="text-xs">
-                                  <CheckCircle2 className="w-3 h-3 me-1" />
-                                  مكتمل
-                                </Badge>
-                              )}
-                            </div>
-                          ) : (
-                            <>
-                              {/* Action Buttons - Service assignments */}
-                              {activeTab === 'new' && (
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="text-destructive border-destructive/30 hover:bg-destructive/10 h-8"
-                                    disabled={actionLoading === assignment.id}
-                                    onClick={() => handleReject(assignment.id)}
-                                  >
-                                    <XCircle className="w-4 h-4 me-1" />
-                                    رفض
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    className="bg-green-600 hover:bg-green-700 h-8"
-                                    disabled={actionLoading === assignment.id}
-                                    onClick={() => handleAccept(assignment.id)}
-                                  >
-                                    {actionLoading === assignment.id ? (
-                                      <RefreshCw className="w-4 h-4 animate-spin" />
-                                    ) : (
-                                      <CheckCircle2 className="w-4 h-4 me-1" />
-                                    )}
-                                    قبول
-                                  </Button>
+                        {/* ══════════════ إجراءات الحالة ══════════════ */}
+                        {activeTab !== 'completed' && (
+                          <div className="space-y-3">
+                            {/* Step Progress Tracker */}
+                            {!isEmergency(assignment) ? (
+                              <div className="p-3 rounded-xl bg-muted/30 border border-border/60">
+                                <p className="text-[10px] font-bold text-muted-foreground/70 uppercase tracking-widest mb-2.5">مسار إجراءات الحالة</p>
+                                <div className="flex items-center">
+                                  {/* Step 1 */}
+                                  <div className="flex flex-col items-center gap-1">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                      assignment.status === 'assigned'
+                                        ? 'bg-amber-500 border-amber-400 text-white shadow-md shadow-amber-500/40 scale-110'
+                                        : 'bg-emerald-500 border-emerald-400 text-white'
+                                    }`}>
+                                      {assignment.status === 'assigned' ? '١' : <CheckCircle2 className="w-4 h-4" />}
+                                    </div>
+                                    <span className={`text-[9px] font-bold ${
+                                      assignment.status === 'assigned' ? 'text-amber-600 dark:text-amber-400' : 'text-emerald-600 dark:text-emerald-400'
+                                    }`}>قبول</span>
+                                  </div>
+                                  {/* Line */}
+                                  <div className={`flex-1 h-1 mx-1 rounded-full ${
+                                    assignment.status !== 'assigned' ? 'bg-nurse' : 'bg-muted'
+                                  }`} />
+                                  {/* Step 2 */}
+                                  <div className="flex flex-col items-center gap-1">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                      assignment.status === 'accepted'
+                                        ? 'bg-sky-500 border-sky-400 text-white shadow-md shadow-sky-500/40 scale-110'
+                                        : assignment.status === 'in_progress'
+                                          ? 'bg-emerald-500 border-emerald-400 text-white'
+                                          : 'bg-muted border-border text-muted-foreground'
+                                    }`}>
+                                      {assignment.status === 'in_progress' ? <CheckCircle2 className="w-4 h-4" /> : '٢'}
+                                    </div>
+                                    <span className={`text-[9px] font-bold ${
+                                      assignment.status === 'accepted' ? 'text-sky-600 dark:text-sky-400' :
+                                      assignment.status === 'in_progress' ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
+                                    }`}>تنفيذ</span>
+                                  </div>
+                                  {/* Line */}
+                                  <div className={`flex-1 h-1 mx-1 rounded-full ${
+                                    assignment.status === 'in_progress' ? 'bg-nurse' : 'bg-muted'
+                                  }`} />
+                                  {/* Step 3 */}
+                                  <div className="flex flex-col items-center gap-1">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                      assignment.status === 'in_progress'
+                                        ? 'bg-green-500 border-green-400 text-white shadow-md shadow-green-500/40 scale-110'
+                                        : 'bg-muted border-border text-muted-foreground'
+                                    }`}>
+                                      ٣
+                                    </div>
+                                    <span className={`text-[9px] font-bold ${
+                                      assignment.status === 'in_progress' ? 'text-green-600 dark:text-green-400' : 'text-muted-foreground'
+                                    }`}>إكمال</span>
+                                  </div>
                                 </div>
-                              )}
+                              </div>
+                            ) : (
+                              <div className="p-3 rounded-xl bg-red-50/50 dark:bg-red-900/10 border border-red-200/60 dark:border-red-900/30">
+                                <p className="text-[10px] font-bold text-red-500/70 uppercase tracking-widest mb-2.5">مسار إجراءات الطوارئ</p>
+                                <div className="flex items-center">
+                                  <div className="flex flex-col items-center gap-1">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                      assignment.status === 'assigned'
+                                        ? 'bg-red-500 border-red-400 text-white shadow-md shadow-red-500/40 scale-110 animate-pulse'
+                                        : 'bg-emerald-500 border-emerald-400 text-white'
+                                    }`}>
+                                      {assignment.status === 'assigned' ? '١' : <CheckCircle2 className="w-4 h-4" />}
+                                    </div>
+                                    <span className="text-[9px] font-bold text-red-600 dark:text-red-400">قبول</span>
+                                  </div>
+                                  <div className={`flex-1 h-1 mx-1 rounded-full ${assignment.status !== 'assigned' ? 'bg-orange-400' : 'bg-muted'}`} />
+                                  <div className="flex flex-col items-center gap-1">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                      assignment.status === 'accepted'
+                                        ? 'bg-orange-500 border-orange-400 text-white shadow-md shadow-orange-500/40 scale-110 animate-pulse'
+                                        : assignment.status === 'in_progress'
+                                          ? 'bg-emerald-500 border-emerald-400 text-white'
+                                          : 'bg-muted border-border text-muted-foreground'
+                                    }`}>
+                                      {assignment.status === 'in_progress' ? <CheckCircle2 className="w-4 h-4" /> : '٢'}
+                                    </div>
+                                    <span className="text-[9px] font-bold text-orange-600 dark:text-orange-400">انطلاق</span>
+                                  </div>
+                                  <div className={`flex-1 h-1 mx-1 rounded-full ${assignment.status === 'in_progress' ? 'bg-green-500' : 'bg-muted'}`} />
+                                  <div className="flex flex-col items-center gap-1">
+                                    <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black border-2 transition-all ${
+                                      assignment.status === 'in_progress'
+                                        ? 'bg-green-500 border-green-400 text-white shadow-md shadow-green-500/40 scale-110 animate-pulse'
+                                        : 'bg-muted border-border text-muted-foreground'
+                                    }`}>٣</div>
+                                    <span className="text-[9px] font-bold text-green-600 dark:text-green-400">إنهاء</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
 
-                              {activeTab === 'active' && (
-                                <div className="flex items-center gap-2">
-                                  {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                            {/* ── Primary Action Buttons ── */}
+                            {isEmergency(assignment) ? (
+                              <>
+                                {activeTab === 'new' && assignment.status === 'assigned' && (
+                                  <div className="space-y-2">
+                                    <p className="text-[11px] text-center text-red-600 dark:text-red-400 font-semibold">⚡ حالة طوارئ عاجلة — حدد قرارك فوراً</p>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Button
+                                        variant="outline"
+                                        className="h-11 w-full text-destructive border-destructive/40 hover:bg-destructive/10 font-semibold gap-1.5"
+                                        disabled={actionLoading === assignment.id}
+                                        onClick={() => handleEmergencyReject(assignment.id)}
+                                      >
+                                        {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <XCircle className="w-4 h-4" />}
+                                        رفض التكليف
+                                      </Button>
+                                      <Button
+                                        className="h-11 w-full bg-red-600 hover:bg-red-700 text-white font-bold gap-1.5 shadow-lg shadow-red-600/30"
+                                        disabled={actionLoading === assignment.id}
+                                        onClick={() => handleEmergencyAccept(assignment.id)}
+                                      >
+                                        {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                        قبول الطوارئ
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                                {activeTab === 'active' && assignment.status === 'accepted' && (
+                                  <div className="space-y-2">
+                                    <div className="p-2.5 rounded-lg bg-orange-50 dark:bg-orange-900/15 border border-orange-200/70 dark:border-orange-800/30 text-center">
+                                      <p className="text-xs font-bold text-orange-700 dark:text-orange-400">الخطوة الثانية — الانطلاق للموقع</p>
+                                      <p className="text-[10px] text-muted-foreground mt-0.5">انطلق الآن ثم اضغط "وصلت للموقع" عند الوصول</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      {assignment.request?.beneficiary?.phone && (
+                                        <Button variant="outline" className="h-10 gap-1.5 font-medium text-sm" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
+                                          <Phone className="w-4 h-4" />اتصال بالمريض
+                                        </Button>
+                                      )}
+                                      {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                                        <Button className="h-10 bg-red-600 hover:bg-red-700 text-white gap-1.5 font-medium text-sm" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`, '_blank')}>
+                                          <Navigation className="w-4 h-4" />اذهب الآن
+                                        </Button>
+                                      )}
+                                    </div>
                                     <Button
-                                      size="sm"
-                                      variant="outline"
-                                      className="h-8"
-                                      onClick={() => {
-                                        window.open(
-                                          `https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`,
-                                          '_blank'
-                                        );
-                                      }}
+                                      className="w-full h-12 bg-sky-600 hover:bg-sky-700 text-white font-bold gap-2 shadow-lg shadow-sky-600/25 text-[15px]"
+                                      disabled={actionLoading === assignment.id}
+                                      onClick={() => handleEmergencyArrive(assignment.id)}
                                     >
-                                      <Navigation className="w-4 h-4 me-1" />
-                                      اتجاه
+                                      {actionLoading === assignment.id ? <RefreshCw className="w-5 h-5 animate-spin" /> : <MapPin className="w-5 h-5" />}
+                                      وصلت للموقع — ابدأ التعامل مع الحالة
                                     </Button>
-                                  )}
-
-                                  {assignment.status === 'accepted' && (
+                                  </div>
+                                )}
+                                {activeTab === 'active' && assignment.status === 'in_progress' && (
+                                  <div className="space-y-2">
+                                    <div className="p-2.5 rounded-lg bg-green-50 dark:bg-green-900/15 border border-green-200/70 dark:border-green-800/30 text-center">
+                                      <p className="text-xs font-bold text-green-700 dark:text-green-400">الخطوة الثالثة — إنهاء الحالة</p>
+                                      <p className="text-[10px] text-muted-foreground mt-0.5">سجّل نتيجة الحالة عند الانتهاء من التعامل معها</p>
+                                    </div>
+                                    {assignment.request?.beneficiary?.phone && (
+                                      <Button variant="outline" className="w-full h-10 gap-1.5 font-medium" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
+                                        <Phone className="w-4 h-4" />اتصال بالمريض
+                                      </Button>
+                                    )}
                                     <Button
-                                      size="sm"
-                                      className="bg-sky-600 hover:bg-sky-700 h-8"
+                                      className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold gap-2 shadow-lg shadow-green-600/25 text-[15px]"
+                                      disabled={actionLoading === assignment.id}
+                                      onClick={() => handleOpenResolveDialog(assignment)}
+                                    >
+                                      {actionLoading === assignment.id ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                      إنهاء الحالة وتسجيل النتيجة
+                                    </Button>
+                                  </div>
+                                )}
+                              </>
+                            ) : (
+                              <>
+                                {activeTab === 'new' && (
+                                  <div className="space-y-2">
+                                    <div className="p-2.5 rounded-lg bg-amber-50 dark:bg-amber-900/15 border border-amber-200/70 dark:border-amber-800/30 text-center">
+                                      <p className="text-xs font-bold text-amber-700 dark:text-amber-400">الخطوة الأولى — قبول التكليف</p>
+                                      <p className="text-[10px] text-muted-foreground mt-0.5">راجع التفاصيل أعلاه ثم حدد قرارك</p>
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-2">
+                                      <Button
+                                        variant="outline"
+                                        className="h-11 w-full text-destructive border-destructive/40 hover:bg-destructive/10 font-semibold gap-1.5"
+                                        disabled={actionLoading === assignment.id}
+                                        onClick={() => handleReject(assignment.id)}
+                                      >
+                                        <XCircle className="w-4 h-4" />رفض التكليف
+                                      </Button>
+                                      <Button
+                                        className="h-11 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold gap-1.5 shadow-lg shadow-emerald-600/25"
+                                        disabled={actionLoading === assignment.id}
+                                        onClick={() => handleAccept(assignment.id)}
+                                      >
+                                        {actionLoading === assignment.id ? <RefreshCw className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                        قبول التكليف
+                                      </Button>
+                                    </div>
+                                  </div>
+                                )}
+                                {activeTab === 'active' && assignment.status === 'accepted' && (
+                                  <div className="space-y-2">
+                                    <div className="p-2.5 rounded-lg bg-sky-50 dark:bg-sky-900/15 border border-sky-200/70 dark:border-sky-800/30 text-center">
+                                      <p className="text-xs font-bold text-sky-700 dark:text-sky-400">الخطوة الثانية — تنفيذ التكليف</p>
+                                      <p className="text-[10px] text-muted-foreground mt-0.5">انطلق للموقع ثم اضغط "بدء تنفيذ التكليف" عند البدء الفعلي</p>
+                                    </div>
+                                    {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                                      <Button variant="outline" className="w-full h-10 gap-1.5 font-medium" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`, '_blank')}>
+                                        <Navigation className="w-4 h-4" />الاتجاه للموقع
+                                      </Button>
+                                    )}
+                                    <Button
+                                      className="w-full h-12 bg-sky-600 hover:bg-sky-700 text-white font-bold gap-2 shadow-lg shadow-sky-600/25 text-[15px]"
                                       disabled={actionLoading === assignment.id}
                                       onClick={() => handleStartService(assignment.id)}
                                     >
-                                      {actionLoading === assignment.id ? (
-                                        <RefreshCw className="w-4 h-4 animate-spin" />
-                                      ) : (
-                                        <PlayCircle className="w-4 h-4 me-1" />
-                                      )}
-                                      بدء التنفيذ
+                                      {actionLoading === assignment.id ? <RefreshCw className="w-5 h-5 animate-spin" /> : <PlayCircle className="w-5 h-5" />}
+                                      بدء تنفيذ التكليف
                                     </Button>
-                                  )}
-
-                                  {assignment.status === 'in_progress' && (
+                                  </div>
+                                )}
+                                {activeTab === 'active' && assignment.status === 'in_progress' && (
+                                  <div className="space-y-2">
+                                    <div className="p-2.5 rounded-lg bg-green-50 dark:bg-green-900/15 border border-green-200/70 dark:border-green-800/30 text-center">
+                                      <p className="text-xs font-bold text-green-700 dark:text-green-400">الخطوة الثالثة — إكمال التكليف</p>
+                                      <p className="text-[10px] text-muted-foreground mt-0.5">بعد الانتهاء من الخدمة اضغط لتأكيد الإنهاء</p>
+                                    </div>
                                     <Button
-                                      size="sm"
-                                      className="bg-green-600 hover:bg-green-700 h-8"
+                                      className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold gap-2 shadow-lg shadow-green-600/25 text-[15px]"
                                       disabled={actionLoading === assignment.id}
                                       onClick={() => handleCompleteService(assignment.id)}
                                     >
-                                      {actionLoading === assignment.id ? (
-                                        <RefreshCw className="w-4 h-4 animate-spin" />
-                                      ) : (
-                                        <CheckCircle2 className="w-4 h-4 me-1" />
-                                      )}
-                                      إكمال
+                                      {actionLoading === assignment.id ? <RefreshCw className="w-5 h-5 animate-spin" /> : <CheckCircle2 className="w-5 h-5" />}
+                                      إكمال التكليف
                                     </Button>
-                                  )}
-                                </div>
-                              )}
-
-                              {activeTab === 'completed' && (
-                                <Badge variant="secondary" className="text-xs">
-                                  <CheckCircle2 className="w-3 h-3 me-1" />
-                                  مكتمل
-                                </Badge>
-                              )}
-                            </>
-                          )}
-                        </div>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {/* Completed state */}
+                        {activeTab === 'completed' && (
+                          <div className="flex items-center gap-3 pt-2">
+                            <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                              <div className="h-full w-full bg-gradient-to-l from-emerald-500 to-teal-500 rounded-full" />
+                            </div>
+                            <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 border-0 gap-1 px-3 py-1">
+                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              مكتمل بنجاح
+                            </Badge>
+                          </div>
+                        )}
                       </GlassCard>
                     </motion.div>
                   ))}
