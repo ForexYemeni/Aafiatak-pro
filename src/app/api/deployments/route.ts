@@ -85,6 +85,36 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    // ── Security: for nurses, mask creator contact data unless payment is fully verified ──
+    // Creator name + phone are only revealed when ALL conditions are true:
+    //   1. The nurse is the accepted assignee on this deployment
+    //   2. The nurse's application status is 'accepted'
+    //   3. contactRevealed flag is true on the deployment
+    // Exception: the nurse who CREATED the deployment always sees full info.
+    if (user.role === 'nurse') {
+      for (const dep of serialized) {
+        const creatorId = dep.createdBy?.id;
+        const isCreator = !!(creatorId && creatorId === user.userId);
+        if (isCreator) continue; // Creator sees full info for their own deployments
+
+        const assignedToId = dep.assignedTo?.id;
+        const isAssignee = !!(assignedToId && assignedToId === user.userId);
+        const myApp = (dep.applications as any[]).find(
+          (a: any) => a.applicantId === user.userId
+        );
+        const paymentAccepted = myApp?.status === 'accepted';
+        const shouldRevealContact = isAssignee && paymentAccepted && dep.contactRevealed;
+
+        if (!shouldRevealContact) {
+          // Strip all identifying creator contact data — keep only the internal ID
+          if (dep.createdBy && typeof dep.createdBy === 'object') {
+            dep.createdBy = { id: dep.createdBy.id, _hidden: true };
+          }
+          delete (dep as any).creatorPhone;
+        }
+      }
+    }
+
     return Response.json({
       success: true,
       data: {

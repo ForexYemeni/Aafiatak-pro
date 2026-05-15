@@ -513,11 +513,15 @@ export default function NurseDeploymentDetailPage() {
               </p>
               <p className="font-bold text-sm">{toArabicNum(deployment.amount.toLocaleString())} ر.ي</p>
             </div>
-            <div className="rounded-xl bg-muted/40 p-3">
-              <p className="text-[10px] text-muted-foreground mb-1 font-medium flex items-center gap-1">
-                <User className="w-3 h-3" /> المنشئ
+            <div className={`rounded-xl p-3 ${(deployment.createdBy as any)?._hidden ? 'bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/30' : 'bg-muted/40'}`}>
+              <p className={`text-[10px] mb-1 font-medium flex items-center gap-1 ${(deployment.createdBy as any)?._hidden ? 'text-amber-600 dark:text-amber-400' : 'text-muted-foreground'}`}>
+                <User className="w-3 h-3" /> صاحب التكليف
               </p>
-              <p className="font-bold text-sm">{deployment.createdBy?.name || 'غير معروف'}</p>
+              {(deployment.createdBy as any)?._hidden ? (
+                <p className="font-semibold text-xs text-amber-700 dark:text-amber-300">مخفي حتى بعد الدفع</p>
+              ) : (
+                <p className="font-bold text-sm">{deployment.createdBy?.name || 'غير معروف'}</p>
+              )}
             </div>
             {/* Show admin commission info */}
             {deployment.adminCommissionAmount > 0 && (

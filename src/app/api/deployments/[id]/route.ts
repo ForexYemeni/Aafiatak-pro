@@ -51,25 +51,31 @@ export async function GET(
       })),
     };
 
-    // ── Security: hide creator contact info unless payment is verified + admin-approved ──
-    // Contact is revealed ONLY when ALL of the following are true for a nurse:
+    // ── Security: hide creator contact data unless payment is verified ──
+    // Creator name + phone are revealed ONLY when ALL conditions are true for a nurse:
     //   1. contactRevealed flag is true on the deployment (set by admin on payment verification)
     //   2. The requesting nurse is the assigned person on this deployment
-    //   3. The nurse's own application has status 'accepted' (set when admin verifies payment)
-    // Admins always see full contact info.
+    //   3. The nurse's own application status is 'accepted'
+    // Exception: the nurse who CREATED this deployment always sees their own info.
+    // Admins/subadmins always see full contact info.
     const isAdmin = ['admin', 'subadmin'].includes(user.role);
+    const creatorId = serialized.createdBy?.id;
+    const isCreator = !!(creatorId && creatorId === user.userId);
     const assignedToId = serialized.assignedTo?.id;
     const isAssignee = !!(assignedToId && assignedToId === user.userId);
-    const myApplication = isAssignee
-      ? (serialized.applications as any[])?.find((app: any) => app.applicantId === user.userId)
-      : null;
+    const myApplication = (serialized.applications as any[])?.find(
+      (app: any) => app.applicantId === user.userId
+    );
     const nursePaymentAccepted = myApplication?.status === 'accepted';
-    const shouldRevealContact = isAdmin || (isAssignee && nursePaymentAccepted && serialized.contactRevealed);
+    const shouldRevealContact =
+      isAdmin ||
+      isCreator ||
+      (isAssignee && nursePaymentAccepted && serialized.contactRevealed);
 
     if (!shouldRevealContact) {
       if (serialized.createdBy && typeof serialized.createdBy === 'object') {
-        const { phone: _phone, ...createdByWithoutPhone } = serialized.createdBy;
-        serialized.createdBy = createdByWithoutPhone;
+        // Strip name + phone — keep only internal ID and a _hidden flag for the UI
+        serialized.createdBy = { id: serialized.createdBy.id, _hidden: true };
       }
       delete serialized.creatorPhone;
     }
