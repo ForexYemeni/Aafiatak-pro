@@ -348,8 +348,9 @@ export default function AdminSettingsPage() {
       } else {
         toast.error(json.error?.message ?? json.message ?? 'فشل الاستعادة');
       }
-    } catch {
-      toast.error('حدث خطأ أثناء استعادة النسخة الاحتياطية');
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'حدث خطأ أثناء استعادة النسخة الاحتياطية';
+      toast.error(errorMsg);
     } finally {
       setIsRestoring(false);
     }

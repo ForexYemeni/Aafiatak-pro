@@ -29,13 +29,25 @@ function deserializeDoc(value: unknown): unknown {
   return value;
 }
 
+// ── Allow longer execution time for large restores ────────────────────
+export const maxDuration = 300; // 5 minutes
+
+// ── Force dynamic rendering — never cache this route ──────────────────
+export const dynamic = 'force-dynamic';
+
 export async function POST(request: NextRequest) {
   try {
     const { user, error, isEmergency } = requireEmergencyOrAdmin(request, ['admin']);
     if (error) return error;
 
     // ── Parse multipart form data ───────────────────────────────────────
-    const formData = await request.formData();
+    let formData: FormData;
+    try {
+      formData = await request.formData();
+    } catch (formErr) {
+      console.error('[RESTORE] Failed to parse form data:', formErr);
+      return createErrorResponse('فشل في قراءة الملف المرفوع — تأكد أن حجم الملف أقل من 50 ميجابايت', 400, 'FORM_PARSE_ERROR');
+    }
     const file = formData.get('file') as File | null;
     const password = formData.get('password') as string | null;
     const mode = (formData.get('mode') as string) || 'replace';
@@ -69,11 +81,26 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Parse ZIP file ──────────────────────────────────────────────────
-    const arrayBuffer = await file.arrayBuffer();
+    console.log(`${logPrefix} Reading file: ${file.name}, size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
+
+    let arrayBuffer: ArrayBuffer;
+    try {
+      arrayBuffer = await file.arrayBuffer();
+    } catch (bufErr) {
+      console.error(`${logPrefix} Failed to read file buffer:`, bufErr);
+      return createErrorResponse('فشل في قراءة الملف — قد يكون الملف تالفاً أو كبيراً جداً', 400, 'FILE_READ_ERROR');
+    }
     const buffer = Buffer.from(arrayBuffer);
 
-    const JSZip = (await import('jszip')).default;
-    const zip = await JSZip.loadAsync(buffer);
+    let zip: import('jszip');
+    try {
+      const JSZip = (await import('jszip')).default;
+      zip = await JSZip.loadAsync(buffer);
+      console.log(`${logPrefix} ZIP parsed successfully — ${Object.keys(zip.files).length} entries`);
+    } catch (zipErr) {
+      console.error(`${logPrefix} Failed to parse ZIP:`, zipErr);
+      return createErrorResponse('فشل في فك ضغط الملف — تأكد أنه ملف نسخة احتياطية صالح (ZIP)', 400, 'INVALID_ZIP');
+    }
 
     // ── Find database files in ZIP ──────────────────────────────────────
     const dbFiles: string[] = [];
@@ -374,6 +401,8 @@ export async function POST(request: NextRequest) {
 
   } catch (err) {
     console.error('[RESTORE ERROR]', err);
-    return createErrorResponse('حدث خطأ أثناء استعادة النسخة الاحتياطية', 500, 'INTERNAL_ERROR');
+    const errMsg = err instanceof Error ? err.message : 'حدث خطأ غير معروف';
+    console.error('[RESTORE ERROR] Details:', errMsg);
+    return createErrorResponse(`حدث خطأ أثناء استعادة النسخة الاحتياطية: ${errMsg}`, 500, 'INTERNAL_ERROR');
   }
 }
