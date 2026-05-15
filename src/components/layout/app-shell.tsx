@@ -71,7 +71,7 @@ export function AppShell({ children }: AppShellProps) {
   }, []);
 
   return (
-    <div className="min-h-screen flex flex-col" dir="rtl" lang="ar">
+    <div className="h-screen flex flex-col overflow-hidden" dir="rtl" lang="ar">
       {/* Navigation progress bar */}
       <NavProgress />
 

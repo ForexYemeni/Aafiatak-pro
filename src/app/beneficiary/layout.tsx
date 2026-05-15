@@ -12,7 +12,7 @@ export default function BeneficiaryLayout({ children }: { children: ReactNode })
       gradientClass="bg-gradient-beneficiary"
       spinnerColorClass="border-beneficiary"
     >
-      <div className="bg-gradient-beneficiary min-h-screen">
+      <div className="bg-gradient-beneficiary h-full overflow-hidden">
         <AppShell>{children}</AppShell>
       </div>
     </AuthHydrationGuard>
