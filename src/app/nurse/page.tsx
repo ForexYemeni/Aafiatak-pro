@@ -509,14 +509,11 @@ export default function NurseTasksPage() {
 
   const isEmergency = (a: Assignment) => a.assignmentType === 'emergency' || a.request?.isEmergency;
 
-  // Payment gate: beneficiary data is only shown after payment is confirmed
-  // Cash orders are always accessible (payment happens at time of service)
+  // Payment gate: beneficiary contact data only shown after admin confirms payment
+  // Applies to ALL payment methods (including cash). Only emergencies bypass this.
   const isPaymentConfirmed = (a: Assignment) => {
-    if (isEmergency(a)) return true; // Emergency requests are always accessible
-    const method = a.request?.paymentMethod;
-    const status = a.request?.paymentStatus;
-    if (method === 'cash') return true; // Cash: always show
-    return status === 'completed'; // Online: only after admin confirms payment
+    if (isEmergency(a)) return true; // Emergency: always accessible
+    return a.request?.paymentStatus === 'completed'; // All others: must be confirmed by admin
   };
 
   // Fetch rating summary
@@ -864,7 +861,7 @@ export default function NurseTasksPage() {
                                 <div className="flex items-center gap-1.5 mt-1.5">
                                   <CreditCard className="w-3 h-3 text-amber-500" />
                                   <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
-                                    {assignment.request?.paymentMethod === 'cash' ? 'دفع نقدي' : 'بانتظار تأكيد الدفع الإلكتروني'}
+                                    بانتظار موافقة الإدارة على الدفع
                                   </span>
                                 </div>
                               </div>

@@ -38,13 +38,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       }
 
       // ── Payment gate (server-side enforcement) ──
-      // Non-cash orders require admin payment confirmation before the nurse
-      // can start execution. This prevents bypassing the frontend gate.
-      const paymentMethod = order.paymentMethod;
-      const paymentStatus = order.paymentStatus;
-      const isCash = !paymentMethod || paymentMethod === 'cash';
-      const isPaymentConfirmed = paymentStatus === 'completed';
-      if (!isCash && !isPaymentConfirmed) {
+      // ALL orders (including cash) require admin payment confirmation before
+      // the nurse can start execution. paymentStatus must be 'completed'.
+      if (order.paymentStatus !== 'completed') {
         return createErrorResponse(
           'لا يمكن بدء تنفيذ الطلب قبل تأكيد الدفع من الإدارة',
           403,

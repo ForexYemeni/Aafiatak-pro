@@ -106,16 +106,13 @@ export async function GET(request: NextRequest) {
     const serviceBeneficiaryMap = new Map(serviceBeneficiaries.map((b: any) => [b._id.toString(), b]));
 
     // ── Payment gate helper ──
-    // Beneficiary contact data is ONLY revealed when:
-    //   1. Payment method is 'cash' (paid in person at time of service), OR
-    //   2. Payment status is 'completed' (online payment confirmed by admin)
-    // Emergency requests always reveal data (no payment gate).
+    // Beneficiary contact data (phone, address, location) is ONLY revealed when:
+    //   - paymentStatus === 'completed'  (admin has confirmed the payment)
+    // This applies to ALL payment methods including cash.
+    // Emergency requests bypass the gate entirely (always reveal).
     const isContactRevealed = (a: any): boolean => {
       if (a.isEmergency) return true;
-      const method = a.paymentMethod;
-      const pStatus = a.paymentStatus;
-      if (!method || method === 'cash') return true;
-      return pStatus === 'completed';
+      return a.paymentStatus === 'completed';
     };
 
     // Transform service requests
