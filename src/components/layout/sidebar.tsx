@@ -194,32 +194,43 @@ export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
   return (
     <aside
       className={cn(
-        'h-full flex flex-col transition-all duration-300 border-l border-border relative',
-        'bg-card/80 backdrop-blur-xl',
+        'h-full flex flex-col transition-all duration-300 border-l border-border/70 relative',
+        'bg-card/95 backdrop-blur-2xl',
         collapsed ? 'w-[68px]' : 'w-64'
       )}
     >
+      {/* Role accent gradient strip on the right border */}
+      <div className={cn('absolute top-0 right-0 bottom-0 w-0.5', getRoleAccentBar(role))} style={{ opacity: 0.5 }} />
+
       {/* Logo Section */}
-      <div className={cn('flex items-center gap-3 p-4 border-b border-border/60', collapsed && 'justify-center px-2')}>
-        <div className={cn('w-10 h-10 rounded-xl flex items-center justify-center shrink-0 shadow-sm', getRoleColor(role))}>
-          <Heart className="w-5 h-5" />
+      <div className={cn(
+        'flex items-center gap-3 p-4 border-b border-border/50',
+        collapsed ? 'justify-center px-2' : '',
+        'bg-gradient-to-b from-muted/30 to-transparent'
+      )}>
+        <div className={cn(
+          'rounded-xl flex items-center justify-center shrink-0 shadow-md transition-all duration-300',
+          getRoleColor(role),
+          collapsed ? 'w-9 h-9' : 'w-10 h-10'
+        )}>
+          <Heart className={cn('transition-all', collapsed ? 'w-4.5 h-4.5' : 'w-5 h-5')} />
         </div>
         {!collapsed && (
           <div className="flex flex-col flex-1 min-w-0">
-            <span className="font-bold text-base leading-tight">عافيتك</span>
-            <span className="text-[11px] text-muted-foreground">Aafiatak</span>
+            <span className="font-black text-base leading-tight tracking-tight">عافيتك</span>
+            <span className="text-[10px] text-muted-foreground font-medium tracking-wider uppercase">Aafiatak Pro</span>
           </div>
         )}
         <Button
           variant="ghost"
           size="icon"
-          className={cn('w-7 h-7 rounded-lg shrink-0 text-muted-foreground hover:text-foreground', collapsed && 'mt-0')}
+          className={cn('w-7 h-7 rounded-lg shrink-0 text-muted-foreground hover:text-foreground hover:bg-muted/60', collapsed && 'mt-0')}
           onClick={() => setCollapsed(!collapsed)}
         >
           {collapsed ? (
-            <ChevronLeft className="w-4 h-4" />
+            <ChevronLeft className="w-3.5 h-3.5" />
           ) : (
-            <ChevronRight className="w-4 h-4" />
+            <ChevronRight className="w-3.5 h-3.5" />
           )}
         </Button>
       </div>
@@ -277,15 +288,23 @@ export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
                       />
                     )}
 
-                    <Icon
-                      className={cn(
-                        'shrink-0 transition-all duration-150',
-                        collapsed ? 'w-5 h-5' : 'w-[18px] h-[18px]',
-                        isActive ? '' : 'group-hover:scale-110'
-                      )}
-                    />
+                    <div className={cn(
+                      'shrink-0 transition-all duration-150 rounded-lg flex items-center justify-center',
+                      collapsed ? 'w-9 h-9' : 'w-8 h-8',
+                      isActive
+                        ? cn(role === 'admin' || role === 'subadmin' ? 'bg-admin/15' : role === 'nurse' ? 'bg-nurse/15' : 'bg-beneficiary/15')
+                        : 'group-hover:bg-muted/80'
+                    )}>
+                      <Icon
+                        className={cn(
+                          'transition-all duration-150',
+                          collapsed ? 'w-5 h-5' : 'w-[17px] h-[17px]',
+                          isActive ? '' : 'group-hover:scale-110'
+                        )}
+                      />
+                    </div>
                     {!collapsed && (
-                      <span className="text-sm font-medium flex-1 truncate">{item.label}</span>
+                      <span className={cn('text-[13px] flex-1 truncate transition-all', isActive ? 'font-bold' : 'font-medium')}>{item.label}</span>
                     )}
                     {!collapsed && item.badge !== undefined && item.badge > 0 && (
                       <span className="mr-auto bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none">
