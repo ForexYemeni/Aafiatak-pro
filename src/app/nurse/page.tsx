@@ -30,6 +30,9 @@ import {
   HelpCircle,
   FileText,
   Star,
+  Lock,
+  CreditCard,
+  Unlock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -84,6 +87,8 @@ interface AssignmentRequest {
   isEmergency: boolean;
   emergencyType?: string;
   emergencyDescription?: string;
+  paymentStatus?: string;
+  paymentMethod?: string;
   service: ServiceInfo;
   beneficiary: BeneficiaryInfo;
 }
@@ -504,6 +509,16 @@ export default function NurseTasksPage() {
 
   const isEmergency = (a: Assignment) => a.assignmentType === 'emergency' || a.request?.isEmergency;
 
+  // Payment gate: beneficiary data is only shown after payment is confirmed
+  // Cash orders are always accessible (payment happens at time of service)
+  const isPaymentConfirmed = (a: Assignment) => {
+    if (isEmergency(a)) return true; // Emergency requests are always accessible
+    const method = a.request?.paymentMethod;
+    const status = a.request?.paymentStatus;
+    if (method === 'cash') return true; // Cash: always show
+    return status === 'completed'; // Online: only after admin confirms payment
+  };
+
   // Fetch rating summary
   const fetchRatingSummary = useCallback(async () => {
     try {
@@ -802,35 +817,58 @@ export default function NurseTasksPage() {
                           </div>
                         )}
 
-                        {/* Beneficiary Info */}
+                        {/* Beneficiary Info — gated behind payment confirmation */}
                         <div className="space-y-2 mb-3">
                           {assignment.request?.beneficiary && (
                             <div className="flex items-center gap-2 text-sm">
                               <UserRound className="w-4 h-4 text-muted-foreground" />
-                              <span>{assignment.request.beneficiary.name}</span>
-                              {assignment.request.beneficiary.phone && (
-                                <a href={`tel:${assignment.request.beneficiary.phone}`} className="text-blue-500">
+                              <span className="font-medium">{assignment.request.beneficiary.name}</span>
+                              {isPaymentConfirmed(assignment) && assignment.request.beneficiary.phone && (
+                                <a href={`tel:${assignment.request.beneficiary.phone}`} className="flex items-center gap-1 text-xs text-sky-600 bg-sky-50 dark:bg-sky-900/20 px-2 py-0.5 rounded-full border border-sky-200 dark:border-sky-800/40">
                                   <Phone className="w-3 h-3" />
+                                  <span dir="ltr">{assignment.request.beneficiary.phone}</span>
                                 </a>
                               )}
                             </div>
                           )}
-                          {assignment.request?.beneficiaryAddress && (
-                            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                              <MapPin className="w-4 h-4 shrink-0" />
-                              <span className="line-clamp-1">{assignment.request.beneficiaryAddress}</span>
+                          {isPaymentConfirmed(assignment) ? (
+                            <>
+                              {assignment.request?.beneficiaryAddress && (
+                                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                                  <MapPin className="w-4 h-4 shrink-0" />
+                                  <span className="line-clamp-1">{assignment.request.beneficiaryAddress}</span>
+                                </div>
+                              )}
+                              {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                                <a
+                                  href={`https://www.google.com/maps?q=${assignment.request.beneficiaryLat},${assignment.request.beneficiaryLng}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="flex items-center gap-1.5 text-xs text-blue-600 font-medium"
+                                >
+                                  <Navigation className="w-3 h-3" />
+                                  عرض الموقع على الخريطة
+                                </a>
+                              )}
+                            </>
+                          ) : (
+                            <div className="flex items-start gap-2.5 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/40">
+                              <div className="w-8 h-8 rounded-lg bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0 mt-0.5">
+                                <Lock className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="text-xs font-bold text-amber-700 dark:text-amber-400">بانتظار تأكيد الدفع</p>
+                                <p className="text-[10px] text-amber-600/80 dark:text-amber-500/80 mt-0.5 leading-relaxed">
+                                  ستظهر بيانات التواصل ومعلومات الموقع بعد تأكيد دفع رسوم التكليف من الإدارة
+                                </p>
+                                <div className="flex items-center gap-1.5 mt-1.5">
+                                  <CreditCard className="w-3 h-3 text-amber-500" />
+                                  <span className="text-[10px] font-semibold text-amber-600 dark:text-amber-400">
+                                    {assignment.request?.paymentMethod === 'cash' ? 'دفع نقدي' : 'بانتظار تأكيد الدفع الإلكتروني'}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
-                          )}
-                          {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
-                            <a
-                              href={`https://www.google.com/maps?q=${assignment.request.beneficiaryLat},${assignment.request.beneficiaryLng}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="flex items-center gap-1.5 text-xs text-blue-600"
-                            >
-                              <Navigation className="w-3 h-3" />
-                              عرض الموقع على الخريطة
-                            </a>
                           )}
                         </div>
 
@@ -1069,34 +1107,65 @@ export default function NurseTasksPage() {
                                   </div>
                                 )}
                                 {activeTab === 'active' && assignment.status === 'accepted' && (
-                                  <div className="space-y-2">
-                                    <div className="p-2.5 rounded-lg bg-sky-50 dark:bg-sky-900/15 border border-sky-200/70 dark:border-sky-800/30 text-center">
-                                      <p className="text-xs font-bold text-sky-700 dark:text-sky-400">الخطوة الثانية — تنفيذ التكليف</p>
-                                      <p className="text-[10px] text-muted-foreground mt-0.5">انطلق للموقع ثم اضغط "بدء تنفيذ التكليف" عند البدء الفعلي</p>
-                                    </div>
-                                    {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
-                                      <Button variant="outline" className="w-full h-10 gap-1.5 font-medium" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`, '_blank')}>
-                                        <Navigation className="w-4 h-4" />الاتجاه للموقع
-                                      </Button>
+                                  <div className="space-y-2.5">
+                                    {/* Payment gate banner for step 2 */}
+                                    {!isPaymentConfirmed(assignment) ? (
+                                      <div className="flex items-center gap-3 p-3.5 rounded-xl bg-amber-50 dark:bg-amber-900/20 border-2 border-amber-200 dark:border-amber-800/50">
+                                        <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-900/40 flex items-center justify-center shrink-0">
+                                          <Lock className="w-4.5 h-4.5 text-amber-600 dark:text-amber-400" />
+                                        </div>
+                                        <div>
+                                          <p className="text-xs font-bold text-amber-700 dark:text-amber-400">لا يمكن البدء — لم يؤكَّد الدفع بعد</p>
+                                          <p className="text-[10px] text-amber-600/80 dark:text-amber-500/80 mt-0.5">انتظر حتى يقوم المسؤول بتأكيد دفع رسوم التكليف</p>
+                                        </div>
+                                      </div>
+                                    ) : (
+                                      <>
+                                        <div className="p-2.5 rounded-xl bg-sky-50 dark:bg-sky-900/15 border border-sky-200/70 dark:border-sky-800/30 text-center">
+                                          <div className="flex items-center justify-center gap-2 mb-0.5">
+                                            <Unlock className="w-3.5 h-3.5 text-sky-600 dark:text-sky-400" />
+                                            <p className="text-xs font-bold text-sky-700 dark:text-sky-400">الخطوة الثانية — تنفيذ التكليف</p>
+                                          </div>
+                                          <p className="text-[10px] text-muted-foreground">تم تأكيد الدفع — انطلق للموقع وابدأ الخدمة</p>
+                                        </div>
+                                        {assignment.request?.beneficiary?.phone && (
+                                          <Button variant="outline" className="w-full h-10 gap-1.5 font-medium text-sky-700 border-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
+                                            <Phone className="w-4 h-4" />الاتصال بالمستفيد
+                                          </Button>
+                                        )}
+                                        {assignment.request?.beneficiaryLat && assignment.request?.beneficiaryLng && (
+                                          <Button variant="outline" className="w-full h-10 gap-1.5 font-medium" onClick={() => window.open(`https://www.google.com/maps/dir/?api=1&destination=${assignment.request!.beneficiaryLat},${assignment.request!.beneficiaryLng}`, '_blank')}>
+                                            <Navigation className="w-4 h-4" />الاتجاه للموقع
+                                          </Button>
+                                        )}
+                                        <Button
+                                          className="w-full h-13 bg-gradient-to-l from-sky-600 to-sky-500 hover:from-sky-700 hover:to-sky-600 text-white font-bold gap-2 shadow-lg shadow-sky-600/30 text-[15px] rounded-xl"
+                                          disabled={actionLoading === assignment.id}
+                                          onClick={() => handleStartService(assignment.id)}
+                                        >
+                                          {actionLoading === assignment.id ? <RefreshCw className="w-5 h-5 animate-spin" /> : <PlayCircle className="w-5 h-5" />}
+                                          بدء تنفيذ التكليف
+                                        </Button>
+                                      </>
                                     )}
-                                    <Button
-                                      className="w-full h-12 bg-sky-600 hover:bg-sky-700 text-white font-bold gap-2 shadow-lg shadow-sky-600/25 text-[15px]"
-                                      disabled={actionLoading === assignment.id}
-                                      onClick={() => handleStartService(assignment.id)}
-                                    >
-                                      {actionLoading === assignment.id ? <RefreshCw className="w-5 h-5 animate-spin" /> : <PlayCircle className="w-5 h-5" />}
-                                      بدء تنفيذ التكليف
-                                    </Button>
                                   </div>
                                 )}
                                 {activeTab === 'active' && assignment.status === 'in_progress' && (
-                                  <div className="space-y-2">
-                                    <div className="p-2.5 rounded-lg bg-green-50 dark:bg-green-900/15 border border-green-200/70 dark:border-green-800/30 text-center">
-                                      <p className="text-xs font-bold text-green-700 dark:text-green-400">الخطوة الثالثة — إكمال التكليف</p>
-                                      <p className="text-[10px] text-muted-foreground mt-0.5">بعد الانتهاء من الخدمة اضغط لتأكيد الإنهاء</p>
+                                  <div className="space-y-2.5">
+                                    <div className="p-2.5 rounded-xl bg-emerald-50 dark:bg-emerald-900/15 border border-emerald-200/70 dark:border-emerald-800/30 text-center">
+                                      <div className="flex items-center justify-center gap-2 mb-0.5">
+                                        <Activity className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                        <p className="text-xs font-bold text-emerald-700 dark:text-emerald-400">الخطوة الثالثة — إكمال التكليف</p>
+                                      </div>
+                                      <p className="text-[10px] text-muted-foreground">الخدمة جارية — اضغط عند الانتهاء لتأكيد إكمال التكليف</p>
                                     </div>
+                                    {assignment.request?.beneficiary?.phone && (
+                                      <Button variant="outline" className="w-full h-10 gap-1.5 font-medium text-sky-700 border-sky-300 hover:bg-sky-50 dark:hover:bg-sky-900/20" onClick={() => window.open(`tel:${assignment.request!.beneficiary!.phone}`, '_self')}>
+                                        <Phone className="w-4 h-4" />الاتصال بالمستفيد
+                                      </Button>
+                                    )}
                                     <Button
-                                      className="w-full h-12 bg-green-600 hover:bg-green-700 text-white font-bold gap-2 shadow-lg shadow-green-600/25 text-[15px]"
+                                      className="w-full h-13 bg-gradient-to-l from-emerald-600 to-green-500 hover:from-emerald-700 hover:to-green-600 text-white font-bold gap-2 shadow-lg shadow-emerald-600/30 text-[15px] rounded-xl"
                                       disabled={actionLoading === assignment.id}
                                       onClick={() => handleCompleteService(assignment.id)}
                                     >

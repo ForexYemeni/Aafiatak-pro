@@ -130,6 +130,8 @@ export async function GET(request: NextRequest) {
           nursePayout: a.nursePayout || 0,
           totalPrice: a.totalPrice || 0,
           isEmergency: a.isEmergency || false,
+          paymentStatus: a.paymentStatus || 'pending',
+          paymentMethod: a.paymentMethod || 'cash',
           service: service ? {
             id: service._id.toString(),
             nameAr: service.nameAr || 'خدمة',

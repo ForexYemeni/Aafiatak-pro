@@ -22,6 +22,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   MessageSquare,
+  Lock,
+  ShieldCheck,
+  Banknote,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -413,14 +416,62 @@ export default function OrderDetailPage() {
         </GlassCard>
       )}
 
+      {/* Awaiting Payment Confirmation */}
+      {order.status === 'awaiting_payment' && (
+        <GlassCard variant="beneficiary" className="overflow-hidden p-0">
+          <div className="bg-gradient-to-l from-amber-500 to-orange-400 px-4 py-3 flex items-center gap-2">
+            <CreditCard className="w-4 h-4 text-white" />
+            <h3 className="font-bold text-sm text-white">بانتظار تأكيد الدفع</h3>
+          </div>
+          <div className="p-4 space-y-3">
+            <div className="flex items-start gap-3">
+              <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center shrink-0">
+                <Lock className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-amber-700 dark:text-amber-400">
+                  الطلب معلق بانتظار تأكيد الدفع من الإدارة
+                </p>
+                <p className="text-xs text-muted-foreground mt-1 leading-relaxed">
+                  {order.paymentMethod === 'cash'
+                    ? 'طريقة الدفع نقدي عند الخدمة — سيتم تأكيد الطلب قريباً.'
+                    : 'يرجى إرسال إثبات الدفع عبر واتساب أو رفعه في التطبيق. سيتم تأكيد الدفع من الإدارة وإشعارك فور ذلك.'}
+                </p>
+              </div>
+            </div>
+            {order.paymentMethod && order.paymentMethod !== 'cash' && (
+              <div className="flex items-center gap-2 p-3 rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800">
+                <Banknote className="w-4 h-4 text-amber-600 shrink-0" />
+                <div className="text-xs">
+                  <span className="font-bold text-amber-700 dark:text-amber-400">
+                    {order.paymentMethod === 'wallet_deposit' ? 'دفع عبر المحفظة الإلكترونية' : 'تحويل بنكي'}
+                  </span>
+                  <span className="text-muted-foreground mr-1.5">— أرسل إثبات الدفع للإدارة عبر واتساب</span>
+                </div>
+              </div>
+            )}
+          </div>
+        </GlassCard>
+      )}
+
       {/* Waiting for nurse assignment */}
       {!order.nurseId && order.status === 'pending' && (
-        <GlassCard variant="beneficiary" className="text-center py-6">
-          <Clock className="w-10 h-10 text-beneficiary mx-auto mb-3" />
-          <p className="font-semibold">بانتظار تعيين ممرض/ـة</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            سيتم إشعارك فور تعيين ممرض/ـة لطلبك
-          </p>
+        <GlassCard variant="beneficiary" className="overflow-hidden p-0">
+          <div className="bg-gradient-to-l from-beneficiary/80 to-beneficiary px-4 py-3 flex items-center gap-2">
+            <Clock className="w-4 h-4 text-white" />
+            <h3 className="font-bold text-sm text-white">بانتظار تعيين ممرض/ـة</h3>
+          </div>
+          <div className="p-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-beneficiary/10 flex items-center justify-center shrink-0">
+              <Stethoscope className="w-5 h-5 text-beneficiary" />
+            </div>
+            <div>
+              <p className="text-sm font-medium">تم استلام طلبك بنجاح</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                سيتم إشعارك فور تعيين ممرض/ـة مناسب لطلبك
+              </p>
+            </div>
+          </div>
         </GlassCard>
       )}
 
