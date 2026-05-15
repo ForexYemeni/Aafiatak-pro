@@ -1680,6 +1680,9 @@ export default function AdminSettingsPage() {
         </GlassCard>
       </motion.div>
 
+        </>
+      )}
+
       {/* ── Restore Backup Section ─────────────────────────────────── */}
       {activeSection === 'restore-admin' && (
         <>
@@ -1942,18 +1945,19 @@ export default function AdminSettingsPage() {
         </>
       )}
 
-      {/* ── Danger Zone: Reset All Data ─────────────────────────── */}
-      <motion.div variants={itemAnim}>
-        <GlassCard className="border-red-200 dark:border-red-900/50">
-          <GlassCardHeader>
-            <div className="flex items-center justify-between">
-              <GlassCardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                  <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-                </div>
-                منطقة الخطر — حذف جميع البيانات
-              </GlassCardTitle>
-              <Button
+      {/* ── Danger Zone: Reset All Data (inside backup tab) ──────────── */}
+      {activeSection === 'backup-admin' && (
+        <motion.div variants={itemAnim}>
+          <GlassCard className="border-red-200 dark:border-red-900/50">
+            <GlassCardHeader>
+              <div className="flex items-center justify-between">
+                <GlassCardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                  </div>
+                  منطقة الخطر — حذف جميع البيانات
+                </GlassCardTitle>
+                <Button
                 variant="outline"
                 size="sm"
                 onClick={() => { setShowResetSection(!showResetSection); setResetResult(null); setResetPassword(''); setResetConfirmText(''); }}
@@ -2118,8 +2122,6 @@ export default function AdminSettingsPage() {
           )}
         </GlassCard>
       </motion.div>
-
-        </>
       )}
 
       {/* Fixed Save Button at Bottom */}
