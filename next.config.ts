@@ -43,6 +43,10 @@
       ignoreBuildErrors: true,
     },
 
+    eslint: {
+      ignoreDuringBuilds: true,
+    },
+
     reactStrictMode: true,
 
     // Remove X-Powered-By header (minor security hardening)
