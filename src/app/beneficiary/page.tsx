@@ -196,33 +196,42 @@ export default function BeneficiaryHomePage() {
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="relative overflow-hidden rounded-3xl bg-gradient-to-l from-beneficiary to-teal-600 p-6 text-beneficiary-foreground"
+        className="relative overflow-hidden rounded-3xl bg-gradient-to-bl from-beneficiary via-purple-600 to-teal-600 p-6 text-white shadow-xl shadow-beneficiary/25"
       >
         <div className="relative z-10">
-          <div className="flex items-center justify-between mb-3">
+          <div className="flex items-start justify-between mb-4">
             <div>
-              <h1 className="text-2xl font-bold">مرحباً {user?.name?.split(' ')[0] || ''} 👋</h1>
-              <p className="text-sm opacity-90 mt-1">خدمات الرعاية الصحية المنزلية</p>
+              <p className="text-[11px] font-semibold uppercase tracking-widest opacity-75 mb-1">منصة عافيتك</p>
+              <h1 className="text-2xl font-black leading-tight">مرحباً {user?.name?.split(' ')[0] || ''}</h1>
+              <p className="text-sm opacity-85 mt-1.5">خدمات الرعاية الصحية المنزلية</p>
             </div>
-            {activeOrdersCount > 0 && (
+            {activeOrdersCount > 0 ? (
               <Button
-                variant="secondary"
                 size="sm"
-                className="gap-2 shrink-0"
+                className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm shrink-0 gap-2 font-semibold shadow-sm"
                 onClick={() => router.push('/beneficiary/orders')}
               >
-                <Clock className="w-4 h-4" />
+                <Clock className="w-3.5 h-3.5" />
                 طلبات نشطة
-                <Badge variant="destructive" className="mr-1">{toArabicNum(activeOrdersCount)}</Badge>
+                <span className="bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center">
+                  {toArabicNum(activeOrdersCount)}
+                </span>
               </Button>
+            ) : (
+              <div className="w-12 h-12 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center">
+                <Heart className="w-6 h-6 text-white" />
+              </div>
             )}
           </div>
-          <p className="text-xs opacity-80">اختر الخدمات التي تحتاجها وأكمل طلبك في خطوات بسيطة</p>
+          <p className="text-xs opacity-75 bg-white/10 rounded-xl px-3 py-2 border border-white/15 inline-block">
+            اختر الخدمات التي تحتاجها وأكمل طلبك في خطوات بسيطة ✓
+          </p>
         </div>
-        {/* Decorative circles */}
-        <div className="absolute -top-8 -left-8 w-32 h-32 rounded-full bg-white/10" />
-        <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-white/10" />
-        <div className="absolute top-1/2 left-1/2 w-16 h-16 rounded-full bg-white/5" />
+        {/* Decorative shapes */}
+        <div className="absolute -top-10 -left-10 w-40 h-40 rounded-full bg-white/8 blur-sm" />
+        <div className="absolute -bottom-8 -right-8 w-28 h-28 rounded-full bg-white/8" />
+        <div className="absolute top-0 right-1/3 w-20 h-20 rounded-full bg-teal-400/20 blur-md" />
+        <div className="absolute bottom-0 left-1/4 w-12 h-12 rounded-full bg-purple-300/20" />
       </motion.div>
 
       {/* Search Bar */}
