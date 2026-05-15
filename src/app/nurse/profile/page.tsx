@@ -583,7 +583,14 @@ export default function NurseProfilePage() {
         )}
       </AnimatePresence>
 
-      <PageHeader title="الملف الشخصي" />
+      <PageHeader
+        title="الملف الشخصي"
+        action={{
+          label: 'معاينة السيرة الذاتية',
+          icon: <FileText className="w-4 h-4" />,
+          onClick: () => { window.location.href = '/nurse/cv'; },
+        }}
+      />
 
       {/* Verification Warning Banner (if not verified) */}
       {(profile.verificationStatus || 'unverified') !== 'verified' && (
