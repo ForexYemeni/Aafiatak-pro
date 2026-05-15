@@ -1,32 +1,51 @@
 'use client';
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { useState, useEffect, useRef, type ReactNode } from 'react';
 
 // ============================================================================
-// Hydration Safe Provider
+// Hydration Safe Provider (ULTRA-FAST v2)
 // ============================================================================
 // Prevents React hydration mismatches by ensuring the first client render
-// exactly matches the server render. This is critical for apps using
-// Zustand persist (localStorage) where server state differs from client state.
+// exactly matches the server render.
 //
-// How it works:
-// 1. Server render: Shows a minimal loading shell (same on server & client)
-// 2. Client hydration: Initially renders the same loading shell (matches server)
-// 3. After mount (useEffect): Replaces loading shell with actual app content
-//
-// This eliminates ALL hydration mismatches because the server HTML and
-// the initial client render are identical.
+// PERFORMANCE FIXES (v2):
+// 1. Module-level flag: Once mounted in this session, ALL subsequent renders
+//    skip the hydration check entirely — no more unnecessary loading shells.
+// 2. Faster detection: Uses requestAnimationFrame instead of waiting for
+//    the next React render cycle.
+// 3. No spinner flash on client-side navigations — only on cold SSR start.
 // ============================================================================
+
+// Module-level cache: once the app has mounted once, it never needs
+// the hydration guard again (even if this component remounts)
+let _globalMounted = false;
 
 interface HydrationSafeProviderProps {
   children: ReactNode;
 }
 
 export function HydrationSafeProvider({ children }: HydrationSafeProviderProps) {
+  // If we already mounted globally, skip all checks — render children immediately
+  if (_globalMounted) {
+    return <>{children}</>;
+  }
+
   const [hasMounted, setHasMounted] = useState(false);
+  const rafRef = useRef<number | null>(null);
 
   useEffect(() => {
-    setHasMounted(true);
+    // Use requestAnimationFrame for faster mounting detection
+    // This is faster than waiting for the next React commit
+    rafRef.current = requestAnimationFrame(() => {
+      _globalMounted = true;
+      setHasMounted(true);
+    });
+
+    return () => {
+      if (rafRef.current) {
+        cancelAnimationFrame(rafRef.current);
+      }
+    };
   }, []);
 
   // During SSR and initial client hydration, show a minimal shell

@@ -122,7 +122,7 @@ interface CachedResponse {
 }
 
 const _GET_CACHE = new Map<string, CachedResponse>();
-const _GET_CACHE_TTL = 180_000; // 3 minutes
+const _GET_CACHE_TTL = 300_000; // 5 minutes (increased from 3 min for faster navigation)
 
 function _getCacheKey(url: string, userId: string): string {
   return `${url}::${userId}`;
@@ -158,7 +158,7 @@ export async function _GET_CACHE_warmUp(endpoints: string[]): Promise<void> {
       if (res.ok) {
         const bodyText = await res.text();
         _GET_CACHE.set(cacheKey, { bodyText, status: res.status, ok: true, ts: Date.now() });
-        if (_GET_CACHE.size > 100) {
+        if (_GET_CACHE.size > 200) {
           const firstKey = _GET_CACHE.keys().next().value;
           if (firstKey) _GET_CACHE.delete(firstKey);
         }
@@ -287,8 +287,8 @@ export function useAuthFetch() {
             ok: response.ok,
             ts: Date.now(),
           });
-          // Trim cache size (keep last 100 entries)
-          if (_GET_CACHE.size > 100) {
+          // Trim cache size (keep last 200 entries — increased for better navigation cache hit rate)
+          if (_GET_CACHE.size > 200) {
             const firstKey = _GET_CACHE.keys().next().value;
             if (firstKey) _GET_CACHE.delete(firstKey);
           }

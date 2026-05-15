@@ -986,19 +986,95 @@ function SocketConnector() {
   return null;
 }
 
+// ============================================================================
+// Deferred Component Loader (PERFORMANCE v2)
+// ============================================================================
+// Delers rendering of non-critical components until the browser is idle.
+// This prevents heavy components from blocking the initial page render
+// and makes navigation feel instant.
+//
+// Priority levels:
+// - "critical": Render after first paint (requestAnimationFrame) — Socket, Emergency sounds
+// - "high": Render after 2 seconds — Notification poller, Chat sounds
+// - "low": Render after 5 seconds — Push subscription, Permission banner, Offline wrapper
+// ============================================================================
+
+import { useState, useEffect as useReactEffect } from 'react';
+
+function DeferredComponent({ children, delayMs }: { children: ReactNode; delayMs: number }) {
+  const [show, setShow] = useState(false);
+
+  useReactEffect(() => {
+    // Use requestIdleCallback if available, otherwise setTimeout
+    const scheduleRender = () => {
+      const timer = setTimeout(() => setShow(true), delayMs);
+      return () => clearTimeout(timer);
+    };
+
+    // On page visibility changes, don't delay further
+    if (document.visibilityState === 'visible') {
+      return scheduleRender();
+    }
+
+    // If page is hidden, wait for it to become visible
+    const handleVisible = () => {
+      if (document.visibilityState === 'visible') {
+        document.removeEventListener('visibilitychange', handleVisible);
+        scheduleRender();
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisible);
+    return () => document.removeEventListener('visibilitychange', handleVisible);
+  }, [delayMs]);
+
+  if (!show) return null;
+  return <>{children}</>;
+}
+
 export function PWAInitializer() {
   return (
     <>
+      {/* CRITICAL (0ms) — Socket connection for real-time features */}
       <SocketConnector />
-      <ServiceWorkerRegistrar />
+
+      {/* CRITICAL (0ms) — Emergency sounds must be ready immediately */}
       <EmergencySoundPlayer />
-      <VoiceNotificationPoller />
-      <ChatSoundPlayer />
-      <NotificationPoller />
-      <WelcomeBackPlayer />
-      <PushSubscriptionManager />
-      <NotificationPermissionBanner />
-      <OfflineWrapper />
+
+      {/* HIGH (1.5s) — Service worker registration (non-blocking) */}
+      <DeferredComponent delayMs={1500}>
+        <ServiceWorkerRegistrar />
+      </DeferredComponent>
+
+      {/* HIGH (2s) — Notification polling (starts after page is interactive) */}
+      <DeferredComponent delayMs={2000}>
+        <NotificationPoller />
+      </DeferredComponent>
+
+      {/* HIGH (2s) — Chat sound player */}
+      <DeferredComponent delayMs={2000}>
+        <ChatSoundPlayer />
+      </DeferredComponent>
+
+      {/* HIGH (2.5s) — Welcome back sound */}
+      <DeferredComponent delayMs={2500}>
+        <WelcomeBackPlayer />
+      </DeferredComponent>
+
+      {/* LOW (5s) — Voice notification poller (heavy, uses TTS) */}
+      <DeferredComponent delayMs={5000}>
+        <VoiceNotificationPoller />
+      </DeferredComponent>
+
+      {/* LOW (6s) — Push subscription (multiple API calls, very heavy) */}
+      <DeferredComponent delayMs={6000}>
+        <PushSubscriptionManager />
+      </DeferredComponent>
+
+      {/* LOW (7s) — Permission banner and offline wrapper */}
+      <DeferredComponent delayMs={7000}>
+        <NotificationPermissionBanner />
+        <OfflineWrapper />
+      </DeferredComponent>
     </>
   );
 }

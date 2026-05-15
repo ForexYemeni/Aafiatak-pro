@@ -47,13 +47,20 @@
       ignoreDuringBuilds: true,
     },
 
-    reactStrictMode: true,
+    // DISABLE strict mode in production — prevents double-rendering which
+    // causes visible flickering and slower perceived performance
+    reactStrictMode: false,
 
     // Remove X-Powered-By header (minor security hardening)
     poweredByHeader: false,
 
     // Enable gzip/brotli compression for all responses (~30-60% smaller bundles)
     compress: true,
+
+    // ============================================================================
+    // Performance: Output standalone build for smaller serverless functions
+    // ============================================================================
+    output: 'standalone',
 
     // ============================================================================
     // Image Optimization
@@ -171,6 +178,21 @@
         "@radix-ui/react-popover",
         "@radix-ui/react-accordion",
         "@radix-ui/react-avatar",
+        // ADDITIONAL: More packages that benefit from tree-shaking
+        "@radix-ui/react-tooltip",
+        "@radix-ui/react-alert-dialog",
+        "@radix-ui/react-checkbox",
+        "@radix-ui/react-switch",
+        "@radix-ui/react-slider",
+        "@radix-ui/react-separator",
+        "@radix-ui/react-scroll-area",
+        "@radix-ui/react-collapsible",
+        "class-variance-authority",
+        "cmdk",
+        "sonner",
+        "zod",
+        "jose",
+        "jszip",
       ],
     },
   };

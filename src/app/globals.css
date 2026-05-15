@@ -924,3 +924,67 @@ a[href]:not([href^="#"]):not([href^="mailto:"]):not([href^="tel:"]) {
 .cv-contact-guard-overlay {
   animation: contact-guard-pulse 3s ease-in-out infinite;
 }
+
+/* ============================================================================
+   PERFORMANCE OPTIMIZATIONS v2
+   ============================================================================ */
+
+/* GPU acceleration for animated elements — reduces paint time */
+.animate-spin,
+.animate-pulse,
+.animate-bounce,
+.animate-float,
+.animate-shimmer,
+.animate-slide-up,
+.animate-slide-down,
+.animate-slide-in-right,
+.animate-bell-ring,
+.animate-shake,
+.emergency-float-btn,
+.cv-badge-glow,
+.page-animate {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Optimize font rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Faster page transitions — reduce default animation durations */
+.page-animate {
+  animation-duration: 0.15s;
+}
+
+/* Content-visibility for off-screen sections — skips rendering until needed */
+.section-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* Optimize scroll performance */
+main {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Faster skeleton pulse */
+.skeleton-fast {
+  animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}

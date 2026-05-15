@@ -13,6 +13,8 @@ const notoArabic = Noto_Sans_Arabic({
   subsets: ["arabic"],
   weight: ["300", "400", "500", "600", "700", "800"],
   display: "swap",
+  // Preload the font to avoid FOIT (Flash of Invisible Text)
+  preload: true,
 });
 
 export const metadata: Metadata = {
@@ -47,8 +49,11 @@ export default function RootLayout({
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
         <meta name="apple-mobile-web-app-title" content="عافيتك" />
         <link rel="apple-touch-icon" href="/icons/icon-192x192.png" />
-        {/* Prefetch hint for faster navigation */}
+        {/* DNS Prefetch — resolve domains before they're needed */}
         <link rel="dns-prefetch" href="https://fonts.gstatic.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
+        {/* Preconnect to API origin for faster fetches */}
+        <link rel="preconnect" href="/" />
       </head>
       <body
         className={`${notoArabic.variable} antialiased bg-background text-foreground font-sans`}

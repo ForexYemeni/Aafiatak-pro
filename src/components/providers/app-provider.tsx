@@ -9,17 +9,18 @@
     return new QueryClient({
       defaultOptions: {
         queries: {
-          // Data stays fresh for 5 minutes before a background refetch
-          staleTime: 5 * 60 * 1000,
-          // Keep unused data in cache for 10 minutes (PWA: reduces redundant fetches after tab switch)
-          gcTime: 10 * 60 * 1000,
-          // Never retry on 4xx errors (auth/not-found); retry twice on network/5xx
+          // Data stays fresh for 10 minutes before a background refetch (was 5min)
+          staleTime: 10 * 60 * 1000,
+          // Keep unused data in cache for 30 minutes (was 10min)
+          // PWA: reduces redundant fetches after tab switch
+          gcTime: 30 * 60 * 1000,
+          // Never retry on 4xx errors (auth/not-found); retry once on network/5xx (was 2)
           retry: (failureCount, error: any) => {
             if (error?.status >= 400 && error?.status < 500) return false;
-            return failureCount < 2;
+            return failureCount < 1;
           },
-          // Retry with exponential backoff (1s, 2s) to avoid hammering a slow API
-          retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
+          // Faster retry: 500ms initial delay instead of 1s
+          retryDelay: (attempt) => Math.min(500 * 2 ** attempt, 2000),
           // Don't refetch when the tab regains focus (reduces noise)
           refetchOnWindowFocus: false,
           // Refetch when network reconnects — important for PWA offline → online
