@@ -105,10 +105,24 @@ export async function GET(request: NextRequest) {
     const serviceMap = new Map(services.map((s: any) => [s._id.toString(), s]));
     const serviceBeneficiaryMap = new Map(serviceBeneficiaries.map((b: any) => [b._id.toString(), b]));
 
+    // ── Payment gate helper ──
+    // Beneficiary contact data is ONLY revealed when:
+    //   1. Payment method is 'cash' (paid in person at time of service), OR
+    //   2. Payment status is 'completed' (online payment confirmed by admin)
+    // Emergency requests always reveal data (no payment gate).
+    const isContactRevealed = (a: any): boolean => {
+      if (a.isEmergency) return true;
+      const method = a.paymentMethod;
+      const pStatus = a.paymentStatus;
+      if (!method || method === 'cash') return true;
+      return pStatus === 'completed';
+    };
+
     // Transform service requests
     const populatedServiceAssignments = serviceAssignments.map((a: any) => {
       const service = serviceMap.get(a.serviceId?.toString());
       const beneficiary = serviceBeneficiaryMap.get(a.beneficiaryId?.toString());
+      const reveal = isContactRevealed(a);
 
       return {
         id: a._id.toString(),
@@ -123,9 +137,10 @@ export async function GET(request: NextRequest) {
           id: a._id.toString(),
           status: a.status,
           scheduledAt: a.scheduledAt?.toISOString() || null,
-          beneficiaryAddress: a.beneficiaryAddress || null,
-          beneficiaryLat: a.beneficiaryLat || null,
-          beneficiaryLng: a.beneficiaryLng || null,
+          // Contact data: only revealed after payment confirmation
+          beneficiaryAddress: reveal ? (a.beneficiaryAddress || null) : null,
+          beneficiaryLat: reveal ? (a.beneficiaryLat || null) : null,
+          beneficiaryLng: reveal ? (a.beneficiaryLng || null) : null,
           basePrice: a.basePrice || 0,
           nursePayout: a.nursePayout || 0,
           totalPrice: a.totalPrice || 0,
@@ -147,9 +162,11 @@ export async function GET(request: NextRequest) {
           },
           beneficiary: beneficiary ? {
             id: beneficiary._id.toString(),
+            // Name is always shown (not sensitive)
             name: beneficiary.name || 'غير معروف',
-            phone: beneficiary.phone || '',
-            address: a.beneficiaryAddress || undefined,
+            // Phone and address: only after payment confirmation
+            phone: reveal ? (beneficiary.phone || '') : '',
+            address: reveal ? (a.beneficiaryAddress || undefined) : undefined,
           } : {
             id: '',
             name: 'غير معروف',

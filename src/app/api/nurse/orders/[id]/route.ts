@@ -36,6 +36,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       if (order.status !== 'accepted') {
         return createErrorResponse('لا يمكن بدء الطلب في حالته الحالية', 400, 'INVALID_STATUS');
       }
+
+      // ── Payment gate (server-side enforcement) ──
+      // Non-cash orders require admin payment confirmation before the nurse
+      // can start execution. This prevents bypassing the frontend gate.
+      const paymentMethod = order.paymentMethod;
+      const paymentStatus = order.paymentStatus;
+      const isCash = !paymentMethod || paymentMethod === 'cash';
+      const isPaymentConfirmed = paymentStatus === 'completed';
+      if (!isCash && !isPaymentConfirmed) {
+        return createErrorResponse(
+          'لا يمكن بدء تنفيذ الطلب قبل تأكيد الدفع من الإدارة',
+          403,
+          'PAYMENT_NOT_CONFIRMED'
+        );
+      }
+
       order.status = 'in_progress';
       order.startedAt = new Date();
       await order.save();
