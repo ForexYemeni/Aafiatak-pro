@@ -149,22 +149,57 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
     beneficiary: 'مستفيد/ـة',
   };
 
+  function getRoleBadgeStyle(role: UserRole): string {
+    switch (role) {
+      case 'admin':
+      case 'subadmin':
+        return 'bg-admin/15 text-admin border border-admin/25';
+      case 'nurse':
+        return 'bg-nurse/15 text-nurse border border-nurse/25';
+      case 'beneficiary':
+        return 'bg-beneficiary/15 text-beneficiary border border-beneficiary/25';
+      default:
+        return 'bg-primary/15 text-primary border border-primary/25';
+    }
+  }
+
+  function getRoleHeaderAccent(role: UserRole): string {
+    switch (role) {
+      case 'admin':
+      case 'subadmin':
+        return 'from-admin/8 via-transparent to-transparent';
+      case 'nurse':
+        return 'from-nurse/8 via-transparent to-transparent';
+      case 'beneficiary':
+        return 'from-beneficiary/8 via-transparent to-transparent';
+      default:
+        return 'from-primary/8 via-transparent to-transparent';
+    }
+  }
+
   return (
     <header className="sticky top-0 z-30 glass-strong border-b border-border safe-top">
-      <div className="flex items-center justify-between h-16 px-4 gap-3">
+      {/* Role accent strip at very top */}
+      <div className={cn('h-0.5 w-full bg-gradient-to-l', getRoleHeaderAccent(role))} />
+      <div className="flex items-center justify-between h-14 px-4 gap-3">
         {/* Menu Button (mobile) + Page Title */}
         <div className="flex items-center gap-3">
           <Button
             variant="ghost"
             size="icon"
-            className="md:hidden"
+            className="md:hidden w-9 h-9 rounded-xl"
             onClick={onMenuToggle}
           >
-            <Menu className="w-5 h-5" />
+            <Menu className="w-4.5 h-4.5" />
           </Button>
-          <h1 className={cn('font-bold text-lg hidden sm:block', getRoleColor(role))}>
-            {roleTitleMap[role]}
-          </h1>
+          <div className="hidden sm:flex items-center gap-2.5">
+            <h1 className={cn('font-bold text-base', getRoleColor(role))}>
+              {roleTitleMap[role]}
+            </h1>
+            <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', getRoleBadgeStyle(role))}>
+              {user?.name?.split(' ')[0] ?? ''}
+            </span>
+          </div>
         </div>
 
         {/* Right Side Actions */}
@@ -217,9 +252,9 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
           {/* User Avatar Dropdown */}
           <DropdownMenu dir="rtl">
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" className="relative h-9 w-9 rounded-full">
-                <Avatar className="h-9 w-9">
-                  <AvatarFallback className={cn('text-xs', getRoleColor(role))}>
+              <Button variant="ghost" className={cn('relative h-9 w-9 rounded-xl p-0 ring-2 ring-offset-1 ring-offset-background transition-all hover:scale-105', role === 'admin' || role === 'subadmin' ? 'ring-admin/30 hover:ring-admin/50' : role === 'nurse' ? 'ring-nurse/30 hover:ring-nurse/50' : 'ring-beneficiary/30 hover:ring-beneficiary/50')}>
+                <Avatar className="h-9 w-9 rounded-xl">
+                  <AvatarFallback className={cn('text-xs font-bold rounded-xl', role === 'admin' || role === 'subadmin' ? 'bg-admin/15 text-admin' : role === 'nurse' ? 'bg-nurse/15 text-nurse' : 'bg-beneficiary/15 text-beneficiary')}>
                     {user?.name?.slice(0, 2) ?? 'عف'}
                   </AvatarFallback>
                 </Avatar>
