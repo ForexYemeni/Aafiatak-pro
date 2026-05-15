@@ -1,0 +1,45 @@
+[
+  {
+    "_id": "69fceb671b6979c0ab71a8f7",
+    "commissionRate": 25,
+    "emergencyFee": 5000,
+    "nightFeePercent": 20,
+    "fridayFeePercent": 15,
+    "nightStartHour": 20,
+    "nightEndHour": 8,
+    "minOrderAmount": 2000,
+    "loyaltyPointsPerOrder": 2,
+    "referralReward": 13,
+    "maxNurseAssignmentRadius": 20,
+    "autoAssignEnabled": false,
+    "emergencyAutoDispatch": true,
+    "maintenanceMode": false,
+    "supportPhone": "773178684",
+    "supportWhatsApp": "773178684",
+    "createdAt": "2026-05-07T19:43:35.180000",
+    "updatedAt": "2026-05-09T04:05:54.158000",
+    "maintenanceMessageAr": "",
+    "__v": 2,
+    "loyaltyRedemptionThreshold": 100,
+    "privacyPolicyAr": "",
+    "supportEmail": "",
+    "supportPhones": [
+      "773178684",
+      "777890073",
+      "773793833"
+    ],
+    "supportWhatsAppNumbers": [
+      "773178684",
+      "777890073",
+      "773793833"
+    ],
+    "termsAndConditionsAr": "",
+    "enabledWalletTypes": [
+      "جيب",
+      "جوالي",
+      "فلوسك",
+      "كاش"
+    ],
+    "withdrawalFee": 200
+  }
+]
