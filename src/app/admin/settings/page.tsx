@@ -7,7 +7,7 @@ import {
   Phone, MessageSquare, FileText, Wrench, MapPin, Users,
   Heart, Gift, Zap, Clock, AlertTriangle, Globe, Briefcase, Building2,
   Database, CheckCircle, Eye, EyeOff, RefreshCw, AlertOctagon, CreditCard,
-  Trash2, TriangleAlert
+  Trash2, TriangleAlert, Upload, Download, Archive, Info
 } from 'lucide-react';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { useAuthFetch } from '@/hooks/use-auth';
@@ -163,6 +163,14 @@ export default function AdminSettingsPage() {
   const [isFullBackingUp, setIsFullBackingUp] = useState(false);
   const [fullBackupStats, setFullBackupStats] = useState<{ documents: number; collections: number; sizeKB: number; hasSource: boolean } | null>(null);
 
+  // ── Restore Backup State ─────────────────────────────────────────
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restorePassword, setRestorePassword] = useState('');
+  const [showRestorePassword, setShowRestorePassword] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('replace');
+  const [restoreResult, setRestoreResult] = useState<{ totalRestored: number; totalErrors: number; backupDate: string | null; results: { collection: string; count: number; status: string }[] } | null>(null);
+
   // ── Reset All Data State ──────────────────────────────────────────
   const [showResetSection, setShowResetSection] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
@@ -308,6 +316,45 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // ── Restore Backup Handler ────────────────────────────────────────
+  const handleRestoreBackup = async () => {
+    if (!restoreFile) {
+      toast.error('اختر ملف النسخة الاحتياطية أولاً');
+      return;
+    }
+    if (!restorePassword.trim()) {
+      toast.error('أدخل كلمة المرور للتأكيد');
+      return;
+    }
+
+    setIsRestoring(true);
+    setRestoreResult(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', restoreFile);
+      formData.append('password', restorePassword);
+      formData.append('mode', restoreMode);
+
+      const res = await authFetch('/api/admin/restore', {
+        method: 'POST',
+        body: formData,
+      });
+      const json = await res.json();
+      if (json.success) {
+        setRestoreResult(json.data);
+        setRestorePassword('');
+        setRestoreFile(null);
+        toast.success(json.message || 'تمت الاستعادة بنجاح');
+      } else {
+        toast.error(json.error?.message ?? json.message ?? 'فشل الاستعادة');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء استعادة النسخة الاحتياطية');
+    } finally {
+      setIsRestoring(false);
+    }
+  };
+
   // ── Reset All Data Handler ────────────────────────────────────────
   const handleResetAllData = async () => {
     if (resetConfirmText !== 'احذف') {
@@ -360,7 +407,8 @@ export default function AdminSettingsPage() {
     { id: 'legal', label: 'المستندات القانونية', icon: FileText },
     { id: 'maintenance', label: 'وضع الصيانة', icon: Wrench },
     { id: 'database', label: 'قاعدة البيانات', icon: Database },
-    { id: 'backup-admin', label: 'النسخ الاحتياطية والإدارة', icon: Shield },
+    { id: 'backup-admin', label: 'النسخ الاحتياطية', icon: Shield },
+    { id: 'restore-admin', label: 'استعادة النسخة', icon: Upload },
   ];
 
   return (
@@ -1510,12 +1558,12 @@ export default function AdminSettingsPage() {
               {/* What's inside */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
-                  { icon: FileText, label: 'source-code.zip', sub: 'كامل كود Next.js من GitHub', ok: true },
-                  { icon: Database, label: 'database/', sub: 'ملف JSON لكل مجموعة MongoDB', ok: true },
-                  { icon: Shield, label: 'environment/.env.local', sub: 'جاهز للنسخ مباشرةً', ok: true },
-                  { icon: Zap, label: 'scripts/restore-db.js', sub: 'سكريبت Node.js للاستعادة التلقائية', ok: true },
-                  { icon: FileText, label: 'DEPLOY_GUIDE.md', sub: 'دليل النشر خطوة بخطوة', ok: true },
-                  { icon: CheckCircle, label: 'meta.json', sub: 'معلومات النسخة والإحصائيات', ok: true },
+                  { icon: FileText, label: 'source-code.zip', sub: 'كامل كود Next.js من GitHub' },
+                  { icon: Database, label: 'database/', sub: 'ملف JSON لكل مجموعة MongoDB (24+)' },
+                  { icon: Shield, label: 'environment/', sub: '.env.local + env-vars.json + Vercel vars' },
+                  { icon: Zap, label: 'scripts/', sub: 'restore-db.js + restore-all.sh + apply-vercel-env.js' },
+                  { icon: Shield, label: 'config/', sub: 'VAPID keys + SW config + Admin settings + Vercel' },
+                  { icon: CheckCircle, label: 'meta.json + DEPLOY_GUIDE.md', sub: 'معلومات شاملة + دليل الاستعادة الكامل' },
                 ].map(({ icon: Icon, label, sub }) => (
                   <div key={label} className="flex items-center gap-3 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 p-3">
                     <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
@@ -1558,11 +1606,14 @@ export default function AdminSettingsPage() {
                   <CheckCircle className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
                   <div>
                     <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-                      {fullBackupStats.hasSource ? 'نسخة شاملة مع الكود المصدري ✅' : 'نسخة البيانات + البيئة (الكود غير متوفر)'}
+                      {fullBackupStats.hasSource ? 'نسخة شاملة v2.0 مع الكود المصدري ✅' : 'نسخة البيانات + البيئة (الكود غير متوفر)'}
                     </p>
                     <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
-                      {fullBackupStats.documents.toLocaleString('ar')} وثيقة · {fullBackupStats.collections} مجموعة
+                      {fullBackupStats.documents.toLocaleString('ar')} وثيقة · {fullBackupStats.collections} مجموعة · config + scripts + sounds
                       {fullBackupStats.sizeKB > 0 && ` · ${fullBackupStats.sizeKB > 1024 ? (fullBackupStats.sizeKB / 1024).toFixed(1) + ' MB' : fullBackupStats.sizeKB.toFixed(0) + ' KB'}`}
+                    </p>
+                    <p className="text-[10px] text-blue-500/70 dark:text-blue-500/70 mt-1">
+                      تشمل: مفاتيح VAPID + إعدادات Vercel + سكريبت استعادة شامل + بيان الإشعارات
                     </p>
                     {!fullBackupStats.hasSource && (
                       <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
@@ -1628,6 +1679,268 @@ export default function AdminSettingsPage() {
             </GlassCardContent>
         </GlassCard>
       </motion.div>
+
+      {/* ── Restore Backup Section ─────────────────────────────────── */}
+      {activeSection === 'restore-admin' && (
+        <>
+
+      {/* ── Upload & Restore ── */}
+      <motion.div variants={itemAnim}>
+        <GlassCard className="border-emerald-200 dark:border-emerald-900/40">
+          <GlassCardHeader>
+            <div className="flex items-center justify-between">
+              <GlassCardTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <Upload className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                </div>
+                استعادة نسخة احتياطية
+              </GlassCardTitle>
+              <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-medium border border-emerald-200 dark:border-emerald-800/50">
+                v2.0
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              ارفع ملف النسخة الاحتياطية ZIP لاستعادة جميع البيانات — يدعم وضع الاستبدال والدمج
+            </p>
+          </GlassCardHeader>
+
+          <GlassCardContent className="space-y-5">
+
+            {/* What gets restored */}
+            <div className="rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 p-4 space-y-2">
+              <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">ما يتم استعادته:</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {[
+                  { icon: Database, label: 'قاعدة البيانات' },
+                  { icon: Shield, label: 'إعدادات الإدارة' },
+                  { icon: Users, label: 'حسابات المستخدمين' },
+                  { icon: Heart, label: 'الخدمات والطلبات' },
+                  { icon: CreditCard, label: 'المعاملات المالية' },
+                  { icon: Phone, label: 'الإشعارات' },
+                ].map(({ icon: Icon, label }) => (
+                  <div key={label} className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
+                    <Icon className="w-3 h-3 shrink-0" />
+                    {label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Mode selector */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">وضع الاستعادة</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setRestoreMode('replace')}
+                  className={`rounded-xl border-2 p-3 text-center transition-all ${
+                    restoreMode === 'replace'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                      : 'border-border hover:border-emerald-300 dark:hover:border-emerald-800'
+                  }`}
+                >
+                  <RefreshCw className={`w-5 h-5 mx-auto mb-1 ${restoreMode === 'replace' ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+                  <p className="text-xs font-semibold">استبدال كامل</p>
+                  <p className="text-[10px] text-muted-foreground">يمسح البيانات الحالية ويعيد كل شيء من النسخة</p>
+                </button>
+                <button
+                  onClick={() => setRestoreMode('merge')}
+                  className={`rounded-xl border-2 p-3 text-center transition-all ${
+                    restoreMode === 'merge'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                      : 'border-border hover:border-emerald-300 dark:hover:border-emerald-800'
+                  }`}
+                >
+                  <Zap className={`w-5 h-5 mx-auto mb-1 ${restoreMode === 'merge' ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+                  <p className="text-xs font-semibold">دمج</p>
+                  <p className="text-[10px] text-muted-foreground">يحافظ على البيانات الحالية ويضيف الجديدة</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Warning for replace mode */}
+            {restoreMode === 'replace' && (
+              <div className="flex items-start gap-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 p-4">
+                <TriangleAlert className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                <div className="text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                  <p className="font-semibold">تحذير: وضع الاستبدال</p>
+                  <p>سيتم حذف جميع البيانات الحالية واستبدالها ببيانات النسخة الاحتياطية. لا يمكن التراجع عن هذا الإجراء.</p>
+                </div>
+              </div>
+            )}
+
+            {/* File upload */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Archive className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                ملف النسخة الاحتياطية (ZIP)
+              </Label>
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".zip"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    setRestoreFile(f || null);
+                    setRestoreResult(null);
+                  }}
+                  className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-100 file:text-emerald-700 dark:file:bg-emerald-900/30 dark:file:text-emerald-400 hover:file:bg-emerald-200 dark:hover:file:bg-emerald-900/50 file:cursor-pointer file:transition-colors"
+                />
+              </div>
+              {restoreFile && (
+                <div className="flex items-center gap-2 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 p-2.5">
+                  <Archive className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div className="text-xs">
+                    <p className="font-medium text-emerald-800 dark:text-emerald-300">{restoreFile.name}</p>
+                    <p className="text-emerald-600/70 dark:text-emerald-500">{(restoreFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                كلمة مرور حساب الإدارة
+              </Label>
+              <div className="relative">
+                <Input
+                  type={showRestorePassword ? 'text' : 'password'}
+                  value={restorePassword}
+                  onChange={(e) => setRestorePassword(e.target.value)}
+                  placeholder="أدخل كلمة مرورك للتأكيد"
+                  dir="ltr"
+                  className="bg-background/50 pl-10"
+                  disabled={isRestoring}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowRestorePassword(!showRestorePassword)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showRestorePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Restore button */}
+            <div className="flex items-center gap-3">
+              <Button
+                onClick={handleRestoreBackup}
+                disabled={isRestoring || !restoreFile || !restorePassword.trim()}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 gap-2 min-w-52 shadow-lg shadow-emerald-600/20 text-white"
+                size="lg"
+              >
+                {isRestoring ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    جارٍ استعادة البيانات...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    استعادة من النسخة الاحتياطية
+                  </>
+                )}
+              </Button>
+              {isRestoring && (
+                <p className="text-xs text-muted-foreground">قد يستغرق هذا بضع دقائق حسب حجم البيانات...</p>
+              )}
+            </div>
+
+            {/* Restore result */}
+            {restoreResult && (
+              <div className="rounded-xl border p-4 space-y-3 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">تمت الاستعادة بنجاح!</p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center rounded-lg bg-emerald-100/60 dark:bg-emerald-900/20 p-2">
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{restoreResult.totalRestored.toLocaleString('ar')}</p>
+                    <p className="text-[10px] text-emerald-600/70 dark:text-emerald-500">وثيقة مستعادة</p>
+                  </div>
+                  <div className="text-center rounded-lg bg-emerald-100/60 dark:bg-emerald-900/20 p-2">
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{restoreResult.results.filter(r => r.status === 'ok').length}</p>
+                    <p className="text-[10px] text-emerald-600/70 dark:text-emerald-500">مجموعة</p>
+                  </div>
+                  <div className="text-center rounded-lg bg-emerald-100/60 dark:bg-emerald-900/20 p-2">
+                    <p className={`text-lg font-bold ${restoreResult.totalErrors > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300'}`}>{restoreResult.totalErrors}</p>
+                    <p className="text-[10px] text-emerald-600/70 dark:text-emerald-500">أخطاء</p>
+                  </div>
+                </div>
+
+                {restoreResult.backupDate && (
+                  <p className="text-xs text-emerald-600/70 dark:text-emerald-500">
+                    تاريخ النسخة الأصلية: {new Date(restoreResult.backupDate).toLocaleDateString('ar')}
+                  </p>
+                )}
+
+                {/* Collection details (collapsible) */}
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-emerald-700 dark:text-emerald-400 font-medium hover:underline">
+                    تفاصيل كل مجموعة ({restoreResult.results.length})
+                  </summary>
+                  <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
+                    {restoreResult.results.map((r) => (
+                      <div key={r.collection} className="flex items-center justify-between py-1 px-2 rounded bg-emerald-50/40 dark:bg-emerald-900/10">
+                        <span className="font-mono text-emerald-800 dark:text-emerald-300">{r.collection}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                          r.status === 'ok' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' :
+                          r.status === 'skipped' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' :
+                          'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                        }`}>
+                          {r.status === 'ok' ? `${r.count} وثيقة` : r.status === 'skipped' ? 'متخطاة' : 'خطأ'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            )}
+
+          </GlassCardContent>
+        </GlassCard>
+      </motion.div>
+
+      {/* ── Info card: What to give AI agent ── */}
+      <motion.div variants={itemAnim}>
+        <GlassCard className="border-purple-200 dark:border-purple-900/40">
+          <GlassCardHeader>
+            <GlassCardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
+              <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <Info className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              </div>
+              إرسال النسخة للوكيل الذكي (AI)
+            </GlassCardTitle>
+          </GlassCardHeader>
+          <GlassCardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              عند إرسال ملف النسخة الاحتياطية لوكيل ذكي، يحتوي على كل ما يلزم لاستعادة المنصة بالكامل:
+            </p>
+            <div className="space-y-1.5">
+              {[
+                { file: 'database/', desc: 'جميع بيانات MongoDB (24+ مجموعة)' },
+                { file: 'environment/.env.local', desc: 'كل متغيرات البيئة جاهزة' },
+                { file: 'config/vapid-keys.json', desc: 'مفاتيح الإشعارات Push' },
+                { file: 'config/admin-settings.json', desc: 'إعدادات المنصة الكاملة' },
+                { file: 'config/vercel-project.json', desc: 'إعدادات مشروع Vercel' },
+                { file: 'scripts/restore-all.sh', desc: 'سكريبت استعادة شامل' },
+                { file: 'source-code.zip', desc: 'كامل الكود المصدري' },
+              ].map(({ file, desc }) => (
+                <div key={file} className="flex items-center gap-2 text-xs">
+                  <code className="bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 px-1.5 py-0.5 rounded font-mono">{file}</code>
+                  <span className="text-muted-foreground">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </GlassCardContent>
+        </GlassCard>
+      </motion.div>
+
+        </>
+      )}
 
       {/* ── Danger Zone: Reset All Data ─────────────────────────── */}
       <motion.div variants={itemAnim}>
