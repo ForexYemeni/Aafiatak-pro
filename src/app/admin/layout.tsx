@@ -1,11 +1,11 @@
 'use client';
 
-import { type ReactNode } from 'react';
+import { type ReactNode, Suspense } from 'react';
 import { usePathname, useSearchParams } from 'next/navigation';
 import { AppShell } from '@/components/layout/app-shell';
 import { AuthHydrationGuard } from '@/components/providers/auth-hydration-guard';
 
-export default function AdminLayout({ children }: { children: ReactNode }) {
+function AdminLayoutInner({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
@@ -25,5 +25,13 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     >
       <AppShell>{children}</AppShell>
     </AuthHydrationGuard>
+  );
+}
+
+export default function AdminLayout({ children }: { children: ReactNode }) {
+  return (
+    <Suspense>
+      <AdminLayoutInner>{children}</AdminLayoutInner>
+    </Suspense>
   );
 }

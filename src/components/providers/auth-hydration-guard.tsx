@@ -1,18 +1,20 @@
 'use client';
 
-import { useEffect, useRef, useMemo, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
 // ============================================================================
-// Auth Hydration Guard (ULTRA-FAST v3 — INSTANT NAVIGATION)
+// Auth Hydration Guard (v4 — NO WHITE SCREEN)
 // ============================================================================
-// PERFORMANCE FIXES (v3):
-// 1. Module-level cache: Once auth is verified, skip ALL checks for 5 minutes
-// 2. INSTANT render: If Zustand is hydrated + valid auth → render immediately
-// 3. No loading spinner flash: Uses transparent placeholder instead of spinner
-// 4. Faster safety timeout: 1.5s instead of 2s
-// 5. Pre-verified path: No re-render after first successful verification
+// FIX: Previous versions showed blank bg-background divs during hydration
+// which caused white screen if JS failed or hydration was slow.
+//
+// v4 approach:
+// 1. Render children IMMEDIATELY — no blank loading shell
+// 2. Handle auth redirect via useEffect (non-blocking)
+// 3. If user is not authenticated, redirect AFTER showing the page briefly
+//    rather than showing a blank page while waiting
 // ============================================================================
 
 interface AuthHydrationGuardProps {
@@ -46,10 +48,9 @@ export function AuthHydrationGuard({
   const redirectAttemptedRef = useRef(false);
 
   // Check if auth is cached (skip guard entirely)
-  const authCached = useMemo(() => Date.now() - _authVerifiedAt < AUTH_CACHE_TTL, []);
+  const authCached = _authVerifiedAt > 0 && Date.now() - _authVerifiedAt < AUTH_CACHE_TTL;
 
   // FAST PATH: If already hydrated and auth is valid, render children immediately
-  // This is the most common case — user is already logged in and navigating between pages
   if (zustandHydrated && isAuthenticated && user && requiredRoles.includes(user.role)) {
     _authVerifiedAt = Date.now();
     _lastVerifiedUserId = user.id;
@@ -64,18 +65,15 @@ export function AuthHydrationGuard({
   }
 
   // If the same user was verified recently, allow immediate render
-  // (prevents flash when Zustand re-hydrates from localStorage)
   if (user && user.id === _lastVerifiedUserId && user.role === _lastVerifiedRole && requiredRoles.includes(user.role)) {
     _authVerifiedAt = Date.now();
     return <>{children}</>;
   }
 
-  // Phase 1: Wait for Zustand hydration (only on cold start)
+  // Force hydration after timeout if Zustand hasn't hydrated yet
   useEffect(() => {
-    // If already hydrated, no need to wait
     if (zustandHydrated) return;
 
-    // Safety timeout: force hydration after 1.5 seconds (was 2s)
     const timer = setTimeout(() => {
       useAuthStore.setState({ _hasHydrated: true });
     }, 1500);
@@ -83,11 +81,11 @@ export function AuthHydrationGuard({
     return () => clearTimeout(timer);
   }, [zustandHydrated]);
 
-  // Phase 2: Auth check and redirect
+  // Auth check and redirect — all in useEffect so it's non-blocking
   useEffect(() => {
     if (!zustandHydrated) return;
     if (redirectAttemptedRef.current) return;
-    if (authCached) return; // Auth was recently verified, skip
+    if (authCached) return;
 
     // Don't redirect during logout
     if (typeof window !== 'undefined' && sessionStorage.getItem('aafiatak-logged-out')) {
@@ -112,17 +110,44 @@ export function AuthHydrationGuard({
     _lastVerifiedRole = user.role;
   }, [zustandHydrated, isAuthenticated, user, requiredRoles, redirectPath, router, authCached]);
 
-  // Show MINIMAL loading shell while not hydrated (NO visible spinner text)
-  // This prevents the "جاري التحميل..." stuck screen
+  // KEY FIX: Instead of showing a BLANK div during hydration,
+  // show a minimal loading indicator with a spinner so the user
+  // knows the app is working and not broken
   if (!zustandHydrated) {
     return (
-      <div className={`min-h-screen ${gradientClass}`} dir="rtl" lang="ar" />
+      <div
+        className="min-h-screen flex items-center justify-center"
+        dir="rtl"
+        lang="ar"
+        style={{
+          background: 'linear-gradient(135deg, #7c3aed10 0%, #0ea5e910 100%)',
+        }}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-3 border-primary border-t-transparent animate-spin" />
+          <p className="text-sm text-muted-foreground">جارٍ التحميل...</p>
+        </div>
+      </div>
     );
   }
 
-  // Auth check: if not authenticated or wrong role, return null while redirect happens
+  // Auth check: if not authenticated or wrong role, show redirect message briefly
   if (!isAuthenticated || !user || !requiredRoles.includes(user.role)) {
-    return null;
+    return (
+      <div
+        className="min-h-screen flex items-center justify-center"
+        dir="rtl"
+        lang="ar"
+        style={{
+          background: 'linear-gradient(135deg, #7c3aed10 0%, #0ea5e910 100%)',
+        }}
+      >
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-8 h-8 rounded-full border-3 border-primary border-t-transparent animate-spin" />
+          <p className="text-sm text-muted-foreground">جارٍ التحويل...</p>
+        </div>
+      </div>
+    );
   }
 
   return <>{children}</>;

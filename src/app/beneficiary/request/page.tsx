@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -124,7 +124,7 @@ function CopyBtn({ text }: { text: string }) {
   );
 }
 
-export default function MultiServiceRequestPage() {
+function MultiServiceRequestPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const idsParam = searchParams.get('ids') || '';
@@ -966,5 +966,13 @@ export default function MultiServiceRequestPage() {
         </div>
       </motion.div>
     </div>
+  );
+}
+
+export default function MultiServiceRequestPage() {
+  return (
+    <Suspense fallback={null}>
+      <MultiServiceRequestPageInner />
+    </Suspense>
   );
 }

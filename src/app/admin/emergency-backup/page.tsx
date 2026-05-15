@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -36,7 +36,7 @@ interface AdminInfo {
   phone: string;
 }
 
-export default function EmergencyBackupPage() {
+function EmergencyBackupPageInner() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const token = searchParams.get('token');
@@ -732,5 +732,13 @@ export default function EmergencyBackupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function EmergencyBackupPage() {
+  return (
+    <Suspense fallback={null}>
+      <EmergencyBackupPageInner />
+    </Suspense>
   );
 }
