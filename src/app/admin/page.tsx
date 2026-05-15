@@ -323,21 +323,33 @@ export default function AdminDashboardPage() {
       animate="show"
       className="space-y-6"
     >
-      {/* Page Header - Professional with gradient accent */}
-      <motion.div variants={item} className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-admin/20 to-admin/5 flex items-center justify-center border border-admin/20">
-            <Activity className="w-6 h-6 text-admin" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold">لوحة التحكم</h1>
-            <p className="text-muted-foreground text-sm mt-0.5">نظرة عامة على منصة عافيتك</p>
+      {/* Page Header - Professional */}
+      <motion.div variants={item}>
+        <div className="relative overflow-hidden rounded-2xl border border-admin/20 bg-gradient-to-l from-admin/8 via-admin/4 to-transparent p-5">
+          {/* Decorative blobs */}
+          <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-admin/8 blur-xl" />
+          <div className="absolute -bottom-4 left-1/3 w-16 h-16 rounded-full bg-admin/5 blur-lg" />
+          <div className="relative flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-admin/25 to-admin/10 flex items-center justify-center border border-admin/25 shadow-sm shadow-admin/20">
+                <Activity className="w-6 h-6 text-admin" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h1 className="text-xl font-black text-foreground">لوحة التحكم</h1>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-admin/15 text-admin border border-admin/25">
+                    عافيتك Pro
+                  </span>
+                </div>
+                <p className="text-muted-foreground text-xs">نظرة شاملة على أداء المنصة والإحصائيات</p>
+              </div>
+            </div>
+            <Button variant="outline" size="sm" onClick={fetchDashboard} className="gap-2 border-admin/30 hover:bg-admin/8 hover:border-admin/50 text-admin font-semibold">
+              <RefreshCw className="w-3.5 h-3.5" />
+              تحديث
+            </Button>
           </div>
         </div>
-        <Button variant="outline" size="sm" onClick={fetchDashboard} className="gap-2 border-admin/20 hover:bg-admin/5">
-          <RefreshCw className="w-4 h-4" />
-          تحديث
-        </Button>
       </motion.div>
 
       {/* Quick Search - Redesigned */}
