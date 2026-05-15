@@ -200,13 +200,13 @@ export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
       )}
     >
       {/* Role accent gradient strip on the right border */}
-      <div className={cn('absolute top-0 right-0 bottom-0 w-0.5', getRoleAccentBar(role))} style={{ opacity: 0.5 }} />
+      <div className={cn('absolute top-0 right-0 bottom-0 w-[3px] rounded-full', getRoleAccentBar(role))} style={{ opacity: 0.6 }} />
 
       {/* Logo Section */}
       <div className={cn(
-        'flex items-center gap-3 p-4 border-b border-border/50',
+        'flex items-center gap-3 p-4 border-b border-border/60',
         collapsed ? 'justify-center px-2' : '',
-        'bg-gradient-to-b from-muted/30 to-transparent'
+        'bg-gradient-to-b from-muted/50 to-transparent'
       )}>
         <div className={cn(
           'rounded-xl flex items-center justify-center shrink-0 shadow-md transition-all duration-300',
@@ -262,27 +262,19 @@ export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
                 <Link key={item.href} href={item.href} prefetch={true}>
                   <div
                     className={cn(
-                      'relative flex items-center gap-3 rounded-xl transition-all duration-150 group',
+                      'relative flex items-center gap-3 rounded-xl transition-all duration-150 group cursor-pointer',
                       collapsed ? 'px-0 py-2.5 justify-center mx-1' : 'px-3 py-2.5 mx-0',
                       isActive
-                        ? getRoleActiveColor(role)
-                        : 'text-muted-foreground hover:text-foreground hover:bg-accent/60'
+                        ? cn(getRoleActiveColor(role), 'shadow-sm')
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted/60'
                     )}
                     title={collapsed ? item.label : undefined}
                   >
-                    {/* Active left-side accent bar */}
-                    {isActive && !collapsed && (
+                    {/* Active right-side accent bar */}
+                    {isActive && (
                       <div
                         className={cn(
-                          'absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-l-full',
-                          getRoleAccentBar(role)
-                        )}
-                      />
-                    )}
-                    {isActive && collapsed && (
-                      <div
-                        className={cn(
-                          'absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-7 rounded-l-full',
+                          'absolute right-0 top-1/2 -translate-y-1/2 w-[3px] h-6 rounded-l-full shadow-sm',
                           getRoleAccentBar(role)
                         )}
                       />
@@ -292,27 +284,27 @@ export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
                       'shrink-0 transition-all duration-150 rounded-lg flex items-center justify-center',
                       collapsed ? 'w-9 h-9' : 'w-8 h-8',
                       isActive
-                        ? cn(role === 'admin' || role === 'subadmin' ? 'bg-admin/15' : role === 'nurse' ? 'bg-nurse/15' : 'bg-beneficiary/15')
-                        : 'group-hover:bg-muted/80'
+                        ? cn(role === 'admin' || role === 'subadmin' ? 'bg-admin/20 text-admin' : role === 'nurse' ? 'bg-nurse/20 text-nurse' : 'bg-beneficiary/20 text-beneficiary')
+                        : 'group-hover:bg-muted/70'
                     )}>
                       <Icon
                         className={cn(
                           'transition-all duration-150',
-                          collapsed ? 'w-5 h-5' : 'w-[17px] h-[17px]',
+                          collapsed ? 'w-[18px] h-[18px]' : 'w-[16px] h-[16px]',
                           isActive ? '' : 'group-hover:scale-110'
                         )}
                       />
                     </div>
                     {!collapsed && (
-                      <span className={cn('text-[13px] flex-1 truncate transition-all', isActive ? 'font-bold' : 'font-medium')}>{item.label}</span>
+                      <span className={cn('text-[13px] flex-1 truncate transition-all leading-tight', isActive ? 'font-bold' : 'font-medium')}>{item.label}</span>
                     )}
                     {!collapsed && item.badge !== undefined && item.badge > 0 && (
-                      <span className="mr-auto bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none">
+                      <span className="bg-destructive text-destructive-foreground text-[10px] px-1.5 py-0.5 rounded-full font-bold leading-none min-w-[18px] text-center">
                         {item.badge}
                       </span>
                     )}
                     {collapsed && item.badge !== undefined && item.badge > 0 && (
-                      <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full" />
+                      <span className="absolute top-1 right-1 w-2 h-2 bg-destructive rounded-full ring-2 ring-background" />
                     )}
                   </div>
                 </Link>
@@ -323,21 +315,30 @@ export function Sidebar({ role, isOpen, onToggle }: SidebarProps) {
       </nav>
 
       {/* User Info & Logout */}
-      <div className="border-t border-border/60 p-3 space-y-1">
+      <div className="border-t border-border/60 p-3 space-y-1 bg-gradient-to-t from-muted/20 to-transparent">
         {!collapsed && user && (
           <div className={cn(
             'flex items-center gap-3 px-3 py-2.5 rounded-xl mb-1',
-            'bg-muted/50'
+            'bg-muted/60 border border-border/40'
           )}>
-            <Avatar className="w-8 h-8 shrink-0">
-              <AvatarFallback className={cn('text-xs font-semibold', getRoleColor(role))}>
+            <Avatar className="w-8 h-8 shrink-0 ring-2 ring-border/60">
+              <AvatarFallback className={cn('text-xs font-bold', getRoleColor(role))}>
                 {user.name.slice(0, 2)}
               </AvatarFallback>
             </Avatar>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-semibold truncate leading-tight">{user.name}</p>
-              <p className="text-[11px] text-muted-foreground">{roleLabelMap[role]}</p>
+              <p className="text-sm font-bold truncate leading-tight">{user.name}</p>
+              <p className="text-[11px] text-muted-foreground font-medium">{roleLabelMap[role]}</p>
             </div>
+          </div>
+        )}
+        {collapsed && user && (
+          <div className="flex justify-center mb-1">
+            <Avatar className="w-8 h-8 ring-2 ring-border/60">
+              <AvatarFallback className={cn('text-xs font-bold', getRoleColor(role))}>
+                {user.name.slice(0, 2)}
+              </AvatarFallback>
+            </Avatar>
           </div>
         )}
 
