@@ -178,7 +178,7 @@ export function TopHeader({ onMenuToggle, role }: TopHeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-30 glass-strong border-b border-border safe-top">
+    <header className="glass-strong border-b border-border safe-top">
       {/* Role accent strip at very top */}
       <div className={cn('h-0.5 w-full bg-gradient-to-l', getRoleHeaderAccent(role))} />
       <div className="flex items-center justify-between h-14 px-4 gap-3">

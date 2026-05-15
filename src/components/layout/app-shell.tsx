@@ -1,20 +1,19 @@
 'use client';
 
-import { useState, useEffect, useCallback, type ReactNode } from 'react';
+import { useState, useEffect, useCallback, useRef, type ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import type { UserRole } from '@/types';
 
 // ============================================================================
-// AppShell (PERFORMANCE v3 — ULTRA-FAST)
+// AppShell (PERFORMANCE v4 — SCROLL FIX)
 // ============================================================================
-// PERFORMANCE FIXES (v3):
-// 1. Lazy loads Sidebar, BottomNav, TopHeader (heavy components)
-// 2. Removes navigation cache overhead (Next.js handles this)
-// 3. Defers PushNotificationSetup and RolePrefetcher
-// 4. Uses CSS will-change for smoother transitions
-// 5. No layout thrashing — CSS-driven responsive breakpoints
+// FIXES (v4):
+// 1. Reset scroll position on navigation (main ref + scrollTop = 0)
+// 2. TopHeader uses flex-shrink-0 so it's NEVER compressed by flex layout
+// 3. Removed sticky from TopHeader (it's a fixed flex child, not inside scroll)
+// 4. h-screen + overflow-hidden on root for proper scroll container
 // ============================================================================
 
 interface AppShellProps {
@@ -31,7 +30,7 @@ const BottomNav = dynamic(() => import('./bottom-nav').then(mod => ({ default: m
 });
 
 const TopHeader = dynamic(() => import('./top-header').then(mod => ({ default: mod.TopHeader })), {
-  loading: () => <div className="h-14" />,
+  loading: () => <div className="h-14 shrink-0" />,
 });
 
 const NavProgress = dynamic(() => import('@/components/common/nav-progress').then(mod => ({ default: mod.NavProgress })), {
@@ -53,12 +52,21 @@ export function AppShell({ children }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const user = useAuthStore((s) => s.user);
   const pathname = usePathname();
+  const mainRef = useRef<HTMLElement>(null);
 
   const role: UserRole = user?.role ?? 'beneficiary';
 
   // Close sidebar on navigation
   useEffect(() => {
     setSidebarOpen(false);
+  }, [pathname]);
+
+  // CRITICAL FIX: Reset scroll position when navigating to a new page
+  // This ensures the user always sees the top of the new page
+  useEffect(() => {
+    if (mainRef.current) {
+      mainRef.current.scrollTop = 0;
+    }
   }, [pathname]);
 
   // Debounced sidebar toggle
@@ -78,15 +86,18 @@ export function AppShell({ children }: AppShellProps) {
       {/* Eagerly prefetch pages for this role → instant navigation */}
       <RolePrefetcher role={role} />
 
-      {/* Top Header */}
-      <TopHeader
-        onMenuToggle={handleMenuToggle}
-        role={role}
-      />
+      {/* Top Header — flex-shrink-0 prevents it from being compressed */}
+      <div className="shrink-0 z-30">
+        <TopHeader
+          onMenuToggle={handleMenuToggle}
+          role={role}
+        />
+      </div>
 
-      <div className="flex flex-1 overflow-hidden">
+      {/* Content area: Sidebar + Main — takes remaining height */}
+      <div className="flex flex-1 min-h-0 overflow-hidden">
         {/* Desktop Sidebar — CSS-driven, no JS breakpoint detection */}
-        <div className="hidden md:block">
+        <div className="hidden md:block shrink-0">
           <Sidebar
             role={role}
             isOpen={true}
@@ -113,10 +124,10 @@ export function AppShell({ children }: AppShellProps) {
           </>
         )}
 
-        {/* Main Content — use will-change for smoother scrolling */}
+        {/* Main Content — scroll container with ref for scroll reset */}
         <main
-          className="flex-1 overflow-y-auto custom-scrollbar pb-24 md:pb-6"
-          style={{ willChange: 'scroll-position' }}
+          ref={mainRef}
+          className="flex-1 min-w-0 overflow-y-auto custom-scrollbar pb-24 md:pb-6"
         >
           <div className="p-4 md:p-6 max-w-7xl mx-auto">
             {children}
@@ -125,7 +136,7 @@ export function AppShell({ children }: AppShellProps) {
       </div>
 
       {/* Mobile Bottom Navigation — CSS-driven */}
-      <div className="md:hidden">
+      <div className="md:hidden shrink-0">
         <BottomNav role={role} />
       </div>
 
