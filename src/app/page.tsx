@@ -90,10 +90,14 @@ const nurseRegisterSchema = z.object({
     .min(1, 'رقم الهاتف مطلوب')
     .regex(/^(7\d{8}|\+9677\d{7,8}|9677\d{7,8})$/, 'صيغة رقم الهاتف غير صحيحة'),
   password: z.string().min(1, 'كلمة المرور مطلوبة').min(6, 'كلمة المرور يجب أن تكون ٦ أحرف على الأقل'),
+  confirmPassword: z.string().min(1, 'تأكيد كلمة المرور مطلوب'),
   specialization: z.string().min(1, 'التخصص مطلوب'),
   licenseNumber: z.string().min(1, 'رقم الترخيص مطلوب'),
   address: z.string().min(1, 'العنوان التفصيلي مطلوب'),
   governorate: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'كلمتا المرور غير متطابقتين',
+  path: ['confirmPassword'],
 });
 
 type NurseRegisterFormValues = z.infer<typeof nurseRegisterSchema>;
@@ -105,9 +109,13 @@ const beneficiaryRegisterSchema = z.object({
     .min(1, 'رقم الهاتف مطلوب')
     .regex(/^(7\d{8}|\+9677\d{7,8}|9677\d{7,8})$/, 'صيغة رقم الهاتف غير صحيحة'),
   password: z.string().min(1, 'كلمة المرور مطلوبة').min(6, 'كلمة المرور يجب أن تكون ٦ أحرف على الأقل'),
+  confirmPassword: z.string().min(1, 'تأكيد كلمة المرور مطلوب'),
   address: z.string().min(1, 'العنوان مطلوب'),
   governorate: z.string().optional(),
   referralCode: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'كلمتا المرور غير متطابقتين',
+  path: ['confirmPassword'],
 });
 
 type BeneficiaryRegisterFormValues = z.infer<typeof beneficiaryRegisterSchema>;
@@ -772,7 +780,7 @@ function LoginPageContent() {
   const nurseForm = useForm<NurseRegisterFormValues>({
     resolver: zodResolver(nurseRegisterSchema),
     defaultValues: {
-      name: '', phone: '', password: '',
+      name: '', phone: '', password: '', confirmPassword: '',
       specialization: '', licenseNumber: '', address: '', governorate: '',
     },
   });
@@ -816,7 +824,7 @@ function LoginPageContent() {
   const beneficiaryForm = useForm<BeneficiaryRegisterFormValues>({
     resolver: zodResolver(beneficiaryRegisterSchema),
     defaultValues: {
-      name: '', phone: '', password: '',
+      name: '', phone: '', password: '', confirmPassword: '',
       address: '', governorate: '', referralCode: '',
     },
   });
@@ -850,7 +858,7 @@ function LoginPageContent() {
   // ============================================================================
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden py-8" dir="rtl" lang="ar">
+    <div className="min-h-screen flex items-start justify-center relative overflow-y-auto overflow-x-hidden py-6 sm:py-8" dir="rtl" lang="ar" style={{ maxHeight: '100vh' }}>
       {/* Post-login loading screen */}
       <AnimatePresence>
         {showLoadingScreen && user && (
@@ -886,7 +894,7 @@ function LoginPageContent() {
         initial={{ opacity: 0, y: 26, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 w-full max-w-[500px] mx-4 sm:mx-auto"
+        className="relative z-10 w-full max-w-[500px] mx-4 sm:mx-auto my-auto"
         style={{
           background: 'linear-gradient(160deg, rgba(255,255,255,0.068) 0%, rgba(255,255,255,0.028) 100%)',
           backdropFilter: 'blur(36px) saturate(170%)',
@@ -894,33 +902,37 @@ function LoginPageContent() {
           borderRadius: 28,
           border: '1px solid rgba(255,255,255,0.11)',
           boxShadow: '0 44px 130px -22px rgba(0,0,0,0.78), inset 0 1px 0 rgba(255,255,255,0.13), inset 0 -1px 0 rgba(0,0,0,0.15)',
+          maxHeight: activeTab === 'register' ? 'calc(100vh - 48px)' : undefined,
+          overflow: activeTab === 'register' ? 'hidden' : undefined,
+          display: activeTab === 'register' ? 'flex' : undefined,
+          flexDirection: activeTab === 'register' ? 'column' : undefined,
         }}
       >
         {/* Inner top highlight line */}
         <div className="absolute top-0 inset-x-10 h-px rounded-full" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)' }} />
 
-        <div className="p-7 sm:p-9 safe-bottom">
+        <div className={cn('safe-bottom', activeTab === 'register' ? 'flex flex-col min-h-0 overflow-hidden p-5 sm:p-7' : 'p-7 sm:p-9')}>
 
           {/* === BRAND HEADER === */}
           <motion.div
             initial={{ opacity: 0, scale: 0.86 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.12, duration: 0.58, ease: [0.16, 1, 0.3, 1] }}
-            className="text-center mb-9"
+            className={cn('text-center shrink-0', activeTab === 'register' ? 'mb-4' : 'mb-9')}
           >
             {/* Icon with pulse ring */}
-            <div className="relative inline-block mb-5">
+            <div className={cn('relative inline-block', activeTab === 'register' ? 'mb-3' : 'mb-5')}>
               <motion.div
                 animate={{ scale: [1, 1.07, 1] }}
                 transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                className="relative w-[76px] h-[76px] rounded-[22px] mx-auto flex items-center justify-center cursor-pointer select-none"
+                className={cn('relative rounded-[22px] mx-auto flex items-center justify-center cursor-pointer select-none', activeTab === 'register' ? 'w-[52px] h-[52px]' : 'w-[76px] h-[76px]')}
                 style={{
                   background: 'linear-gradient(135deg, #0d9488 0%, #10b981 55%, #06b6d4 100%)',
                   boxShadow: '0 20px 48px -10px rgba(20,184,166,0.45), 0 4px 16px -4px rgba(20,184,166,0.3)',
                 }}
                 onClick={handleHeartClick}
               >
-                <Heart className="w-[36px] h-[36px] text-white pointer-events-none" fill="currentColor" />
+                <Heart className={cn('text-white pointer-events-none', activeTab === 'register' ? 'w-[24px] h-[24px]' : 'w-[36px] h-[36px]')} fill="currentColor" />
                 {/* Click progress dots */}
                 {heartClickCount > 0 && (
                   <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-[3px] pointer-events-none">
@@ -945,12 +957,12 @@ function LoginPageContent() {
             </div>
             {/* Brand name */}
             <h1
-              className="text-[34px] font-black mb-2 leading-none"
+              className={cn('font-black leading-none', activeTab === 'register' ? 'text-[26px] mb-1' : 'text-[34px] mb-2')}
               style={{ background: 'linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.78) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
             >
               عافيتك
             </h1>
-            <p className="text-[13px] font-medium tracking-wide" style={{ color: 'rgba(255,255,255,0.32)' }}>رعاية صحية منزلية بلمسة زر</p>
+            {activeTab === 'login' && <p className="text-[13px] font-medium tracking-wide" style={{ color: 'rgba(255,255,255,0.32)' }}>رعاية صحية منزلية بلمسة زر</p>}
           </motion.div>
 
           {/* === TAB SWITCHER === */}
@@ -958,7 +970,7 @@ function LoginPageContent() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.22 }}
-            className="relative flex p-[5px] mb-7 rounded-2xl"
+            className={cn('relative flex p-[5px] rounded-2xl shrink-0', activeTab === 'register' ? 'mb-4' : 'mb-7')}
             style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <motion.div
@@ -1122,7 +1134,7 @@ function LoginPageContent() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -18 }}
                 transition={{ duration: 0.28 }}
-                className="space-y-4"
+                className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-4 -mx-1 px-1 pb-2"
               >
                 {/* === ROLE SELECTOR === */}
                 <div className="grid grid-cols-2 gap-3">
@@ -1287,6 +1299,20 @@ function LoginPageContent() {
                           {beneficiaryForm.formState.errors.password && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.password.message}</p>}
                           <PasswordStrengthBar password={beneficiaryPasswordValue} />
                         </div>
+                        {/* Confirm Password */}
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="ben-confirm-password" type={showPassword ? 'text' : 'password'} placeholder="تأكيد كلمة المرور" dir="ltr" className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...beneficiaryForm.register('confirmPassword')} />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          {beneficiaryForm.formState.errors.confirmPassword && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.confirmPassword.message}</p>}
+                        </div>
                       </div>
 
                       {/* Submit */}
@@ -1433,6 +1459,20 @@ function LoginPageContent() {
                           {nurseForm.formState.errors.password && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.password.message}</p>}
                           <PasswordStrengthBar password={nursePasswordValue} />
                         </div>
+                        {/* Confirm Password */}
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="nurse-confirm-password" type={showPassword ? 'text' : 'password'} placeholder="تأكيد كلمة المرور" dir="ltr" className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(14,165,233,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...nurseForm.register('confirmPassword')} />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          {nurseForm.formState.errors.confirmPassword && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.confirmPassword.message}</p>}
+                        </div>
                       </div>
 
                       {/* Submit */}
@@ -1452,16 +1492,18 @@ function LoginPageContent() {
           </AnimatePresence>
 
           {/* Trust badge */}
+          {activeTab === 'login' && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.65 }}
-            className="mt-7 flex items-center justify-center gap-2"
+            className="mt-7 flex items-center justify-center gap-2 shrink-0"
             style={{ color: 'rgba(255,255,255,0.18)' }}
           >
             <Shield className="w-3 h-3" />
             <span className="text-[11px]">بياناتك مشفرة ومحمية بالكامل</span>
           </motion.div>
+          )}
 
         </div>
       </motion.div>

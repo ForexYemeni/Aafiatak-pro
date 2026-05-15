@@ -744,12 +744,10 @@ button, [role="button"] {
 html {
   scroll-behavior: smooth;
   height: 100%;
-  overflow: hidden;
 }
 
 body {
   height: 100%;
-  overflow: hidden;
 }
 
 /* ============================================================================
