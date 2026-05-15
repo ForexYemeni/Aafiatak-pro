@@ -969,7 +969,7 @@ body {
 
 /* Faster page transitions — reduce default animation durations */
 .page-animate {
-  animation-duration: 0.15s;
+  animation-duration: 0.1s;
 }
 
 /* Content-visibility for off-screen sections — skips rendering until needed */
@@ -987,4 +987,51 @@ main {
 /* Faster skeleton pulse */
 .skeleton-fast {
   animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ============================================================================
+   PERFORMANCE OPTIMIZATIONS v3 — ULTRA-FAST NAVIGATION
+   ============================================================================ */
+
+/* Instant hydration — prevent FOUC (Flash of Unstyled Content) */
+html {
+  visibility: visible;
+}
+
+/* Faster link hover transitions */
+a, button, [role="button"] {
+  transition-duration: 150ms;
+}
+
+/* Reduce backdrop-filter blur for better GPU performance */
+.glass,
+.glass-strong,
+.glass-subtle,
+.glass-admin,
+.glass-nurse,
+.glass-beneficiary {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Disable heavy animations on low-end devices */
+@media (prefers-reduced-motion: reduce) {
+  .login-mesh-orb-1,
+  .login-mesh-orb-2,
+  .login-mesh-orb-3 {
+    animation: none !important;
+  }
+}
+
+/* Contain layout to prevent unnecessary reflows */
+.glass,
+.glass-strong,
+.glass-subtle {
+  contain: layout style;
+}
+
+/* Faster card transitions */
+.card-lift {
+  contain: layout style;
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }

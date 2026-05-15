@@ -3,17 +3,16 @@
 import { useEffect, useRef, useMemo, type ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { RefreshCw } from 'lucide-react';
 
 // ============================================================================
-// Auth Hydration Guard (ULTRA-FAST v2)
+// Auth Hydration Guard (ULTRA-FAST v3 — INSTANT NAVIGATION)
 // ============================================================================
-// PERFORMANCE FIXES:
+// PERFORMANCE FIXES (v3):
 // 1. Module-level cache: Once auth is verified, skip ALL checks for 5 minutes
-// 2. Instant render: If Zustand is already hydrated on mount, render immediately
-// 3. No unnecessary state updates: Uses refs instead of state where possible
-// 4. Faster safety timeout: 2s instead of 3s
-// 5. No spinner flash: Uses CSS-only transition instead of React state
+// 2. INSTANT render: If Zustand is hydrated + valid auth → render immediately
+// 3. No loading spinner flash: Uses transparent placeholder instead of spinner
+// 4. Faster safety timeout: 1.5s instead of 2s
+// 5. Pre-verified path: No re-render after first successful verification
 // ============================================================================
 
 interface AuthHydrationGuardProps {
@@ -25,12 +24,12 @@ interface AuthHydrationGuardProps {
 }
 
 // Module-level cache: once auth is verified for a session, we skip re-checking
-// Increased from 1 minute to 5 minutes — reduces unnecessary guard evaluations
 let _authVerifiedAt = 0;
 const AUTH_CACHE_TTL = 300_000; // 5 minutes
 
-// Track if we've ever shown the guard spinner (only show on cold start)
-let _hasEverShownGuard = false;
+// Track the last verified user ID + role to avoid flash on same-user navigation
+let _lastVerifiedUserId = '';
+let _lastVerifiedRole = '';
 
 export function AuthHydrationGuard({
   children,
@@ -45,8 +44,6 @@ export function AuthHydrationGuard({
   const user = useAuthStore((s) => s.user);
 
   const redirectAttemptedRef = useRef(false);
-  const renderCountRef = useRef(0);
-  renderCountRef.current++;
 
   // Check if auth is cached (skip guard entirely)
   const authCached = useMemo(() => Date.now() - _authVerifiedAt < AUTH_CACHE_TTL, []);
@@ -55,7 +52,8 @@ export function AuthHydrationGuard({
   // This is the most common case — user is already logged in and navigating between pages
   if (zustandHydrated && isAuthenticated && user && requiredRoles.includes(user.role)) {
     _authVerifiedAt = Date.now();
-    _hasEverShownGuard = true;
+    _lastVerifiedUserId = user.id;
+    _lastVerifiedRole = user.role;
     return <>{children}</>;
   }
 
@@ -65,15 +63,22 @@ export function AuthHydrationGuard({
     return <>{children}</>;
   }
 
+  // If the same user was verified recently, allow immediate render
+  // (prevents flash when Zustand re-hydrates from localStorage)
+  if (user && user.id === _lastVerifiedUserId && user.role === _lastVerifiedRole && requiredRoles.includes(user.role)) {
+    _authVerifiedAt = Date.now();
+    return <>{children}</>;
+  }
+
   // Phase 1: Wait for Zustand hydration (only on cold start)
   useEffect(() => {
     // If already hydrated, no need to wait
     if (zustandHydrated) return;
 
-    // Safety timeout: force hydration after 2 seconds (was 3s)
+    // Safety timeout: force hydration after 1.5 seconds (was 2s)
     const timer = setTimeout(() => {
       useAuthStore.setState({ _hasHydrated: true });
-    }, 2000);
+    }, 1500);
 
     return () => clearTimeout(timer);
   }, [zustandHydrated]);
@@ -103,18 +108,15 @@ export function AuthHydrationGuard({
 
     // Mark auth as verified
     _authVerifiedAt = Date.now();
+    _lastVerifiedUserId = user.id;
+    _lastVerifiedRole = user.role;
   }, [zustandHydrated, isAuthenticated, user, requiredRoles, redirectPath, router, authCached]);
 
-  // Show loading spinner while not hydrated (only on cold start)
+  // Show MINIMAL loading shell while not hydrated (NO visible spinner text)
+  // This prevents the "جاري التحميل..." stuck screen
   if (!zustandHydrated) {
-    _hasEverShownGuard = true;
     return (
-      <div className={`min-h-screen flex items-center justify-center ${gradientClass}`} dir="rtl" lang="ar">
-        <div className="flex flex-col items-center gap-4">
-          <div className={`w-12 h-12 border-4 ${spinnerColorClass}/30 border-t-${spinnerColorClass} rounded-full animate-spin`} />
-          <p className="text-muted-foreground text-sm">جاري التحميل...</p>
-        </div>
-      </div>
+      <div className={`min-h-screen ${gradientClass}`} dir="rtl" lang="ar" />
     );
   }
 

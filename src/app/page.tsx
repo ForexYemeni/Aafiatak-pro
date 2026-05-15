@@ -635,7 +635,8 @@ function LoginPageContent() {
           .then(res => {
             if (res.ok) {
               const destination = redirectPath ?? getDashboardPath(user.role);
-              window.location.href = destination;
+              // Use router.push for instant client-side navigation (no full page reload)
+              router.push(destination);
             } else {
               useAuthStore.setState({
                 user: null,
@@ -649,7 +650,8 @@ function LoginPageContent() {
           })
           .catch(() => {
             const destination = redirectPath ?? getDashboardPath(user.role);
-            window.location.href = destination;
+            // Use router.push for instant client-side navigation
+            router.push(destination);
           });
       } else {
         useAuthStore.setState({
@@ -671,9 +673,10 @@ function LoginPageContent() {
   const handleLoadingComplete = useCallback(() => {
     if (user) {
       const destination = redirectPath ?? getDashboardPath(user.role);
-      window.location.href = destination;
+      // Use router.push for instant client-side navigation (no full page reload)
+      router.push(destination);
     }
-  }, [user, redirectPath]);
+  }, [user, redirectPath, router]);
 
   // ── Emergency Heart Click Handler ───────────────────────────────────
   const handleHeartClick = useCallback(() => {

@@ -43,10 +43,6 @@
       ignoreBuildErrors: true,
     },
 
-    eslint: {
-      ignoreDuringBuilds: true,
-    },
-
     // DISABLE strict mode in production — prevents double-rendering which
     // causes visible flickering and slower perceived performance
     reactStrictMode: false,
@@ -146,6 +142,11 @@
     // ============================================================================
     // Experimental Features
     // ============================================================================
+
+    // Turbopack root — silence the workspace root warning
+    turbopack: {
+      root: '..',
+    },
 
     experimental: {
       optimizePackageImports: [
