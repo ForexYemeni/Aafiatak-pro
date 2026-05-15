@@ -19,7 +19,7 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { requireEmergencyOrAdmin, createErrorResponse } from '@/lib/auth/middleware';
 import { verifyPassword } from '@/lib/auth';
 
 // ── BSON-safe serializer ──────────────────────────────────────────────────────
@@ -877,25 +877,33 @@ chmod +x scripts/restore-all.sh
 
 export async function POST(request: NextRequest) {
   try {
-    const { user, error } = requireRole(request, ['admin']);
+    const { user, error, isEmergency } = requireEmergencyOrAdmin(request, ['admin']);
     if (error) return error;
 
     const body = await request.json();
     const { password } = body;
 
-    if (!password || typeof password !== 'string') {
-      return createErrorResponse('كلمة المرور مطلوبة', 400, 'VALIDATION_ERROR');
-    }
-
+    // ── Verify admin password (skip for emergency tokens) ───────────────
     await connectDB();
-
-    // ── Verify admin ───────────────────────────────────────────────────
     const { User } = await import('@/models/mongoose/User');
-    const currentAdmin = await User.findOne({ role: 'admin', _id: user!.userId }).lean();
-    if (!currentAdmin) return createErrorResponse('حساب الإدارة غير موجود', 404, 'ADMIN_NOT_FOUND');
 
-    const isPasswordValid = await verifyPassword(password, (currentAdmin as any).password);
-    if (!isPasswordValid) return createErrorResponse('كلمة المرور غير صحيحة', 401, 'INVALID_PASSWORD');
+    let adminName = 'admin';
+    if (!isEmergency) {
+      if (!password || typeof password !== 'string') {
+        return createErrorResponse('كلمة المرور مطلوبة', 400, 'VALIDATION_ERROR');
+      }
+
+      const currentAdmin = await User.findOne({ role: 'admin', _id: user!.userId }).lean();
+      if (!currentAdmin) return createErrorResponse('حساب الإدارة غير موجود', 404, 'ADMIN_NOT_FOUND');
+
+      const isPasswordValid = await verifyPassword(password, (currentAdmin as any).password);
+      if (!isPasswordValid) return createErrorResponse('كلمة المرور غير صحيحة', 401, 'INVALID_PASSWORD');
+      adminName = (currentAdmin as any).name || 'admin';
+    } else {
+      // Emergency access — fetch admin name
+      const adminUser = await User.findById(user!.userId).select('name').lean();
+      if (adminUser) adminName = (adminUser as any).name || 'admin';
+    }
 
     // ── Connect to MongoDB ─────────────────────────────────────────────
     const mongoose = await import('mongoose');
@@ -1018,7 +1026,7 @@ export async function POST(request: NextRequest) {
     // DEPLOY_GUIDE.md
     zip.file('DEPLOY_GUIDE.md', buildDeployGuide(
       dateStr,
-      (currentAdmin as any).name || 'admin',
+      adminName,
       totalDocuments,
       hasSource,
       Object.keys(dbExport).length,
@@ -1031,7 +1039,7 @@ export async function POST(request: NextRequest) {
       version: '2.0',
       backupType: 'complete-platform',
       exportedAt: now.toISOString(),
-      exportedBy: (currentAdmin as any).name || 'admin',
+      exportedBy: adminName,
       totalDocuments,
       collectionCount: Object.keys(dbExport).length,
       envVarCount: Object.keys(envExport).length,
