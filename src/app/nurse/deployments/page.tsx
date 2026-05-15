@@ -9,7 +9,7 @@ import {
   Building2, Landmark, Hash, Percent, FileCheck, Wallet, Star,
   User, ShieldCheck, Award, BriefcaseMedical, Phone, CheckCircle,
   CreditCard, MessageSquare, Activity, Heart, Zap, Stethoscope, XCircle,
-  Tag, CircleCheck
+  Tag, CircleCheck, PlayCircle, TrendingUp
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -251,6 +251,9 @@ export default function NurseDeploymentsPage() {
   const [manageTarget, setManageTarget] = useState<DeploymentItem | null>(null);
   const [isSelecting, setIsSelecting] = useState(false);
 
+  // Task execution loading state
+  const [execLoading, setExecLoading] = useState<string | null>(null);
+
   // Create deployment form state
   const [createForm, setCreateForm] = useState({
     type: 'nursing',
@@ -421,6 +424,50 @@ export default function NurseDeploymentsPage() {
       toast.error('حدث خطأ أثناء اختيار المتقدم');
     } finally {
       setIsSelecting(false);
+    }
+  };
+
+  /* ── Start deployment execution ── */
+  const handleStartDeployment = async (deploymentId: string) => {
+    setExecLoading(deploymentId);
+    try {
+      const res = await authFetch(`/api/deployments/${deploymentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم بدء تنفيذ التكليف');
+        void fetchDeployments();
+      } else {
+        toast.error(json.message ?? 'فشل بدء التنفيذ');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    } finally {
+      setExecLoading(null);
+    }
+  };
+
+  /* ── Complete deployment ── */
+  const handleCompleteDeployment = async (deploymentId: string) => {
+    setExecLoading(deploymentId);
+    try {
+      const res = await authFetch(`/api/deployments/${deploymentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم إكمال التكليف بنجاح! 🎉');
+        void fetchDeployments();
+      } else {
+        toast.error(json.message ?? 'فشل إكمال التكليف');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    } finally {
+      setExecLoading(null);
     }
   };
 
@@ -842,6 +889,42 @@ export default function NurseDeploymentsPage() {
             </div>
           )}
 
+          {/* Task Execution Buttons — shown when this nurse is the assignee */}
+          {idMatches(dep.assignedTo?.id, currentUserId) && dep.status === 'assigned' && (
+            <div className="p-3 rounded-xl bg-gradient-to-r from-nurse/5 to-teal-500/5 border border-nurse/20 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <PlayCircle className="w-3.5 h-3.5 text-nurse" />
+                <p className="text-xs font-semibold text-nurse">جاهز للتنفيذ</p>
+              </div>
+              <Button
+                size="sm"
+                className="w-full h-9 text-xs gap-1.5 font-bold bg-gradient-to-r from-nurse to-teal-600 hover:from-nurse/90 hover:to-teal-700 text-white border-0 shadow-sm"
+                onClick={() => handleStartDeployment(dep.id)}
+                disabled={execLoading === dep.id}
+              >
+                {execLoading === dep.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <PlayCircle className="w-3.5 h-3.5" />}
+                بدء تنفيذ التكليف
+              </Button>
+            </div>
+          )}
+          {idMatches(dep.assignedTo?.id, currentUserId) && dep.status === 'in_progress' && (
+            <div className="p-3 rounded-xl bg-gradient-to-r from-teal-500/5 to-emerald-500/5 border border-teal-500/20 space-y-2">
+              <div className="flex items-center gap-1.5">
+                <Activity className="w-3.5 h-3.5 text-teal-600 animate-pulse" />
+                <p className="text-xs font-semibold text-teal-600">قيد التنفيذ الآن</p>
+              </div>
+              <Button
+                size="sm"
+                className="w-full h-9 text-xs gap-1.5 font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white border-0 shadow-sm"
+                onClick={() => handleCompleteDeployment(dep.id)}
+                disabled={execLoading === dep.id}
+              >
+                {execLoading === dep.id ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}
+                إكمال التكليف
+              </Button>
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex gap-2 pt-1">
             <Button
@@ -977,17 +1060,45 @@ export default function NurseDeploymentsPage() {
   /* ═══════════════ RENDER ═══════════════ */
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
-      {/* Header */}
+      {/* Hero Header */}
       <motion.div variants={itemAnim}>
-        <PageHeader
-          title="التكليفات"
-          description="تصفح التكليفات المتاحة وتقدم لها أو أنشئ تكليفاً خاصاً بك"
-          action={{
-            label: 'تحديث',
-            icon: <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />,
-            onClick: () => { setIsLoading(true); void fetchDeployments(); },
-          }}
-        />
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-bl from-sky-600 via-nurse to-teal-600 p-5 text-white shadow-lg shadow-nurse/25">
+          <div className="absolute inset-0 opacity-10">
+            <div className="absolute top-2 left-8 w-28 h-28 rounded-full bg-white/20 blur-2xl" />
+            <div className="absolute bottom-0 right-4 w-24 h-24 rounded-full bg-white/15 blur-xl" />
+          </div>
+          <div className="relative flex items-center justify-between gap-3">
+            <div className="flex-1">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-white/60 mb-1">منصة التكليفات</p>
+              <h1 className="text-xl font-black leading-snug">التكليفات المهنية</h1>
+              <p className="text-xs text-white/75 mt-1">تصفح وتقدم لأحدث التكليفات المتاحة</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center">
+                <Briefcase className="w-5 h-5 text-white" />
+              </div>
+              <button
+                onClick={() => { setIsLoading(true); void fetchDeployments(); }}
+                className="w-10 h-10 rounded-xl bg-white/15 border border-white/20 flex items-center justify-center hover:bg-white/25 transition-colors"
+              >
+                <RefreshCw className={`w-4 h-4 text-white ${isLoading ? 'animate-spin' : ''}`} />
+              </button>
+            </div>
+          </div>
+          {/* Stats row */}
+          <div className="relative mt-4 grid grid-cols-3 gap-2">
+            {[
+              { label: 'متاحة', value: availableDeployments.length },
+              { label: 'نشطة', value: activeDeployments.length },
+              { label: 'تقديماتي', value: myApplications.length },
+            ].map((stat) => (
+              <div key={stat.label} className="text-center bg-white/10 rounded-xl py-2 border border-white/15">
+                <p className="text-base font-black text-white leading-none">{toArabicNum(stat.value)}</p>
+                <p className="text-[9px] text-white/70 mt-0.5">{stat.label}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </motion.div>
 
       {/* Tabs - Updated to 6 tabs */}
