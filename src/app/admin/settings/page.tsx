@@ -10,7 +10,7 @@ import {
   Trash2, TriangleAlert, Upload, Download, Archive, Info
 } from 'lucide-react';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
-import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthFetch, invalidateAuthFetchCache } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -378,6 +378,8 @@ export default function AdminSettingsPage() {
         setResetResult(json.data);
         setResetPassword('');
         setResetConfirmText('');
+        // CRITICAL: Clear ALL API cache after database reset
+        invalidateAuthFetchCache();
         toast.success('تم حذف جميع البيانات بنجاح');
       } else {
         toast.error(json.error?.message ?? json.message ?? 'فشل حذف البيانات');

@@ -37,7 +37,7 @@ import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { Currency } from '@/components/common/currency';
 import { DateFormatter, toArabicNum } from '@/components/common/date-formatter';
-import { useAuthFetch, _GET_CACHE_readSync } from '@/hooks/use-auth';
+import { useAuthFetch, _GET_CACHE_readSync, invalidateAuthFetchCache } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -140,9 +140,16 @@ export default function AdminDashboardPage() {
   // Order detail dialog
   const [selectedOrder, setSelectedOrder] = useState<any | null>(null);
 
-  const fetchDashboard = async () => {
+  const fetchDashboard = async (forceRefresh = false) => {
     setIsLoading(true);
     setError(null);
+    // CRITICAL: Clear cache before fetching to ensure fresh data from server
+    if (forceRefresh) {
+      invalidateAuthFetchCache('/api/admin/dashboard');
+      invalidateAuthFetchCache('/api/admin/orders');
+      invalidateAuthFetchCache('/api/admin/nurses');
+      invalidateAuthFetchCache('/api/admin/beneficiaries');
+    }
     try {
       // Parallel API calls for faster loading
       const [dashboardRes, ordersRes, nursesRes, benRes] = await Promise.allSettled([
@@ -247,7 +254,9 @@ export default function AdminDashboardPage() {
   };
 
   useEffect(() => {
-    void fetchDashboard();
+    // Always force fresh data on mount — cache may be stale
+    invalidateAuthFetchCache('/api/admin/');
+    void fetchDashboard(false);
   }, []);
 
   // Quick search handler
@@ -306,7 +315,7 @@ export default function AdminDashboardPage() {
         <AlertTriangle className="w-16 h-16 text-destructive mb-4" />
         <h3 className="text-lg font-semibold mb-2">خطأ في التحميل</h3>
         <p className="text-muted-foreground mb-4">{error}</p>
-        <Button onClick={fetchDashboard} className="gap-2">
+        <Button onClick={() => fetchDashboard(true)} className="gap-2">
           <RefreshCw className="w-4 h-4" />
           إعادة المحاولة
         </Button>
@@ -344,7 +353,7 @@ export default function AdminDashboardPage() {
                 <p className="text-muted-foreground text-xs">نظرة شاملة على أداء المنصة والإحصائيات</p>
               </div>
             </div>
-            <Button variant="outline" size="sm" onClick={fetchDashboard} className="gap-2 border-admin/30 hover:bg-admin/8 hover:border-admin/50 text-admin font-semibold">
+            <Button variant="outline" size="sm" onClick={() => fetchDashboard(true)} className="gap-2 border-admin/30 hover:bg-admin/8 hover:border-admin/50 text-admin font-semibold">
               <RefreshCw className="w-3.5 h-3.5" />
               تحديث
             </Button>
