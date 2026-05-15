@@ -741,7 +741,38 @@ export default function AdminNursesPage() {
 
       {/* ═══ Page Header ═══ */}
       <motion.div variants={itemAnim}>
-        <PageHeader title="إدارة الممرضين" description="إدارة الممرضين وطلبات السحب" />
+        <div className="relative overflow-hidden rounded-2xl border border-nurse/20 bg-gradient-to-l from-nurse/8 via-nurse/4 to-transparent p-5">
+          <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-nurse/8 blur-xl" />
+          <div className="absolute -bottom-4 left-1/3 w-16 h-16 rounded-full bg-nurse/5 blur-lg" />
+          <div className="relative flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-nurse/25 to-nurse/10 flex items-center justify-center border border-nurse/25 shadow-sm shadow-nurse/20">
+                <Stethoscope className="w-6 h-6 text-nurse" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h1 className="text-xl font-black text-foreground">إدارة الممرضين</h1>
+                  {nurseStats.pending > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                      {nurseStats.pending} قيد المراجعة
+                    </span>
+                  )}
+                </div>
+                <p className="text-muted-foreground text-xs">إدارة الممرضين وطلبات السحب والتوثيق</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-nurse/10 border border-nurse/20 rounded-xl px-3 py-1.5">
+                <Users className="w-3.5 h-3.5 text-nurse" />
+                <span className="text-xs font-bold text-nurse">{nurseStats.total} ممرض</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-1.5">
+                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{nurseStats.verified} موثق</span>
+              </div>
+            </div>
+          </div>
+        </div>
       </motion.div>
 
       {/* ═══ Tabs ═══ */}

@@ -358,15 +358,35 @@ export default function AdminDeploymentsPage() {
     <motion.div variants={containerAnim} initial="hidden" animate="show" className="space-y-6">
       {/* Header */}
       <motion.div variants={itemAnim}>
-        <PageHeader
-          title="إدارة التكليفات"
-          description="متابعة وإدارة التكليفات والطلبات"
-          action={{
-            label: 'تكليف جديد',
-            icon: <Plus className="w-4 h-4" />,
-            onClick: () => setShowCreateDialog(true),
-          }}
-        />
+        <div className="relative overflow-hidden rounded-2xl border border-admin/20 bg-gradient-to-l from-admin/8 via-admin/4 to-transparent p-5">
+          <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-admin/8 blur-xl" />
+          <div className="absolute -bottom-4 left-1/3 w-16 h-16 rounded-full bg-admin/5 blur-lg" />
+          <div className="relative flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-admin/25 to-admin/10 flex items-center justify-center border border-admin/25 shadow-sm shadow-admin/20">
+                <Briefcase className="w-6 h-6 text-admin" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h1 className="text-xl font-black text-foreground">إدارة التكليفات</h1>
+                  {creatorSelectedCount > 0 && (
+                    <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/25">
+                      {creatorSelectedCount} بانتظار الموافقة
+                    </span>
+                  )}
+                </div>
+                <p className="text-muted-foreground text-xs">متابعة وإدارة جميع التكليفات والطلبات</p>
+              </div>
+            </div>
+            <Button
+              onClick={() => setShowCreateDialog(true)}
+              className="bg-admin hover:bg-admin/90 gap-2 shadow-md shadow-admin/20"
+            >
+              <Plus className="w-4 h-4" />
+              تكليف جديد
+            </Button>
+          </div>
+        </div>
       </motion.div>
 
       {/* Stats Row */}

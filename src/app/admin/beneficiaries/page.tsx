@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Eye, RefreshCw, MapPin, Phone, MessageCircle, Ban, Trash2, Shield, Heart, Navigation } from 'lucide-react';
+import { Users, Eye, RefreshCw, MapPin, Phone, MessageCircle, Ban, Trash2, Shield, Heart, Navigation, Activity, TrendingUp, UserCheck } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -91,6 +91,7 @@ export default function AdminBeneficiariesPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
 
+  const [totalCount, setTotalCount] = useState(0);
   const [viewTarget, setViewTarget] = useState<BeneficiaryItem | null>(null);
   const [toggleTarget, setToggleTarget] = useState<BeneficiaryItem | null>(null);
   const [blockTarget, setBlockTarget] = useState<BeneficiaryItem | null>(null);
@@ -112,6 +113,7 @@ export default function AdminBeneficiariesPage() {
         const items = json.data.beneficiaries ?? json.data;
         setBeneficiaries(Array.isArray(items) ? items : []);
         if (json.data.pages) setTotalPages(json.data.pages);
+        if (json.data.total) setTotalCount(json.data.total);
       }
     } catch {
       toast.error('فشل تحميل بيانات المستفيدين');
@@ -414,10 +416,71 @@ export default function AdminBeneficiariesPage() {
     </div>
   );
 
+  const activeCount = beneficiaries.filter(b => b.status === 'active' && !b.isBlocked).length;
+  const blockedCount = beneficiaries.filter(b => b.isBlocked).length;
+  const goldPlatinumCount = beneficiaries.filter(b => b.loyaltyTier === 'gold' || b.loyaltyTier === 'platinum').length;
+
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+      {/* Professional Header Banner */}
       <motion.div variants={itemAnim}>
-        <PageHeader title="إدارة المستفيدين" description="عرض وإدارة حسابات المستفيدين" />
+        <div className="relative overflow-hidden rounded-2xl border border-beneficiary/20 bg-gradient-to-l from-beneficiary/8 via-beneficiary/4 to-transparent p-5">
+          <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-beneficiary/8 blur-xl" />
+          <div className="absolute -bottom-4 left-1/3 w-16 h-16 rounded-full bg-beneficiary/5 blur-lg" />
+          <div className="relative flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-beneficiary/25 to-beneficiary/10 flex items-center justify-center border border-beneficiary/25 shadow-sm shadow-beneficiary/20">
+                <Users className="w-6 h-6 text-beneficiary" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h1 className="text-xl font-black text-foreground">إدارة المستفيدين</h1>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-beneficiary/15 text-beneficiary border border-beneficiary/25">
+                    عافيتك Pro
+                  </span>
+                </div>
+                <p className="text-muted-foreground text-xs">عرض وإدارة حسابات المستفيدين والعملاء</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-beneficiary/10 border border-beneficiary/20 rounded-xl px-3 py-1.5">
+                <Users className="w-3.5 h-3.5 text-beneficiary" />
+                <span className="text-xs font-bold text-beneficiary">{totalCount || (totalPages * 10)} مستفيد</span>
+              </div>
+              <Button variant="outline" size="icon" className="border-beneficiary/30 hover:bg-beneficiary/8 hover:border-beneficiary/50" onClick={() => void fetchBeneficiaries()}>
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Stat Cards */}
+      <motion.div variants={itemAnim} className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-violet-500 to-violet-700 p-4 text-white shadow-lg shadow-violet-500/20">
+          <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+          <Users className="w-7 h-7 mb-2 opacity-80" />
+          <p className="text-2xl font-bold">{totalCount || (totalPages * 10)}</p>
+          <p className="text-xs text-violet-100">إجمالي المستفيدين</p>
+        </div>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 text-white shadow-lg shadow-emerald-500/20">
+          <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+          <UserCheck className="w-7 h-7 mb-2 opacity-80" />
+          <p className="text-2xl font-bold">{activeCount}</p>
+          <p className="text-xs text-emerald-100">نشطون (الصفحة الحالية)</p>
+        </div>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-rose-500 to-rose-700 p-4 text-white shadow-lg shadow-rose-500/20">
+          <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+          <Ban className="w-7 h-7 mb-2 opacity-80" />
+          <p className="text-2xl font-bold">{blockedCount}</p>
+          <p className="text-xs text-rose-100">محظورون (الصفحة الحالية)</p>
+        </div>
+        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 p-4 text-white shadow-lg shadow-amber-500/20">
+          <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+          <TrendingUp className="w-7 h-7 mb-2 opacity-80" />
+          <p className="text-2xl font-bold">{goldPlatinumCount}</p>
+          <p className="text-xs text-amber-100">ذهبي / بلاتيني</p>
+        </div>
       </motion.div>
 
       <motion.div variants={itemAnim}>
@@ -435,9 +498,6 @@ export default function AdminBeneficiariesPage() {
                 <SelectItem value="suspended">موقوف</SelectItem>
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={() => void fetchBeneficiaries()}>
-              <RefreshCw className="w-4 h-4" />
-            </Button>
           </div>
         </GlassCard>
       </motion.div>

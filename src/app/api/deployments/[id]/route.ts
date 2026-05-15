@@ -118,8 +118,14 @@ export async function PATCH(
     // ── Authorization for status changes ──
     const isAdminOrSubadmin = ['admin', 'subadmin'].includes(user.role);
     const isCreator = existingDeployment.createdBy.toString() === user.userId;
+    const isAssignee = existingDeployment.assignedTo &&
+      existingDeployment.assignedTo.toString() === user.userId;
 
-    if (body.status && !isAdminOrSubadmin && !isCreator) {
+    // Assignees (the nurse doing the work) can only move to in_progress or completed
+    const assigneeAllowedStatuses = ['in_progress', 'completed'];
+    const isAssigneeStatusChange = isAssignee && body.status && assigneeAllowedStatuses.includes(body.status);
+
+    if (body.status && !isAdminOrSubadmin && !isCreator && !isAssigneeStatusChange) {
       return createErrorResponse('ليس لديك صلاحية لتغيير حالة هذا التكليف', 403, 'FORBIDDEN');
     }
 
