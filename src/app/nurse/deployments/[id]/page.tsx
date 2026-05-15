@@ -8,7 +8,7 @@ import {
   CheckCircle2, XCircle, Upload, Navigation, User, CreditCard,
   Wallet, Building2, Calendar, FileText, AlertTriangle, Eye,
   Star, ShieldCheck, Award, BriefcaseMedical, Phone, X, MessageSquare,
-  Copy
+  Copy, PlayCircle, CheckSquare, Zap, Activity, TrendingUp
 } from 'lucide-react';
 import { GlassCard } from '@/components/common/glass-card';
 import { BadgeStatus } from '@/components/common/badge-status';
@@ -214,6 +214,9 @@ export default function NurseDeploymentDetailPage() {
   // Select applicant state
   const [isSelecting, setIsSelecting] = useState(false);
 
+  // Task execution state
+  const [isExecuting, setIsExecuting] = useState(false);
+
   /* ── Fetch deployment ── */
   const fetchDeployment = useCallback(async () => {
     if (!deploymentId) return;
@@ -346,6 +349,50 @@ export default function NurseDeploymentDetailPage() {
       toast.error('حدث خطأ أثناء التقييم');
     } finally {
       setIsSubmittingRating(false);
+    }
+  };
+
+  /* ── Start task execution ── */
+  const handleStartExecution = async () => {
+    setIsExecuting(true);
+    try {
+      const res = await authFetch(`/api/deployments/${deploymentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'in_progress' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم بدء تنفيذ التكليف بنجاح');
+        void fetchDeployment();
+      } else {
+        toast.error(json.message ?? 'فشل بدء التنفيذ');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء بدء التنفيذ');
+    } finally {
+      setIsExecuting(false);
+    }
+  };
+
+  /* ── Complete task ── */
+  const handleCompleteExecution = async () => {
+    setIsExecuting(true);
+    try {
+      const res = await authFetch(`/api/deployments/${deploymentId}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'completed' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم إكمال التكليف بنجاح! 🎉');
+        void fetchDeployment();
+      } else {
+        toast.error(json.message ?? 'فشل إكمال التكليف');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء إكمال التكليف');
+    } finally {
+      setIsExecuting(false);
     }
   };
 
@@ -1014,6 +1061,144 @@ export default function NurseDeploymentDetailPage() {
                   </div>
                 ))}
               </div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* ═══ TASK EXECUTION SECTION — for assigned nurse ═══ */}
+      {isAssignedToMe && ['assigned', 'in_progress'].includes(deployment.status) && (
+        <motion.div variants={itemAnim}>
+          <GlassCard variant="nurse" className="overflow-hidden p-0">
+            {/* Gradient header */}
+            <div className={`px-4 py-3.5 flex items-center gap-3 ${
+              deployment.status === 'in_progress'
+                ? 'bg-gradient-to-r from-teal-600 via-teal-500 to-emerald-500'
+                : 'bg-gradient-to-r from-nurse via-nurse/90 to-teal-600'
+            }`}>
+              <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                {deployment.status === 'in_progress'
+                  ? <Activity className="w-4 h-4 text-white" />
+                  : <PlayCircle className="w-4 h-4 text-white" />
+                }
+              </div>
+              <div className="flex-1">
+                <p className="text-white font-bold text-sm">إجراءات تنفيذ التكليف</p>
+                <p className="text-white/75 text-[10px]">
+                  {deployment.status === 'in_progress' ? 'التكليف قيد التنفيذ حالياً' : 'جاهز للبدء — ابدأ التنفيذ متى أردت'}
+                </p>
+              </div>
+              <div className={`px-2.5 py-1 rounded-full text-[10px] font-bold ${
+                deployment.status === 'in_progress'
+                  ? 'bg-white/20 text-white border border-white/30'
+                  : 'bg-white/15 text-white border border-white/25'
+              }`}>
+                {deploymentStatusLabel[deployment.status]}
+              </div>
+            </div>
+
+            <div className="p-4 space-y-4">
+              {/* Progress steps */}
+              <div className="space-y-2">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wide mb-2">مراحل التكليف</p>
+                {[
+                  {
+                    label: 'تم التعيين والموافقة على الدفع',
+                    sublabel: 'تم التحقق من دفعك وتعيينك',
+                    done: true,
+                    icon: CheckSquare,
+                  },
+                  {
+                    label: 'تنفيذ التكليف',
+                    sublabel: deployment.status === 'in_progress' ? 'جارٍ التنفيذ الآن' : 'ابدأ حين تصل إلى موقع العمل',
+                    done: deployment.status === 'in_progress' || deployment.status === 'completed',
+                    icon: Zap,
+                  },
+                  {
+                    label: 'إكمال التكليف',
+                    sublabel: 'أنهِ التكليف بعد الانتهاء',
+                    done: deployment.status === 'completed',
+                    icon: TrendingUp,
+                  },
+                ].map((step, i) => {
+                  const Icon = step.icon;
+                  const isCurrent = i === 1 && deployment.status === 'assigned' || i === 2 && deployment.status === 'in_progress';
+                  return (
+                    <div key={i} className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+                      step.done
+                        ? 'bg-teal-50 dark:bg-teal-900/10 border-teal-200 dark:border-teal-800/30'
+                        : isCurrent
+                          ? 'bg-nurse/5 dark:bg-nurse/10 border-nurse/30 ring-1 ring-nurse/20'
+                          : 'bg-muted/30 border-border'
+                    }`}>
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${
+                        step.done
+                          ? 'bg-teal-500 text-white'
+                          : isCurrent
+                            ? 'bg-nurse/20 text-nurse'
+                            : 'bg-muted-foreground/10 text-muted-foreground'
+                      }`}>
+                        {step.done
+                          ? <CheckCircle2 className="w-4 h-4" />
+                          : <Icon className="w-4 h-4" />
+                        }
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className={`text-xs font-semibold ${
+                          step.done ? 'text-teal-700 dark:text-teal-300' : isCurrent ? 'text-foreground' : 'text-muted-foreground'
+                        }`}>{step.label}</p>
+                        <p className="text-[10px] text-muted-foreground">{step.sublabel}</p>
+                      </div>
+                      {step.done && <CheckCircle2 className="w-4 h-4 text-teal-500 shrink-0" />}
+                      {isCurrent && !step.done && (
+                        <div className="w-2 h-2 rounded-full bg-nurse animate-pulse shrink-0" />
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              <div className="h-px bg-border" />
+
+              {/* Action Buttons */}
+              {deployment.status === 'assigned' && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground text-center">اضغط لبدء التنفيذ عند وصولك لموقع العمل</p>
+                  <Button
+                    className="w-full gap-2 h-12 text-sm font-bold bg-gradient-to-r from-nurse to-teal-600 hover:from-nurse/90 hover:to-teal-700 text-white shadow-md shadow-nurse/20 border-0"
+                    onClick={handleStartExecution}
+                    disabled={isExecuting}
+                  >
+                    {isExecuting ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <PlayCircle className="w-5 h-5" />
+                    )}
+                    بدء تنفيذ التكليف
+                  </Button>
+                </div>
+              )}
+
+              {deployment.status === 'in_progress' && (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2 p-2.5 rounded-lg bg-teal-50 dark:bg-teal-900/10 border border-teal-200 dark:border-teal-800/30">
+                    <Activity className="w-3.5 h-3.5 text-teal-600 animate-pulse" />
+                    <p className="text-xs text-teal-700 dark:text-teal-300 font-medium">التكليف قيد التنفيذ — اضغط للإكمال عند الانتهاء</p>
+                  </div>
+                  <Button
+                    className="w-full gap-2 h-12 text-sm font-bold bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-md shadow-emerald-600/20 border-0"
+                    onClick={handleCompleteExecution}
+                    disabled={isExecuting}
+                  >
+                    {isExecuting ? (
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-5 h-5" />
+                    )}
+                    إكمال التكليف
+                  </Button>
+                </div>
+              )}
             </div>
           </GlassCard>
         </motion.div>
