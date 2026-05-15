@@ -6,6 +6,10 @@ import { connectDB } from '@/lib/mongodb';
 import { User, Nurse, Beneficiary, ServiceRequest, EmergencyRequest, Transaction, Referral, Deployment } from '@/models/mongoose';
 import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
+// Force dynamic rendering — NEVER cache this on the server
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -139,7 +143,7 @@ export async function GET(request: NextRequest) {
       ordersChartData.push({ date: dateKey, orders: ordersByDate.get(dateKey) || 0 });
     }
 
-    return Response.json({
+    return new Response(JSON.stringify({
       success: true,
       data: {
         totalBeneficiaries,
@@ -178,6 +182,13 @@ export async function GET(request: NextRequest) {
         deploymentRevenue: Math.round(totalDeploymentRevenue[0]?.totalFees || 0),
         deploymentCommission: Math.round(totalDeploymentRevenue[0]?.totalCommission || 0),
         deploymentCreatorFees: Math.round(totalDeploymentRevenue[0]?.totalCreatorFees || 0),
+      },
+    }), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
     });
   } catch (error) {

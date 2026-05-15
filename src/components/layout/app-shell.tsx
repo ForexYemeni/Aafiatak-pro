@@ -7,13 +7,10 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import type { UserRole } from '@/types';
 
 // ============================================================================
-// AppShell (PERFORMANCE v4 — SCROLL FIX)
+// AppShell (v5 — FIXED HEADER + BOTTOM NAV)
 // ============================================================================
-// FIXES (v4):
-// 1. Reset scroll position on navigation (main ref + scrollTop = 0)
-// 2. TopHeader uses flex-shrink-0 so it's NEVER compressed by flex layout
-// 3. Removed sticky from TopHeader (it's a fixed flex child, not inside scroll)
-// 4. h-screen + overflow-hidden on root for proper scroll container
+// ARCHITECTURE: TopHeader and BottomNav are position:fixed — they NEVER scroll.
+// Only the <main> element scrolls. This is the ONLY bulletproof approach.
 // ============================================================================
 
 interface AppShellProps {
@@ -30,7 +27,7 @@ const BottomNav = dynamic(() => import('./bottom-nav').then(mod => ({ default: m
 });
 
 const TopHeader = dynamic(() => import('./top-header').then(mod => ({ default: mod.TopHeader })), {
-  loading: () => <div className="h-14 shrink-0" />,
+  loading: () => <div className="fixed top-0 left-0 right-0 z-50 h-[58px] glass-strong border-b border-border" />,
 });
 
 const NavProgress = dynamic(() => import('@/components/common/nav-progress').then(mod => ({ default: mod.NavProgress })), {
@@ -61,15 +58,16 @@ export function AppShell({ children }: AppShellProps) {
     setSidebarOpen(false);
   }, [pathname]);
 
-  // CRITICAL FIX: Reset scroll position when navigating to a new page
-  // This ensures the user always sees the top of the new page
+  // Reset scroll position when navigating to a new page
   useEffect(() => {
-    if (mainRef.current) {
-      mainRef.current.scrollTop = 0;
-    }
+    // Use requestAnimationFrame to ensure DOM has updated
+    requestAnimationFrame(() => {
+      if (mainRef.current) {
+        mainRef.current.scrollTop = 0;
+      }
+    });
   }, [pathname]);
 
-  // Debounced sidebar toggle
   const handleMenuToggle = useCallback(() => {
     setSidebarOpen((prev) => !prev);
   }, []);
@@ -79,25 +77,30 @@ export function AppShell({ children }: AppShellProps) {
   }, []);
 
   return (
-    <div className="h-screen flex flex-col overflow-hidden" dir="rtl" lang="ar">
+    <div className="h-dvh flex flex-col" dir="rtl" lang="ar">
       {/* Navigation progress bar */}
       <NavProgress />
 
       {/* Eagerly prefetch pages for this role → instant navigation */}
       <RolePrefetcher role={role} />
 
-      {/* Top Header — flex-shrink-0 prevents it from being compressed */}
-      <div className="shrink-0 z-30">
-        <TopHeader
-          onMenuToggle={handleMenuToggle}
-          role={role}
-        />
+      {/* ===== FIXED TOP HEADER — never scrolls away ===== */}
+      <TopHeader
+        onMenuToggle={handleMenuToggle}
+        role={role}
+      />
+
+      {/* ===== FIXED BOTTOM NAV (mobile) — never scrolls away ===== */}
+      <div className="md:hidden">
+        <BottomNav role={role} />
       </div>
 
-      {/* Content area: Sidebar + Main — takes remaining height */}
-      <div className="flex flex-1 min-h-0 overflow-hidden">
-        {/* Desktop Sidebar — CSS-driven, no JS breakpoint detection */}
-        <div className="hidden md:block shrink-0">
+      {/* ===== CONTENT AREA — positioned between fixed header and bottom nav ===== */}
+      {/* On mobile: top padding = header height (~58px), bottom padding = bottom nav height (~68px) */}
+      {/* On desktop: top padding = header height (~58px), no bottom nav */}
+      <div className="flex-1 pt-[58px] md:pb-0 pb-[68px] min-h-0">
+        {/* Desktop Sidebar */}
+        <div className="hidden md:block shrink-0 fixed top-[58px] bottom-0 right-0 z-20 w-64 border-l border-border/70">
           <Sidebar
             role={role}
             isOpen={true}
@@ -124,20 +127,15 @@ export function AppShell({ children }: AppShellProps) {
           </>
         )}
 
-        {/* Main Content — scroll container with ref for scroll reset */}
+        {/* Main Content — the ONLY scrollable element */}
         <main
           ref={mainRef}
-          className="flex-1 min-w-0 overflow-y-auto custom-scrollbar pb-24 md:pb-6"
+          className="flex-1 min-w-0 overflow-y-auto custom-scrollbar md:mr-64"
         >
           <div className="p-4 md:p-6 max-w-7xl mx-auto">
             {children}
           </div>
         </main>
-      </div>
-
-      {/* Mobile Bottom Navigation — CSS-driven */}
-      <div className="md:hidden shrink-0">
-        <BottomNav role={role} />
       </div>
 
       {/* Push Notification Auto-Setup (deferred) */}
@@ -151,7 +149,6 @@ function DeferredPushSetup() {
   const [show, setShow] = useState(false);
 
   useEffect(() => {
-    // Defer push notification setup by 3 seconds
     const timer = setTimeout(() => setShow(true), 3000);
     return () => clearTimeout(timer);
   }, []);
