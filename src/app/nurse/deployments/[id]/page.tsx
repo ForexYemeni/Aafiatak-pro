@@ -160,7 +160,7 @@ const applicationStatusLabel: Record<string, string> = {
   selected_by_creator: 'تم اختياره',
   admin_approved: 'موافقة الإدارة',
   payment_pending: 'بانتظار الدفع',
-  payment_submitted: 'تم تقديم الدفع',
+  payment_submitted: 'بانتظار مراجعة الإدارة',
   payment_verified: 'تم التحقق',
   accepted: 'مقبول',
   rejected: 'مرفوض',
@@ -844,6 +844,14 @@ export default function NurseDeploymentDetailPage() {
                   <p className="text-xs text-orange-600 dark:text-orange-400">
                     المبلغ المطلوب: {toArabicNum(myApplication.serviceFee)} ر.ي
                   </p>
+                  {myApplication.rejectedReason && (
+                    <div className="mt-2.5 p-2 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30">
+                      <p className="text-[11px] text-red-600 dark:text-red-400 font-medium flex items-center gap-1.5">
+                        <XCircle className="w-3 h-3 shrink-0" />
+                        {myApplication.rejectedReason}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {/* Payment Details Card */}
@@ -1093,8 +1101,31 @@ export default function NurseDeploymentDetailPage() {
         </motion.div>
       )}
 
-      {/* ═══ TASK EXECUTION SECTION — for assigned nurse ═══ */}
-      {isAssignedToMe && ['assigned', 'in_progress'].includes(deployment.status) && (
+      {/* ═══ PAYMENT PENDING NOTICE — for assigned nurse without payment verified ═══ */}
+      {isAssignedToMe && !deployment.contactRevealed && myApplication?.status !== 'accepted' && ['assigned'].includes(deployment.status) && (
+        <motion.div variants={itemAnim}>
+          <GlassCard variant="nurse" className="overflow-hidden p-0">
+            <div className="bg-gradient-to-r from-amber-500 to-orange-500 px-4 py-3.5 flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center border border-white/20">
+                <Clock className="w-4 h-4 text-white" />
+              </div>
+              <div className="flex-1">
+                <p className="text-white font-bold text-sm">بانتظار تأكيد الدفع</p>
+                <p className="text-white/75 text-[10px]">
+                  {myApplication?.status === 'payment_pending'
+                    ? 'يرجى دفع رسوم التقديم أولاً للتمكن من بدء التنفيذ'
+                    : myApplication?.status === 'payment_submitted'
+                    ? 'تم تقديم إثبات الدفع — بانتظار مراجعة الإدارة'
+                    : 'لا يمكن بدء التنفيذ حتى يتم تأكيد الدفع من الإدارة'}
+                </p>
+              </div>
+            </div>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* ═══ TASK EXECUTION SECTION — for assigned nurse WITH payment verified ═══ */}
+      {isAssignedToMe && deployment.contactRevealed && myApplication?.status === 'accepted' && ['assigned', 'in_progress'].includes(deployment.status) && (
         <motion.div variants={itemAnim}>
           <GlassCard variant="nurse" className="overflow-hidden p-0">
             {/* Gradient header */}
@@ -1242,7 +1273,7 @@ export default function NurseDeploymentDetailPage() {
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {deployment.applications.map((app) => (
                 <div
-                  key={app._id || app.applicantId}
+                  key={app.id || app.applicantId}
                   className="p-3 rounded-xl border bg-card space-y-2"
                 >
                   <div className="flex items-center justify-between">
@@ -1304,7 +1335,7 @@ export default function NurseDeploymentDetailPage() {
                     <Button
                       size="sm"
                       className="w-full h-8 text-xs gap-1 bg-nurse hover:bg-nurse/90 text-white"
-                      onClick={() => handleSelectApplicant(app._id!)}
+                      onClick={() => handleSelectApplicant(app.id)}
                       disabled={isSelecting}
                     >
                       {isSelecting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <CheckCircle2 className="w-3.5 h-3.5" />}

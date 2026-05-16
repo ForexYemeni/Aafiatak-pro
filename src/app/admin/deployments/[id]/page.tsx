@@ -164,7 +164,7 @@ const applicationStatusLabel: Record<string, string> = {
   selected_by_creator: 'تم اختياره',
   admin_approved: 'موافقة الإدارة',
   payment_pending: 'بانتظار الدفع',
-  payment_submitted: 'تم تقديم الدفع',
+  payment_submitted: 'بانتظار مراجعة الإدارة',
   payment_verified: 'تم التحقق',
   accepted: 'مقبول',
   rejected: 'مرفوض',
@@ -270,7 +270,7 @@ export default function AdminDeploymentDetailPage() {
     try {
       const res = await authFetch(`/api/deployments/${deploymentId}/select-applicant`, {
         method: 'PATCH',
-        body: JSON.stringify({ applicationId: selectingApp._id }),
+        body: JSON.stringify({ applicationId: selectingApp.id }),
       });
       const json = await res.json();
       if (json.success) {
@@ -294,7 +294,7 @@ export default function AdminDeploymentDetailPage() {
     try {
       const res = await authFetch(`/api/deployments/${deploymentId}/verify-payment`, {
         method: 'PATCH',
-        body: JSON.stringify({ applicationId: verifyingApp._id, verified }),
+        body: JSON.stringify({ applicationId: verifyingApp.id, verified }),
       });
       const json = await res.json();
       if (json.success) {
@@ -320,7 +320,7 @@ export default function AdminDeploymentDetailPage() {
     try {
       const res = await authFetch(`/api/deployments/${deploymentId}/accept`, {
         method: 'PATCH',
-        body: JSON.stringify({ applicationId: acceptingApp._id }),
+        body: JSON.stringify({ applicationId: acceptingApp.id }),
       });
       const json = await res.json();
       if (json.success) {
@@ -762,13 +762,20 @@ export default function AdminDeploymentDetailPage() {
               )}
               {deployment.status === 'assigned' && (
                 <>
-                  <Button
-                    size="sm"
-                    className="gap-1.5 bg-sky-600 hover:bg-sky-700 text-white"
-                    onClick={() => setStatusChangeTarget({ status: 'in_progress', label: 'قيد التنفيذ' })}
-                  >
-                    <Play className="w-3.5 h-3.5" /> بدء التنفيذ
-                  </Button>
+                  {deployment.contactRevealed ? (
+                    <Button
+                      size="sm"
+                      className="gap-1.5 bg-sky-600 hover:bg-sky-700 text-white"
+                      onClick={() => setStatusChangeTarget({ status: 'in_progress', label: 'قيد التنفيذ' })}
+                    >
+                      <Play className="w-3.5 h-3.5" /> بدء التنفيذ
+                    </Button>
+                  ) : (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30">
+                      <ShieldX className="w-4 h-4 text-amber-600" />
+                      <span className="text-xs font-medium text-amber-700 dark:text-amber-300">لا يمكن بدء التنفيذ قبل تأكيد الدفع</span>
+                    </div>
+                  )}
                   <Button
                     variant="outline"
                     size="sm"
@@ -817,7 +824,7 @@ export default function AdminDeploymentDetailPage() {
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {deployment.applications.map((app) => (
                 <div
-                  key={app._id || app.applicantId}
+                  key={app.id || app.applicantId}
                   className={`p-3 rounded-xl border bg-card space-y-2 ${
                     app.status === 'selected_by_creator' || app.status === 'admin_approved' || app.status === 'payment_pending' || app.status === 'payment_submitted' || app.status === 'payment_verified' || app.status === 'accepted'
                       ? 'border-amber-300 dark:border-amber-700/50 bg-amber-50/50 dark:bg-amber-900/5'
