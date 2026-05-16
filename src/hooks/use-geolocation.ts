@@ -144,43 +144,43 @@ function getPosition(options: PositionOptions): Promise<GeolocationPosition> {
 }
 
 /**
- * Reverse geocode with retry logic.
- * Tries Nominatim up to 3 times with increasing delay.
+ * Reverse geocode via our server API (which proxies to Nominatim).
+ * This avoids CORS issues and browser network restrictions.
  */
-async function reverseGeocode(lat: number, lng: number): Promise<{
+async function reverseGeocodeViaServer(lat: number, lng: number): Promise<{
   display_name: string;
-  address: Record<string, string>;
+  road: string;
+  neighbourhood: string;
+  suburb: string;
+  city: string;
+  district: string;
+  state: string;
+  county: string;
+  country: string;
 } | null> {
-  const maxRetries = 3;
-  for (let attempt = 0; attempt < maxRetries; attempt++) {
-    try {
-      const response = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=json&lat=${lat}&lon=${lng}&accept-language=ar&addressdetails=1&zoom=18`,
-        {
-          headers: {
-            'User-Agent': 'Aafiatak-Healthcare-Platform/1.0',
-          },
-        }
-      );
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-      if (response.ok) {
-        const data = await response.json();
-        if (data && data.display_name) {
-          return data;
-        }
-      }
+    const response = await fetch('/api/geocode/reverse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ lat, lng }),
+      signal: controller.signal,
+    });
 
-      // Rate limit or error — wait before retry
-      if (attempt < maxRetries - 1) {
-        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-      }
-    } catch {
-      if (attempt < maxRetries - 1) {
-        await new Promise(r => setTimeout(r, 1000 * (attempt + 1)));
-      }
+    clearTimeout(timeoutId);
+
+    if (!response.ok) return null;
+
+    const result = await response.json();
+    if (result.success && result.data) {
+      return result.data;
     }
+    return null;
+  } catch {
+    return null;
   }
-  return null;
 }
 
 export function useGeolocation(): UseGeolocationReturn {
@@ -189,17 +189,6 @@ export function useGeolocation(): UseGeolocationReturn {
   const [isResolvingAddress, setIsResolvingAddress] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const enrichCallbackRef = useRef<((loc: LocationData) => void) | null>(null);
-
-  // ─── Race condition guard ───
-  // When Phase 3 (Nominatim) enriches the address, we store the enriched
-  // address fields so Phase 2 (precise GPS) can merge coords without losing them.
-  const enrichedRef = useRef<{
-    address: string;
-    governorate: string;
-    governorateValue: string;
-    district: string;
-    city: string;
-  } | null>(null);
 
   const onAddressEnriched = useCallback((callback: (loc: LocationData) => void) => {
     enrichCallbackRef.current = callback;
@@ -210,14 +199,10 @@ export function useGeolocation(): UseGeolocationReturn {
     setIsResolvingAddress(true);
     setError(null);
 
-    // Reset enrichment for this cycle
-    enrichedRef.current = null;
-
     try {
       // ────────────────────────────────────────────────
       // PHASE 1: Fast position using WiFi/cell towers
       // Returns almost instantly with approximate location.
-      // We show coordinates as the address so the user gets instant feedback.
       // ────────────────────────────────────────────────
       const position = await getPosition({
         enableHighAccuracy: false,
@@ -258,8 +243,6 @@ export function useGeolocation(): UseGeolocationReturn {
         .then((precisePos) => {
           setLocation(prev => {
             if (!prev) return prev;
-            // Merge precise coords but keep the current address
-            // (whether it's still coordinates or already enriched by Phase 3)
             return {
               ...prev,
               latitude: precisePos.coords.latitude,
@@ -267,22 +250,18 @@ export function useGeolocation(): UseGeolocationReturn {
               accuracy: precisePos.coords.accuracy,
             };
           });
-          // No enrichment callback here — we only updated coords, not address
         })
-        .catch(() => {
-          // Precise position failed — approximate position is fine
-        });
+        .catch(() => {});
 
       // ────────────────────────────────────────────────
-      // PHASE 3: Reverse geocode via Nominatim (background)
-      // Replaces the coordinates-only address with a real
-      // human-readable Arabic address. Includes retry logic.
+      // PHASE 3: Reverse geocode via our server API (background)
+      // The server proxies to Nominatim, avoiding CORS/browser issues.
+      // Replaces coordinates with a real human-readable Arabic address.
       // ────────────────────────────────────────────────
-      reverseGeocode(currentLat, currentLng)
+      reverseGeocodeViaServer(currentLat, currentLng)
         .then((data) => {
-          if (data) {
-            const addr = data.address || {};
-            const govMapping = mapGovernorate(addr.state || addr.region || addr.county || '');
+          if (data && data.display_name) {
+            const govMapping = mapGovernorate(data.state || data.county || '');
 
             const enriched: LocationData = {
               latitude: currentLat,
@@ -291,33 +270,24 @@ export function useGeolocation(): UseGeolocationReturn {
               address: data.display_name,
               governorate: govMapping.label,
               governorateValue: govMapping.value,
-              district: addr.city || addr.town || addr.village || addr.suburb || addr.district || addr.neighbourhood || '',
-              city: addr.city || addr.town || addr.village || addr.county || '',
-            };
-
-            // Store enriched address fields for Phase 2 safety
-            enrichedRef.current = {
-              address: enriched.address,
-              governorate: enriched.governorate,
-              governorateValue: enriched.governorateValue,
-              district: enriched.district,
-              city: enriched.city,
+              district: data.city || data.suburb || data.district || data.neighbourhood || '',
+              city: data.city || data.county || '',
             };
 
             setLocation(enriched);
             setIsResolvingAddress(false);
 
+            // Notify enrichment callback (updates parent components)
             if (enrichCallbackRef.current) {
               enrichCallbackRef.current(enriched);
             }
           } else {
-            // Nominatim failed after all retries — keep coordinates as address
+            // Server geocoding failed — keep coordinates, stop loading
             setIsResolvingAddress(false);
-            // Already have coordinates displayed, just stop loading state
           }
         })
         .catch(() => {
-          // Unexpected error — keep coordinates as address
+          // Unexpected error — keep coordinates, stop loading
           setIsResolvingAddress(false);
         });
 

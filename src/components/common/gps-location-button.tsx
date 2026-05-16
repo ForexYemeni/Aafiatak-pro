@@ -27,10 +27,9 @@ export function GpsLocationButton({
   const [detected, setDetected] = useState(false);
   const [enrichedAddress, setEnrichedAddress] = useState('');
 
-  // Listen for background address enrichment (when Nominatim resolves)
+  // Listen for background address enrichment (when server reverse geocode resolves)
   useEffect(() => {
     onAddressEnriched((loc) => {
-      // Accept any non-coordinate address from enrichment
       if (loc.address && !isRawCoordinates(loc.address)) {
         setEnrichedAddress(loc.address);
         // Notify parent with the enriched data
@@ -38,6 +37,17 @@ export function GpsLocationButton({
       }
     });
   }, [onAddressEnriched, onLocationDetected]);
+
+  // Also react to location.address changes directly from state
+  // (this catches cases where the callback ref wasn't set yet)
+  useEffect(() => {
+    if (location?.address && !isRawCoordinates(location.address) && detected) {
+      if (location.address !== enrichedAddress) {
+        setEnrichedAddress(location.address);
+        onLocationDetected(location);
+      }
+    }
+  }, [location?.address, detected, enrichedAddress, onLocationDetected]);
 
   const handleDetect = useCallback(async () => {
     clearError();
@@ -53,9 +63,9 @@ export function GpsLocationButton({
   }, [detectLocation, onLocationDetected, clearError]);
 
   // Display logic:
-  // 1. Enriched address (real human-readable from Nominatim) — always preferred
-  // 2. Location address from hook (coordinates while loading, then enriched)
-  // 3. Incoming value prop
+  // 1. Enriched address (real human-readable from server) — always preferred
+  // 2. Location address from hook state (may be coordinates while loading, then enriched)
+  // 3. Incoming value prop (but not coordinates)
   // 4. Empty — show placeholder
   const displayValue = enrichedAddress
     || (location?.address && !isRawCoordinates(location.address) ? location.address : '')
