@@ -31,10 +31,14 @@ interface SettingsData {
   deploymentWalletOwnerName: string;
   deploymentBankAccountInfo: string;
   bankAccountInfo: string;
+  nightFeeEnabled: boolean;
   nightFeePercent: number;
+  fridayFeeEnabled: boolean;
   fridayFeePercent: number;
   nightStartHour: number;
   nightEndHour: number;
+  loyaltyRedemptionRate: number;
+  loyaltyPointsPerRial: number;
   minOrderAmount: number;
   loyaltyPointsPerOrder: number;
   loyaltyRedemptionThreshold: number;
@@ -70,10 +74,14 @@ const defaultSettings: SettingsData = {
   deploymentWalletOwnerName: '',
   deploymentBankAccountInfo: '',
   bankAccountInfo: '',
+  nightFeeEnabled: true,
   nightFeePercent: 20,
+  fridayFeeEnabled: true,
   fridayFeePercent: 15,
   nightStartHour: 22,
   nightEndHour: 6,
+  loyaltyRedemptionRate: 0,
+  loyaltyPointsPerRial: 1,
   minOrderAmount: 1000,
   loyaltyPointsPerOrder: 10,
   loyaltyRedemptionThreshold: 100,
@@ -697,27 +705,55 @@ export default function AdminSettingsPage() {
                     className="bg-background/50"
                   />
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">رسوم الخدمة الليلية (%)</Label>
-                  <Input
-                    type="number"
-                    value={settings.nightFeePercent}
-                    onChange={(e) => updateField('nightFeePercent', Number(e.target.value))}
-                    min={0}
-                    max={100}
-                    className="bg-background/50"
-                  />
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Moon className="w-3.5 h-3.5 text-indigo-500" />
+                      تفعيل رسوم الخدمة الليلية
+                    </Label>
+                    <Switch
+                      checked={settings.nightFeeEnabled}
+                      onCheckedChange={(checked) => updateField('nightFeeEnabled', checked)}
+                    />
+                  </div>
+                  {settings.nightFeeEnabled && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">نسبة الرسوم الليلية (%)</Label>
+                      <Input
+                        type="number"
+                        value={settings.nightFeePercent}
+                        onChange={(e) => updateField('nightFeePercent', Number(e.target.value))}
+                        min={0}
+                        max={100}
+                        className="bg-background/50"
+                      />
+                    </div>
+                  )}
                 </div>
-                <div className="space-y-2">
-                  <Label className="text-sm font-medium">رسوم خدمة الجمعة (%)</Label>
-                  <Input
-                    type="number"
-                    value={settings.fridayFeePercent}
-                    onChange={(e) => updateField('fridayFeePercent', Number(e.target.value))}
-                    min={0}
-                    max={100}
-                    className="bg-background/50"
-                  />
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Flame className="w-3.5 h-3.5 text-orange-500" />
+                      تفعيل رسوم خدمة الجمعة
+                    </Label>
+                    <Switch
+                      checked={settings.fridayFeeEnabled}
+                      onCheckedChange={(checked) => updateField('fridayFeeEnabled', checked)}
+                    />
+                  </div>
+                  {settings.fridayFeeEnabled && (
+                    <div className="space-y-1">
+                      <Label className="text-xs text-muted-foreground">نسبة رسوم الجمعة (%)</Label>
+                      <Input
+                        type="number"
+                        value={settings.fridayFeePercent}
+                        onChange={(e) => updateField('fridayFeePercent', Number(e.target.value))}
+                        min={0}
+                        max={100}
+                        className="bg-background/50"
+                      />
+                    </div>
+                  )}
                 </div>
                 <div className="space-y-2">
                   <Label className="text-sm font-medium flex items-center gap-1.5">

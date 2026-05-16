@@ -178,12 +178,16 @@ export async function POST(request: NextRequest) {
     let settings = await AdminSettings.findOne().lean();
     if (!settings) settings = await AdminSettings.create({});
 
-    // Calculate pricing
+    // Calculate pricing — respect nightFeeEnabled and fridayFeeEnabled toggles
     const now = new Date();
     const scheduledDate = scheduledAt ? new Date(scheduledAt) : now;
     const hour = scheduledDate.getHours();
-    const isNightService = hour >= settings.nightStartHour || hour < settings.nightEndHour;
-    const isFridayService = scheduledDate.getDay() === 5;
+    const isNightService = settings.nightFeeEnabled
+      ? (settings.nightStartHour > settings.nightEndHour
+          ? (hour >= settings.nightStartHour || hour < settings.nightEndHour)
+          : (hour >= settings.nightStartHour && hour < settings.nightEndHour))
+      : false;
+    const isFridayService = settings.fridayFeeEnabled && scheduledDate.getDay() === 5;
 
     // Determine order status based on payment method
     const isCashPayment = paymentMethod === 'cash';

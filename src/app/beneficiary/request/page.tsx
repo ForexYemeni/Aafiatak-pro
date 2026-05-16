@@ -152,19 +152,19 @@ function MultiServiceRequestPageInner() {
 
   // Payment methods
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>([]);
-  const [emergencyFee, setEmergencyFee] = useState(5000);
+  const [emergencyFee, setEmergencyFee] = useState(0);
   const [supportWhatsApp, setSupportWhatsApp] = useState('');
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
 
   // Pricing settings
   const [commissionRate, setCommissionRate] = useState(15);
-  const [nightFeeEnabled, setNightFeeEnabled] = useState(false);
-  const [nightFeePercent, setNightFeePercent] = useState(0);
+  const [nightFeeEnabled, setNightFeeEnabled] = useState(true);
+  const [nightFeePercent, setNightFeePercent] = useState(20);
   const [nightStartHour, setNightStartHour] = useState(22);
   const [nightEndHour, setNightEndHour] = useState(6);
-  const [fridayFeeEnabled, setFridayFeeEnabled] = useState(false);
-  const [fridayFeePercent, setFridayFeePercent] = useState(0);
+  const [fridayFeeEnabled, setFridayFeeEnabled] = useState(true);
+  const [fridayFeePercent, setFridayFeePercent] = useState(15);
 
   // Loyalty
   const [loyaltyPoints, setLoyaltyPoints] = useState(0);
@@ -244,7 +244,7 @@ function MultiServiceRequestPageInner() {
       ]);
       const pricingData = await pricingRes.json();
       if (pricingData.success && pricingData.data) {
-        setEmergencyFee(pricingData.data.emergencyFee || 5000);
+        setEmergencyFee(pricingData.data.emergencyFee ?? 0);
         setCommissionRate(pricingData.data.commissionRate || 15);
         setNightFeeEnabled(pricingData.data.nightFeeEnabled ?? false);
         setNightFeePercent(pricingData.data.nightFeePercent || 0);
@@ -420,7 +420,7 @@ function MultiServiceRequestPageInner() {
   const cashMethods = paymentMethods.filter(pm => pm.type === 'cash');
 
   return (
-    <div className="space-y-6 pb-24">
+    <div className="space-y-6 pb-36">
       {/* Header */}
       <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }} className="flex items-center gap-3">
         <Button variant="ghost" size="icon" onClick={() => router.back()}>
@@ -648,6 +648,80 @@ function MultiServiceRequestPageInner() {
                 طريقة الدفع
               </h2>
 
+              {/* ═══ Professional Financial Summary — shown BEFORE payment methods ═══ */}
+              <div className="rounded-xl bg-gradient-to-bl from-beneficiary/5 to-purple-500/5 border border-beneficiary/20 p-5 space-y-3">
+                <h3 className="font-bold text-sm flex items-center gap-2 text-beneficiary">
+                  <CreditCard className="w-4 h-4" />
+                  ملخص التكلفة
+                </h3>
+                {/* Services */}
+                <div className="space-y-1.5">
+                  {selectedServices.map((service) => (
+                    <div key={service.id} className="flex justify-between items-center">
+                      <span className="text-sm text-muted-foreground">{service.nameAr}</span>
+                      <Currency amount={service.basePrice} className="text-sm font-medium" />
+                    </div>
+                  ))}
+                  <div className="flex justify-between items-center pt-1 border-t border-border/30">
+                    <span className="text-sm text-muted-foreground">مجموع الأسعار الأساسية</span>
+                    <Currency amount={totalBasePrice} className="text-sm font-medium" />
+                  </div>
+                </div>
+                {/* Extra Fees */}
+                {(totalNightFee > 0 || totalFridayFee > 0 || totalEmergencyFee > 0) && (
+                  <div className="space-y-1.5 pt-2 border-t border-border/50">
+                    <p className="text-xs font-semibold text-muted-foreground">الرسوم الإضافية</p>
+                    {totalNightFee > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-orange-600 dark:text-orange-400 flex items-center gap-1">
+                          <Clock className="w-3 h-3" />
+                          رسوم الخدمة الليلية ({nightFeePercent}%)
+                        </span>
+                        <Currency amount={totalNightFee} className="text-xs text-orange-600 dark:text-orange-400" />
+                      </div>
+                    )}
+                    {totalFridayFee > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-orange-600 dark:text-orange-400">رسوم خدمة الجمعة ({fridayFeePercent}%)</span>
+                        <Currency amount={totalFridayFee} className="text-xs text-orange-600 dark:text-orange-400" />
+                      </div>
+                    )}
+                    {totalEmergencyFee > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-red-600 dark:text-red-400 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3" />
+                          رسوم الطوارئ
+                        </span>
+                        <Currency amount={totalEmergencyFee} className="text-xs text-red-600 dark:text-red-400" />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Discounts */}
+                {(couponDiscount > 0 || loyaltyDiscount > 0) && (
+                  <div className="space-y-1.5 pt-2 border-t border-border/50">
+                    <p className="text-xs font-semibold text-muted-foreground">الخصومات</p>
+                    {couponDiscount > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-green-600 dark:text-green-400">خصم الكوبون</span>
+                        <Currency amount={-couponDiscount} className="text-xs text-green-600 dark:text-green-400" />
+                      </div>
+                    )}
+                    {loyaltyDiscount > 0 && (
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-green-600 dark:text-green-400">خصم نقاط الولاء</span>
+                        <Currency amount={-loyaltyDiscount} className="text-xs text-green-600 dark:text-green-400" />
+                      </div>
+                    )}
+                  </div>
+                )}
+                {/* Grand Total */}
+                <div className="flex justify-between items-center pt-3 border-t-2 border-beneficiary/30">
+                  <span className="font-bold text-base">المبلغ الإجمالي النهائي</span>
+                  <Currency amount={grandTotal} className="text-xl text-beneficiary font-black" />
+                </div>
+              </div>
+
               {paymentMethods.length === 0 ? (
                 <div className="text-center py-8">
                   <CreditCard className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
@@ -666,7 +740,12 @@ function MultiServiceRequestPageInner() {
                         }`}>
                           <input type="radio" name="payment" checked={selectedPaymentMethodId === pm.id} onChange={() => setSelectedPaymentMethodId(pm.id)} className="w-4 h-4 text-green-600" />
                           <div className="flex-1">
-                            <p className="font-medium text-sm">{pm.nameAr}</p>
+                            <div className="flex items-center justify-between">
+                              <p className="font-medium text-sm">{pm.nameAr}</p>
+                              <span className="text-xs font-bold text-green-700 dark:text-green-400">
+                                المبلغ: {formatYemeniRial(grandTotal)}
+                              </span>
+                            </div>
                             {pm.instructions && <p className="text-xs text-muted-foreground mt-0.5">{pm.instructions}</p>}
                           </div>
                         </label>
@@ -686,8 +765,13 @@ function MultiServiceRequestPageInner() {
                           <input type="radio" name="payment" checked={selectedPaymentMethodId === pm.id} onChange={() => setSelectedPaymentMethodId(pm.id)} className="w-4 h-4 text-purple-600" />
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center justify-between">
-                              <p className="font-medium text-sm">{pm.nameAr}</p>
-                              <span className="text-[10px] text-muted-foreground">{pm.nameEn}</span>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-sm">{pm.nameAr}</p>
+                                <span className="text-[10px] text-muted-foreground">{pm.nameEn}</span>
+                              </div>
+                              <span className="text-xs font-bold text-purple-700 dark:text-purple-400">
+                                المبلغ: {formatYemeniRial(grandTotal)}
+                              </span>
                             </div>
                             {selectedPaymentMethodId === pm.id && (
                               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-2 pt-2 border-t border-border">
@@ -712,7 +796,7 @@ function MultiServiceRequestPageInner() {
                         </label>
                       ))}
                     </div>
-                  )}
+                  )
 
                   {bankMethods.length > 0 && (
                     <div className="space-y-2">
@@ -726,8 +810,13 @@ function MultiServiceRequestPageInner() {
                           <input type="radio" name="payment" checked={selectedPaymentMethodId === pm.id} onChange={() => setSelectedPaymentMethodId(pm.id)} className="w-4 h-4 text-blue-600" />
                           <div className="flex-1 space-y-2">
                             <div className="flex items-center justify-between">
-                              <p className="font-medium text-sm">{pm.nameAr}</p>
-                              <span className="text-[10px] text-muted-foreground">{pm.nameEn}</span>
+                              <div className="flex items-center gap-2">
+                                <p className="font-medium text-sm">{pm.nameAr}</p>
+                                <span className="text-[10px] text-muted-foreground">{pm.nameEn}</span>
+                              </div>
+                              <span className="text-xs font-bold text-blue-700 dark:text-blue-400">
+                                المبلغ: {formatYemeniRial(grandTotal)}
+                              </span>
                             </div>
                             {selectedPaymentMethodId === pm.id && (
                               <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-2 pt-2 border-t border-border">
@@ -929,13 +1018,14 @@ function MultiServiceRequestPageInner() {
         )}
       </div>
 
-      {/* Sticky Pricing Summary Bar */}
+      {/* Sticky Pricing Summary Bar — sits ABOVE bottom nav */}
       <motion.div
         initial={{ y: 100, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
-        className="fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border shadow-lg"
+        className="fixed left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border shadow-lg md:bottom-0"
+        style={{ bottom: '68px' }}
       >
-        <div className="max-w-2xl mx-auto px-4 py-3">
+        <div className="max-w-2xl mx-auto px-4 py-2.5 safe-bottom">
           <div className="flex items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">

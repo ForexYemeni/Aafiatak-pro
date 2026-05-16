@@ -12,12 +12,16 @@ export interface IAdminSettings extends Document {
   deploymentWalletOwnerName: string;
   deploymentBankAccountInfo: string;
   bankAccountInfo: string;
+  nightFeeEnabled: boolean;
   nightFeePercent: number;
+  fridayFeeEnabled: boolean;
   fridayFeePercent: number;
   nightStartHour: number;
   nightEndHour: number;
   minOrderAmount: number;
   loyaltyPointsPerOrder: number;
+  loyaltyRedemptionRate: number;
+  loyaltyPointsPerRial: number;
   referralReward: number;
   maxNurseAssignmentRadius: number;
   autoAssignEnabled: boolean;
@@ -48,12 +52,16 @@ const AdminSettingsSchema = new Schema<IAdminSettings>({
   deploymentWalletOwnerName: { type: String, default: '' },
   deploymentBankAccountInfo: { type: String, default: '' },
   bankAccountInfo: { type: String, default: '' },
+  nightFeeEnabled: { type: Boolean, default: true },
   nightFeePercent: { type: Number, default: 20 },
+  fridayFeeEnabled: { type: Boolean, default: true },
   fridayFeePercent: { type: Number, default: 15 },
   nightStartHour: { type: Number, default: 22 },
   nightEndHour: { type: Number, default: 6 },
   minOrderAmount: { type: Number, default: 2000 },
   loyaltyPointsPerOrder: { type: Number, default: 10 },
+  loyaltyRedemptionRate: { type: Number, default: 0 },
+  loyaltyPointsPerRial: { type: Number, default: 1 },
   referralReward: { type: Number, default: 50 },
   maxNurseAssignmentRadius: { type: Number, default: 20 },
   autoAssignEnabled: { type: Boolean, default: false },

@@ -749,9 +749,10 @@ export default function BeneficiaryHomePage() {
             initial="hidden"
             animate="visible"
             exit="exit"
-            className="fixed bottom-0 left-0 right-0 z-40"
+            className="fixed left-0 right-0 z-40 md:bottom-0"
+            style={{ bottom: '68px' }}
           >
-            <div className="bg-background/70 backdrop-blur-2xl border-t border-beneficiary/20 shadow-2xl shadow-beneficiary/15">
+            <div className="bg-background/70 backdrop-blur-2xl border-t border-beneficiary/20 shadow-2xl shadow-beneficiary/15 safe-bottom">
               {/* Selected services chips preview */}
               {selectedServicesList.length <= 3 && (
                 <div className="max-w-2xl mx-auto px-4 pt-2.5">
