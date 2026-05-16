@@ -14,13 +14,15 @@ import { resolve } from "path";
 
   const SECURITY_HEADERS: Record<string, string> = {
     "X-Content-Type-Options": "nosniff",
-    // Capacitor WebView doesn't use frames; SAMEORIGIN is fine for web browsers.
-    "X-Frame-Options": "SAMEORIGIN",
+    // Allow Capacitor WebView to load the app (it acts as a frame with server URL origin)
+    // Using empty value to not send X-Frame-Options at all — CSP frame-ancestors handles this
+    // "X-Frame-Options" removed — replaced by CSP frame-ancestors which is more flexible
     "X-XSS-Protection": "1; mode=block",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    // Capacitor WebView: camera/mic/geolocation permissions are intercepted
-    // natively by Android/iOS — (self) works because the origin IS the server URL.
-    "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(self)",
+    // Permissions-Policy: Allow camera, microphone, geolocation from the Capacitor WebView.
+    // Capacitor WebView has the same origin as server.url, so (self) works.
+    // We also allow * explicitly because some Android WebView versions need it.
+    "Permissions-Policy": "camera=*, microphone=*, geolocation=*",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "Content-Security-Policy": [
       "default-src 'self'",
@@ -34,7 +36,9 @@ import { resolve } from "path";
       "frame-src 'self'",  // needed for embedded content
       "base-uri 'self'",
       "form-action 'self'",
-      "frame-ancestors 'self' https://aafiatak-pro.vercel.app",
+      // Allow Capacitor WebView to embed the app (frame-ancestors replaces X-Frame-Options)
+      // 'self' covers same-origin, the vercel.app URL covers the Capacitor remote URL
+      "frame-ancestors 'self' https://aafiatak-pro.vercel.app capacitor://com.aafiatak.app",
     ].join("; "),
   };
 

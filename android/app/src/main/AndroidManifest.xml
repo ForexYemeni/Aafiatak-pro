@@ -36,16 +36,25 @@
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
 
-        <!-- Custom Firebase Cloud Messaging Service -->
-        <!-- This is the ONLY service that handles FCM messages.
-             The Capacitor PushNotificationsService is REMOVED because it
-             conflicts with our custom service (both register for MESSAGING_EVENT).
-             Our custom service handles notification display with proper sound,
-             vibration, and channel routing. The Capacitor plugin still works
-             for token registration and foreground event delivery via JS. -->
+        <!-- ============================================================
+             Firebase Cloud Messaging Service
+             ============================================================
+             This is the ONLY service that handles FCM messages.
+             It handles:
+             - Foreground notifications (with sound, vibration, popup)
+             - Background notifications (system tray with sound)
+             - Data-only messages (both foreground and background)
+             - Emergency notifications (heads-up, full-screen)
+             
+             The Capacitor PushNotifications plugin is NOT used for
+             message handling because it conflicts with this service.
+             Token registration still works via the Capacitor JS bridge.
+             ============================================================ -->
         <service
             android:name="com.aafiatak.app.services.AafiatakFirebaseMessagingService"
-            android:exported="false">
+            android:exported="false"
+            android:directBootAware="true"
+            android:stopWithTask="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
@@ -57,7 +66,28 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- Notification Channel for Android 8+ -->
+        <!-- Firebase Instance ID service for token refresh -->
+        <service
+            android:name="com.aafiatak.app.services.AafiatakInstanceIDService"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.google.firebase.INSTANCE_ID_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- Boot receiver to re-register for notifications after device restart -->
+        <receiver
+            android:name="com.aafiatak.app.receivers.BootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Notification Channel metadata -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
             android:value="aafiatak_notifications" />
@@ -65,12 +95,16 @@
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color" />
         <meta-data
-            android:name="com.google.firebase.messaging.default_notification_sound"
-            android:resource="@raw/notification_sound" />
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_aafiatak" />
 
     </application>
 
-    <!-- Permissions -->
+    <!-- ============================================================
+         Permissions
+         ============================================================ -->
+    
+    <!-- Network -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
@@ -86,7 +120,7 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
 
-    <!-- Notification permissions -->
+    <!-- Notification permissions - CRITICAL for Android 13+ -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.VIBRATE" />
@@ -94,12 +128,17 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
     <!-- Audio for voice notifications -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
 
     <!-- Boot for restart on device reboot -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Keep app running in background for notifications -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
 
     <!-- Features -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
