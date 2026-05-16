@@ -5,9 +5,14 @@ export type Platform = 'web' | 'android' | 'ios';
 
 export interface IFCMToken extends Document {
   userId: Types.ObjectId;
+  /** Web Push: subscription endpoint. FCM: unused (empty string). */
   endpoint: string;
+  /** Web Push: p256dh key. FCM: unused (empty string). */
   p256dh: string;
+  /** Web Push: auth key. FCM: unused (empty string). */
   auth: string;
+  /** FCM device token (for android/ios). Empty for web platform. */
+  fcmToken: string;
   platform: Platform;
   deviceId: string;
   isActive: boolean;
@@ -26,17 +31,22 @@ const fcmTokenSchema = new Schema<IFCMToken>(
     },
     endpoint: {
       type: String,
-      required: [true, 'رابط الاشتراك مطلوب'],
+      default: '',
       trim: true,
     },
     p256dh: {
       type: String,
-      required: [true, 'مفتاح التشفير مطلوب'],
+      default: '',
       trim: true,
     },
     auth: {
       type: String,
-      required: [true, 'مفتاح المصادقة مطلوب'],
+      default: '',
+      trim: true,
+    },
+    fcmToken: {
+      type: String,
+      default: '',
       trim: true,
     },
     platform: {
@@ -73,7 +83,9 @@ const fcmTokenSchema = new Schema<IFCMToken>(
 // ── Indexes ─────────────────────────────────────────────────────────
 // Index for cleanup of expired subscriptions
 fcmTokenSchema.index({ endpoint: 1 });
+fcmTokenSchema.index({ fcmToken: 1 });
 fcmTokenSchema.index({ userId: 1, isActive: 1 });
+fcmTokenSchema.index({ platform: 1, isActive: 1 });
 // Compound index for fast lookup per user per device (NOT unique — same device
 // can have push subscriptions for multiple users on the same browser)
 fcmTokenSchema.index({ userId: 1, deviceId: 1 });

@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { serializeDoc } from '@/lib/mongoose/serialize';
 
 export async function GET(request: NextRequest) {
   try {
@@ -42,14 +43,18 @@ export async function GET(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        notifications: notifications.map((n: any) => ({
-          ...n,
-          id: n._id.toString(),
-          title: n.titleAr,
-          body: n.bodyAr,
-          voiceEnabled: n.voiceEnabled,
-          voicePlayedAt: n.voicePlayedAt,
-        })),
+        // CRITICAL: Use serializeDoc to prevent React Error #300
+        // Notification.data (Schema.Types.Mixed) can contain non-serializable objects
+        notifications: notifications.map((n: any) => {
+          const serialized = serializeDoc(n);
+          return {
+            ...serialized,
+            title: n.titleAr || '',
+            body: n.bodyAr || '',
+            voiceEnabled: !!n.voiceEnabled,
+            voicePlayedAt: n.voicePlayedAt ? new Date(n.voicePlayedAt).toISOString() : null,
+          };
+        }),
         total,
         unreadCount,
         page,

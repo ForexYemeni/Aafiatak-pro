@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Chat, ChatMessage } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -50,7 +51,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     return Response.json({
       success: true,
       data: {
-        messages: messages.map((m: any) => ({ ...m, id: m._id.toString() })).reverse(),
+        messages: messages.map((m: any) => (serializeDoc(m))).reverse(),
         total,
         page,
         pages: Math.ceil(total / limit),
@@ -116,7 +117,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return Response.json({
       success: true,
-      data: { ...message.toObject(), id: message._id.toString() },
+      data: serializeDoc(message.toObject()),
     }, { status: 201 });
   } catch (error) {
     console.error('[CHAT MESSAGE SEND ERROR]', error);

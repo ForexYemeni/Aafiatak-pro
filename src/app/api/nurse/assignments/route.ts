@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, EmergencyRequest, Nurse, Beneficiary, Service } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 const emergencyTypeLabels: Record<string, string> = {
   medical: 'طبي عام', injury: 'إصابة', breathing: 'تنفسي',
   cardiac: 'قلبي', fall: 'سقوط', other: 'أخرى', general_medical: 'طبي عام',

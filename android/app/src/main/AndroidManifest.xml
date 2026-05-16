@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <application
+        android:allowBackup="true"
+        android:icon="@mipmap/ic_launcher"
+        android:label="@string/app_name"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:supportsRtl="true"
+        android:theme="@style/AppTheme"
+        android:usesCleartextTraffic="true"
+        android:networkSecurityConfig="@xml/network_security_config">
+
+        <activity
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|locale|smallestScreenSize|screenLayout|uiMode|navigation|density"
+            android:name=".MainActivity"
+            android:label="@string/title_activity_main"
+            android:theme="@style/AppTheme.NoActionBarLaunch"
+            android:launchMode="singleTask"
+            android:exported="true">
+
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Intent filter for FCM click_action – opens the app when user
+                 taps a notification that was built with clickAction=OPEN_ACTIVITY -->
+            <intent-filter>
+                <action android:name="OPEN_ACTIVITY" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+
+        </activity>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths"></meta-data>
+        </provider>
+
+        <!-- ============================================================
+             Firebase Cloud Messaging Service
+             ============================================================
+             This is the ONLY service that handles FCM messages.
+             It handles:
+             - Foreground notifications (with sound, vibration, popup)
+             - Background notifications (system tray with sound)
+             - Data-only messages (both foreground and background)
+             - Emergency notifications (heads-up, full-screen)
+             
+             The Capacitor PushNotifications plugin is NOT used for
+             message handling because it conflicts with this service.
+             Token registration still works via the Capacitor JS bridge.
+             ============================================================ -->
+        <service
+            android:name="com.aafiatak.app.services.AafiatakFirebaseMessagingService"
+            android:exported="false"
+            android:directBootAware="true"
+            android:stopWithTask="false"
+            tools:node="replace"
+            tools:replace="android:exported,android:directBootAware,android:stopWithTask">
+            <intent-filter android:priority="999">
+                <action android:name="com.google.firebase.MESSAGING_EVENT" />
+            </intent-filter>
+        </service>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             REMOVE Capacitor PushNotifications MessagingService!
+             ═══════════════════════════════════════════════════════════════
+             This is THE ROOT CAUSE of notifications not working properly.
+             Capacitor's MessagingService registers for MESSAGING_EVENT
+             and intercepts FCM messages BEFORE our custom service can
+             handle them. It shows notifications WITHOUT our custom
+             sound, channel, or heads-up popup.
+             tools:node="remove" completely eliminates it from the
+             merged manifest so ONLY our service handles FCM.
+             ═══════════════════════════════════════════════════════════════ -->
+        <service
+            android:name="com.capacitorjs.plugins.pushnotifications.MessagingService"
+            tools:node="remove" />
+
+        <!-- Background location service -->
+        <service
+            android:name="com.capacitorjs.plugins.geolocation.GeolocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
+
+        <!-- Boot receiver to re-register for notifications after device restart -->
+        <receiver
+            android:name="com.aafiatak.app.receivers.BootReceiver"
+            android:exported="true"
+            android:enabled="true">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+                <action android:name="android.intent.action.QUICKBOOT_POWERON" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Notification Channel metadata -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_channel_id"
+            android:value="aafiatak_notifications_v3" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_color" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_aafiatak" />
+
+    </application>
+
+    <!-- ============================================================
+         Permissions
+         ============================================================ -->
+    
+    <!-- Network -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+
+    <!-- Location permissions -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
+
+    <!-- Camera permissions -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
+
+    <!-- Notification permissions - CRITICAL for Android 13+ -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <uses-permission android:name="android.permission.VIBRATE" />
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- CRITICAL for Android 14+ (API 34+): Required for full-screen intent notifications
+         (heads-up popup when app is in background/killed). Without this, the system
+         silently ignores setFullScreenIntent() and notifications appear without popup. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+
+    <!-- Audio for voice notifications -->
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!-- Boot for restart on device reboot -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+
+    <!-- Keep app running in background for notifications -->
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+    <uses-permission android:name="android.permission.REORDER_TASKS" />
+
+    <!-- Features -->
+    <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature android:name="android.hardware.location.gps" android:required="false" />
+</manifest>

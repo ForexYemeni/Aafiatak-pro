@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Nurse } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { serializeDoc } from '@/lib/mongoose/serialize';
 import bcrypt from 'bcryptjs';
 
 export async function GET(request: NextRequest) {
@@ -24,7 +25,10 @@ export async function GET(request: NextRequest) {
 
     if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
 
-    return Response.json({ success: true, data: { ...nurse, id: nurse._id.toString() } });
+    // CRITICAL: Use serializeDoc to prevent React Error #300
+    // Raw Mongoose docs contain ObjectId, Date objects, and nested sub-documents
+    // that crash React when rendered in JSX
+    return Response.json({ success: true, data: serializeDoc(nurse) });
   } catch (error) {
     console.error('[NURSE PROFILE GET ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
@@ -80,7 +84,7 @@ export async function PATCH(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...nurse, id: nurse._id.toString() },
+      data: serializeDoc(nurse),
       message: 'تم تحديث الملف الشخصي بنجاح',
     });
   } catch (error) {

@@ -9,6 +9,7 @@ import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middl
 import { logActivity, creditNurseEarnings } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return Response.json({
       success: true,
-      data: { ...order.toObject(), id: order._id.toString() },
+      data: serializeDoc(order.toObject()),
       message: 'تم تنفيذ الطلب مباشرة بنجاح',
     });
   } catch (error) {

@@ -8,6 +8,7 @@ import { requireSubadminPermission, requireRole, createErrorResponse } from '@/l
 import { logActivity } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const emergency = await EmergencyRequest.findById(id).lean();
     if (!emergency) return createErrorResponse('طلب الطوارئ غير موجود', 404, 'NOT_FOUND');
 
-    return Response.json({ success: true, data: { ...emergency, id: emergency._id.toString() } });
+    return Response.json({ success: true, data: serializeDoc(emergency) });
   } catch (error) {
     console.error('[ADMIN EMERGENCY DETAIL ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
@@ -275,7 +276,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     });
 
-    return Response.json({ success: true, data: { ...emergency, id: emergency._id.toString() }, message: 'تم تحديث طلب الطوارئ بنجاح' });
+    return Response.json({ success: true, data: serializeDoc(emergency), message: 'تم تحديث طلب الطوارئ بنجاح' });
   } catch (error) {
     console.error('[ADMIN EMERGENCY UPDATE ERROR]', error);
     return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');

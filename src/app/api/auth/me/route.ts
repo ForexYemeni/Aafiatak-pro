@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { User, Nurse, Beneficiary } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { serializeDoc } from '@/lib/mongoose/serialize';
 
 export async function GET(request: NextRequest) {
   try {
@@ -26,9 +27,12 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('المستخدم غير موجود', 404, 'USER_NOT_FOUND');
     }
 
+    // CRITICAL: Use serializeDoc to prevent React Error #300
+    // Raw Mongoose docs contain ObjectId, Date objects, and nested sub-documents
+    // that crash React when rendered in JSX
     return Response.json({
       success: true,
-      data: { ...userData, id: userData._id.toString() },
+      data: serializeDoc(userData),
     });
   } catch (error) {
     console.error('[AUTH ME ERROR]', error);

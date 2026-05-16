@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Rating, Notification, Nurse } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function POST(request: NextRequest) {
   try {
     await connectDB();
@@ -41,7 +42,7 @@ export async function POST(request: NextRequest) {
       // For now, create a general notification
       return Response.json({
         success: true,
-        data: { ...complaintRating.toObject(), id: complaintRating._id.toString() },
+        data: serializeDoc(complaintRating.toObject()),
         message: 'تم إرسال الشكوى بنجاح. سيتم مراجعتها',
       }, { status: 201 });
     }

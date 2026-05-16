@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "845103366416",
+    "project_id": "aafiatak-a23fa",
+    "storage_bucket": "aafiatak-a23fa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:845103366416:android:38511d932f55881166e595",
+        "android_client_info": {
+          "package_name": "com.aafiatak.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAROZ526PN4qt53Cal4M7OvBSuoWCQJY3g"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -7,7 +7,30 @@
 
 import { NextRequest } from 'next/server';
 import { verifyToken, createErrorResponse } from './index';
+import jwt from 'jsonwebtoken';
 import type { SubAdminPermission } from '@/types';
+
+const JWT_SECRET = process.env.JWT_SECRET ?? '';
+
+// ── Emergency token payload ──────────────────────────────────────────────────
+interface EmergencyTokenPayload {
+  type: string;
+  userId: string;
+  role: string;
+  iat: number;
+  exp: number;
+}
+
+// ── Verify emergency token ───────────────────────────────────────────────────
+function verifyEmergencyToken(token: string): { userId: string; role: string } | null {
+  try {
+    const decoded = jwt.verify(token, JWT_SECRET) as EmergencyTokenPayload;
+    if (decoded.type !== 'emergency' || decoded.role !== 'admin') return null;
+    return { userId: decoded.userId, role: decoded.role };
+  } catch {
+    return null;
+  }
+}
 
 // Re-export createErrorResponse for convenience in API routes
 export { createErrorResponse } from './index';
@@ -180,4 +203,57 @@ export async function requireSubadminPermission(
     user: null,
     error: createErrorResponse('ليس لديك صلاحية لهذا الإجراء', 403, 'FORBIDDEN'),
   };
+}
+
+// ---- Require Emergency Or Admin ----
+
+/**
+ * Accepts either a regular admin JWT or an emergency backup token.
+ * First tries requireRole(), then falls back to emergency token verification.
+ * Used by backup/restore APIs to allow emergency access without full login.
+ */
+export function requireEmergencyOrAdmin(request: NextRequest, roles: string[] = ['admin']): {
+  user: { userId: string; phone: string; role: string };
+  error: null;
+  isEmergency: boolean;
+} | {
+  user: null;
+  error: Response;
+  isEmergency: false;
+} {
+  // 1. Try regular auth first
+  const roleResult = requireRole(request, roles);
+  if (!roleResult.error) {
+    return { user: roleResult.user, error: null, isEmergency: false };
+  }
+
+  // 2. Try emergency token from Authorization header
+  const authHeader = request.headers.get('Authorization');
+  if (authHeader?.startsWith('Bearer ')) {
+    const token = authHeader.substring(7);
+    const emergencyUser = verifyEmergencyToken(token);
+    if (emergencyUser) {
+      return {
+        user: { userId: emergencyUser.userId, phone: '', role: emergencyUser.role },
+        error: null,
+        isEmergency: true,
+      };
+    }
+  }
+
+  // 3. Try emergency token from query parameter
+  const queryToken = request.nextUrl.searchParams.get('token');
+  if (queryToken) {
+    const emergencyUser = verifyEmergencyToken(queryToken);
+    if (emergencyUser) {
+      return {
+        user: { userId: emergencyUser.userId, phone: '', role: emergencyUser.role },
+        error: null,
+        isEmergency: true,
+      };
+    }
+  }
+
+  // 4. Neither worked — return the original role error
+  return { user: null, error: roleResult.error, isEmergency: false };
 }

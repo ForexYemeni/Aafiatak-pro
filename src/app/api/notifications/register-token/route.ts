@@ -1,11 +1,11 @@
 // POST /api/notifications/register-token - Register push notification token
-// MongoDB/Mongoose based - NO Firebase, NO Firebase Cloud Messaging
-// Voice notifications come from MongoDB Notification model, not FCM
+// Supports both Web Push (VAPID) subscriptions and FCM device tokens
+// MongoDB/Mongoose based with Firebase Cloud Messaging support
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { User, Nurse, Beneficiary } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import FCMToken from '@/models/FCMToken';
 
 export async function POST(request: NextRequest) {
   try {
@@ -14,24 +14,48 @@ export async function POST(request: NextRequest) {
     if (error) return error;
 
     const body = await request.json();
-    const { fcmToken } = body;
+    const { fcmToken, platform, deviceId } = body;
 
     if (!fcmToken) {
       return createErrorResponse('رمز الإشعار مطلوب', 400, 'VALIDATION_ERROR');
     }
 
-    // Store the FCM token on the user record for future push notifications
-    // This is a simplified approach - in production, use a dedicated Token model
-    let Model: any;
-    if (user.role === 'nurse') {
-      Model = Nurse;
-    } else if (user.role === 'beneficiary') {
-      Model = Beneficiary;
-    } else {
-      Model = User;
-    }
+    const tokenPlatform = platform || 'android';
+    const tokenDeviceId = deviceId || `device-${Date.now()}`;
 
-    await Model.findByIdAndUpdate(user.userId, { fcmToken });
+    // Upsert the FCM token — deactivate old tokens for the same device first
+    // This prevents duplicate tokens for the same device
+    await FCMToken.updateMany(
+      {
+        userId: user!.userId,
+        deviceId: tokenDeviceId,
+        platform: tokenPlatform,
+        isActive: true,
+      },
+      { isActive: false }
+    );
+
+    // Also deactivate any other device that has this same FCM token
+    // (in case the same token is registered under a different device/user)
+    await FCMToken.updateMany(
+      { fcmToken, isActive: true },
+      { isActive: false }
+    );
+
+    // Create new token record
+    await FCMToken.create({
+      userId: user!.userId,
+      fcmToken,
+      platform: tokenPlatform,
+      deviceId: tokenDeviceId,
+      endpoint: '',
+      p256dh: '',
+      auth: '',
+      isActive: true,
+      lastUsedAt: new Date(),
+    });
+
+    console.log(`[NOTIFICATION] FCM token registered for user ${user!.userId}, platform: ${tokenPlatform}`);
 
     return Response.json({
       success: true,

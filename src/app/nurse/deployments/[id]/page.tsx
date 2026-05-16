@@ -179,7 +179,8 @@ const statusTimeline: { key: string; label: string; icon: React.ElementType }[] 
 const statusOrder = ['open', 'creator_selected', 'admin_approved', 'assigned', 'in_progress', 'completed'];
 
 /* ─────────────── Animation ─────────────── */
-const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
+const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0, transition: { ease: 'easeOut' as const } } } as const;
+const pulseRing = { scale: [1, 1.2, 1], opacity: [0.5, 0, 0.5] } as const;
 
 /* ════════════════════════════════════════════════════════════════ */
 /* ═══════════════ MAIN COMPONENT ════════════════════════════════ */
@@ -607,39 +608,59 @@ export default function NurseDeploymentDetailPage() {
             <Clock className="w-4 h-4 text-nurse" />
             حالة التكليف
           </h3>
-          <div className="space-y-3">
+          <div className="relative space-y-0">
+            {/* Vertical connecting line */}
+            <div className="absolute right-4 top-0 bottom-0 w-0.5 bg-muted/50" />
             {statusTimeline.map((step, index) => {
               const Icon = step.icon;
               const isReached = index <= currentStatusIndex && !isCancelled;
               const isCurrent = index === currentStatusIndex && !isCancelled;
 
               return (
-                <div key={step.key} className="flex items-center gap-3">
-                  <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
-                    isReached
-                      ? 'bg-nurse text-white'
-                      : 'bg-muted text-muted-foreground'
-                  } ${isCurrent ? 'ring-2 ring-nurse/30 ring-offset-2' : ''}`}>
+                <div key={step.key} className="flex items-center gap-4 relative pb-6 last:pb-0">
+                  <motion.div
+                    initial={false}
+                    animate={isCurrent ? { scale: [1, 1.1, 1] } : {}}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' as const }}
+                    className={`relative w-9 h-9 rounded-2xl flex items-center justify-center shrink-0 z-10 ${
+                      isReached
+                        ? 'bg-gradient-to-bl from-nurse to-teal-600 text-white shadow-lg shadow-nurse/20'
+                        : 'bg-muted/80 text-muted-foreground border border-border'
+                    }`}
+                  >
                     <Icon className="w-4 h-4" />
-                  </div>
+                    {isCurrent && (
+                      <motion.div
+                        className="absolute inset-0 rounded-2xl border-2 border-nurse/40"
+                        animate={pulseRing}
+                        transition={{ duration: 2, repeat: Infinity, ease: 'easeOut' as const }}
+                      />
+                    )}
+                  </motion.div>
                   <div className="flex-1">
-                    <p className={`text-sm font-medium ${isReached ? 'text-foreground' : 'text-muted-foreground'}`}>
+                    <p className={`text-sm font-semibold ${isReached ? 'text-foreground' : 'text-muted-foreground'}`}>
                       {step.label}
                     </p>
                   </div>
                   {isReached && (
-                    <CheckCircle2 className="w-4 h-4 text-nurse" />
+                    <motion.div
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      transition={{ ease: 'easeOut' as const }}
+                    >
+                      <CheckCircle2 className="w-4 h-4 text-nurse" />
+                    </motion.div>
                   )}
                 </div>
               );
             })}
 
             {isCancelled && (
-              <div className="flex items-center gap-3 mt-2">
-                <div className="w-8 h-8 rounded-full bg-destructive text-destructive-foreground flex items-center justify-center shrink-0">
+              <div className="flex items-center gap-4 relative">
+                <div className="w-9 h-9 rounded-2xl bg-destructive text-destructive-foreground flex items-center justify-center shrink-0 z-10">
                   <XCircle className="w-4 h-4" />
                 </div>
-                <p className="text-sm font-medium text-destructive">
+                <p className="text-sm font-semibold text-destructive">
                   تم إلغاء التكليف
                 </p>
               </div>
@@ -721,10 +742,12 @@ export default function NurseDeploymentDetailPage() {
 
                 {/* Payment Details Card for admin_approved */}
                 {(deployment.paymentMethod || deployment.walletNumber || deployment.walletOwnerName) && (
-                  <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/10 border border-blue-200 dark:border-blue-900/30 space-y-3">
+                  <div className="p-4 rounded-2xl bg-gradient-to-br from-sky-50 to-blue-50 dark:from-sky-950/20 dark:to-blue-950/10 border border-sky-200 dark:border-sky-900/30 space-y-3">
                     <div className="flex items-center gap-2 mb-2">
-                      <CreditCard className="w-4 h-4 text-blue-600" />
-                      <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
+                      <div className="w-8 h-8 rounded-xl bg-sky-500/10 flex items-center justify-center">
+                        <CreditCard className="w-4 h-4 text-sky-600 dark:text-sky-400" />
+                      </div>
+                      <p className="text-sm font-bold text-sky-700 dark:text-sky-300">
                         تفاصيل الدفع
                       </p>
                     </div>
@@ -795,7 +818,7 @@ export default function NurseDeploymentDetailPage() {
                 )}
 
                 <Button
-                  className="w-full gap-2 bg-orange-600 hover:bg-orange-700 text-white"
+                  className="w-full gap-2 bg-gradient-to-l from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/20"
                   onClick={() => {
                     setShowPaymentModal(true);
                     setPaymentProof('');
@@ -899,7 +922,7 @@ export default function NurseDeploymentDetailPage() {
                 )}
 
                 <Button
-                  className="w-full gap-2 bg-orange-600 hover:bg-orange-700 text-white"
+                  className="w-full gap-2 bg-gradient-to-l from-orange-500 to-amber-600 hover:from-orange-600 hover:to-amber-700 text-white shadow-lg shadow-orange-500/20"
                   onClick={() => {
                     setShowPaymentModal(true);
                     setPaymentProof('');
@@ -1453,7 +1476,9 @@ export default function NurseDeploymentDetailPage() {
         <DialogContent dir="rtl" className="max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-5 h-5 text-nurse" />
+              <div className="w-8 h-8 rounded-xl bg-nurse/10 flex items-center justify-center">
+                <FileText className="w-4 h-4 text-nurse" />
+              </div>
               التقديم على التكليف
             </DialogTitle>
             <DialogDescription>
@@ -1463,18 +1488,18 @@ export default function NurseDeploymentDetailPage() {
 
           <div className="space-y-4">
             {/* Summary */}
-            <div className="p-3 rounded-xl bg-muted/40 space-y-2">
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-nurse/5 to-teal-500/5 border border-nurse/10 space-y-2.5">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">النوع</span>
-                <span className="font-medium">{typeLabels[deployment.type]}</span>
+                <span className="font-bold">{typeLabels[deployment.type]}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">الساعات</span>
-                <span className="font-medium">{toArabicNum(deployment.hours)} ساعة</span>
+                <span className="font-bold">{toArabicNum(deployment.hours)} ساعة</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">المبلغ</span>
-                <span className="font-medium">{toArabicNum(deployment.amount.toLocaleString())} ر.ي</span>
+                <span className="font-black text-emerald-600 dark:text-emerald-400">{toArabicNum(deployment.amount.toLocaleString())} ر.ي</span>
               </div>
               {deployment.adminCommissionAmount > 0 && (
                 <div className="flex items-center justify-between text-sm text-orange-600 dark:text-orange-400">
@@ -1492,13 +1517,17 @@ export default function NurseDeploymentDetailPage() {
 
             {/* Cover letter */}
             <div className="space-y-2">
-              <Label htmlFor="nurse-cover-letter" className="text-sm font-medium">رسالة التقديم (اختياري)</Label>
+              <Label htmlFor="nurse-cover-letter" className="text-sm font-semibold flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5 text-nurse" />
+                رسالة التقديم (اختياري)
+              </Label>
               <Textarea
                 id="nurse-cover-letter"
                 placeholder="اكتب رسالة تشرح فيها لماذا أنت مناسب لهذا التكليف..."
-                rows={3}
+                rows={4}
                 value={coverLetter}
                 onChange={(e) => setCoverLetter(e.target.value)}
+                className="border-nurse/20 focus:border-nurse resize-none"
               />
             </div>
           </div>

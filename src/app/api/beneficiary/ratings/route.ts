@@ -8,6 +8,7 @@ import { Rating, ServiceRequest, EmergencyRequest, Nurse, Notification } from '@
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        ratings: ratings.map((r: any) => ({ ...r, id: r._id.toString() })),
+        ratings: ratings.map((r: any) => (serializeDoc(r))),
         total,
         page,
         pages: Math.ceil(total / limit),
@@ -171,7 +172,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...rating.toObject(), id: rating._id.toString() },
+      data: serializeDoc(rating.toObject()),
       message: 'تم إرسال التقييم بنجاح',
     }, { status: 201 });
   } catch (error) {

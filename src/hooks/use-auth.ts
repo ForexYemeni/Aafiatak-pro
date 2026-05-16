@@ -122,7 +122,7 @@ interface CachedResponse {
 }
 
 const _GET_CACHE = new Map<string, CachedResponse>();
-const _GET_CACHE_TTL = 180_000; // 3 minutes
+const _GET_CACHE_TTL = 30_000; // 30 seconds (short enough to avoid stale data, long enough for navigation)
 
 function _getCacheKey(url: string, userId: string): string {
   return `${url}::${userId}`;
@@ -158,7 +158,7 @@ export async function _GET_CACHE_warmUp(endpoints: string[]): Promise<void> {
       if (res.ok) {
         const bodyText = await res.text();
         _GET_CACHE.set(cacheKey, { bodyText, status: res.status, ok: true, ts: Date.now() });
-        if (_GET_CACHE.size > 100) {
+        if (_GET_CACHE.size > 200) {
           const firstKey = _GET_CACHE.keys().next().value;
           if (firstKey) _GET_CACHE.delete(firstKey);
         }
@@ -201,6 +201,19 @@ export function invalidateAuthFetchCache(urlPrefix?: string): void {
       _GET_CACHE.delete(key);
     }
   }
+}
+
+/** Force-bust cache and re-fetch — used by refresh buttons and after data mutations */
+export async function forceRefreshFetch(
+  authFetch: (url: string, options?: RequestInit) => Promise<Response>,
+  url: string
+): Promise<Response> {
+  // Clear cache for this URL first
+  const userId = useAuthStore.getState().user?.id ?? 'anon';
+  const cacheKey = _getCacheKey(url, userId);
+  _GET_CACHE.delete(cacheKey);
+  // Now fetch fresh from server
+  return authFetch(url);
 }
 
 // ---- useAuthFetch (OPTIMIZED) ----
@@ -287,8 +300,8 @@ export function useAuthFetch() {
             ok: response.ok,
             ts: Date.now(),
           });
-          // Trim cache size (keep last 100 entries)
-          if (_GET_CACHE.size > 100) {
+          // Trim cache size (keep last 200 entries — increased for better navigation cache hit rate)
+          if (_GET_CACHE.size > 200) {
             const firstKey = _GET_CACHE.keys().next().value;
             if (firstKey) _GET_CACHE.delete(firstKey);
           }

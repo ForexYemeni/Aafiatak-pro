@@ -8,6 +8,7 @@ import { hashPassword, createErrorResponse } from '@/lib/auth';
 import { requireRole } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -36,7 +37,7 @@ export async function GET(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        subadmins: subadmins.map((s: any) => ({ ...s, id: s._id.toString() })),
+        subadmins: subadmins.map((s: any) => (serializeDoc(s))),
         total,
         page,
         pages: Math.ceil(total / limit),

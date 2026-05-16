@@ -7,6 +7,7 @@ import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 async function handleAssignmentAction(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -137,7 +138,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
 
       return Response.json({
         success: true,
-        data: { ...order.toObject(), id: order._id.toString() },
+        data: serializeDoc(order.toObject()),
         message: 'تم قبول الطلب بنجاح',
       });
     } else {
@@ -203,7 +204,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
 
       return Response.json({
         success: true,
-        data: { ...order.toObject(), id: order._id.toString() },
+        data: serializeDoc(order.toObject()),
         message: 'تم رفض الطلب',
       });
     }

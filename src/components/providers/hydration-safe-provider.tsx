@@ -1,21 +1,20 @@
 'use client';
 
-import { useState, useEffect, type ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
 // ============================================================================
-// Hydration Safe Provider
+// Hydration Safe Provider (v4 — SAFE RENDER)
 // ============================================================================
-// Prevents React hydration mismatches by ensuring the first client render
-// exactly matches the server render. This is critical for apps using
-// Zustand persist (localStorage) where server state differs from client state.
+// FIX: v3 caused white screen because it rendered an EMPTY div during SSR
+// and if client hydration failed (JS error), the app stayed blank forever.
 //
-// How it works:
-// 1. Server render: Shows a minimal loading shell (same on server & client)
-// 2. Client hydration: Initially renders the same loading shell (matches server)
-// 3. After mount (useEffect): Replaces loading shell with actual app content
+// v4 approach: Simply render children directly. Next.js App Router handles
+// hydration well. The 'use client' directive ensures this runs on the client.
+// If any child throws during hydration, the error boundary (SafeProvider)
+// will catch it and the app won't be stuck on a blank page.
 //
-// This eliminates ALL hydration mismatches because the server HTML and
-// the initial client render are identical.
+// This component is kept as a pass-through for backward compatibility
+// and can be safely removed in a future cleanup.
 // ============================================================================
 
 interface HydrationSafeProviderProps {
@@ -23,28 +22,6 @@ interface HydrationSafeProviderProps {
 }
 
 export function HydrationSafeProvider({ children }: HydrationSafeProviderProps) {
-  const [hasMounted, setHasMounted] = useState(false);
-
-  useEffect(() => {
-    setHasMounted(true);
-  }, []);
-
-  // During SSR and initial client hydration, show a minimal shell
-  // that exactly matches what the server renders
-  if (!hasMounted) {
-    return (
-      <div
-        className="min-h-screen flex items-center justify-center bg-background"
-        dir="rtl"
-        lang="ar"
-      >
-        <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin" />
-          <p className="text-muted-foreground text-sm">جاري التحميل...</p>
-        </div>
-      </div>
-    );
-  }
-
+  // Direct render — no hydration guard, no blank screen, no loading delay
   return <>{children}</>;
 }

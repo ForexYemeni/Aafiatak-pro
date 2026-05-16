@@ -10,6 +10,7 @@ import { Deployment, Notification, Nurse, AdminSettings, User } from '@/models/m
 import { requireAuth, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }

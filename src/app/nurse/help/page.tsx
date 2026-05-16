@@ -12,6 +12,8 @@ import {
   Info,
   ChevronDown,
   Loader2,
+  Sparkles,
+  LifeBuoy,
 } from 'lucide-react';
 import {
   Accordion,
@@ -113,23 +115,46 @@ export default function NurseHelpPage() {
       : ['+967123456789'];
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
       <PageHeader title="المساعدة والدعم" description="الأسئلة الشائعة والتواصل مع الدعم" />
 
-      {/* FAQ Section */}
-      <GlassCard variant="nurse" className="p-4">
+      {/* ══════════════ Help Hero Card ══════════════ */}
+      <GlassCard variant="nurse" className="p-0 overflow-hidden">
+        <div className="relative bg-gradient-to-bl from-nurse via-sky-500 to-teal-500 p-6 text-white">
+          <div className="absolute -top-8 -left-8 w-28 h-28 rounded-full bg-white/8 blur-sm" />
+          <div className="absolute -bottom-6 -right-6 w-24 h-24 rounded-full bg-white/6" />
+          <div className="relative z-10 flex items-center gap-4">
+            <motion.div
+              animate={{ rotate: [0, 10, -10, 0] }}
+              transition={{ duration: 3, repeat: Infinity, ease: 'easeOut' as const }}
+              className="w-14 h-14 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center shrink-0 backdrop-blur-sm"
+            >
+              <LifeBuoy className="w-7 h-7 text-white" />
+            </motion.div>
+            <div>
+              <h2 className="text-lg font-black">كيف يمكننا مساعدتك؟</h2>
+              <p className="text-sm opacity-80 mt-0.5">ابحث عن إجابات أو تواصل مع فريق الدعم</p>
+            </div>
+          </div>
+        </div>
+      </GlassCard>
+
+      {/* ══════════════ FAQ Section ══════════════ */}
+      <GlassCard variant="nurse" className="p-5">
         <div className="flex items-center gap-2 mb-4">
-          <HelpCircle className="w-5 h-5 text-nurse" />
-          <h3 className="font-semibold">الأسئلة الشائعة</h3>
+          <div className="w-8 h-8 rounded-xl bg-nurse/10 flex items-center justify-center">
+            <HelpCircle className="w-4 h-4 text-nurse" />
+          </div>
+          <h3 className="font-bold">الأسئلة الشائعة</h3>
         </div>
         <Accordion type="single" collapsible className="space-y-2">
-          {faqItems.map((item) => (
+          {faqItems.map((item, i) => (
             <AccordionItem
               key={item.id}
               value={item.id}
-              className="border border-border/50 rounded-xl px-4 data-[state=open]:bg-nurse/5"
+              className="border border-border/50 rounded-2xl px-4 data-[state=open]:bg-nurse/5 data-[state=open]:border-nurse/20 transition-colors"
             >
-              <AccordionTrigger className="text-sm text-right hover:no-underline py-3">
+              <AccordionTrigger className="text-sm text-right hover:no-underline py-3.5 font-semibold">
                 {item.question}
               </AccordionTrigger>
               <AccordionContent className="text-sm text-muted-foreground leading-relaxed pb-4">
@@ -140,87 +165,101 @@ export default function NurseHelpPage() {
         </Accordion>
       </GlassCard>
 
-      {/* Contact Support */}
-      <GlassCard variant="nurse" className="p-4">
+      {/* ══════════════ Contact Support ══════════════ */}
+      <GlassCard variant="nurse" className="p-5">
         <div className="flex items-center gap-2 mb-4">
-          <Phone className="w-5 h-5 text-nurse" />
-          <h3 className="font-semibold">تواصل مع الدعم</h3>
+          <div className="w-8 h-8 rounded-xl bg-nurse/10 flex items-center justify-center">
+            <Phone className="w-4 h-4 text-nurse" />
+          </div>
+          <h3 className="font-bold">تواصل مع الدعم</h3>
         </div>
         <div className="space-y-3">
           {phones.map((phone, i) => (
-            <Button
-              key={`phone-${i}`}
-              variant="outline"
-              className="w-full justify-start gap-3 h-12 text-sm"
-              onClick={() => window.open(`tel:${phone.replace(/\s/g, '')}`)}
-            >
-              <Phone className="w-5 h-5 text-green-600" />
-              <div className="text-right">
-                <p className="font-medium">{i === 0 ? 'اتصل بنا' : `اتصل بنا ${i + 1}`}</p>
-                <p className="text-xs text-muted-foreground" dir="ltr">{phone}</p>
-              </div>
-            </Button>
+            <motion.div key={`phone-${i}`} whileTap={{ scale: 0.98 }}>
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-3 h-14 text-sm rounded-2xl border-border/50 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors"
+                onClick={() => window.open(`tel:${phone.replace(/\s/g, '')}`)}
+              >
+                <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                  <Phone className="w-5 h-5 text-emerald-600" />
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-sm">{i === 0 ? 'اتصل بنا' : `اتصل بنا ${i + 1}`}</p>
+                  <p className="text-xs text-muted-foreground" dir="ltr">{phone}</p>
+                </div>
+              </Button>
+            </motion.div>
           ))}
           {whatsApps.map((wa, i) => (
-            <Button
-              key={`wa-${i}`}
-              variant="outline"
-              className="w-full justify-start gap-3 h-12 text-sm"
-              onClick={() => window.open(`https://wa.me/${wa.replace(/[^0-9]/g, '')}`, '_blank')}
-            >
-              <MessageCircle className="w-5 h-5 text-green-600" />
-              <div className="text-right">
-                <p className="font-medium">{i === 0 ? 'واتساب' : `واتساب ${i + 1}`}</p>
-                <p className="text-xs text-muted-foreground" dir="ltr">{wa}</p>
-              </div>
-            </Button>
+            <motion.div key={`wa-${i}`} whileTap={{ scale: 0.98 }}>
+              <Button
+                variant="outline"
+                className="w-full justify-start gap-3 h-14 text-sm rounded-2xl border-border/50 hover:bg-green-50 dark:hover:bg-green-900/10 transition-colors"
+                onClick={() => window.open(`https://wa.me/${wa.replace(/[^0-9]/g, '')}`, '_blank')}
+              >
+                <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                  <MessageCircle className="w-5 h-5 text-green-600" />
+                </div>
+                <div className="text-right">
+                  <p className="font-bold text-sm">{i === 0 ? 'واتساب' : `واتساب ${i + 1}`}</p>
+                  <p className="text-xs text-muted-foreground" dir="ltr">{wa}</p>
+                </div>
+              </Button>
+            </motion.div>
           ))}
         </div>
       </GlassCard>
 
-      {/* Legal Links */}
-      <GlassCard variant="nurse" className="p-4">
+      {/* ══════════════ Legal Links ══════════════ */}
+      <GlassCard variant="nurse" className="p-5">
         <div className="flex items-center gap-2 mb-4">
-          <FileText className="w-5 h-5 text-nurse" />
-          <h3 className="font-semibold">المستندات القانونية</h3>
+          <div className="w-8 h-8 rounded-xl bg-nurse/10 flex items-center justify-center">
+            <FileText className="w-4 h-4 text-nurse" />
+          </div>
+          <h3 className="font-bold">المستندات القانونية</h3>
         </div>
         <div className="space-y-2">
-          <Link href="/nurse/help/terms" className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors">
+          <Link href="/nurse/help/terms" className="flex items-center justify-between w-full p-3.5 rounded-2xl hover:bg-muted/50 transition-colors border border-transparent hover:border-border/50">
             <div className="flex items-center gap-3">
-              <Shield className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm">شروط والأحكام</span>
+              <div className="w-9 h-9 rounded-xl bg-muted/50 flex items-center justify-center">
+                <Shield className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <span className="text-sm font-semibold">شروط والأحكام</span>
             </div>
             <ChevronDown className="w-4 h-4 text-muted-foreground -rotate-90" />
           </Link>
-          <Link href="/nurse/help/privacy" className="flex items-center justify-between w-full p-3 rounded-xl hover:bg-muted/50 transition-colors">
+          <Link href="/nurse/help/privacy" className="flex items-center justify-between w-full p-3.5 rounded-2xl hover:bg-muted/50 transition-colors border border-transparent hover:border-border/50">
             <div className="flex items-center gap-3">
-              <FileText className="w-5 h-5 text-muted-foreground" />
-              <span className="text-sm">سياسة الخصوصية</span>
+              <div className="w-9 h-9 rounded-xl bg-muted/50 flex items-center justify-center">
+                <FileText className="w-4 h-4 text-muted-foreground" />
+              </div>
+              <span className="text-sm font-semibold">سياسة الخصوصية</span>
             </div>
             <ChevronDown className="w-4 h-4 text-muted-foreground -rotate-90" />
           </Link>
         </div>
       </GlassCard>
 
-      {/* App Info */}
-      <GlassCard variant="nurse" className="p-4">
-        <div className="flex items-center gap-2 mb-3">
-          <Info className="w-5 h-5 text-nurse" />
-          <h3 className="font-semibold">معلومات التطبيق</h3>
+      {/* ══════════════ App Info ══════════════ */}
+      <GlassCard variant="nurse" className="p-5">
+        <div className="flex items-center gap-2 mb-4">
+          <div className="w-8 h-8 rounded-xl bg-nurse/10 flex items-center justify-center">
+            <Info className="w-4 h-4 text-nurse" />
+          </div>
+          <h3 className="font-bold">معلومات التطبيق</h3>
         </div>
-        <div className="space-y-2 text-sm">
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">اسم التطبيق</span>
-            <span className="font-medium">عافيتك</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">الإصدار</span>
-            <span className="font-medium">١.٠.١</span>
-          </div>
-          <div className="flex items-center justify-between">
-            <span className="text-muted-foreground">نوع الحساب</span>
-            <span className="font-medium">ممرض/ـة</span>
-          </div>
+        <div className="space-y-3 text-sm">
+          {[
+            { label: 'اسم التطبيق', value: 'عافيتك' },
+            { label: 'الإصدار', value: '١.٠.١' },
+            { label: 'نوع الحساب', value: 'ممرض/ـة' },
+          ].map((item, i) => (
+            <div key={i} className="flex items-center justify-between p-2 rounded-xl bg-muted/20">
+              <span className="text-muted-foreground font-medium">{item.label}</span>
+              <span className="font-bold">{item.value}</span>
+            </div>
+          ))}
         </div>
       </GlassCard>
     </div>

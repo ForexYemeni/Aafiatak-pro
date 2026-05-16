@@ -8,6 +8,7 @@ import { hashPassword, verifyPassword, createErrorResponse } from '@/lib/auth';
 import { requireRole } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const subadmin = await User.findOne({ _id: id, role: 'subadmin' }).select('-password').lean();
     if (!subadmin) return createErrorResponse('المشرف غير موجود', 404, 'NOT_FOUND');
 
-    return Response.json({ success: true, data: { ...subadmin, id: subadmin._id.toString() } });
+    return Response.json({ success: true, data: serializeDoc(subadmin) });
   } catch (error) {
     console.error('[ADMIN SUBADMIN DETAIL ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
@@ -57,7 +58,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     });
 
-    return Response.json({ success: true, data: { ...subadmin, id: subadmin._id.toString() }, message: 'تم تحديث بيانات المشرف بنجاح' });
+    return Response.json({ success: true, data: serializeDoc(subadmin), message: 'تم تحديث بيانات المشرف بنجاح' });
   } catch (error) {
     console.error('[ADMIN SUBADMIN UPDATE ERROR]', error);
     return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');

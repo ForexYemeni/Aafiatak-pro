@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Nurse } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -42,7 +43,7 @@ export async function GET(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        nurses: nurses.map((n: any) => ({ ...n, id: n._id.toString() })),
+        nurses: nurses.map((n: any) => (serializeDoc(n))),
         total,
         page,
         pages: Math.ceil(total / limit),

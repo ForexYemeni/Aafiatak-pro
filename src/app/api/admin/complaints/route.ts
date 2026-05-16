@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Rating } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 // Since there's no dedicated Complaint mongoose model, we use Rating with low scores as complaints proxy
 // In production, a Complaint model should be added
 
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        complaints: complaints.map((c: any) => ({ ...c, id: c._id.toString() })),
+        complaints: complaints.map((c: any) => (serializeDoc(c))),
         total,
         page,
         pages: Math.ceil(total / limit),

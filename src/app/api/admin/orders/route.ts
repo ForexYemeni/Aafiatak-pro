@@ -7,6 +7,7 @@ import { ServiceRequest, Beneficiary, Nurse, Service } from '@/models/mongoose';
 import PaymentMethod from '@/models/PaymentMethod';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();

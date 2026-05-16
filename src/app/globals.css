@@ -743,6 +743,11 @@ button, [role="button"] {
 
 html {
   scroll-behavior: smooth;
+  height: 100%;
+}
+
+body {
+  height: 100%;
 }
 
 /* ============================================================================
@@ -809,4 +814,229 @@ a[href]:not([href^="#"]):not([href^="mailto:"]):not([href^="tel:"]) {
 
 .dark .card-lift:hover {
   box-shadow: 0 8px 25px -5px rgba(0,0,0,0.4), 0 4px 10px -5px rgba(0,0,0,0.2);
+}
+
+/* ============================================================================
+   Nurse CV - Section Reveal Animations
+   ============================================================================ */
+
+@keyframes cv-section-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.cv-section-animate {
+  animation: cv-section-reveal 0.5s ease-out forwards;
+}
+
+/* ============================================================================
+   Nurse CV - Skill Bar Fill Animation
+   ============================================================================ */
+
+@keyframes skill-bar-fill {
+  from { width: 0; }
+}
+
+.cv-skill-bar {
+  animation: skill-bar-fill 0.8s ease-out;
+}
+
+/* ============================================================================
+   Nurse CV - Timeline Connector Styles
+   ============================================================================ */
+
+.cv-timeline-line {
+  position: absolute;
+  right: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 2px;
+  background: linear-gradient(to bottom, oklch(0.65 0.17 220), oklch(0.65 0.17 220 / 0.3));
+}
+
+.dark .cv-timeline-line {
+  background: linear-gradient(to bottom, oklch(0.7 0.17 220), oklch(0.7 0.17 220 / 0.3));
+}
+
+.cv-timeline-dot {
+  position: absolute;
+  right: 0;
+  top: 6px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 3px solid var(--background);
+  background: oklch(0.65 0.17 220);
+}
+
+.dark .cv-timeline-dot {
+  background: oklch(0.7 0.17 220);
+}
+
+/* ============================================================================
+   Nurse CV - Circular Progress Indicator
+   ============================================================================ */
+
+@keyframes cv-progress-spin {
+  from {
+    stroke-dashoffset: var(--cv-circumference);
+  }
+  to {
+    stroke-dashoffset: var(--cv-offset);
+  }
+}
+
+.cv-circular-progress {
+  animation: cv-progress-spin 1.2s ease-out forwards;
+}
+
+/* ============================================================================
+   Nurse CV - Badge Glow/Pulse Animations
+   ============================================================================ */
+
+@keyframes badge-glow-nurse {
+  0%, 100% {
+    box-shadow: 0 0 4px rgba(14, 165, 233, 0.2);
+  }
+  50% {
+    box-shadow: 0 0 12px rgba(14, 165, 233, 0.4);
+  }
+}
+
+.cv-badge-glow {
+  animation: badge-glow-nurse 2.5s ease-in-out infinite;
+}
+
+/* ============================================================================
+   Nurse CV - Contact Guard Blur Effect
+   ============================================================================ */
+
+@keyframes contact-guard-pulse {
+  0%, 100% {
+    backdrop-filter: blur(4px);
+  }
+  50% {
+    backdrop-filter: blur(8px);
+  }
+}
+
+.cv-contact-guard-overlay {
+  animation: contact-guard-pulse 3s ease-in-out infinite;
+}
+
+/* ============================================================================
+   PERFORMANCE OPTIMIZATIONS v2
+   ============================================================================ */
+
+/* GPU acceleration for animated elements — reduces paint time */
+.animate-spin,
+.animate-pulse,
+.animate-bounce,
+.animate-float,
+.animate-shimmer,
+.animate-slide-up,
+.animate-slide-down,
+.animate-slide-in-right,
+.animate-bell-ring,
+.animate-shake,
+.emergency-float-btn,
+.cv-badge-glow,
+.page-animate {
+  will-change: transform, opacity;
+  backface-visibility: hidden;
+  -webkit-backface-visibility: hidden;
+}
+
+/* Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Optimize font rendering */
+body {
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Faster page transitions — reduce default animation durations */
+.page-animate {
+  animation-duration: 0.1s;
+}
+
+/* Content-visibility for off-screen sections — skips rendering until needed */
+.section-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: 0 500px;
+}
+
+/* Optimize scroll performance */
+main {
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+}
+
+/* Faster skeleton pulse */
+.skeleton-fast {
+  animation: pulse 1s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* ============================================================================
+   PERFORMANCE OPTIMIZATIONS v3 — ULTRA-FAST NAVIGATION
+   ============================================================================ */
+
+/* Instant hydration — prevent FOUC (Flash of Unstyled Content) */
+html {
+  visibility: visible;
+}
+
+/* Faster link hover transitions */
+a, button, [role="button"] {
+  transition-duration: 150ms;
+}
+
+/* Reduce backdrop-filter blur for better GPU performance */
+.glass,
+.glass-strong,
+.glass-subtle,
+.glass-admin,
+.glass-nurse,
+.glass-beneficiary {
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+/* Disable heavy animations on low-end devices */
+@media (prefers-reduced-motion: reduce) {
+  .login-mesh-orb-1,
+  .login-mesh-orb-2,
+  .login-mesh-orb-3 {
+    animation: none !important;
+  }
+}
+
+/* Contain layout to prevent unnecessary reflows */
+.glass,
+.glass-strong,
+.glass-subtle {
+  contain: layout style;
+}
+
+/* Faster card transitions */
+.card-lift {
+  contain: layout style;
+  transition: transform 120ms ease, box-shadow 120ms ease;
 }

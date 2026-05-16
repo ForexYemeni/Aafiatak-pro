@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Beneficiary, LoyaltyTransaction } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -52,7 +53,7 @@ export async function GET(request: NextRequest) {
         pointsToNextTier: currentTier.nextTier
           ? (tierInfo[currentTier.nextTier]?.minPoints || 0) - beneficiary.loyaltyPoints
           : 0,
-        transactions: transactions.map((t: any) => ({ ...t, id: t._id.toString() })),
+        transactions: transactions.map((t: any) => (serializeDoc(t))),
         total,
         page,
         pages: Math.ceil(total / limit),

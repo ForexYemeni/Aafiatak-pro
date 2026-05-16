@@ -7,6 +7,7 @@ import { Coupon } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -33,7 +34,7 @@ export async function GET(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        coupons: coupons.map((c: any) => ({ ...c, id: c._id.toString() })),
+        coupons: coupons.map((c: any) => (serializeDoc(c))),
         total,
         page,
         pages: Math.ceil(total / limit),
@@ -89,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...coupon.toObject(), id: coupon._id.toString() },
+      data: serializeDoc(coupon.toObject()),
       message: 'تم إنشاء الكوبون بنجاح',
     }, { status: 201 });
   } catch (error) {

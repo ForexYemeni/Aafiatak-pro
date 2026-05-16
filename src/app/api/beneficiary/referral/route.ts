@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Beneficiary, Referral } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -35,7 +36,7 @@ export async function GET(request: NextRequest) {
         totalReferrals,
         completedReferrals,
         totalRewards,
-        referrals: referrals.map((r: any) => ({ ...r, id: r._id.toString() })),
+        referrals: referrals.map((r: any) => (serializeDoc(r))),
       },
     });
   } catch (error) {

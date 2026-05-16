@@ -7,6 +7,7 @@ import PaymentMethod from '@/models/PaymentMethod';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const pm = await PaymentMethod.findById(id).lean();
     if (!pm) return createErrorResponse('طريقة الدفع غير موجودة', 404, 'NOT_FOUND');
 
-    return Response.json({ success: true, data: { ...pm, id: pm._id.toString() } });
+    return Response.json({ success: true, data: serializeDoc(pm) });
   } catch (error) {
     console.error('[ADMIN PAYMENT METHOD DETAIL ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
@@ -57,7 +58,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     });
 
-    return Response.json({ success: true, data: { ...pm, id: pm._id.toString() }, message: 'تم تحديث طريقة الدفع بنجاح' });
+    return Response.json({ success: true, data: serializeDoc(pm), message: 'تم تحديث طريقة الدفع بنجاح' });
   } catch (error) {
     console.error('[ADMIN PAYMENT METHOD UPDATE ERROR]', error);
     return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');

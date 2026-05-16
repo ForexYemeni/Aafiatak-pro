@@ -1,24 +1,17 @@
 // ============================================================================
-// عافيتك (Aafiatak) Healthcare Platform - Web Push Notification Service
+// عافيتك (Aafiatak) Healthcare Platform - Unified Push Notification Service
 // ============================================================================
-// Server-side push notification library using web-push with VAPID keys.
-// NO Firebase — pure Web Push Protocol (RFC 8030) over VAPID (RFC 8292).
+// Server-side push notification delivery.
+// Dual delivery: Web Push (VAPID) for browsers + FCM for Android/iOS devices.
 // ============================================================================
 
 import webpush from 'web-push';
 import { connectDB } from '@/lib/mongodb';
 import FCMToken from '@/models/FCMToken';
 import { Notification } from '@/models/mongoose';
+import { sendFCMToDevice, sendFCMToDevices } from './firebase-admin-sdk';
 
 // ── VAPID Configuration ────────────────────────────────────────────
-// All VAPID keys MUST come from environment variables.
-// Never hardcode keys in source code — they are secrets.
-// Run `npx web-push generate-vapid-keys` to generate a fresh pair.
-// Required env vars:
-//   VAPID_PUBLIC_KEY   — the base64url-encoded public key
-//   VAPID_PRIVATE_KEY  — the base64url-encoded private key
-//   VAPID_SUBJECT      — mailto: or https: contact URI
-
 const VAPID_PUBLIC_KEY = process.env.VAPID_PUBLIC_KEY ?? '';
 const VAPID_PRIVATE_KEY = process.env.VAPID_PRIVATE_KEY ?? '';
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT ?? 'mailto:support@aafiatak.com';
@@ -35,8 +28,7 @@ if (VAPID_CONFIGURED) {
 } else {
   console.warn(
     '[PUSH] VAPID_PUBLIC_KEY or VAPID_PRIVATE_KEY is not set. ' +
-    'Push notifications will not be delivered. ' +
-    'Run: npx web-push generate-vapid-keys and add the output to your .env file.'
+    'Web Push notifications will not be delivered.'
   );
 }
 
@@ -62,11 +54,11 @@ interface PushResult {
   failed: number;
 }
 
-// ── Core: Send Push to a Single User ───────────────────────────────
+// ── Core: Send Push to a Single User (Web Push + FCM) ───────────────
 
 /**
- * Send a Web Push notification to all active devices of a user.
- * Returns the count of sent and failed deliveries.
+ * Send push notification to all active devices of a user.
+ * Uses Web Push (VAPID) for web browsers and FCM for Android/iOS devices.
  */
 export async function sendPushToUser(
   userId: string,
@@ -83,61 +75,122 @@ export async function sendPushToUser(
     const tokens = await FCMToken.find({ userId, isActive: true }).lean();
     if (!tokens.length) return { sent: 0, failed: 0 };
 
-    const pushPayload = JSON.stringify({
-      title: payload.title,
-      body: payload.body,
-      icon: payload.icon ?? '/icons/icon-192x192.png',
-      badge: payload.badge ?? '/icons/icon-72x72.png',
-      image: payload.image,
-      url: payload.url,
-      type: payload.type ?? 'system',
-      priority: payload.priority ?? 'medium',
-      sound: payload.sound !== false,
-      tag: payload.tag,
-      data: {
-        ...(payload.data ?? {}),
-        targetUserId: userId,
-      },
-      userRole: payload.userRole,
-      timestamp: Date.now(),
-    });
+    // Separate tokens by platform
+    const webTokens = tokens.filter((t) => t.platform === 'web' && t.endpoint);
+    const fcmTokens = tokens.filter(
+      (t) => (t.platform === 'android' || t.platform === 'ios') && t.fcmToken
+    );
 
     let sent = 0;
     let failed = 0;
 
-    await Promise.allSettled(
-      tokens.map(async (tokenDoc) => {
-        try {
-          await webpush.sendNotification(
-            {
-              endpoint: tokenDoc.endpoint,
-              keys: { p256dh: tokenDoc.p256dh, auth: tokenDoc.auth },
-            } as webpush.PushSubscription,
-            pushPayload,
-            {
-              TTL: 86400,
-              urgency:
-                payload.priority === 'urgent' || payload.priority === 'high'
-                  ? 'high'
-                  : 'normal',
-            }
-          );
-          sent++;
-        } catch (error: unknown) {
-          const webPushError = error as { statusCode?: number };
-          if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
-            try {
-              await FCMToken.findByIdAndUpdate(tokenDoc._id, { isActive: false });
-            } catch {
-              // ignore cleanup errors
-            }
-          }
-          failed++;
-        }
-      })
-    );
+    // ── Send via Web Push (VAPID) to browsers ──────────────────────
+    if (webTokens.length > 0) {
+      const pushPayload = JSON.stringify({
+        title: payload.title,
+        body: payload.body,
+        icon: payload.icon ?? '/icons/icon-192x192.png',
+        badge: payload.badge ?? '/icons/icon-72x72.png',
+        image: payload.image,
+        url: payload.url,
+        type: payload.type ?? 'system',
+        priority: payload.priority ?? 'medium',
+        sound: payload.sound !== false,
+        tag: payload.tag,
+        data: {
+          ...(payload.data ?? {}),
+          targetUserId: userId,
+        },
+        userRole: payload.userRole,
+        timestamp: Date.now(),
+      });
 
-    console.log(`[PUSH] User ${userId}: ${sent} sent, ${failed} failed`);
+      const webResults = await Promise.allSettled(
+        webTokens.map(async (tokenDoc) => {
+          try {
+            await webpush.sendNotification(
+              {
+                endpoint: tokenDoc.endpoint,
+                keys: { p256dh: tokenDoc.p256dh, auth: tokenDoc.auth },
+              } as webpush.PushSubscription,
+              pushPayload,
+              {
+                TTL: 86400,
+                urgency:
+                  payload.priority === 'urgent' || payload.priority === 'high'
+                    ? 'high'
+                    : 'normal',
+              }
+            );
+            return true;
+          } catch (error: unknown) {
+            const webPushError = error as { statusCode?: number };
+            if (webPushError.statusCode === 410 || webPushError.statusCode === 404) {
+              try {
+                await FCMToken.findByIdAndUpdate(tokenDoc._id, { isActive: false });
+              } catch {
+                // ignore cleanup errors
+              }
+            }
+            return false;
+          }
+        })
+      );
+
+      for (const result of webResults) {
+        if (result.status === 'fulfilled' && result.value) sent++;
+        else failed++;
+      }
+    }
+
+    // ── Send via FCM to Android/iOS devices ────────────────────────
+    if (fcmTokens.length > 0) {
+      const fcmTokenStrings = fcmTokens.map((t) => t.fcmToken);
+
+      const fcmPayload = {
+        title: payload.title,
+        body: payload.body,
+        icon: payload.icon ?? '/icons/icon-192x192.png',
+        image: payload.image,
+        url: payload.url,
+        type: payload.type ?? 'system',
+        priority: payload.priority ?? 'medium',
+        sound: payload.sound !== false,
+        tag: payload.tag,
+        data: (payload.data
+          ? Object.fromEntries(
+              Object.entries(payload.data).map(([k, v]) => [k, String(v)])
+            )
+          : {}) as Record<string, string>,
+        userRole: payload.userRole,
+      };
+
+      if (fcmTokenStrings.length === 1) {
+        // Single device — use single send
+        const success = await sendFCMToDevice(fcmTokenStrings[0], fcmPayload);
+        if (success) sent++;
+        else failed++;
+      } else {
+        // Multiple devices — use multicast
+        const result = await sendFCMToDevices(fcmTokenStrings, fcmPayload);
+        sent += result.successCount;
+        failed += result.failureCount;
+
+        // Deactivate invalid FCM tokens
+        if (result.invalidTokens.length > 0) {
+          await Promise.allSettled(
+            result.invalidTokens.map((invalidToken) =>
+              FCMToken.updateMany(
+                { fcmToken: invalidToken, isActive: true },
+                { isActive: false }
+              )
+            )
+          );
+        }
+      }
+    }
+
+    console.log(`[PUSH] User ${userId}: ${sent} sent, ${failed} failed (web: ${webTokens.length}, fcm: ${fcmTokens.length})`);
     return { sent, failed };
   } catch (error) {
     console.error('[PUSH] Error sending push to user:', error);

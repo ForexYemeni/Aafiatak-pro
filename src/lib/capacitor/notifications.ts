@@ -2,6 +2,7 @@
 // عافيتك (Aafiatak) Healthcare Platform - Capacitor Notifications Plugin
 // ============================================================================
 // Wrapper for Capacitor Push Notifications plugin.
+// Registers FCM token with server for push notification delivery.
 // Gracefully degrades when not running in a native environment.
 // ============================================================================
 
@@ -32,11 +33,97 @@ const notificationReceivedListeners: Set<NotificationReceivedCallback> = new Set
 const notificationClickedListeners: Set<NotificationClickedCallback> = new Set();
 let pushToken: string | null = null;
 let listenersRegistered = false;
+let tokenSentToServer = false;
+
+/**
+ * Get or generate a persistent device ID.
+ */
+function getDeviceId(): string {
+  if (typeof window === 'undefined') return 'server';
+  const key = 'aafiatak-device-id';
+  let id = localStorage.getItem(key);
+  if (!id) {
+    id = 'capacitor-' + Date.now() + '-' + Math.random().toString(36).substring(2);
+    localStorage.setItem(key, id);
+  }
+  return id;
+}
+
+/**
+ * Send FCM token to the server so it can send push notifications.
+ */
+async function sendTokenToServer(token: string): Promise<boolean> {
+  try {
+    // Get auth token from localStorage
+    const authStorage = localStorage.getItem('auth-storage');
+    let authToken = '';
+
+    if (authStorage) {
+      try {
+        const parsed = JSON.parse(authStorage);
+        authToken = parsed?.state?.token || '';
+      } catch {}
+    }
+
+    if (!authToken) {
+      console.warn('[Capacitor] No auth token found — will send FCM token after login');
+      return false;
+    }
+
+    const response = await fetch('/api/notifications/register-token', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${authToken}`,
+      },
+      body: JSON.stringify({
+        fcmToken: token,
+        platform: 'android',
+        deviceId: getDeviceId(),
+      }),
+    });
+
+    if (response.ok) {
+      const data = await response.json();
+      if (data.success) {
+        tokenSentToServer = true;
+        console.log('[Capacitor] FCM token sent to server successfully');
+        return true;
+      }
+    }
+
+    console.warn('[Capacitor] Failed to send FCM token to server:', response.status);
+    return false;
+  } catch (error) {
+    console.error('[Capacitor] Error sending FCM token to server:', error);
+    return false;
+  }
+}
+
+/**
+ * Try to send the stored FCM token to server.
+ * Called after login when the token might have been received before auth was available.
+ */
+export async function syncFCMTokenWithServer(): Promise<void> {
+  if (tokenSentToServer || !pushToken) return;
+
+  // Check if we now have an auth token
+  const authStorage = localStorage.getItem('auth-storage');
+  if (!authStorage) return;
+
+  try {
+    const parsed = JSON.parse(authStorage);
+    if (parsed?.state?.token) {
+      await sendTokenToServer(pushToken);
+    }
+  } catch {}
+}
 
 /**
  * Register for push notifications.
- * On native platforms, this requests permission and registers the device token.
- * On web, it does nothing.
+ * On native platforms, this requests permission, registers for FCM,
+ * and sends the FCM token to the server.
+ * On web, it does nothing (web uses Web Push via service worker).
  */
 export async function registerPushNotifications(): Promise<void> {
   if (typeof window === 'undefined') return;
@@ -46,9 +133,12 @@ export async function registerPushNotifications(): Promise<void> {
 
     // Register event listeners once
     if (!listenersRegistered) {
-      PushNotifications.addListener('registration', (token: { value: string }) => {
+      PushNotifications.addListener('registration', async (token: { value: string }) => {
         pushToken = token.value;
-        console.info('[Capacitor] Push token received:', token.value.substring(0, 10) + '...');
+        console.info('[Capacitor] FCM token received:', token.value.substring(0, 20) + '...');
+
+        // Immediately try to send token to server
+        await sendTokenToServer(token.value);
       });
 
       PushNotifications.addListener('registrationError', (error: { error: string }) => {
@@ -56,6 +146,15 @@ export async function registerPushNotifications(): Promise<void> {
       });
 
       PushNotifications.addListener('pushNotificationReceived', (notification: PushNotification) => {
+        console.log('[Capacitor] Push notification received in foreground:', notification);
+
+        // Play sound/vibration for foreground notifications
+        try {
+          if (navigator.vibrate) {
+            navigator.vibrate([200, 100, 200]);
+          }
+        } catch {}
+
         for (const callback of notificationReceivedListeners) {
           try {
             callback(notification);
@@ -66,6 +165,8 @@ export async function registerPushNotifications(): Promise<void> {
       });
 
       PushNotifications.addListener('pushNotificationActionPerformed', (action: PushNotificationAction) => {
+        console.log('[Capacitor] Push notification clicked:', action);
+
         for (const callback of notificationClickedListeners) {
           try {
             callback(action);
@@ -78,10 +179,18 @@ export async function registerPushNotifications(): Promise<void> {
       listenersRegistered = true;
     }
 
-    // Register the device for push notifications
+    // Request permission first
+    const permResult = await PushNotifications.requestPermissions();
+    if (permResult.receive !== 'granted') {
+      console.warn('[Capacitor] Push notification permission not granted');
+      return;
+    }
+
+    // Register the device for push notifications (triggers FCM token)
     await PushNotifications.register();
+    console.log('[Capacitor] Push notifications registered');
   } catch (error) {
-    console.info('[Capacitor] Push notifications not available:', error);
+    console.info('[Capacitor] Push notifications not available (web platform):', error);
   }
 }
 

@@ -9,6 +9,7 @@ import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 import { creditNurseEarnings } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -109,7 +110,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       return Response.json({
         success: true,
-        data: { ...emergency.toObject(), id: emergency._id.toString() },
+        data: serializeDoc(emergency.toObject()),
         message: 'تم قبول حالة الطوارئ',
       });
     }
@@ -195,7 +196,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       return Response.json({
         success: true,
-        data: { ...emergency.toObject(), id: emergency._id.toString() },
+        data: serializeDoc(emergency.toObject()),
         message: 'تم تسجيل الوصول وبدء التعامل مع حالة الطوارئ',
       });
     }
@@ -329,7 +330,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       return Response.json({
         success: true,
-        data: { ...emergency.toObject(), id: emergency._id.toString() },
+        data: serializeDoc(emergency.toObject()),
         message: 'تم إنهاء حالة الطوارئ بنجاح',
       });
     }
@@ -401,7 +402,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       return Response.json({
         success: true,
-        data: { ...emergency.toObject(), id: emergency._id.toString() },
+        data: serializeDoc(emergency.toObject()),
         message: 'تم رفض حالة الطوارئ',
       });
     }

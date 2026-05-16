@@ -8,6 +8,7 @@ import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { hashPassword, verifyPassword } from '@/lib/auth';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -24,7 +25,7 @@ export async function GET(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...dbUser, id: dbUser._id.toString() },
+      data: serializeDoc(dbUser),
     });
   } catch (error) {
     console.error('[SUBADMIN PROFILE GET ERROR]', error);
@@ -117,7 +118,7 @@ export async function PATCH(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...updated, id: updated._id.toString() },
+      data: serializeDoc(updated),
       message: 'تم تحديث البيانات بنجاح',
     });
   } catch (error) {

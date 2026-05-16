@@ -33,7 +33,7 @@
           </div>
           <h2 className="text-xl font-bold text-foreground mb-2">حدث خطأ في حسابك</h2>
           <p className="text-muted-foreground mb-6 text-sm">
-            {error.message || 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.'}
+            {typeof error.message === 'string' ? error.message : 'حدث خطأ غير متوقع. يرجى المحاولة مرة أخرى.'}
           </p>
           <div className="flex gap-3 justify-center">
             <button

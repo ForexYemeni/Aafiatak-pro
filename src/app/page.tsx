@@ -90,10 +90,14 @@ const nurseRegisterSchema = z.object({
     .min(1, 'رقم الهاتف مطلوب')
     .regex(/^(7\d{8}|\+9677\d{7,8}|9677\d{7,8})$/, 'صيغة رقم الهاتف غير صحيحة'),
   password: z.string().min(1, 'كلمة المرور مطلوبة').min(6, 'كلمة المرور يجب أن تكون ٦ أحرف على الأقل'),
+  confirmPassword: z.string().min(1, 'تأكيد كلمة المرور مطلوب'),
   specialization: z.string().min(1, 'التخصص مطلوب'),
   licenseNumber: z.string().min(1, 'رقم الترخيص مطلوب'),
   address: z.string().min(1, 'العنوان التفصيلي مطلوب'),
   governorate: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'كلمتا المرور غير متطابقتين',
+  path: ['confirmPassword'],
 });
 
 type NurseRegisterFormValues = z.infer<typeof nurseRegisterSchema>;
@@ -105,9 +109,13 @@ const beneficiaryRegisterSchema = z.object({
     .min(1, 'رقم الهاتف مطلوب')
     .regex(/^(7\d{8}|\+9677\d{7,8}|9677\d{7,8})$/, 'صيغة رقم الهاتف غير صحيحة'),
   password: z.string().min(1, 'كلمة المرور مطلوبة').min(6, 'كلمة المرور يجب أن تكون ٦ أحرف على الأقل'),
+  confirmPassword: z.string().min(1, 'تأكيد كلمة المرور مطلوب'),
   address: z.string().min(1, 'العنوان مطلوب'),
   governorate: z.string().optional(),
   referralCode: z.string().optional(),
+}).refine((data) => data.password === data.confirmPassword, {
+  message: 'كلمتا المرور غير متطابقتين',
+  path: ['confirmPassword'],
 });
 
 type BeneficiaryRegisterFormValues = z.infer<typeof beneficiaryRegisterSchema>;
@@ -596,6 +604,16 @@ function LoginPageContent() {
   const hasRedirectedRef = useRef(false);
   const logoutGuardConsumedRef = useRef(false);
 
+  // ── Emergency Access State ──────────────────────────────────────────
+  const [heartClickCount, setHeartClickCount] = useState(0);
+  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
+  const [emergencyPassword, setEmergencyPassword] = useState('');
+  const [emergencyLoading, setEmergencyLoading] = useState(false);
+  const [emergencyError, setEmergencyError] = useState('');
+  const [emergencySuccess, setEmergencySuccess] = useState(false);
+  const [showEmergencyPassword, setShowEmergencyPassword] = useState(false);
+  const heartClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   // On mount: detect if we arrived after a logout
   useEffect(() => {
     const isAfterLogout = searchParams.get('logout') === 'true';
@@ -625,7 +643,8 @@ function LoginPageContent() {
           .then(res => {
             if (res.ok) {
               const destination = redirectPath ?? getDashboardPath(user.role);
-              window.location.href = destination;
+              // Use router.push for instant client-side navigation (no full page reload)
+              router.push(destination);
             } else {
               useAuthStore.setState({
                 user: null,
@@ -639,7 +658,8 @@ function LoginPageContent() {
           })
           .catch(() => {
             const destination = redirectPath ?? getDashboardPath(user.role);
-            window.location.href = destination;
+            // Use router.push for instant client-side navigation
+            router.push(destination);
           });
       } else {
         useAuthStore.setState({
@@ -661,9 +681,78 @@ function LoginPageContent() {
   const handleLoadingComplete = useCallback(() => {
     if (user) {
       const destination = redirectPath ?? getDashboardPath(user.role);
-      window.location.href = destination;
+      // Use router.push for instant client-side navigation (no full page reload)
+      router.push(destination);
     }
-  }, [user, redirectPath]);
+  }, [user, redirectPath, router]);
+
+  // ── Emergency Heart Click Handler ───────────────────────────────────
+  const handleHeartClick = useCallback(() => {
+    // Reset timer on each click
+    if (heartClickTimerRef.current) {
+      clearTimeout(heartClickTimerRef.current);
+    }
+
+    setHeartClickCount(prev => {
+      const newCount = prev + 1;
+      if (newCount >= 10) {
+        setShowEmergencyModal(true);
+        return 0; // Reset after triggering
+      }
+      return newCount;
+    });
+
+    // Reset count after 3 seconds of no clicks
+    heartClickTimerRef.current = setTimeout(() => {
+      setHeartClickCount(0);
+    }, 3000);
+  }, []);
+
+  // ── Emergency Password Submit ───────────────────────────────────────
+  const handleEmergencySubmit = useCallback(async () => {
+    if (!emergencyPassword) {
+      setEmergencyError('يرجى إدخال كلمة المرور');
+      return;
+    }
+
+    setEmergencyLoading(true);
+    setEmergencyError('');
+
+    try {
+      const res = await fetch('/api/admin/emergency-auth', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: emergencyPassword }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        setEmergencySuccess(true);
+        // Wait for animation then redirect
+        setTimeout(() => {
+          window.location.href = `/admin/emergency-backup?token=${encodeURIComponent(data.token)}`;
+        }, 1200);
+      } else {
+        setEmergencyError(data.error?.message || 'كلمة المرور غير صحيحة');
+        // Shake animation will be triggered by error state
+      }
+    } catch {
+      setEmergencyError('حدث خطأ في الاتصال بالخادم');
+    } finally {
+      setEmergencyLoading(false);
+    }
+  }, [emergencyPassword]);
+
+  // ── Close Emergency Modal ───────────────────────────────────────────
+  const handleCloseEmergencyModal = useCallback(() => {
+    if (emergencyLoading) return;
+    setShowEmergencyModal(false);
+    setEmergencyPassword('');
+    setEmergencyError('');
+    setEmergencySuccess(false);
+    setHeartClickCount(0);
+  }, [emergencyLoading]);
 
   // ============================================================================
   // Login Form
@@ -691,7 +780,7 @@ function LoginPageContent() {
   const nurseForm = useForm<NurseRegisterFormValues>({
     resolver: zodResolver(nurseRegisterSchema),
     defaultValues: {
-      name: '', phone: '', password: '',
+      name: '', phone: '', password: '', confirmPassword: '',
       specialization: '', licenseNumber: '', address: '', governorate: '',
     },
   });
@@ -735,7 +824,7 @@ function LoginPageContent() {
   const beneficiaryForm = useForm<BeneficiaryRegisterFormValues>({
     resolver: zodResolver(beneficiaryRegisterSchema),
     defaultValues: {
-      name: '', phone: '', password: '',
+      name: '', phone: '', password: '', confirmPassword: '',
       address: '', governorate: '', referralCode: '',
     },
   });
@@ -769,7 +858,7 @@ function LoginPageContent() {
   // ============================================================================
 
   return (
-    <div className="min-h-screen flex items-center justify-center relative overflow-hidden py-8" dir="rtl" lang="ar">
+    <div className="min-h-screen flex items-start justify-center relative overflow-y-auto overflow-x-hidden py-6 sm:py-8" dir="rtl" lang="ar" style={{ maxHeight: '100vh' }}>
       {/* Post-login loading screen */}
       <AnimatePresence>
         {showLoadingScreen && user && (
@@ -805,7 +894,7 @@ function LoginPageContent() {
         initial={{ opacity: 0, y: 26, scale: 0.96 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.9, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 w-full max-w-[500px] mx-4 sm:mx-auto"
+        className="relative z-10 w-full max-w-[500px] mx-4 sm:mx-auto my-auto"
         style={{
           background: 'linear-gradient(160deg, rgba(255,255,255,0.068) 0%, rgba(255,255,255,0.028) 100%)',
           backdropFilter: 'blur(36px) saturate(170%)',
@@ -813,47 +902,67 @@ function LoginPageContent() {
           borderRadius: 28,
           border: '1px solid rgba(255,255,255,0.11)',
           boxShadow: '0 44px 130px -22px rgba(0,0,0,0.78), inset 0 1px 0 rgba(255,255,255,0.13), inset 0 -1px 0 rgba(0,0,0,0.15)',
+          maxHeight: activeTab === 'register' ? 'calc(100vh - 48px)' : undefined,
+          overflow: activeTab === 'register' ? 'hidden' : undefined,
+          display: activeTab === 'register' ? 'flex' : undefined,
+          flexDirection: activeTab === 'register' ? 'column' : undefined,
         }}
       >
         {/* Inner top highlight line */}
         <div className="absolute top-0 inset-x-10 h-px rounded-full" style={{ background: 'linear-gradient(90deg, transparent, rgba(255,255,255,0.28), transparent)' }} />
 
-        <div className="p-7 sm:p-9 safe-bottom">
+        <div className={cn('safe-bottom', activeTab === 'register' ? 'flex flex-col min-h-0 overflow-hidden p-5 sm:p-7' : 'p-7 sm:p-9')}>
 
           {/* === BRAND HEADER === */}
           <motion.div
             initial={{ opacity: 0, scale: 0.86 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ delay: 0.12, duration: 0.58, ease: [0.16, 1, 0.3, 1] }}
-            className="text-center mb-9"
+            className={cn('text-center shrink-0', activeTab === 'register' ? 'mb-4' : 'mb-9')}
           >
             {/* Icon with pulse ring */}
-            <div className="relative inline-block mb-5">
+            <div className={cn('relative inline-block', activeTab === 'register' ? 'mb-3' : 'mb-5')}>
               <motion.div
                 animate={{ scale: [1, 1.07, 1] }}
                 transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                className="relative w-[76px] h-[76px] rounded-[22px] mx-auto flex items-center justify-center"
+                className={cn('relative rounded-[22px] mx-auto flex items-center justify-center cursor-pointer select-none', activeTab === 'register' ? 'w-[52px] h-[52px]' : 'w-[76px] h-[76px]')}
                 style={{
                   background: 'linear-gradient(135deg, #0d9488 0%, #10b981 55%, #06b6d4 100%)',
                   boxShadow: '0 20px 48px -10px rgba(20,184,166,0.45), 0 4px 16px -4px rgba(20,184,166,0.3)',
                 }}
+                onClick={handleHeartClick}
               >
-                <Heart className="w-[36px] h-[36px] text-white" fill="currentColor" />
+                <Heart className={cn('text-white pointer-events-none', activeTab === 'register' ? 'w-[24px] h-[24px]' : 'w-[36px] h-[36px]')} fill="currentColor" />
+                {/* Click progress dots */}
+                {heartClickCount > 0 && (
+                  <div className="absolute -bottom-3 left-1/2 -translate-x-1/2 flex gap-[3px] pointer-events-none">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div
+                        key={i}
+                        className="w-[5px] h-[5px] rounded-full transition-all duration-200"
+                        style={{
+                          background: i < heartClickCount ? 'rgba(20,184,166,0.9)' : 'rgba(255,255,255,0.15)',
+                          transform: i < heartClickCount ? 'scale(1.2)' : 'scale(1)',
+                        }}
+                      />
+                    ))}
+                  </div>
+                )}
               </motion.div>
               <motion.div
-                className="absolute inset-0 rounded-[22px]"
+                className="absolute inset-0 rounded-[22px] pointer-events-none"
                 animate={{ boxShadow: ['0 0 0 0 rgba(20,184,166,0.35)', '0 0 0 16px rgba(20,184,166,0)', '0 0 0 0 rgba(20,184,166,0)'] }}
                 transition={{ duration: 2.8, repeat: Infinity, ease: 'easeOut', delay: 0.5 }}
               />
             </div>
             {/* Brand name */}
             <h1
-              className="text-[34px] font-black mb-2 leading-none"
+              className={cn('font-black leading-none', activeTab === 'register' ? 'text-[26px] mb-1' : 'text-[34px] mb-2')}
               style={{ background: 'linear-gradient(135deg, #ffffff 0%, rgba(255,255,255,0.78) 100%)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}
             >
               عافيتك
             </h1>
-            <p className="text-[13px] font-medium tracking-wide" style={{ color: 'rgba(255,255,255,0.32)' }}>رعاية صحية منزلية بلمسة زر</p>
+            {activeTab === 'login' && <p className="text-[13px] font-medium tracking-wide" style={{ color: 'rgba(255,255,255,0.32)' }}>رعاية صحية منزلية بلمسة زر</p>}
           </motion.div>
 
           {/* === TAB SWITCHER === */}
@@ -861,7 +970,7 @@ function LoginPageContent() {
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.22 }}
-            className="relative flex p-[5px] mb-7 rounded-2xl"
+            className={cn('relative flex p-[5px] rounded-2xl shrink-0', activeTab === 'register' ? 'mb-4' : 'mb-7')}
             style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)' }}
           >
             <motion.div
@@ -894,7 +1003,7 @@ function LoginPageContent() {
               >
                 <div className="flex items-start gap-3 p-4 rounded-2xl text-[13px] text-red-300" style={{ background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.22)' }}>
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-                  <span className="leading-relaxed">{error}</span>
+                  <span className="leading-relaxed">{typeof error === 'string' ? error : String(error)}</span>
                 </div>
               </motion.div>
             )}
@@ -1025,7 +1134,7 @@ function LoginPageContent() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -18 }}
                 transition={{ duration: 0.28 }}
-                className="space-y-4"
+                className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-4 -mx-1 px-1 pb-2"
               >
                 {/* === ROLE SELECTOR === */}
                 <div className="grid grid-cols-2 gap-3">
@@ -1190,6 +1299,20 @@ function LoginPageContent() {
                           {beneficiaryForm.formState.errors.password && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.password.message}</p>}
                           <PasswordStrengthBar password={beneficiaryPasswordValue} />
                         </div>
+                        {/* Confirm Password */}
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="ben-confirm-password" type={showPassword ? 'text' : 'password'} placeholder="تأكيد كلمة المرور" dir="ltr" className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...beneficiaryForm.register('confirmPassword')} />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          {beneficiaryForm.formState.errors.confirmPassword && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.confirmPassword.message}</p>}
+                        </div>
                       </div>
 
                       {/* Submit */}
@@ -1336,6 +1459,20 @@ function LoginPageContent() {
                           {nurseForm.formState.errors.password && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.password.message}</p>}
                           <PasswordStrengthBar password={nursePasswordValue} />
                         </div>
+                        {/* Confirm Password */}
+                        <div className="space-y-1.5">
+                          <div className="relative">
+                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input id="nurse-confirm-password" type={showPassword ? 'text' : 'password'} placeholder="تأكيد كلمة المرور" dir="ltr" className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
+                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(14,165,233,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
+                              {...nurseForm.register('confirmPassword')} />
+                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
+                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                            </button>
+                          </div>
+                          {nurseForm.formState.errors.confirmPassword && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.confirmPassword.message}</p>}
+                        </div>
                       </div>
 
                       {/* Submit */}
@@ -1355,19 +1492,168 @@ function LoginPageContent() {
           </AnimatePresence>
 
           {/* Trust badge */}
+          {activeTab === 'login' && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.65 }}
-            className="mt-7 flex items-center justify-center gap-2"
+            className="mt-7 flex items-center justify-center gap-2 shrink-0"
             style={{ color: 'rgba(255,255,255,0.18)' }}
           >
             <Shield className="w-3 h-3" />
             <span className="text-[11px]">بياناتك مشفرة ومحمية بالكامل</span>
           </motion.div>
+          )}
 
         </div>
       </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          Emergency Access Modal
+          ═══════════════════════════════════════════════════════════════════ */}
+      <AnimatePresence>
+        {showEmergencyModal && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[9999] flex items-center justify-center p-4"
+            style={{ background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(12px)' }}
+            onClick={handleCloseEmergencyModal}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.85, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.85, y: 20 }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              className="w-full max-w-sm rounded-3xl p-7 relative overflow-hidden"
+              style={{ background: 'rgba(15,23,42,0.92)', backdropFilter: 'blur(24px)', border: '1px solid rgba(255,255,255,0.1)' }}
+              onClick={e => e.stopPropagation()}
+            >
+              {/* ECG Line Animation */}
+              <div className="absolute bottom-0 left-0 right-0 h-8 opacity-10 overflow-hidden">
+                <svg width="100%" height="32" viewBox="0 0 400 32" preserveAspectRatio="none" fill="none">
+                  <path d="M0 16 L50 16 L70 4 L80 28 L90 6 L100 26 L110 16 L200 16 L220 4 L230 28 L240 6 L250 26 L260 16 L400 16" stroke="#14b8a6" strokeWidth="2" fill="none">
+                    <animate attributeName="stroke-dashoffset" from="800" to="0" dur="3s" repeatCount="indefinite" />
+                  </path>
+                </svg>
+              </div>
+
+              {/* Lock Icon */}
+              <div className="text-center mb-5">
+                <motion.div
+                  animate={emergencySuccess ? { scale: [1, 1.2, 1] } : { scale: [1, 1.05, 1] }}
+                  transition={emergencySuccess ? { duration: 0.5 } : { duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                  className="w-16 h-16 rounded-2xl mx-auto flex items-center justify-center mb-4"
+                  style={{
+                    background: emergencySuccess
+                      ? 'linear-gradient(135deg, rgba(16,185,129,0.3), rgba(5,150,105,0.3))'
+                      : 'linear-gradient(135deg, rgba(20,184,166,0.2), rgba(16,185,129,0.2))',
+                    boxShadow: emergencySuccess
+                      ? '0 0 30px rgba(16,185,129,0.3)'
+                      : '0 0 20px rgba(20,184,166,0.15)',
+                  }}
+                >
+                  {emergencySuccess ? (
+                    <motion.div initial={{ scale: 0 }} animate={{ scale: 1 }} transition={{ type: 'spring', stiffness: 500 }}>
+                      <CheckCircle2 className="w-8 h-8 text-emerald-400" />
+                    </motion.div>
+                  ) : (
+                    <Lock className="w-8 h-8 text-teal-400" />
+                  )}
+                </motion.div>
+                <h3 className="text-lg font-black text-white mb-1">الوصول الطارئ للنسخ الاحتياطي</h3>
+                <p className="text-white/35 text-xs">هذه الميزة مخصصة للإدارة فقط</p>
+              </div>
+
+              {/* Success State */}
+              {emergencySuccess ? (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="text-center py-4"
+                >
+                  <p className="text-emerald-300 text-sm font-bold mb-2">تم التحقق بنجاح!</p>
+                  <p className="text-white/40 text-xs">جاري التحويل إلى صفحة النسخ الاحتياطي...</p>
+                  <Loader2 className="w-5 h-5 animate-spin text-emerald-400 mx-auto mt-3" />
+                </motion.div>
+              ) : (
+                <>
+                  {/* Error Display */}
+                  <AnimatePresence>
+                    {emergencyError && (
+                      <motion.div
+                        initial={{ opacity: 0, x: 0 }}
+                        animate={{ opacity: 1, x: [0, -8, 8, -4, 4, 0] }}
+                        exit={{ opacity: 0 }}
+                        transition={{ x: { duration: 0.4 }, opacity: { duration: 0.2 } }}
+                        className="mb-4 p-3 rounded-xl text-[12px] text-red-300 flex items-center gap-2"
+                        style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.2)' }}
+                      >
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0 text-red-400" />
+                        <span>{emergencyError}</span>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+
+                  {/* Password Input */}
+                  <div className="mb-5">
+                    <label className="block text-white/50 text-xs font-bold mb-2">أدخل كلمة مرور الإدارة</label>
+                    <div className="relative">
+                      <input
+                        type={showEmergencyPassword ? 'text' : 'password'}
+                        value={emergencyPassword}
+                        onChange={e => { setEmergencyPassword(e.target.value); setEmergencyError(''); }}
+                        onKeyDown={e => { if (e.key === 'Enter') handleEmergencySubmit(); }}
+                        placeholder="كلمة المرور"
+                        autoFocus
+                        className="w-full h-12 px-4 pl-12 rounded-2xl text-white text-sm placeholder:text-white/20 outline-none transition-all focus:ring-1 focus:ring-teal-400/30"
+                        style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)' }}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowEmergencyPassword(!showEmergencyPassword)}
+                        className="absolute left-3 top-1/2 -translate-y-1/2 text-white/30 hover:text-white/60 transition-colors"
+                      >
+                        {showEmergencyPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Submit Button */}
+                  <motion.div whileHover={{ scale: 1.016 }} whileTap={{ scale: 0.984 }}>
+                    <button
+                      type="button"
+                      onClick={handleEmergencySubmit}
+                      disabled={emergencyLoading}
+                      className="w-full h-[50px] rounded-2xl font-bold text-[14px] text-white overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300 flex items-center justify-center gap-2"
+                      style={{ background: 'linear-gradient(135deg, #0d9488 0%, #10b981 55%, #06b6d4 100%)', boxShadow: '0 8px 30px -6px rgba(20,184,166,0.5)' }}
+                    >
+                      {emergencyLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                        <>
+                          <Lock className="w-4 h-4" />
+                          دخول الطوارئ
+                        </>
+                      )}
+                    </button>
+                  </motion.div>
+
+                  {/* Cancel Button */}
+                  <button
+                    type="button"
+                    onClick={handleCloseEmergencyModal}
+                    disabled={emergencyLoading}
+                    className="w-full mt-3 h-10 rounded-2xl text-white/30 hover:text-white/50 text-xs font-medium transition-colors disabled:opacity-50"
+                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
+                  >
+                    إلغاء
+                  </button>
+                </>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -7,6 +7,7 @@ import { AdminSettings } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -21,7 +22,7 @@ export async function GET(request: NextRequest) {
       settings = settings.toObject();
     }
 
-    return Response.json({ success: true, data: { ...settings, id: settings._id.toString() } });
+    return Response.json({ success: true, data: serializeDoc(settings) });
   } catch (error) {
     console.error('[ADMIN SETTINGS GET ERROR]', error);
     return createErrorResponse('حدث خطأ أثناء جلب الإعدادات', 500, 'INTERNAL_ERROR');
@@ -57,7 +58,7 @@ export async function PATCH(request: NextRequest) {
     const settingsObj = settings.toObject();
     return Response.json({
       success: true,
-      data: { ...settingsObj, id: settingsObj._id.toString() },
+      data: serializeDoc(settingsObj),
       message: 'تم تحديث الإعدادات بنجاح',
     });
   } catch (error) {

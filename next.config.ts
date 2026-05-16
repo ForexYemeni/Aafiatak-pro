@@ -6,6 +6,7 @@
   // ============================================================================
 
   import type { NextConfig } from "next";
+import { resolve } from "path";
 
   // ============================================================================
   // Security Headers (defined inline to avoid import issues during build)
@@ -13,24 +14,31 @@
 
   const SECURITY_HEADERS: Record<string, string> = {
     "X-Content-Type-Options": "nosniff",
-    "X-Frame-Options": "DENY",
+    // Allow Capacitor WebView to load the app (it acts as a frame with server URL origin)
+    // Using empty value to not send X-Frame-Options at all — CSP frame-ancestors handles this
+    // "X-Frame-Options" removed — replaced by CSP frame-ancestors which is more flexible
     "X-XSS-Protection": "1; mode=block",
     "Referrer-Policy": "strict-origin-when-cross-origin",
-    "Permissions-Policy": "camera=(), microphone=(), geolocation=(self)",
+    // Permissions-Policy: Allow camera, microphone, geolocation from the Capacitor WebView.
+    // Capacitor WebView has the same origin as server.url, so (self) works.
+    // We also allow * explicitly because some Android WebView versions need it.
+    "Permissions-Policy": "camera=*, microphone=*, geolocation=*",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "Content-Security-Policy": [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",  // blob: for workers, unsafe-eval for some libs
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https: blob:",
-      "connect-src 'self' https: ws: wss: blob:",
-      "media-src 'self' blob:",
+      "img-src 'self' data: https: blob:",  // data: for inline SVGs, https: for external images
+      "connect-src 'self' https: ws: wss: blob:",  // ws:/wss: for WebSocket, blob: for streaming
+      "media-src 'self' blob: https:",  // blob: for camera/captured streams, https: for remote media
       "object-src 'none'",
-      "frame-src 'none'",
+      "frame-src 'self'",  // needed for embedded content
       "base-uri 'self'",
       "form-action 'self'",
-      "frame-ancestors 'none'",
+      // Allow Capacitor WebView to embed the app (frame-ancestors replaces X-Frame-Options)
+      // 'self' covers same-origin, the vercel.app URL covers the Capacitor remote URL
+      "frame-ancestors 'self' https://aafiatak-pro.vercel.app capacitor://com.aafiatak.app",
     ].join("; "),
   };
 
@@ -43,17 +51,20 @@
       ignoreBuildErrors: true,
     },
 
-    eslint: {
-      ignoreDuringBuilds: true,
-    },
-
-    reactStrictMode: true,
+    // DISABLE strict mode in production — prevents double-rendering which
+    // causes visible flickering and slower perceived performance
+    reactStrictMode: false,
 
     // Remove X-Powered-By header (minor security hardening)
     poweredByHeader: false,
 
     // Enable gzip/brotli compression for all responses (~30-60% smaller bundles)
     compress: true,
+
+    // ============================================================================
+    // Performance: Output standalone build for smaller serverless functions
+    // ============================================================================
+    output: 'standalone',
 
     // ============================================================================
     // Image Optimization
@@ -100,6 +111,8 @@
       "nodemailer",
       "socket.io",
       "web-push",
+      "jszip",
+      "firebase-admin",
     ],
 
     // ============================================================================
@@ -140,6 +153,11 @@
     // Experimental Features
     // ============================================================================
 
+    // Turbopack root — set to project directory to avoid workspace root detection issues
+    turbopack: {
+      root: resolve(__dirname),
+    },
+
     experimental: {
       optimizePackageImports: [
         // UI Icons — very large without tree-shaking
@@ -171,6 +189,20 @@
         "@radix-ui/react-popover",
         "@radix-ui/react-accordion",
         "@radix-ui/react-avatar",
+        // ADDITIONAL: More packages that benefit from tree-shaking
+        "@radix-ui/react-tooltip",
+        "@radix-ui/react-alert-dialog",
+        "@radix-ui/react-checkbox",
+        "@radix-ui/react-switch",
+        "@radix-ui/react-slider",
+        "@radix-ui/react-separator",
+        "@radix-ui/react-scroll-area",
+        "@radix-ui/react-collapsible",
+        "class-variance-authority",
+        "cmdk",
+        "sonner",
+        "zod",
+        "jose",
       ],
     },
   };

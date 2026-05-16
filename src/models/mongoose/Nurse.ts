@@ -1,6 +1,41 @@
 import mongoose, { Schema, Document } from 'mongoose';
 import { User } from './User';
 
+// ---- Skill Sub-schema ----
+const SkillSchema = new Schema({
+  name: { type: String, required: true },
+  level: { type: String, enum: ['beginner', 'intermediate', 'advanced', 'expert'], default: 'intermediate' },
+  order: { type: Number, default: 0 },
+}, { _id: false });
+
+// ---- Experience Sub-schema ----
+const ExperienceSchema = new Schema({
+  facility: { type: String },       // جهة العمل
+  title: { type: String },          // المسمى الوظيفي
+  duration: { type: String },       // مدة العمل
+  description: { type: String },    // وصف المهام
+  casesType: { type: String },      // نوع الحالات
+  startDate: { type: Date },
+  endDate: { type: Date },
+  order: { type: Number, default: 0 },
+}, { _id: false });
+
+// ---- Certificate Sub-schema ----
+const CertificateSchema = new Schema({
+  name: { type: String, required: true },    // اسم الشهادة
+  issuer: { type: String },                   // الجهة المانحة
+  date: { type: String },                     // تاريخ الحصول
+  type: { type: String, enum: ['certificate', 'course', 'license', 'training'], default: 'certificate' },
+  verified: { type: Boolean, default: false },
+  order: { type: Number, default: 0 },
+}, { _id: false });
+
+// ---- Language Sub-schema ----
+const LanguageSchema = new Schema({
+  name: { type: String, required: true },
+  level: { type: String, enum: ['native', 'fluent', 'advanced', 'intermediate', 'basic'], default: 'intermediate' },
+}, { _id: false });
+
 export interface INurse extends Document {
   name: string;
   phone: string;
@@ -35,6 +70,23 @@ export interface INurse extends Document {
   isActive: boolean;
   isBlocked: boolean;
   blockedReason?: string;
+  // New CV fields
+  skills: { name: string; level: string; order: number }[];
+  experiences: {
+    facility?: string; title?: string; duration?: string;
+    description?: string; casesType?: string;
+    startDate?: Date; endDate?: Date; order: number;
+  }[];
+  certificates: {
+    name: string; issuer?: string; date?: string;
+    type: string; verified: boolean; order: number;
+  }[];
+  languages: { name: string; level: string }[];
+  professionalTitle?: string;
+  emergencyCases: number;
+  responseRate: number;
+  complianceRate: number;
+  avatar?: string;
 }
 
 const NurseSchema = new Schema({
@@ -66,6 +118,16 @@ const NurseSchema = new Schema({
   rejectedReason: { type: String },
   isBlocked: { type: Boolean, default: false },
   blockedReason: { type: String },
+  // New CV fields
+  skills: [SkillSchema],
+  experiences: [ExperienceSchema],
+  certificates: [CertificateSchema],
+  languages: [LanguageSchema],
+  professionalTitle: { type: String, default: '' },
+  emergencyCases: { type: Number, default: 0 },
+  responseRate: { type: Number, default: 0 },
+  complianceRate: { type: Number, default: 0 },
+  avatar: { type: String },
 });
 
 // ── Performance Indexes ──────────────────────────────────────────────

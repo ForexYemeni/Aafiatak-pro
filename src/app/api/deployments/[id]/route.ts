@@ -8,6 +8,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Deployment, Notification, Nurse, User } from '@/models/mongoose';
 import { requireAuth, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { serializeDoc } from '@/lib/mongoose/serialize';
 
 // ── GET: Get deployment details by ID ───────────────────────────────────────
 
@@ -32,20 +33,19 @@ export async function GET(
 
     // Serialize with fallback for unpopulated references
     const serialized: any = {
-      ...deployment,
-      id: deployment._id.toString(),
+      ...serializeDoc(deployment),
       createdBy: deployment.createdBy && typeof deployment.createdBy === 'object' && (deployment.createdBy as any)._id
-        ? { ...(deployment.createdBy as any), id: (deployment.createdBy as any)._id.toString() }
+        ? serializeDoc(deployment.createdBy)
         : deployment.createdBy
           ? { id: deployment.createdBy.toString() }
           : null,
       assignedTo: deployment.assignedTo && typeof deployment.assignedTo === 'object' && (deployment.assignedTo as any)._id
-        ? { ...(deployment.assignedTo as any), id: (deployment.assignedTo as any)._id.toString() }
+        ? serializeDoc(deployment.assignedTo)
         : deployment.assignedTo
           ? { id: deployment.assignedTo.toString() }
           : null,
       applications: (deployment.applications || []).map((a: any) => ({
-        ...a,
+        ...serializeDoc(a),
         applicantId: a.applicantId?.toString(),
         paymentVerifiedBy: a.paymentVerifiedBy?.toString(),
       })),
@@ -323,10 +323,9 @@ export async function PATCH(
     return Response.json({
       success: true,
       data: {
-        ...deployment,
-        id: deployment._id.toString(),
+        ...serializeDoc(deployment),
         applications: (deployment.applications || []).map((a: any) => ({
-          ...a,
+          ...serializeDoc(a),
           applicantId: a.applicantId?.toString(),
           paymentVerifiedBy: a.paymentVerifiedBy?.toString(),
         })),

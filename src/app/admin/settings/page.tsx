@@ -7,10 +7,10 @@ import {
   Phone, MessageSquare, FileText, Wrench, MapPin, Users,
   Heart, Gift, Zap, Clock, AlertTriangle, Globe, Briefcase, Building2,
   Database, CheckCircle, Eye, EyeOff, RefreshCw, AlertOctagon, CreditCard,
-  Trash2, TriangleAlert
+  Trash2, TriangleAlert, Upload, Download, Archive, Info, Flame
 } from 'lucide-react';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
-import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthFetch, invalidateAuthFetchCache } from '@/hooks/use-auth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -163,6 +163,22 @@ export default function AdminSettingsPage() {
   const [isFullBackingUp, setIsFullBackingUp] = useState(false);
   const [fullBackupStats, setFullBackupStats] = useState<{ documents: number; collections: number; sizeKB: number; hasSource: boolean } | null>(null);
 
+  // ── Restore Backup State ─────────────────────────────────────────
+  const [restoreFile, setRestoreFile] = useState<File | null>(null);
+  const [restorePassword, setRestorePassword] = useState('');
+  const [showRestorePassword, setShowRestorePassword] = useState(false);
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('replace');
+  const [restoreResult, setRestoreResult] = useState<{ totalRestored: number; totalErrors: number; backupDate: string | null; results: { collection: string; count: number; status: string }[] } | null>(null);
+
+  // ── Firebase Config State ──────────────────────────────────────────
+  const [firebaseConfig, setFirebaseConfig] = useState<{ projectId: string; clientEmail: string; privateKey: string; storageBucket: string; isActive: boolean } | null>(null);
+  const [firebaseForm, setFirebaseForm] = useState({ projectId: '', clientEmail: '', privateKey: '', storageBucket: '' });
+  const [isSavingFirebase, setIsSavingFirebase] = useState(false);
+  const [isLoadingFirebase, setIsLoadingFirebase] = useState(false);
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [firebaseTestResult, setFirebaseTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
   // ── Reset All Data State ──────────────────────────────────────────
   const [showResetSection, setShowResetSection] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
@@ -170,6 +186,125 @@ export default function AdminSettingsPage() {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetResult, setResetResult] = useState<{ totalDeleted: number; summary: Record<string, number> } | null>(null);
+
+  // Fetch Firebase config when section is opened
+  useEffect(() => {
+    if (activeSection === 'firebase' && !firebaseConfig) {
+      const fetchFirebaseConfig = async () => {
+        setIsLoadingFirebase(true);
+        try {
+          const res = await authFetch('/api/admin/firebase-config');
+          const json = await res.json();
+          if (json.success && json.data) {
+            setFirebaseConfig(json.data);
+            setFirebaseForm({
+              projectId: json.data.projectId || '',
+              clientEmail: json.data.clientEmail || '',
+              privateKey: '', // Don't pre-fill private key for security
+              storageBucket: json.data.storageBucket || '',
+            });
+          }
+        } catch {
+          toast.error('فشل تحميل إعدادات Firebase');
+        } finally {
+          setIsLoadingFirebase(false);
+        }
+      };
+      void fetchFirebaseConfig();
+    }
+  }, [activeSection, authFetch, firebaseConfig]);
+
+  const handleSaveFirebaseConfig = async () => {
+    if (!firebaseForm.projectId.trim()) {
+      toast.error('معرف مشروع Firebase مطلوب');
+      return;
+    }
+    if (!firebaseForm.clientEmail.trim()) {
+      toast.error('البريد الإلكتروني لحساب الخدمة مطلوب');
+      return;
+    }
+    // Only require private key if it's a new config or user wants to update it
+    if (!firebaseConfig?.isActive && !firebaseForm.privateKey.trim()) {
+      toast.error('المفتاح الخاص مطلوب للإعداد الأول');
+      return;
+    }
+
+    setIsSavingFirebase(true);
+    setFirebaseTestResult(null);
+    try {
+      const payload: Record<string, string> = {
+        projectId: firebaseForm.projectId.trim(),
+        clientEmail: firebaseForm.clientEmail.trim(),
+        storageBucket: firebaseForm.storageBucket.trim(),
+      };
+      // Only send private key if user entered a new one
+      if (firebaseForm.privateKey.trim()) {
+        payload.privateKey = firebaseForm.privateKey.trim();
+      }
+
+      const res = await authFetch('/api/admin/firebase-config', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم حفظ إعدادات Firebase بنجاح — سيتم تفعيل الإشعارات الفورية خلال لحظات');
+        setFirebaseConfig(json.data);
+        setFirebaseForm((prev) => ({ ...prev, privateKey: '' })); // Clear private key after save
+        setShowPrivateKey(false);
+        // Reload config to get updated masked key
+        try {
+          const getRes = await authFetch('/api/admin/firebase-config');
+          const getJson = await getRes.json();
+          if (getJson.success && getJson.data) {
+            setFirebaseConfig(getJson.data);
+          }
+        } catch {}
+      } else {
+        toast.error(json.error?.message ?? json.message ?? 'فشل حفظ إعدادات Firebase');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء حفظ إعدادات Firebase');
+    } finally {
+      setIsSavingFirebase(false);
+    }
+  };
+
+  const handleTestFirebasePush = async () => {
+    setFirebaseTestResult(null);
+    try {
+      const res = await authFetch('/api/notifications/test-push', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      setFirebaseTestResult({
+        success: json.success,
+        message: json.success ? 'تم إرسال إشعار اختبار بنجاح!' : (json.error?.message ?? json.message ?? 'فشل إرسال إشعار الاختبار'),
+      });
+    } catch {
+      setFirebaseTestResult({ success: false, message: 'فشل الاتصال بالخادم لاختبار الإشعارات' });
+    }
+  };
+
+  const handleDeleteFirebaseConfig = async () => {
+    const confirmed = window.confirm('هل أنت متأكد من تعطيل إعدادات Firebase؟ لن يتم إرسال إشعارات فورية حتى يتم إعداد Firebase مرة أخرى.');
+    if (!confirmed) return;
+
+    try {
+      const res = await authFetch('/api/admin/firebase-config', { method: 'DELETE' });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم تعطيل إعدادات Firebase');
+        setFirebaseConfig(null);
+        setFirebaseForm({ projectId: '', clientEmail: '', privateKey: '', storageBucket: '' });
+      } else {
+        toast.error(json.error?.message ?? 'فشل تعطيل إعدادات Firebase');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء تعطيل إعدادات Firebase');
+    }
+  };
 
   // Fetch current database info when database section is opened
   useEffect(() => {
@@ -308,6 +443,111 @@ export default function AdminSettingsPage() {
     }
   };
 
+  // ── Restore Backup Handler (Chunked Upload) ──────────────────────────
+  const handleRestoreBackup = async () => {
+    if (!restoreFile) {
+      toast.error('اختر ملف النسخة الاحتياطية أولاً');
+      return;
+    }
+    if (!restorePassword.trim()) {
+      toast.error('أدخل كلمة المرور للتأكيد');
+      return;
+    }
+
+    setIsRestoring(true);
+    setRestoreResult(null);
+    try {
+      const CHUNK_SIZE = 2 * 1024 * 1024; // 2 MB per chunk (well under Vercel's 4.5 MB limit)
+      const fileSizeMB = (restoreFile.size / 1024 / 1024).toFixed(2);
+      const uploadId = `restore_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+
+      // ── Step 1: Read file as base64 ──────────────────────────────
+      toast.loading('جارٍ قراءة الملف...', { id: 'restore-progress' });
+      const arrayBuffer = await restoreFile.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = '';
+      const chunkSizeBin = 8192;
+      for (let i = 0; i < uint8Array.length; i += chunkSizeBin) {
+        const slice = uint8Array.slice(i, i + chunkSizeBin);
+        binary += String.fromCharCode(...slice);
+      }
+      const base64Data = btoa(binary);
+
+      // ── Step 2: Split into chunks and upload ─────────────────────
+      const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
+      console.log(`[RESTORE] File: ${fileSizeMB} MB, Chunks: ${totalChunks}`);
+
+      for (let i = 0; i < totalChunks; i++) {
+        const chunk = base64Data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+
+        toast.loading(`جارٍ رفع الجزء ${i + 1} من ${totalChunks}...`, { id: 'restore-progress' });
+
+        const res = await authFetch('/api/admin/restore-chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'upload-chunk',
+            uploadId,
+            chunkIndex: i,
+            totalChunks,
+            data: chunk,
+          }),
+        });
+
+        // Safe JSON parsing
+        let json: any;
+        try {
+          const text = await res.text();
+          json = JSON.parse(text);
+        } catch {
+          throw new Error(`استجابة غير صالحة من السيرفر عند رفع الجزء ${i + 1}. قد يكون الملف كبيراً جداً.`);
+        }
+
+        if (!json.success) {
+          throw new Error(json.error?.message ?? json.message ?? `فشل رفع الجزء ${i + 1}`);
+        }
+      }
+
+      // ── Step 3: Complete the restore ─────────────────────────────
+      toast.loading('جارٍ استعادة البيانات...', { id: 'restore-progress' });
+
+      const completeRes = await authFetch('/api/admin/restore-chunk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'complete-restore',
+          uploadId,
+          password: restorePassword,
+          mode: restoreMode,
+        }),
+      });
+
+      // Safe JSON parsing
+      let result: any;
+      try {
+        const text = await completeRes.text();
+        result = JSON.parse(text);
+      } catch {
+        throw new Error('استجابة غير صالحة من السيرفر. قد يكون الملف كبيراً جداً أو حدث خطأ في الخادم.');
+      }
+
+      if (result.success) {
+        setRestoreResult(result.data);
+        setRestorePassword('');
+        setRestoreFile(null);
+        toast.success(result.message || 'تمت الاستعادة بنجاح', { id: 'restore-progress' });
+      } else {
+        toast.error(result.error?.message ?? result.message ?? 'فشل الاستعادة', { id: 'restore-progress' });
+      }
+    } catch (err) {
+      const errorMsg = err instanceof Error ? err.message : 'حدث خطأ أثناء استعادة النسخة الاحتياطية';
+      toast.error(errorMsg, { id: 'restore-progress' });
+    } finally {
+      setIsRestoring(false);
+      toast.dismiss('restore-progress');
+    }
+  };
+
   // ── Reset All Data Handler ────────────────────────────────────────
   const handleResetAllData = async () => {
     if (resetConfirmText !== 'احذف') {
@@ -331,6 +571,8 @@ export default function AdminSettingsPage() {
         setResetResult(json.data);
         setResetPassword('');
         setResetConfirmText('');
+        // CRITICAL: Clear ALL API cache after database reset
+        invalidateAuthFetchCache();
         toast.success('تم حذف جميع البيانات بنجاح');
       } else {
         toast.error(json.error?.message ?? json.message ?? 'فشل حذف البيانات');
@@ -359,8 +601,10 @@ export default function AdminSettingsPage() {
     { id: 'support', label: 'أرقام التواصل', icon: Phone },
     { id: 'legal', label: 'المستندات القانونية', icon: FileText },
     { id: 'maintenance', label: 'وضع الصيانة', icon: Wrench },
+    { id: 'firebase', label: 'Firebase والإشعارات', icon: Flame },
     { id: 'database', label: 'قاعدة البيانات', icon: Database },
-    { id: 'backup-admin', label: 'النسخ الاحتياطية والإدارة', icon: Shield },
+    { id: 'backup-admin', label: 'النسخ الاحتياطية', icon: Shield },
+    { id: 'restore-admin', label: 'استعادة النسخة', icon: Upload },
   ];
 
   return (
@@ -1233,6 +1477,280 @@ export default function AdminSettingsPage() {
         </motion.div>
       )}
 
+      {/* Firebase & Push Notifications */}
+      {activeSection === 'firebase' && (
+        <motion.div variants={itemAnim} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          {/* Firebase Config Card */}
+          <GlassCard variant="admin">
+            <GlassCardHeader>
+              <GlassCardTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <Flame className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                </div>
+                إعدادات Firebase والإشعارات الفورية
+              </GlassCardTitle>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="space-y-6">
+                {/* Status Banner */}
+                {firebaseConfig?.isActive ? (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50">
+                    <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Firebase مفعّل ونشط</p>
+                      <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70 leading-relaxed">
+                        المشروع: {firebaseConfig.projectId} — الإشعارات الفورية تعمل على أجهزة Android
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Firebase غير مُعد</p>
+                      <p className="text-xs text-amber-600/80 dark:text-amber-400/70 leading-relaxed">
+                        الإشعارات الفورية لن تعمل حتى يتم إعداد حساب Firebase. أدخل بيانات Service Account أدناه.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Banner */}
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50">
+                  <Info className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-orange-700 dark:text-orange-400">كيفية الحصول على بيانات Firebase</p>
+                    <ol className="text-xs text-orange-600/80 dark:text-orange-400/70 leading-relaxed space-y-1 list-decimal list-inside">
+                      <li>اذهب إلى <span className="font-mono text-[10px] bg-orange-100 dark:bg-orange-900/40 px-1 rounded">console.firebase.google.com</span></li>
+                      <li>اختر مشروعك واضغط على إعدادات المشروع</li>
+                      <li>اذهب إلى تبويب &quot;Service Accounts&quot;</li>
+                      <li>اضغط &quot;Generate New Private Key&quot; لتحميل ملف JSON</li>
+                      <li>انسخ البيانات من الملف إلى الحقول أدناه</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {/* Project ID */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-orange-500" />
+                      معرف المشروع (Project ID)
+                    </Label>
+                    <Input
+                      value={firebaseForm.projectId}
+                      onChange={(e) => setFirebaseForm((prev) => ({ ...prev, projectId: e.target.value }))}
+                      placeholder="مثال: aafiatak-a23fa"
+                      dir="ltr"
+                      className="bg-background/50"
+                    />
+                    <p className="text-[10px] text-muted-foreground">تجده في إعدادات المشروع في Firebase Console</p>
+                  </div>
+
+                  {/* Client Email */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <MessageSquare className="w-3.5 h-3.5 text-orange-500" />
+                      البريد الإلكتروني (Client Email)
+                    </Label>
+                    <Input
+                      value={firebaseForm.clientEmail}
+                      onChange={(e) => setFirebaseForm((prev) => ({ ...prev, clientEmail: e.target.value }))}
+                      placeholder="firebase-adminsdk-xxx@project.iam.gserviceaccount.com"
+                      dir="ltr"
+                      className="bg-background/50"
+                    />
+                    <p className="text-[10px] text-muted-foreground">البريد الإلكتروني لحساب الخدمة</p>
+                  </div>
+
+                  {/* Storage Bucket */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-orange-500" />
+                      حاوية التخزين (Storage Bucket)
+                    </Label>
+                    <Input
+                      value={firebaseForm.storageBucket}
+                      onChange={(e) => setFirebaseForm((prev) => ({ ...prev, storageBucket: e.target.value }))}
+                      placeholder="مثال: aafiatak-a23fa.firebasestorage.app"
+                      dir="ltr"
+                      className="bg-background/50"
+                    />
+                    <p className="text-[10px] text-muted-foreground">اختياري — لحاوية Firebase Storage</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Private Key */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-orange-500" />
+                    المفتاح الخاص (Private Key)
+                  </Label>
+                  {firebaseConfig?.isActive && !firebaseForm.privateKey && (
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                      المفتاح الحالي محفوظ ومخفي — اترك الحقل فارغاً للإبقاء على المفتاح الحالي، أو أدخل مفتاحاً جديداً لتحديثه
+                    </p>
+                  )}
+                  <div className="relative">
+                    <Textarea
+                      value={firebaseForm.privateKey}
+                      onChange={(e) => setFirebaseForm((prev) => ({ ...prev, privateKey: e.target.value }))}
+                      placeholder="-----BEGIN PRIVATE KEY-----&#10;MIIEvQIBADANBgkqhkiG9w0BAQEF...&#10;-----END PRIVATE KEY-----"
+                      dir="ltr"
+                      rows={4}
+                      className="bg-background/50 font-mono text-xs pr-10"
+                      type={showPrivateKey ? 'text' : 'password'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPrivateKey(!showPrivateKey)}
+                      className="absolute left-3 top-3 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPrivateKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    الصق محتوى المفتاح الخاص من ملف Service Account JSON (يدعم تنسيق PEM أو Base64)
+                  </p>
+                </div>
+
+                <Separator />
+
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    onClick={handleSaveFirebaseConfig}
+                    disabled={isSavingFirebase}
+                    className="bg-orange-600 hover:bg-orange-700 gap-2 shadow-lg shadow-orange-600/20"
+                  >
+                    {isSavingFirebase ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        جارٍ الحفظ...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        حفظ إعدادات Firebase
+                      </>
+                    )}
+                  </Button>
+
+                  {firebaseConfig?.isActive && (
+                    <>
+                      <Button
+                        onClick={handleTestFirebasePush}
+                        variant="outline"
+                        className="gap-2 border-orange-300 dark:border-orange-700 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        إرسال إشعار اختبار
+                      </Button>
+                      <Button
+                        onClick={handleDeleteFirebaseConfig}
+                        variant="outline"
+                        className="gap-2 border-red-300 dark:border-red-700 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        تعطيل Firebase
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                {/* Test Result */}
+                {firebaseTestResult && (
+                  <div className={`flex items-start gap-3 p-4 rounded-xl ${
+                    firebaseTestResult.success
+                      ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50'
+                      : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50'
+                  }`}>
+                    {firebaseTestResult.success ? (
+                      <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertOctagon className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <p className={`text-sm font-medium ${firebaseTestResult.success ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                        {firebaseTestResult.success ? 'نجح الاختبار' : 'فشل الاختبار'}
+                      </p>
+                      <p className={`text-xs ${firebaseTestResult.success ? 'text-emerald-600/80 dark:text-emerald-400/70' : 'text-red-600/80 dark:text-red-400/70'}`}>
+                        {firebaseTestResult.message}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Current Config Info */}
+                {firebaseConfig?.isActive && (
+                  <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50">
+                    <p className="text-[10px] text-orange-600 dark:text-orange-400 mb-2 font-medium">الإعدادات الحالية:</p>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">معرف المشروع</span>
+                        <span className="font-medium" dir="ltr">{firebaseConfig.projectId}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">البريد الإلكتروني</span>
+                        <span className="font-medium" dir="ltr">{firebaseConfig.clientEmail}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">المفتاح الخاص</span>
+                        <span className="font-medium" dir="ltr">{firebaseConfig.privateKey}</span>
+                      </div>
+                      {firebaseConfig.storageBucket && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">حاوية التخزين</span>
+                          <span className="font-medium" dir="ltr">{firebaseConfig.storageBucket}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+
+          {/* How Push Notifications Work */}
+          <GlassCard variant="admin">
+            <GlassCardHeader>
+              <GlassCardTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                كيف تعمل الإشعارات الفورية
+              </GlassCardTitle>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+                <p>
+                  يستخدم تطبيق عافيتك نظام إشعارات مزدوج لضمان وصول الإشعارات على جميع المنصات:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800/50">
+                    <p className="text-xs font-medium text-teal-700 dark:text-teal-400 mb-1">أجهزة Android (APK)</p>
+                    <p className="text-[10px] text-teal-600/80 dark:text-teal-400/70">
+                      Firebase Cloud Messaging (FCM) — إشعارات فورية مع صوت واهتزاز حتى عند إغلاق التطبيق
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50">
+                    <p className="text-xs font-medium text-violet-700 dark:text-violet-400 mb-1">متصفح الويب</p>
+                    <p className="text-[10px] text-violet-600/80 dark:text-violet-400/70">
+                      Web Push (VAPID) — إشعارات عبر المتصفح باستخدام Service Worker
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[10px]">
+                  بعد حفظ إعدادات Firebase، تأكد من منح تطبيق APK إذن الإشعارات من إعدادات الجهاز.
+                </p>
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+        </motion.div>
+      )}
+
       {/* Database Management */}
       {activeSection === 'database' && (
         <motion.div variants={itemAnim} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
@@ -1510,12 +2028,12 @@ export default function AdminSettingsPage() {
               {/* What's inside */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {[
-                  { icon: FileText, label: 'source-code.zip', sub: 'كامل كود Next.js من GitHub', ok: true },
-                  { icon: Database, label: 'database/', sub: 'ملف JSON لكل مجموعة MongoDB', ok: true },
-                  { icon: Shield, label: 'environment/.env.local', sub: 'جاهز للنسخ مباشرةً', ok: true },
-                  { icon: Zap, label: 'scripts/restore-db.js', sub: 'سكريبت Node.js للاستعادة التلقائية', ok: true },
-                  { icon: FileText, label: 'DEPLOY_GUIDE.md', sub: 'دليل النشر خطوة بخطوة', ok: true },
-                  { icon: CheckCircle, label: 'meta.json', sub: 'معلومات النسخة والإحصائيات', ok: true },
+                  { icon: FileText, label: 'source-code.zip', sub: 'كامل كود Next.js من GitHub' },
+                  { icon: Database, label: 'database/', sub: 'ملف JSON لكل مجموعة MongoDB (24+)' },
+                  { icon: Shield, label: 'environment/', sub: '.env.local + env-vars.json + Vercel vars' },
+                  { icon: Zap, label: 'scripts/', sub: 'restore-db.js + restore-all.sh + apply-vercel-env.js' },
+                  { icon: Shield, label: 'config/', sub: 'VAPID keys + SW config + Admin settings + Vercel' },
+                  { icon: CheckCircle, label: 'meta.json + DEPLOY_GUIDE.md', sub: 'معلومات شاملة + دليل الاستعادة الكامل' },
                 ].map(({ icon: Icon, label, sub }) => (
                   <div key={label} className="flex items-center gap-3 rounded-lg bg-blue-50/60 dark:bg-blue-950/20 border border-blue-100 dark:border-blue-900/30 p-3">
                     <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center shrink-0">
@@ -1558,11 +2076,14 @@ export default function AdminSettingsPage() {
                   <CheckCircle className="w-5 h-5 text-blue-500 mt-0.5 shrink-0" />
                   <div>
                     <p className="text-sm font-semibold text-blue-700 dark:text-blue-300">
-                      {fullBackupStats.hasSource ? 'نسخة شاملة مع الكود المصدري ✅' : 'نسخة البيانات + البيئة (الكود غير متوفر)'}
+                      {fullBackupStats.hasSource ? 'نسخة شاملة v2.0 مع الكود المصدري ✅' : 'نسخة البيانات + البيئة (الكود غير متوفر)'}
                     </p>
                     <p className="text-xs text-blue-600/80 dark:text-blue-400/80 mt-1">
-                      {fullBackupStats.documents.toLocaleString('ar')} وثيقة · {fullBackupStats.collections} مجموعة
+                      {fullBackupStats.documents.toLocaleString('ar')} وثيقة · {fullBackupStats.collections} مجموعة · config + scripts + sounds
                       {fullBackupStats.sizeKB > 0 && ` · ${fullBackupStats.sizeKB > 1024 ? (fullBackupStats.sizeKB / 1024).toFixed(1) + ' MB' : fullBackupStats.sizeKB.toFixed(0) + ' KB'}`}
+                    </p>
+                    <p className="text-[10px] text-blue-500/70 dark:text-blue-500/70 mt-1">
+                      تشمل: مفاتيح VAPID + إعدادات Vercel + سكريبت استعادة شامل + بيان الإشعارات
                     </p>
                     {!fullBackupStats.hasSource && (
                       <p className="text-[10px] text-amber-600 dark:text-amber-400 mt-1">
@@ -1629,18 +2150,284 @@ export default function AdminSettingsPage() {
         </GlassCard>
       </motion.div>
 
-      {/* ── Danger Zone: Reset All Data ─────────────────────────── */}
+        </>
+      )}
+
+      {/* ── Restore Backup Section ─────────────────────────────────── */}
+      {activeSection === 'restore-admin' && (
+        <>
+
+      {/* ── Upload & Restore ── */}
       <motion.div variants={itemAnim}>
-        <GlassCard className="border-red-200 dark:border-red-900/50">
+        <GlassCard className="border-emerald-200 dark:border-emerald-900/40">
           <GlassCardHeader>
             <div className="flex items-center justify-between">
-              <GlassCardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
-                <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-                  <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+              <GlassCardTitle className="flex items-center gap-2 text-emerald-700 dark:text-emerald-400">
+                <div className="w-8 h-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center">
+                  <Upload className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
                 </div>
-                منطقة الخطر — حذف جميع البيانات
+                استعادة نسخة احتياطية
               </GlassCardTitle>
+              <span className="text-[10px] px-2.5 py-1 rounded-full bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400 font-medium border border-emerald-200 dark:border-emerald-800/50">
+                v2.0
+              </span>
+            </div>
+            <p className="text-xs text-muted-foreground mt-1">
+              ارفع ملف النسخة الاحتياطية ZIP لاستعادة جميع البيانات — يدعم وضع الاستبدال والدمج
+            </p>
+          </GlassCardHeader>
+
+          <GlassCardContent className="space-y-5">
+
+            {/* What gets restored */}
+            <div className="rounded-xl bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 p-4 space-y-2">
+              <p className="text-xs font-semibold text-emerald-800 dark:text-emerald-300">ما يتم استعادته:</p>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                {[
+                  { icon: Database, label: 'قاعدة البيانات' },
+                  { icon: Shield, label: 'إعدادات الإدارة' },
+                  { icon: Users, label: 'حسابات المستخدمين' },
+                  { icon: Heart, label: 'الخدمات والطلبات' },
+                  { icon: CreditCard, label: 'المعاملات المالية' },
+                  { icon: Phone, label: 'الإشعارات' },
+                ].map(({ icon: Icon, label }) => (
+                  <div key={label} className="flex items-center gap-1.5 text-xs text-emerald-700 dark:text-emerald-400">
+                    <Icon className="w-3 h-3 shrink-0" />
+                    {label}
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Mode selector */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium">وضع الاستعادة</Label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => setRestoreMode('replace')}
+                  className={`rounded-xl border-2 p-3 text-center transition-all ${
+                    restoreMode === 'replace'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                      : 'border-border hover:border-emerald-300 dark:hover:border-emerald-800'
+                  }`}
+                >
+                  <RefreshCw className={`w-5 h-5 mx-auto mb-1 ${restoreMode === 'replace' ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+                  <p className="text-xs font-semibold">استبدال كامل</p>
+                  <p className="text-[10px] text-muted-foreground">يمسح البيانات الحالية ويعيد كل شيء من النسخة</p>
+                </button>
+                <button
+                  onClick={() => setRestoreMode('merge')}
+                  className={`rounded-xl border-2 p-3 text-center transition-all ${
+                    restoreMode === 'merge'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
+                      : 'border-border hover:border-emerald-300 dark:hover:border-emerald-800'
+                  }`}
+                >
+                  <Zap className={`w-5 h-5 mx-auto mb-1 ${restoreMode === 'merge' ? 'text-emerald-600' : 'text-muted-foreground'}`} />
+                  <p className="text-xs font-semibold">دمج</p>
+                  <p className="text-[10px] text-muted-foreground">يحافظ على البيانات الحالية ويضيف الجديدة</p>
+                </button>
+              </div>
+            </div>
+
+            {/* Warning for replace mode */}
+            {restoreMode === 'replace' && (
+              <div className="flex items-start gap-3 rounded-xl bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800/40 p-4">
+                <TriangleAlert className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+                <div className="text-xs text-amber-700 dark:text-amber-400 space-y-1">
+                  <p className="font-semibold">تحذير: وضع الاستبدال</p>
+                  <p>سيتم حذف جميع البيانات الحالية واستبدالها ببيانات النسخة الاحتياطية. لا يمكن التراجع عن هذا الإجراء.</p>
+                </div>
+              </div>
+            )}
+
+            {/* File upload */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Archive className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                ملف النسخة الاحتياطية (ZIP)
+              </Label>
+              <div className="relative">
+                <input
+                  type="file"
+                  accept=".zip"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    setRestoreFile(f || null);
+                    setRestoreResult(null);
+                  }}
+                  className="w-full text-sm file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-emerald-100 file:text-emerald-700 dark:file:bg-emerald-900/30 dark:file:text-emerald-400 hover:file:bg-emerald-200 dark:hover:file:bg-emerald-900/50 file:cursor-pointer file:transition-colors"
+                />
+              </div>
+              {restoreFile && (
+                <div className="flex items-center gap-2 rounded-lg bg-emerald-50/60 dark:bg-emerald-950/20 border border-emerald-100 dark:border-emerald-900/30 p-2.5">
+                  <Archive className="w-4 h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <div className="text-xs">
+                    <p className="font-medium text-emerald-800 dark:text-emerald-300">{restoreFile.name}</p>
+                    <p className="text-emerald-600/70 dark:text-emerald-500">{(restoreFile.size / 1024 / 1024).toFixed(2)} MB</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Password */}
+            <div className="space-y-2">
+              <Label className="text-sm font-medium flex items-center gap-1.5">
+                <Shield className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                كلمة مرور حساب الإدارة
+              </Label>
+              <div className="relative">
+                <Input
+                  type={showRestorePassword ? 'text' : 'password'}
+                  value={restorePassword}
+                  onChange={(e) => setRestorePassword(e.target.value)}
+                  placeholder="أدخل كلمة مرورك للتأكيد"
+                  dir="ltr"
+                  className="bg-background/50 pl-10"
+                  disabled={isRestoring}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowRestorePassword(!showRestorePassword)}
+                  className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  {showRestorePassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            {/* Restore button */}
+            <div className="flex items-center gap-3">
               <Button
+                onClick={handleRestoreBackup}
+                disabled={isRestoring || !restoreFile || !restorePassword.trim()}
+                className="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 gap-2 min-w-52 shadow-lg shadow-emerald-600/20 text-white"
+                size="lg"
+              >
+                {isRestoring ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    جارٍ استعادة البيانات...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="w-4 h-4" />
+                    استعادة من النسخة الاحتياطية
+                  </>
+                )}
+              </Button>
+              {isRestoring && (
+                <p className="text-xs text-muted-foreground">قد يستغرق هذا بضع دقائق حسب حجم البيانات...</p>
+              )}
+            </div>
+
+            {/* Restore result */}
+            {restoreResult && (
+              <div className="rounded-xl border p-4 space-y-3 bg-emerald-50 dark:bg-emerald-950/20 border-emerald-200 dark:border-emerald-800/50">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400" />
+                  <p className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">تمت الاستعادة بنجاح!</p>
+                </div>
+
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="text-center rounded-lg bg-emerald-100/60 dark:bg-emerald-900/20 p-2">
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{restoreResult.totalRestored.toLocaleString('ar')}</p>
+                    <p className="text-[10px] text-emerald-600/70 dark:text-emerald-500">وثيقة مستعادة</p>
+                  </div>
+                  <div className="text-center rounded-lg bg-emerald-100/60 dark:bg-emerald-900/20 p-2">
+                    <p className="text-lg font-bold text-emerald-700 dark:text-emerald-300">{restoreResult.results.filter(r => r.status === 'ok').length}</p>
+                    <p className="text-[10px] text-emerald-600/70 dark:text-emerald-500">مجموعة</p>
+                  </div>
+                  <div className="text-center rounded-lg bg-emerald-100/60 dark:bg-emerald-900/20 p-2">
+                    <p className={`text-lg font-bold ${restoreResult.totalErrors > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-700 dark:text-emerald-300'}`}>{restoreResult.totalErrors}</p>
+                    <p className="text-[10px] text-emerald-600/70 dark:text-emerald-500">أخطاء</p>
+                  </div>
+                </div>
+
+                {restoreResult.backupDate && (
+                  <p className="text-xs text-emerald-600/70 dark:text-emerald-500">
+                    تاريخ النسخة الأصلية: {new Date(restoreResult.backupDate).toLocaleDateString('ar')}
+                  </p>
+                )}
+
+                {/* Collection details (collapsible) */}
+                <details className="text-xs">
+                  <summary className="cursor-pointer text-emerald-700 dark:text-emerald-400 font-medium hover:underline">
+                    تفاصيل كل مجموعة ({restoreResult.results.length})
+                  </summary>
+                  <div className="mt-2 space-y-1 max-h-60 overflow-y-auto">
+                    {restoreResult.results.map((r) => (
+                      <div key={r.collection} className="flex items-center justify-between py-1 px-2 rounded bg-emerald-50/40 dark:bg-emerald-900/10">
+                        <span className="font-mono text-emerald-800 dark:text-emerald-300">{r.collection}</span>
+                        <span className={`text-[10px] px-1.5 py-0.5 rounded ${
+                          r.status === 'ok' ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400' :
+                          r.status === 'skipped' ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400' :
+                          'bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400'
+                        }`}>
+                          {r.status === 'ok' ? `${r.count} وثيقة` : r.status === 'skipped' ? 'متخطاة' : 'خطأ'}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              </div>
+            )}
+
+          </GlassCardContent>
+        </GlassCard>
+      </motion.div>
+
+      {/* ── Info card: What to give AI agent ── */}
+      <motion.div variants={itemAnim}>
+        <GlassCard className="border-purple-200 dark:border-purple-900/40">
+          <GlassCardHeader>
+            <GlassCardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
+              <div className="w-8 h-8 rounded-lg bg-purple-100 dark:bg-purple-900/30 flex items-center justify-center">
+                <Info className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+              </div>
+              إرسال النسخة للوكيل الذكي (AI)
+            </GlassCardTitle>
+          </GlassCardHeader>
+          <GlassCardContent className="space-y-3">
+            <p className="text-xs text-muted-foreground">
+              عند إرسال ملف النسخة الاحتياطية لوكيل ذكي، يحتوي على كل ما يلزم لاستعادة المنصة بالكامل:
+            </p>
+            <div className="space-y-1.5">
+              {[
+                { file: 'database/', desc: 'جميع بيانات MongoDB (24+ مجموعة)' },
+                { file: 'environment/.env.local', desc: 'كل متغيرات البيئة جاهزة' },
+                { file: 'config/vapid-keys.json', desc: 'مفاتيح الإشعارات Push' },
+                { file: 'config/admin-settings.json', desc: 'إعدادات المنصة الكاملة' },
+                { file: 'config/vercel-project.json', desc: 'إعدادات مشروع Vercel' },
+                { file: 'scripts/restore-all.sh', desc: 'سكريبت استعادة شامل' },
+                { file: 'source-code.zip', desc: 'كامل الكود المصدري' },
+              ].map(({ file, desc }) => (
+                <div key={file} className="flex items-center gap-2 text-xs">
+                  <code className="bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-400 px-1.5 py-0.5 rounded font-mono">{file}</code>
+                  <span className="text-muted-foreground">{desc}</span>
+                </div>
+              ))}
+            </div>
+          </GlassCardContent>
+        </GlassCard>
+      </motion.div>
+
+        </>
+      )}
+
+      {/* ── Danger Zone: Reset All Data (inside backup tab) ──────────── */}
+      {activeSection === 'backup-admin' && (
+        <motion.div variants={itemAnim}>
+          <GlassCard className="border-red-200 dark:border-red-900/50">
+            <GlassCardHeader>
+              <div className="flex items-center justify-between">
+                <GlassCardTitle className="flex items-center gap-2 text-red-600 dark:text-red-400">
+                  <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                    <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
+                  </div>
+                  منطقة الخطر — حذف جميع البيانات
+                </GlassCardTitle>
+                <Button
                 variant="outline"
                 size="sm"
                 onClick={() => { setShowResetSection(!showResetSection); setResetResult(null); setResetPassword(''); setResetConfirmText(''); }}
@@ -1805,8 +2592,6 @@ export default function AdminSettingsPage() {
           )}
         </GlassCard>
       </motion.div>
-
-        </>
       )}
 
       {/* Fixed Save Button at Bottom */}

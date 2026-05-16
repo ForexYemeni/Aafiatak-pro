@@ -8,6 +8,7 @@ import { Nurse, Transaction, WithdrawalRequest, AdminSettings, Notification } fr
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -107,7 +108,7 @@ export async function GET(request: NextRequest) {
           rejectedReason: w.rejectedReason || null,
         })),
         dailyEarnings: dailyAgg.map((d: any) => ({ date: d._id, earnings: d.earnings })),
-        transactions: transactions.map((t: any) => ({ ...t, id: t._id.toString() })),
+        transactions: transactions.map((t: any) => (serializeDoc(t))),
       },
     });
   } catch (error) {

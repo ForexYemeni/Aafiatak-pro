@@ -7,6 +7,7 @@ import { Service } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -25,7 +26,7 @@ export async function GET(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: services.map((s: any) => ({ ...s, id: s._id.toString() })),
+      data: services.map((s: any) => (serializeDoc(s))),
     });
   } catch (error) {
     console.error('[ADMIN SERVICES LIST ERROR]', error);
@@ -62,7 +63,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...service.toObject(), id: service._id.toString() },
+      data: serializeDoc(service.toObject()),
       message: 'تم إنشاء الخدمة بنجاح',
     }, { status: 201 });
   } catch (error) {
