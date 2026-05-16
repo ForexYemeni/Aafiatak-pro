@@ -14,6 +14,7 @@ import {
   Loader2,
   Sparkles,
   LifeBuoy,
+  Mail,
 } from 'lucide-react';
 import {
   Accordion,
@@ -73,6 +74,7 @@ const faqItems = [
 
 interface SupportSettings {
   supportPhone: string;
+  supportEmail: string;
   supportWhatsApp: string;
   supportPhones: string[];
   supportWhatsAppNumbers: string[];
@@ -106,13 +108,17 @@ export default function NurseHelpPage() {
     ? supportSettings.supportPhones
     : supportSettings?.supportPhone
       ? [supportSettings.supportPhone]
-      : ['+967123456789'];
+      : [];
 
   const whatsApps = supportSettings?.supportWhatsAppNumbers?.length
     ? supportSettings.supportWhatsAppNumbers
     : supportSettings?.supportWhatsApp
       ? [supportSettings.supportWhatsApp]
-      : ['+967123456789'];
+      : [];
+
+  const supportEmail = supportSettings?.supportEmail || '';
+
+  const hasAnyContactInfo = phones.length > 0 || whatsApps.length > 0 || supportEmail;
 
   return (
     <div className="space-y-5">
@@ -173,42 +179,70 @@ export default function NurseHelpPage() {
           </div>
           <h3 className="font-bold">تواصل مع الدعم</h3>
         </div>
-        <div className="space-y-3">
-          {phones.map((phone, i) => (
-            <motion.div key={`phone-${i}`} whileTap={{ scale: 0.98 }}>
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-3 h-14 text-sm rounded-2xl border-border/50 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors"
-                onClick={() => window.open(`tel:${phone.replace(/\s/g, '')}`)}
-              >
-                <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
-                  <Phone className="w-5 h-5 text-emerald-600" />
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-sm">{i === 0 ? 'اتصل بنا' : `اتصل بنا ${i + 1}`}</p>
-                  <p className="text-xs text-muted-foreground" dir="ltr">{phone}</p>
-                </div>
-              </Button>
-            </motion.div>
-          ))}
-          {whatsApps.map((wa, i) => (
-            <motion.div key={`wa-${i}`} whileTap={{ scale: 0.98 }}>
-              <Button
-                variant="outline"
-                className="w-full justify-start gap-3 h-14 text-sm rounded-2xl border-border/50 hover:bg-green-50 dark:hover:bg-green-900/10 transition-colors"
-                onClick={() => window.open(`https://wa.me/${wa.replace(/[^0-9]/g, '')}`, '_blank')}
-              >
-                <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
-                  <MessageCircle className="w-5 h-5 text-green-600" />
-                </div>
-                <div className="text-right">
-                  <p className="font-bold text-sm">{i === 0 ? 'واتساب' : `واتساب ${i + 1}`}</p>
-                  <p className="text-xs text-muted-foreground" dir="ltr">{wa}</p>
-                </div>
-              </Button>
-            </motion.div>
-          ))}
-        </div>
+        {isLoadingSupport ? (
+          <div className="flex items-center justify-center py-6">
+            <Loader2 className="w-6 h-6 animate-spin text-nurse" />
+          </div>
+        ) : !hasAnyContactInfo ? (
+          <div className="text-center py-6">
+            <Phone className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">لا توجد بيانات تواصل حالياً</p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {phones.map((phone, i) => (
+              <motion.div key={`phone-${i}`} whileTap={{ scale: 0.98 }}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-14 text-sm rounded-2xl border-border/50 hover:bg-emerald-50 dark:hover:bg-emerald-900/10 transition-colors"
+                  onClick={() => window.open(`tel:${phone.replace(/\s/g, '')}`)}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center shrink-0">
+                    <Phone className="w-5 h-5 text-emerald-600" />
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-sm">{i === 0 ? 'اتصل بنا' : `اتصل بنا ${i + 1}`}</p>
+                    <p className="text-xs text-muted-foreground" dir="ltr">{phone}</p>
+                  </div>
+                </Button>
+              </motion.div>
+            ))}
+            {whatsApps.map((wa, i) => (
+              <motion.div key={`wa-${i}`} whileTap={{ scale: 0.98 }}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-14 text-sm rounded-2xl border-border/50 hover:bg-green-50 dark:hover:bg-green-900/10 transition-colors"
+                  onClick={() => window.open(`https://wa.me/${wa.replace(/[^0-9]/g, '')}`, '_blank')}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center shrink-0">
+                    <MessageCircle className="w-5 h-5 text-green-600" />
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-sm">{i === 0 ? 'واتساب' : `واتساب ${i + 1}`}</p>
+                    <p className="text-xs text-muted-foreground" dir="ltr">{wa}</p>
+                  </div>
+                </Button>
+              </motion.div>
+            ))}
+            {supportEmail && (
+              <motion.div whileTap={{ scale: 0.98 }}>
+                <Button
+                  variant="outline"
+                  className="w-full justify-start gap-3 h-14 text-sm rounded-2xl border-border/50 hover:bg-blue-50 dark:hover:bg-blue-900/10 transition-colors"
+                  onClick={() => window.open(`mailto:${supportEmail}`)}
+                >
+                  <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center shrink-0">
+                    <Mail className="w-5 h-5 text-blue-600" />
+                  </div>
+                  <div className="text-right">
+                    <p className="font-bold text-sm">البريد الإلكتروني</p>
+                    <p className="text-xs text-muted-foreground" dir="ltr">{supportEmail}</p>
+                  </div>
+                </Button>
+              </motion.div>
+            )}
+          </div>
+        )}
       </GlassCard>
 
       {/* ══════════════ Legal Links ══════════════ */}

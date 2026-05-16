@@ -7,7 +7,7 @@ import {
   Phone, MessageSquare, FileText, Wrench, MapPin, Users,
   Heart, Gift, Zap, Clock, AlertTriangle, Globe, Briefcase, Building2,
   Database, CheckCircle, Eye, EyeOff, RefreshCw, AlertOctagon, CreditCard,
-  Trash2, TriangleAlert, Upload, Download, Archive, Info, Flame
+  Trash2, TriangleAlert, Upload, Download, Archive, Info, Flame, Mail
 } from 'lucide-react';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { useAuthFetch, invalidateAuthFetchCache } from '@/hooks/use-auth';
@@ -1279,12 +1279,39 @@ export default function AdminSettingsPage() {
             </GlassCardHeader>
             <GlassCardContent>
               <div className="space-y-6">
-                {/* Phone Numbers */}
+                {/* Info banner */}
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800/50">
+                  <Info className="w-5 h-5 text-teal-600 dark:text-teal-400 shrink-0 mt-0.5" />
+                  <div>
+                    <p className="text-sm font-medium text-teal-700 dark:text-teal-400 mb-1">مصدر البيانات الموحد</p>
+                    <p className="text-xs text-teal-600/80 dark:text-teal-400/70 leading-relaxed">
+                      هذه البيانات هي المصدر الرئيسي لبيانات الدعم في التطبيق بالكامل. أي تعديل هنا يظهر فوراً لحسابات المستفيدين والممرضين.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Primary Phone Number */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <Phone className="w-4 h-4 text-blue-500" />
+                    رقم الهاتف الرئيسي
+                  </Label>
+                  <Input
+                    value={settings.supportPhone}
+                    onChange={(e) => updateField('supportPhone', e.target.value)}
+                    placeholder="+967XXXXXXXX"
+                    dir="ltr"
+                    className="bg-background/50"
+                  />
+                  <p className="text-[10px] text-muted-foreground">الرقم الرئيسي الذي يظهر في صفحة الدعم للمستفيدين والممرضين</p>
+                </div>
+
+                {/* Additional Phone Numbers */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium flex items-center gap-1.5">
                       <Phone className="w-4 h-4 text-blue-500" />
-                      أرقام الهاتف
+                      أرقام هاتف إضافية
                     </Label>
                     <Button
                       variant="outline"
@@ -1299,7 +1326,7 @@ export default function AdminSettingsPage() {
                   {settings.supportPhones.length === 0 && (
                     <div className="text-center py-4 glass rounded-xl">
                       <Phone className="w-6 h-6 text-muted-foreground mx-auto mb-1" />
-                      <p className="text-xs text-muted-foreground">لم يتم إضافة أرقام بعد</p>
+                      <p className="text-xs text-muted-foreground">لم يتم إضافة أرقام إضافية بعد</p>
                     </div>
                   )}
                   {settings.supportPhones.map((phone, i) => (
@@ -1311,7 +1338,7 @@ export default function AdminSettingsPage() {
                           updated[i] = e.target.value;
                           updateField('supportPhones', updated);
                         }}
-                        placeholder="967XXXXXXXX+"
+                        placeholder="+967XXXXXXXX"
                         dir="ltr"
                         className="bg-background/50"
                       />
@@ -1332,12 +1359,28 @@ export default function AdminSettingsPage() {
 
                 <Separator />
 
-                {/* WhatsApp Numbers */}
+                {/* Primary WhatsApp Number */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <MessageSquare className="w-4 h-4 text-green-500" />
+                    رقم الواتساب الرئيسي
+                  </Label>
+                  <Input
+                    value={settings.supportWhatsApp}
+                    onChange={(e) => updateField('supportWhatsApp', e.target.value)}
+                    placeholder="+967XXXXXXXX"
+                    dir="ltr"
+                    className="bg-background/50"
+                  />
+                  <p className="text-[10px] text-muted-foreground">رقم الواتساب الرئيسي الذي يظهر في صفحة الدعم</p>
+                </div>
+
+                {/* Additional WhatsApp Numbers */}
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <Label className="text-sm font-medium flex items-center gap-1.5">
                       <MessageSquare className="w-4 h-4 text-green-500" />
-                      أرقام الواتساب
+                      أرقام واتساب إضافية
                     </Label>
                     <Button
                       variant="outline"
@@ -1352,7 +1395,7 @@ export default function AdminSettingsPage() {
                   {settings.supportWhatsAppNumbers.length === 0 && (
                     <div className="text-center py-4 glass rounded-xl">
                       <MessageSquare className="w-6 h-6 text-muted-foreground mx-auto mb-1" />
-                      <p className="text-xs text-muted-foreground">لم يتم إضافة أرقام بعد</p>
+                      <p className="text-xs text-muted-foreground">لم يتم إضافة أرقام واتساب إضافية بعد</p>
                     </div>
                   )}
                   {settings.supportWhatsAppNumbers.map((wa, i) => (
@@ -1364,7 +1407,7 @@ export default function AdminSettingsPage() {
                           updated[i] = e.target.value;
                           updateField('supportWhatsAppNumbers', updated);
                         }}
-                        placeholder="967XXXXXXXX+"
+                        placeholder="+967XXXXXXXX"
                         dir="ltr"
                         className="bg-background/50"
                       />
@@ -1381,6 +1424,25 @@ export default function AdminSettingsPage() {
                       </Button>
                     </div>
                   ))}
+                </div>
+
+                <Separator />
+
+                {/* Support Email */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <Mail className="w-4 h-4 text-blue-500" />
+                    البريد الإلكتروني للدعم
+                  </Label>
+                  <Input
+                    value={settings.supportEmail}
+                    onChange={(e) => updateField('supportEmail', e.target.value)}
+                    placeholder="support@example.com"
+                    dir="ltr"
+                    type="email"
+                    className="bg-background/50"
+                  />
+                  <p className="text-[10px] text-muted-foreground">البريد الإلكتروني الرسمي للدعم الفني الذي يظهر للمستفيدين والممرضين</p>
                 </div>
               </div>
             </GlassCardContent>

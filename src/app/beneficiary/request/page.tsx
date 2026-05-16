@@ -153,7 +153,7 @@ function MultiServiceRequestPageInner() {
   // Payment methods
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethodItem[]>([]);
   const [emergencyFee, setEmergencyFee] = useState(5000);
-  const [supportWhatsApp, setSupportWhatsApp] = useState('+967123456789');
+  const [supportWhatsApp, setSupportWhatsApp] = useState('');
   const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
   const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
 
@@ -257,7 +257,7 @@ function MultiServiceRequestPageInner() {
       }
       const supportData = await supportRes.json();
       if (supportData.success && supportData.data) {
-        const wa = supportData.data.supportWhatsAppNumbers?.[0] || supportData.data.supportWhatsApp || '+967123456789';
+        const wa = supportData.data.supportWhatsAppNumbers?.[0] || supportData.data.supportWhatsApp || '';
         setSupportWhatsApp(wa);
       }
     } catch { /* silent */ }

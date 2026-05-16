@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import {
   HelpCircle,
@@ -12,14 +12,15 @@ import {
   Mail,
   ChevronDown,
   ChevronUp,
+  Loader2,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { GlassCard } from '@/components/common/glass-card';
 import { useToast } from '@/hooks/use-toast';
+import { useAuthFetch } from '@/hooks/use-auth';
 
 interface FAQItem {
   question: string;
@@ -30,6 +31,14 @@ interface SectionData {
   icon: React.ElementType;
   title: string;
   content: string;
+}
+
+interface SupportSettings {
+  supportPhone: string;
+  supportEmail: string;
+  supportWhatsApp: string;
+  supportPhones: string[];
+  supportWhatsAppNumbers: string[];
 }
 
 function ExpandableSection({ section }: { section: SectionData }) {
@@ -97,10 +106,49 @@ const faqItems: FAQItem[] = [
 
 export default function HelpPage() {
   const { toast } = useToast();
+  const authFetch = useAuthFetch();
   const [expandedFAQ, setExpandedFAQ] = useState<number | null>(null);
   const [reportSubject, setReportSubject] = useState('');
   const [reportDescription, setReportDescription] = useState('');
   const [isSending, setIsSending] = useState(false);
+
+  // ── Support Settings (Dynamic) ──────────────────────────
+  const [supportSettings, setSupportSettings] = useState<SupportSettings | null>(null);
+  const [isLoadingSupport, setIsLoadingSupport] = useState(true);
+
+  useEffect(() => {
+    const fetchSupport = async () => {
+      try {
+        const res = await authFetch('/api/settings/support');
+        const data = await res.json();
+        if (data.success && data.data) {
+          setSupportSettings(data.data);
+        }
+      } catch {
+        // Failed to fetch support settings — will show empty state
+      } finally {
+        setIsLoadingSupport(false);
+      }
+    };
+    void fetchSupport();
+  }, [authFetch]);
+
+  // Derive contact lists from API data
+  const phones = supportSettings?.supportPhones?.length
+    ? supportSettings.supportPhones
+    : supportSettings?.supportPhone
+      ? [supportSettings.supportPhone]
+      : [];
+
+  const whatsApps = supportSettings?.supportWhatsAppNumbers?.length
+    ? supportSettings.supportWhatsAppNumbers
+    : supportSettings?.supportWhatsApp
+      ? [supportSettings.supportWhatsApp]
+      : [];
+
+  const supportEmail = supportSettings?.supportEmail || '';
+
+  const hasAnyContactInfo = phones.length > 0 || whatsApps.length > 0 || supportEmail;
 
   const handleReport = async () => {
     if (!reportSubject || !reportDescription) {
@@ -185,29 +233,60 @@ export default function HelpPage() {
           <Phone className="w-4 h-4 text-beneficiary" />
           تواصل مع الدعم
         </h3>
-        <div className="space-y-3">
-          <div className="flex items-center gap-3 p-3 glass rounded-xl">
-            <Phone className="w-5 h-5 text-green-600" />
-            <div className="flex-1">
-              <p className="text-sm font-medium">اتصل بنا</p>
-              <p className="text-xs text-muted-foreground" dir="ltr">+967 1 234 567</p>
-            </div>
+
+        {isLoadingSupport ? (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-6 h-6 animate-spin text-beneficiary" />
           </div>
-          <div className="flex items-center gap-3 p-3 glass rounded-xl">
-            <MessageSquare className="w-5 h-5 text-green-600" />
-            <div className="flex-1">
-              <p className="text-sm font-medium">واتساب</p>
-              <p className="text-xs text-muted-foreground" dir="ltr">+967 7 123 4567</p>
-            </div>
+        ) : !hasAnyContactInfo ? (
+          <div className="text-center py-8 glass rounded-xl">
+            <Phone className="w-8 h-8 text-muted-foreground mx-auto mb-2" />
+            <p className="text-sm text-muted-foreground">لا توجد بيانات تواصل حالياً</p>
           </div>
-          <div className="flex items-center gap-3 p-3 glass rounded-xl">
-            <Mail className="w-5 h-5 text-blue-600" />
-            <div className="flex-1">
-              <p className="text-sm font-medium">البريد الإلكتروني</p>
-              <p className="text-xs text-muted-foreground" dir="ltr">support@aafiatak.com</p>
-            </div>
+        ) : (
+          <div className="space-y-3">
+            {phones.map((phone, i) => (
+              <a
+                key={`phone-${i}`}
+                href={`tel:${phone.replace(/\s/g, '')}`}
+                className="flex items-center gap-3 p-3 glass rounded-xl hover:bg-accent/50 transition-colors"
+              >
+                <Phone className="w-5 h-5 text-green-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{i === 0 ? 'اتصل بنا' : `اتصل بنا ${i + 1}`}</p>
+                  <p className="text-xs text-muted-foreground" dir="ltr">{phone}</p>
+                </div>
+              </a>
+            ))}
+            {whatsApps.map((wa, i) => (
+              <a
+                key={`wa-${i}`}
+                href={`https://wa.me/${wa.replace(/[^0-9]/g, '')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-3 p-3 glass rounded-xl hover:bg-accent/50 transition-colors"
+              >
+                <MessageSquare className="w-5 h-5 text-green-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">{i === 0 ? 'واتساب' : `واتساب ${i + 1}`}</p>
+                  <p className="text-xs text-muted-foreground" dir="ltr">{wa}</p>
+                </div>
+              </a>
+            ))}
+            {supportEmail && (
+              <a
+                href={`mailto:${supportEmail}`}
+                className="flex items-center gap-3 p-3 glass rounded-xl hover:bg-accent/50 transition-colors"
+              >
+                <Mail className="w-5 h-5 text-blue-600" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">البريد الإلكتروني</p>
+                  <p className="text-xs text-muted-foreground" dir="ltr">{supportEmail}</p>
+                </div>
+              </a>
+            )}
           </div>
-        </div>
+        )}
       </GlassCard>
 
       {/* Report a Problem */}

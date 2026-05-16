@@ -7,12 +7,13 @@ export async function GET(request: NextRequest) {
   try {
     await connectDB();
     const settings = await AdminSettings.findOne().lean();
-    
+
     return Response.json({
       success: true,
       data: {
-        supportPhone: settings?.supportPhone || '+967123456789',
-        supportWhatsApp: settings?.supportWhatsApp || '+967123456789',
+        supportPhone: settings?.supportPhone || '',
+        supportEmail: settings?.supportEmail || '',
+        supportWhatsApp: settings?.supportWhatsApp || '',
         supportPhones: settings?.supportPhones || [],
         supportWhatsAppNumbers: settings?.supportWhatsAppNumbers || [],
       },
@@ -22,8 +23,9 @@ export async function GET(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        supportPhone: '+967123456789',
-        supportWhatsApp: '+967123456789',
+        supportPhone: '',
+        supportEmail: '',
+        supportWhatsApp: '',
         supportPhones: [],
         supportWhatsAppNumbers: [],
       },
