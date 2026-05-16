@@ -79,6 +79,7 @@ export async function PATCH(
       application.paymentProofData = undefined;
       application.paymentProofImage = undefined;
       application.paymentSubmittedAt = undefined;
+      application.rejectedReason = 'لم يتم قبول إثبات الدفع من قبل الإدارة. يرجى إعادة التقديم بإثبات صحيح';
     }
 
     await deployment.save();

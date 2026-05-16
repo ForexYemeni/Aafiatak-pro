@@ -146,6 +146,24 @@ export async function PATCH(
       if (existingDeployment.status !== 'assigned' && !isAdminOrSubadmin) {
         return createErrorResponse('لا يمكن بدء تكليف لم يتم تعيينه بعد', 400, 'INVALID_STATUS_TRANSITION');
       }
+      // ── Payment verification gate: prevent starting if payment not verified ──
+      // If applicant is responsible for fees, contactRevealed must be true (set by admin on payment verification)
+      // and the assigned application must be in 'accepted' status
+      if (existingDeployment.feeResponsible === 'applicant' && !existingDeployment.contactRevealed && !isAdminOrSubadmin) {
+        const assignedApp = existingDeployment.applications.find(
+          (a: any) => a.applicantId.toString() === existingDeployment.assignedTo?.toString()
+        );
+        if (assignedApp && assignedApp.status !== 'accepted') {
+          return createErrorResponse('لا يمكن بدء التنفيذ قبل تأكيد الدفع من الإدارة', 400, 'PAYMENT_NOT_VERIFIED');
+        }
+      }
+    }
+
+    if (body.status === 'completed') {
+      // Same payment gate for completion
+      if (existingDeployment.feeResponsible === 'applicant' && !existingDeployment.contactRevealed && !isAdminOrSubadmin) {
+        return createErrorResponse('لا يمكن إكمال التكليف قبل تأكيد الدفع من الإدارة', 400, 'PAYMENT_NOT_VERIFIED');
+      }
     }
 
     const deployment = await Deployment.findByIdAndUpdate(id, updateData, { new: true }).lean();

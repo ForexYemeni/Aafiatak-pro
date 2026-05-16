@@ -203,9 +203,9 @@ const applicationStatusLabel: Record<string, string> = {
   selected_by_creator: 'تم اختياره',
   admin_approved: 'موافقة الإدارة',
   payment_pending: 'بانتظار الدفع',
-  payment_submitted: 'تم تقديم الدفع',
+  payment_submitted: 'بانتظار مراجعة الإدارة',
   payment_verified: 'تم التحقق',
-  accepted: 'مقبول',
+  accepted: 'تم القبول',
   rejected: 'مرفوض',
 };
 
@@ -918,6 +918,14 @@ export default function NurseDeploymentsPage() {
                         </p>
                       </div>
                     </div>
+                    {myApp.rejectedReason && (
+                      <div className="mt-2.5 p-2 rounded-lg bg-red-50 dark:bg-red-900/10 border border-red-200 dark:border-red-800/30">
+                        <p className="text-[11px] text-red-600 dark:text-red-400 font-medium flex items-center gap-1.5">
+                          <XCircle className="w-3 h-3 shrink-0" />
+                          {myApp.rejectedReason}
+                        </p>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1001,7 +1009,7 @@ export default function NurseDeploymentsPage() {
             )}
 
             {/* Task Execution Buttons */}
-            {idMatches(dep.assignedTo?.id, currentUserId) && dep.status === 'assigned' && (
+            {idMatches(dep.assignedTo?.id, currentUserId) && dep.status === 'assigned' && dep.contactRevealed && myApp?.status === 'accepted' && (
               <motion.div variants={fadeIn} initial="hidden" animate="show" className="p-3.5 rounded-xl bg-gradient-to-r from-sky-50/50 to-teal-50/50 dark:from-sky-950/20 dark:to-teal-950/10 border border-sky-200/50 dark:border-sky-800/30 space-y-2.5">
                 <div className="flex items-center gap-2">
                   <PlayCircle className="w-4 h-4 text-sky-600" />
@@ -1018,7 +1026,17 @@ export default function NurseDeploymentsPage() {
                 </Button>
               </motion.div>
             )}
-            {idMatches(dep.assignedTo?.id, currentUserId) && dep.status === 'in_progress' && (
+            {idMatches(dep.assignedTo?.id, currentUserId) && dep.status === 'assigned' && !dep.contactRevealed && myApp?.status !== 'accepted' && myApp?.status !== 'rejected' && (
+              <motion.div variants={fadeIn} initial="hidden" animate="show" className="p-3.5 rounded-xl bg-gradient-to-r from-amber-50/50 to-orange-50/50 dark:from-amber-950/20 dark:to-orange-950/10 border border-amber-200/50 dark:border-amber-800/30 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-amber-600" />
+                  <p className="text-xs font-bold text-amber-700 dark:text-amber-400">
+                    {myApp?.status === 'payment_pending' ? 'يرجى دفع رسوم التقديم أولاً' : myApp?.status === 'payment_submitted' ? 'بانتظار مراجعة الإدارة للدفع' : 'بانتظار تأكيد الدفع'}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+            {idMatches(dep.assignedTo?.id, currentUserId) && dep.status === 'in_progress' && dep.contactRevealed && myApp?.status === 'accepted' && (
               <motion.div variants={fadeIn} initial="hidden" animate="show" className="p-3.5 rounded-xl bg-gradient-to-r from-teal-50/50 to-emerald-50/50 dark:from-teal-950/20 dark:to-emerald-950/10 border border-teal-200/50 dark:border-teal-800/30 space-y-2.5">
                 <div className="flex items-center gap-2">
                   <Activity className="w-4 h-4 text-teal-600 animate-pulse" />
@@ -1950,7 +1968,7 @@ export default function NurseDeploymentsPage() {
                 </div>
               ) : (
                 manageTarget.applications.map((app) => (
-                  <GlassCard key={app._id || app.applicantId} variant="nurse" className="space-y-3">
+                  <GlassCard key={app.id || app.applicantId} variant="nurse" className="space-y-3">
                     {/* Applicant header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -2024,7 +2042,7 @@ export default function NurseDeploymentsPage() {
                         <Button
                           size="sm"
                           className="flex-1 h-10 text-xs gap-2 bg-gradient-to-r from-sky-500 to-teal-500 hover:from-sky-600 hover:to-teal-600 text-white rounded-xl font-bold shadow-sm"
-                          onClick={() => handleSelectApplicant(manageTarget.id, app._id!)}
+                          onClick={() => handleSelectApplicant(manageTarget.id, app.id)}
                           disabled={isSelecting}
                         >
                           {isSelecting ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
