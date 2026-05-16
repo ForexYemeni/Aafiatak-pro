@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -18,7 +18,16 @@ import {
   Sparkles,
   Shield,
   Activity,
-  Check,
+  Search,
+  CheckCircle2,
+  FlaskConical,
+  Radiation,
+  HeartPulse,
+  Baby,
+  Syringe,
+  Siren,
+  Home,
+  MoreHorizontal,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -26,13 +35,104 @@ import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { YEMEN_GOVERNORATES } from '@/lib/constants/governorates';
 import { GpsLocationButton } from '@/components/common/gps-location-button';
+import { DEFAULT_SPECIALIZATIONS, SPECIALIZATION_CATEGORIES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
-import {
-  DEFAULT_SPECIALIZATIONS,
-  SPECIALIZATION_CATEGORIES,
-  SPECIALIZATION_CATEGORIES_META,
-  getCategoryMeta,
-} from '@/lib/constants';
+
+// ── Category Config ──────────────────────────────────────────────────────────
+
+const CATEGORY_CONFIG: Record<string, {
+  icon: React.ElementType;
+  color: string;
+  bg: string;
+  border: string;
+  activeBg: string;
+  activeText: string;
+  ring: string;
+}> = {
+  'تمريض': {
+    icon: Stethoscope,
+    color: 'text-teal-600 dark:text-teal-400',
+    bg: 'bg-teal-50 dark:bg-teal-900/20',
+    border: 'border-teal-200 dark:border-teal-800',
+    activeBg: 'bg-teal-500',
+    activeText: 'text-white',
+    ring: 'ring-teal-500/30',
+  },
+  'مختبر': {
+    icon: FlaskConical,
+    color: 'text-purple-600 dark:text-purple-400',
+    bg: 'bg-purple-50 dark:bg-purple-900/20',
+    border: 'border-purple-200 dark:border-purple-800',
+    activeBg: 'bg-purple-500',
+    activeText: 'text-white',
+    ring: 'ring-purple-500/30',
+  },
+  'أشعة': {
+    icon: Radiation,
+    color: 'text-blue-600 dark:text-blue-400',
+    bg: 'bg-blue-50 dark:bg-blue-900/20',
+    border: 'border-blue-200 dark:border-blue-800',
+    activeBg: 'bg-blue-500',
+    activeText: 'text-white',
+    ring: 'ring-blue-500/30',
+  },
+  'طبي': {
+    icon: HeartPulse,
+    color: 'text-indigo-600 dark:text-indigo-400',
+    bg: 'bg-indigo-50 dark:bg-indigo-900/20',
+    border: 'border-indigo-200 dark:border-indigo-800',
+    activeBg: 'bg-indigo-500',
+    activeText: 'text-white',
+    ring: 'ring-indigo-500/30',
+  },
+  'توليد': {
+    icon: Baby,
+    color: 'text-pink-600 dark:text-pink-400',
+    bg: 'bg-pink-50 dark:bg-pink-900/20',
+    border: 'border-pink-200 dark:border-pink-800',
+    activeBg: 'bg-pink-500',
+    activeText: 'text-white',
+    ring: 'ring-pink-500/30',
+  },
+  'علاج': {
+    icon: Syringe,
+    color: 'text-amber-600 dark:text-amber-400',
+    bg: 'bg-amber-50 dark:bg-amber-900/20',
+    border: 'border-amber-200 dark:border-amber-800',
+    activeBg: 'bg-amber-500',
+    activeText: 'text-white',
+    ring: 'ring-amber-500/30',
+  },
+  'طوارئ': {
+    icon: Siren,
+    color: 'text-red-600 dark:text-red-400',
+    bg: 'bg-red-50 dark:bg-red-900/20',
+    border: 'border-red-200 dark:border-red-800',
+    activeBg: 'bg-red-500',
+    activeText: 'text-white',
+    ring: 'ring-red-500/30',
+  },
+  'رعاية': {
+    icon: Home,
+    color: 'text-green-600 dark:text-green-400',
+    bg: 'bg-green-50 dark:bg-green-900/20',
+    border: 'border-green-200 dark:border-green-800',
+    activeBg: 'bg-green-500',
+    activeText: 'text-white',
+    ring: 'ring-green-500/30',
+  },
+  'أخرى': {
+    icon: MoreHorizontal,
+    color: 'text-gray-600 dark:text-gray-400',
+    bg: 'bg-gray-50 dark:bg-gray-900/20',
+    border: 'border-gray-200 dark:border-gray-800',
+    activeBg: 'bg-gray-500',
+    activeText: 'text-white',
+    ring: 'ring-gray-500/30',
+  },
+};
+
+// ── Schema ───────────────────────────────────────────────────────────────────
 
 const nurseRegisterSchema = z
   .object({
@@ -65,18 +165,7 @@ interface RegisterNurseFormProps {
   className?: string;
 }
 
-// Dynamic specializations grouped by category
-const specializationGroups = SPECIALIZATION_CATEGORIES.map((cat) => {
-  const meta = SPECIALIZATION_CATEGORIES_META.find((m) => m.id === cat);
-  const items = DEFAULT_SPECIALIZATIONS
-    .filter((s) => s.category === cat)
-    .sort((a, b) => (a.order || 0) - (b.order || 0));
-  return {
-    category: cat,
-    icon: meta?.icon || '📋',
-    items,
-  };
-}).filter((g) => g.items.length > 0);
+// ── Floating Particles ───────────────────────────────────────────────────────
 
 function FloatingParticles() {
   return (
@@ -125,20 +214,75 @@ const inputClass = cn(
   'placeholder:text-muted-foreground/40',
 );
 
+// ── Main Component ───────────────────────────────────────────────────────────
+
 export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
-  const [selectedCategory, setSelectedCategory] = useState<string>('تمريض');
   const registerNurse = useAuthStore((s) => s.registerNurse);
   const isLoading = useAuthStore((s) => s.isLoading);
   const error = useAuthStore((s) => s.error);
   const clearError = useAuthStore((s) => s.clearError);
 
+  // Specialization state
+  const [selectedSpec, setSelectedSpec] = useState('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [specSearch, setSpecSearch] = useState('');
+  const [fetchedSpecs, setFetchedSpecs] = useState(DEFAULT_SPECIALIZATIONS);
+
+  // Fetch specializations from API
+  const fetchSpecializations = useCallback(async () => {
+    try {
+      const res = await fetch('/api/specializations');
+      const data = await res.json();
+      if (data.success && data.data?.length > 0) {
+        setFetchedSpecs(data.data);
+      }
+    } catch {
+      // Fallback to defaults already set
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchSpecializations();
+  }, [fetchSpecializations]);
+
+  // Group specializations by category
+  const groupedSpecs = SPECIALIZATION_CATEGORIES.reduce<Record<string, typeof fetchedSpecs>>((acc, cat) => {
+    const items = fetchedSpecs.filter((s) => s.category === cat);
+    if (items.length > 0) acc[cat] = items;
+    return acc;
+  }, {});
+
+  // Add any uncategorized
+  fetchedSpecs.forEach((s) => {
+    if (!SPECIALIZATION_CATEGORIES.includes(s.category)) {
+      if (!groupedSpecs[s.category]) groupedSpecs[s.category] = [];
+      if (!groupedSpecs[s.category].some((item) => item.id === s.id)) {
+        groupedSpecs[s.category].push(s);
+      }
+    }
+  });
+
+  // Filter by search
+  const filteredGrouped = Object.entries(groupedSpecs).reduce<Record<string, typeof fetchedSpecs>>((acc, [cat, items]) => {
+    const filtered = items.filter((s) =>
+      !specSearch ||
+      s.label.includes(specSearch) ||
+      s.id.includes(specSearch) ||
+      s.category.includes(specSearch)
+    );
+    if (filtered.length > 0) acc[cat] = filtered;
+    return acc;
+  }, {});
+
+  // Only show categories that match search
+  const visibleCategories = Object.keys(filteredGrouped);
+
   const {
     register,
     handleSubmit,
     setValue,
-    watch,
     formState: { errors },
   } = useForm<NurseRegisterFormValues>({
     resolver: zodResolver(nurseRegisterSchema),
@@ -153,17 +297,10 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
     },
   });
 
-  const selectedSpec = watch('specialization');
-  const selectedSpecMeta = selectedSpec ? DEFAULT_SPECIALIZATIONS.find((s) => s.id === selectedSpec) : null;
-
   const handleSelectSpec = (specId: string) => {
+    setSelectedSpec(specId);
     setValue('specialization', specId, { shouldValidate: true });
   };
-
-  // Get items for current category
-  const currentCategoryItems = DEFAULT_SPECIALIZATIONS
-    .filter((s) => s.category === selectedCategory)
-    .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   const onSubmit = async (data: NurseRegisterFormValues) => {
     clearError();
@@ -186,6 +323,9 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
     animate: { opacity: 1, x: 0 },
     transition: { delay, duration: 0.4 },
   });
+
+  // Get selected spec label for display
+  const selectedSpecLabel = fetchedSpecs.find((s) => s.id === selectedSpec)?.label || '';
 
   return (
     <motion.div
@@ -301,100 +441,124 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
             </AnimatePresence>
           </motion.div>
 
-          {/* Specialization Selection - Visual Grid */}
+          {/* ── Specialization Categorized Selection ── */}
           <motion.div {...fieldAnim(0.43)} className="space-y-3">
-            <Label className="text-sm font-semibold flex items-center gap-1.5">
-              <Stethoscope className="w-4 h-4 text-sky-500" />
-              التخصص
-            </Label>
+            <div className="flex items-center justify-between">
+              <Label className="text-sm font-semibold flex items-center gap-1.5">
+                <Stethoscope className="w-3.5 h-3.5 text-sky-500" />
+                التخصص
+              </Label>
+              {selectedSpec && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="flex items-center gap-1 text-xs text-emerald-600 dark:text-emerald-400"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  {selectedSpecLabel}
+                </motion.div>
+              )}
+            </div>
 
-            {/* Category Tabs */}
-            <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
-              {SPECIALIZATION_CATEGORIES_META.map((cat) => {
-                const isActive = selectedCategory === cat.id;
-                const hasSelected = selectedSpec && DEFAULT_SPECIALIZATIONS.some((s) => s.id === selectedSpec && s.category === cat.id);
+            {/* Search */}
+            <div className="relative">
+              <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
+              <Input
+                value={specSearch}
+                onChange={(e) => setSpecSearch(e.target.value)}
+                placeholder="ابحث عن تخصص..."
+                className="pr-9 h-9 text-sm rounded-lg bg-white/60 dark:bg-slate-800/60 border-2 border-slate-200/80 dark:border-slate-700/80"
+                dir="rtl"
+              />
+            </div>
+
+            {/* Category Chips */}
+            <div className="flex gap-1.5 flex-wrap">
+              {visibleCategories.map((cat) => {
+                const config = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['أخرى'];
+                const Icon = config.icon;
+                const isActive = selectedCategory === cat;
                 return (
                   <button
-                    key={cat.id}
+                    key={cat}
                     type="button"
-                    onClick={() => setSelectedCategory(cat.id)}
+                    onClick={() => setSelectedCategory(isActive ? '' : cat)}
                     className={cn(
-                      'shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 border-2',
+                      'flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 border',
                       isActive
-                        ? 'bg-sky-50 dark:bg-sky-900/30 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 shadow-sm'
-                        : hasSelected
-                          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
-                          : 'bg-white/40 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-700/60 text-muted-foreground hover:border-sky-200 dark:hover:border-sky-800',
+                        ? `${config.activeBg} ${config.activeText} border-transparent shadow-sm`
+                        : `${config.bg} ${config.color} ${config.border} hover:shadow-sm`,
                     )}
                   >
-                    <span className="ml-1">{cat.icon}</span>
-                    {cat.label}
-                    {hasSelected && <Check className="w-3 h-3 inline mr-1 text-green-500" />}
+                    <Icon className="w-3 h-3" />
+                    {cat}
+                    <span className="opacity-70">({filteredGrouped[cat]?.length || 0})</span>
                   </button>
                 );
               })}
             </div>
 
-            {/* Specialization Items Grid */}
-            <div className="grid grid-cols-2 gap-2 min-h-[80px]">
-              <AnimatePresence mode="wait">
-                <motion.div
-                  key={selectedCategory}
-                  initial={{ opacity: 0, x: 10 }}
-                  animate={{ opacity: 1, x: 0 }}
-                  exit={{ opacity: 0, x: -10 }}
-                  transition={{ duration: 0.2 }}
-                  className="col-span-2 grid grid-cols-2 gap-2"
-                >
-                  {currentCategoryItems.map((spec) => {
-                    const isSelected = selectedSpec === spec.id;
-                    const catMeta = getCategoryMeta(spec.category);
-                    return (
-                      <button
-                        key={spec.id}
-                        type="button"
-                        onClick={() => handleSelectSpec(spec.id)}
-                        className={cn(
-                          'relative flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 border-2 text-right',
-                          isSelected
-                            ? 'bg-sky-100 dark:bg-sky-900/40 border-sky-400 dark:border-sky-600 text-sky-800 dark:text-sky-200 shadow-md shadow-sky-200/50 dark:shadow-sky-900/30 scale-[1.02]'
-                            : 'bg-white/50 dark:bg-slate-800/50 border-slate-200/60 dark:border-slate-700/60 hover:border-sky-200 dark:hover:border-sky-800 hover:bg-white/80 dark:hover:bg-slate-800/80',
-                        )}
-                      >
-                        {isSelected && (
-                          <motion.div
-                            initial={{ scale: 0 }}
-                            animate={{ scale: 1 }}
-                            className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center"
+            {/* Specializations Grid */}
+            <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-200/80 dark:border-slate-700/80 bg-white/40 dark:bg-slate-800/40 p-2 space-y-1.5 custom-scrollbar">
+              {(selectedCategory ? { [selectedCategory]: filteredGrouped[selectedCategory] || [] } : filteredGrouped) &&
+                Object.entries(selectedCategory ? { [selectedCategory]: filteredGrouped[selectedCategory] || [] } : filteredGrouped).map(([cat, items]) => (
+                  <div key={cat}>
+                    {/* Category header inside the scrollable area (when showing all) */}
+                    {!selectedCategory && (
+                      <div className="flex items-center gap-1.5 px-2 py-1 mb-1">
+                        {(() => {
+                          const config = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['أخرى'];
+                          const Icon = config.icon;
+                          return (
+                            <>
+                              <Icon className={cn('w-3 h-3', config.color)} />
+                              <span className={cn('text-[10px] font-bold uppercase tracking-wider', config.color)}>
+                                {cat}
+                              </span>
+                              <div className="flex-1 h-px bg-border/50" />
+                            </>
+                          );
+                        })()}
+                      </div>
+                    )}
+                    <div className="grid grid-cols-2 gap-1.5">
+                      {items.map((spec) => {
+                        const isSelected = selectedSpec === spec.id;
+                        const config = CATEGORY_CONFIG[spec.category] || CATEGORY_CONFIG['أخرى'];
+                        return (
+                          <button
+                            key={spec.id}
+                            type="button"
+                            onClick={() => handleSelectSpec(spec.id)}
+                            className={cn(
+                              'relative flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all duration-200 border text-right',
+                              isSelected
+                                ? `${config.activeBg} text-white border-transparent shadow-md ring-2 ${config.ring}`
+                                : `${config.bg} ${config.color} ${config.border} hover:shadow-sm hover:scale-[1.02] active:scale-[0.98]`,
+                            )}
                           >
-                            <Check className="w-3 h-3 text-white" />
-                          </motion.div>
-                        )}
-                        <span className="text-base shrink-0">{catMeta?.icon || '📋'}</span>
-                        <span className="font-medium text-[13px] leading-tight">{spec.label}</span>
-                      </button>
-                    );
-                  })}
-                </motion.div>
-              </AnimatePresence>
-            </div>
-
-            {/* Selected specialization display */}
-            <AnimatePresence mode="wait">
-              {selectedSpecMeta && (
-                <motion.div
-                  initial={{ opacity: 0, y: -5 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -5 }}
-                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800"
-                >
-                  <Check className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
-                  <span className="text-xs text-sky-700 dark:text-sky-300">
-                    التخصص المختار: <span className="font-bold">{selectedSpecMeta.label}</span>
-                  </span>
-                </motion.div>
+                            {isSelected && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: 'spring', stiffness: 500, damping: 30 }}
+                              >
+                                <CheckCircle2 className="w-3.5 h-3.5 shrink-0" />
+                              </motion.div>
+                            )}
+                            <span className="truncate">{spec.label}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              {Object.keys(selectedCategory ? { [selectedCategory]: filteredGrouped[selectedCategory] || [] } : filteredGrouped).length === 0 && (
+                <div className="text-center py-4 text-xs text-muted-foreground">
+                  لا توجد نتائج
+                </div>
               )}
-            </AnimatePresence>
+            </div>
 
             <AnimatePresence mode="wait">
               {errors.specialization && (
@@ -405,7 +569,7 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
             </AnimatePresence>
           </motion.div>
 
-          {/* License Number - Full Width */}
+          {/* License Number */}
           <motion.div {...fieldAnim(0.46)} className="space-y-2">
             <Label htmlFor="nurse-license" className="text-sm font-semibold">رقم الترخيص</Label>
             <div className="relative">
@@ -414,7 +578,7 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
                 id="nurse-license"
                 placeholder="رقم الترخيص"
                 className={cn(
-                  'pr-10 text-right h-12 rounded-xl text-[14px]',
+                  'pr-10 text-right h-12 rounded-xl text-[15px]',
                   'bg-white/60 dark:bg-slate-800/60',
                   'border-2 border-slate-200/80 dark:border-slate-700/80',
                   'hover:border-sky-300 dark:hover:border-sky-700',
@@ -435,7 +599,7 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
           </motion.div>
 
           {/* Location GPS */}
-          <motion.div {...fieldAnim(0.46)} className="space-y-2">
+          <motion.div {...fieldAnim(0.49)} className="space-y-2">
             <Label className="text-sm font-semibold">الموقع</Label>
             <GpsLocationButton
               onLocationDetected={(loc) => {
@@ -449,7 +613,7 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
           </motion.div>
 
           {/* Password */}
-          <motion.div {...fieldAnim(0.49)} className="space-y-2">
+          <motion.div {...fieldAnim(0.52)} className="space-y-2">
             <Label htmlFor="nurse-password" className="text-sm font-semibold">كلمة المرور</Label>
             <div className="relative">
               <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground/60 pointer-events-none" />
@@ -489,7 +653,7 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
           </motion.div>
 
           {/* Confirm Password */}
-          <motion.div {...fieldAnim(0.52)} className="space-y-2">
+          <motion.div {...fieldAnim(0.55)} className="space-y-2">
             <Label htmlFor="nurse-confirm-password" className="text-sm font-semibold">تأكيد كلمة المرور</Label>
             <div className="relative">
               <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[18px] h-[18px] text-muted-foreground/60 pointer-events-none" />
@@ -532,7 +696,7 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
           <motion.div
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.57, duration: 0.4 }}
+            transition={{ delay: 0.6, duration: 0.4 }}
           >
             <Button
               type="submit"
@@ -567,7 +731,7 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6, duration: 0.4 }}
+            transition={{ delay: 0.65, duration: 0.4 }}
             className="mt-5 text-center"
           >
             <button
