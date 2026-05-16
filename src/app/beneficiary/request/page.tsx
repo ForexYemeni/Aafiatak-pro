@@ -796,7 +796,7 @@ function MultiServiceRequestPageInner() {
                         </label>
                       ))}
                     </div>
-                  )
+                  )}
 
                   {bankMethods.length > 0 && (
                     <div className="space-y-2">
