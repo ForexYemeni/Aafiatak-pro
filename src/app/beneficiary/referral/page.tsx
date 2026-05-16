@@ -60,8 +60,10 @@ export default function ReferralPage() {
     if (!token) return;
     setIsLoading(true);
     try {
-      const res = await fetch('/api/beneficiary/referral', {
+      // Add cache-busting query param + no-store to prevent stale data
+      const res = await fetch(`/api/beneficiary/referral?_t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
       });
       const data: ApiResponse<ReferralData> = await res.json();
       if (data.success && data.data) {

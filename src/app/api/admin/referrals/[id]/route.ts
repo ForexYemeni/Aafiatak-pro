@@ -1,6 +1,7 @@
 // GET /api/admin/referrals/[id] - Get referred users for a specific beneficiary
 // Returns: the referrer's info + list of all users they referred
 // MongoDB/Mongoose based
+// CRITICAL: Always returns fresh data from DB (no caching)
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
@@ -25,7 +26,7 @@ export async function GET(
       return createErrorResponse('المستفيد غير موجود', 404, 'NOT_FOUND');
     }
 
-    // Get all referrals made by this user
+    // Get all referrals made by this user (from Referral collection)
     const referrals = await Referral.find({ referrerId: id })
       .populate('referredId', 'name phone isActive createdAt loyaltyPoints')
       .sort({ createdAt: -1 })
@@ -37,7 +38,7 @@ export async function GET(
       .sort({ createdAt: -1 })
       .lean();
 
-    // Combine and deduplicate
+    // Combine and deduplicate - prefer Referral collection data, add missing from direct
     const referredIds = new Set(referrals.map((r: any) => (r.referredId as any)?._id?.toString()));
     const extraDirectReferrals = directReferrals.filter((d: any) => !referredIds.has(d._id.toString()));
 
@@ -77,6 +78,12 @@ export async function GET(
         referralCode: referrer.referralCode,
         totalReferred: allReferredUsers.length,
         referredUsers: allReferredUsers,
+      },
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
     });
   } catch (error) {

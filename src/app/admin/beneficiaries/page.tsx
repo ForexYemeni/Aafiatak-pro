@@ -115,6 +115,8 @@ export default function AdminBeneficiariesPage() {
         limit: '10',
         search,
         ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
+        // Cache-busting to prevent stale referral data
+        _t: String(Date.now()),
       });
       // Use referrals API which includes referralCount
       const res = await authFetch(`/api/admin/referrals?${params}`);
@@ -181,7 +183,8 @@ export default function AdminBeneficiariesPage() {
     setReferralTarget(ben);
     setIsLoadingReferrals(true);
     try {
-      const res = await authFetch(`/api/admin/referrals/${ben.id}`);
+      // Cache-busting to prevent stale referral details
+      const res = await authFetch(`/api/admin/referrals/${ben.id}?_t=${Date.now()}`);
       const json = await res.json();
       if (json.success && json.data) {
         setReferredUsers(json.data.referredUsers || []);

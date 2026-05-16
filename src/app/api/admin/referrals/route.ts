@@ -1,8 +1,10 @@
 // GET /api/admin/referrals - List beneficiaries with referral stats
 // Returns: users with referralCode, referralCount, and their referred users
 // MongoDB/Mongoose based
+// CRITICAL: Always returns fresh data from DB (no caching)
 
 import { NextRequest } from 'next/server';
+import mongoose from 'mongoose';
 import { connectDB } from '@/lib/mongodb';
 import { Beneficiary, Referral } from '@/models/mongoose';
 import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
@@ -30,16 +32,34 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Get referral counts per referrer
-    const referralCounts = await Referral.aggregate([
-      { $group: { _id: '$referrerId', count: { $sum: 1 } } },
+    // Get referral counts per referrer from BOTH sources:
+    // 1. Referral collection (tracking records)
+    // 2. Direct referredBy field (fallback for missing Referral records)
+    const [referralCounts, directReferredCounts] = await Promise.all([
+      Referral.aggregate([
+        { $group: { _id: '$referrerId', count: { $sum: 1 } } },
+      ]),
+      Beneficiary.aggregate([
+        { $match: { referredBy: { $ne: null, $exists: true } } },
+        { $group: { _id: '$referredBy', count: { $sum: 1 } } },
+      ]),
     ]);
-    const countMap = new Map(referralCounts.map((r: any) => [r._id.toString(), r.count]));
+
+    // Merge both count sources - take the MAX for each referrer
+    const countMap = new Map<string, number>();
+    for (const r of referralCounts) {
+      countMap.set(r._id.toString(), r.count);
+    }
+    for (const r of directReferredCounts) {
+      const id = r._id.toString();
+      const existing = countMap.get(id) || 0;
+      countMap.set(id, Math.max(existing, r.count));
+    }
 
     // If filtering to users with referrals only
     if (withReferralsOnly) {
-      const referrerIds = referralCounts.map((r: any) => r._id);
-      filter._id = { $in: referrerIds };
+      const referrerIds = [...countMap.keys()];
+      filter._id = { $in: referrerIds.map(id => new mongoose.Types.ObjectId(id)) };
     }
 
     const [beneficiaries, total] = await Promise.all([
@@ -78,7 +98,13 @@ export async function GET(request: NextRequest) {
         total,
         page,
         pages: Math.ceil(total / limit),
-        totalReferralCount: referralCounts.reduce((sum: number, r: any) => sum + r.count, 0),
+        totalReferralCount: [...countMap.values()].reduce((sum, c) => sum + c, 0),
+      },
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
       },
     });
   } catch (error) {

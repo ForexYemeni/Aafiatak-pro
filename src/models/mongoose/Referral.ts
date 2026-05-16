@@ -18,4 +18,9 @@ const ReferralSchema = new Schema<IReferral>({
   completedAt: { type: Date },
 }, { timestamps: true });
 
+// ── Performance Indexes ──────────────────────────────────────────────
+ReferralSchema.index({ referrerId: 1, createdAt: -1 });
+ReferralSchema.index({ referredId: 1 });
+ReferralSchema.index({ status: 1 });
+
 export const Referral = mongoose.models.Referral || mongoose.model<IReferral>('Referral', ReferralSchema);

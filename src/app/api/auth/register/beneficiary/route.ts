@@ -55,12 +55,14 @@ export async function POST(request: NextRequest) {
 
     // ── Validate referral code if provided ─────────────────────────
     let referrerId: string | null = null;
+    let referrerCode: string | null = null; // Store the actual referrer's code for the Referral record
     if (usedReferralCode && typeof usedReferralCode === 'string') {
       const normalizedCode = usedReferralCode.trim().toUpperCase();
       // Support both AF-XXXXXX and AFK-XXXXXX (legacy) formats
-      const referrer = await Beneficiary.findOne({ referralCode: normalizedCode }).select('_id').lean();
+      const referrer = await Beneficiary.findOne({ referralCode: normalizedCode }).select('_id referralCode').lean();
       if (referrer) {
         referrerId = referrer._id.toString();
+        referrerCode = referrer.referralCode; // The referrer's actual code (not the new user's code)
       }
       // If code not found, we still proceed but without linking (no error thrown)
       // This prevents registration failure due to typos in referral codes
@@ -85,10 +87,11 @@ export async function POST(request: NextRequest) {
     if (referrerId) {
       try {
         // Create the referral tracking record
+        // CRITICAL: `code` must be the REFERRER's code (the code that was used), NOT the new user's code
         await Referral.create({
           referrerId,
           referredId: beneficiary._id,
-          code: referralCode,
+          code: referrerCode || (usedReferralCode ? usedReferralCode.trim().toUpperCase() : ''),
           reward: REFERRAL_REWARD_POINTS,
           status: 'completed',
           completedAt: new Date(),

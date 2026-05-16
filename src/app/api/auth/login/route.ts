@@ -3,7 +3,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { User } from '@/models/mongoose/User';
+import { User, Beneficiary } from '@/models/mongoose';
 import {
   verifyPassword,
   generateToken,
@@ -66,15 +66,48 @@ export async function POST(request: NextRequest) {
       await User.findByIdAndUpdate(user._id, { lastLoginAt: new Date() });
     } catch {}
 
+    // Build user response with role-specific fields
+    const baseUser = {
+      id: user._id.toString(),
+      name: user.name,
+      phone: user.phone,
+      role: user.role,
+      isActive: user.isActive,
+      permissions: user.permissions || [],
+    };
+
+    let userResponse: Record<string, any> = baseUser;
+
+    // For beneficiaries, fetch and include all beneficiary-specific fields
+    // This ensures referralCode, loyaltyPoints, etc. are available in the auth store
+    if (user.role === 'beneficiary') {
+      try {
+        const beneficiary = await Beneficiary.findById(user._id)
+          .select('referralCode loyaltyPoints loyaltyTier governorate district address totalSpent orderCount gender bloodType')
+          .lean();
+        if (beneficiary) {
+          userResponse = {
+            ...baseUser,
+            referralCode: beneficiary.referralCode || '',
+            loyaltyPoints: beneficiary.loyaltyPoints || 0,
+            loyaltyTier: beneficiary.loyaltyTier || 'bronze',
+            governorate: beneficiary.governorate || '',
+            district: beneficiary.district || '',
+            address: beneficiary.address || '',
+            totalSpent: beneficiary.totalSpent || 0,
+            orderCount: beneficiary.orderCount || 0,
+            gender: beneficiary.gender || '',
+            bloodType: beneficiary.bloodType || '',
+          };
+        }
+      } catch (err) {
+        // If beneficiary lookup fails, continue with base user data
+        console.error('[AUTH LOGIN BENEFICIARY LOOKUP ERROR]', err);
+      }
+    }
+
     const responseData = {
-      user: {
-        id: user._id.toString(),
-        name: user.name,
-        phone: user.phone,
-        role: user.role,
-        isActive: user.isActive,
-        permissions: user.permissions || [],
-      },
+      user: userResponse,
       token,
       refreshToken,
     };
