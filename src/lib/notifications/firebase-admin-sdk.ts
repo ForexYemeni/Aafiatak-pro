@@ -219,15 +219,27 @@ export async function sendFCMToDevice(
     const isEmergency = payload.type === 'emergency';
     const isHighPriority = payload.priority === 'high' || payload.priority === 'urgent';
 
+    // ── DATA-ONLY MESSAGE ──────────────────────────────────────────────
+    // CRITICAL: Do NOT include a top-level `notification` field.
+    // When `notification` is present alongside `data`, Android auto-displays
+    // the notification using system defaults and BYPASSES
+    // onMessageReceived() while the app is in the background.
+    //
+    // By sending data-only messages, our custom
+    // AafiatakFirebaseMessagingService.onMessageReceived() is ALWAYS
+    // invoked — in foreground AND background — giving us full control
+    // over sound, channel, heads-up popup, and emergency full-screen.
+    // ──────────────────────────────────────────────────────────────────
     const message: admin.messaging.Message = {
       token: fcmToken,
-      notification: {
+      data: {
+        // Core notification fields moved into data so our service can
+        // build the Android Notification manually with the correct channel.
         title: payload.title,
         body: payload.body,
+        ...(payload.icon ? { icon: payload.icon } : {}),
         ...(payload.image ? { image: payload.image } : {}),
-      },
-      data: {
-        // FCM data payload must be string key-value pairs
+        // Custom metadata
         ...(payload.data || {}),
         type: payload.type || 'system',
         priority: payload.priority || 'medium',
@@ -239,24 +251,6 @@ export async function sendFCMToDevice(
       },
       android: {
         priority: isHighPriority ? 'high' : 'normal',
-        notification: {
-          icon: 'ic_launcher_foreground',
-          color: '#14b8a6',
-          sound: payload.sound !== false ? 'notification_sound.wav' : undefined,
-          tag: payload.tag || undefined,
-          clickAction: 'OPEN_ACTIVITY',
-          channelId: isEmergency ? 'aafiatak_emergency' : 'aafiatak_notifications',
-          priority: isEmergency
-            ? ('max' as const)
-            : isHighPriority
-            ? ('high' as const)
-            : ('default' as const),
-          defaultSound: payload.sound !== false,
-          defaultVibrateTimings: true,
-          notificationCount: 1,
-          sticky: isEmergency,
-          localOnly: false,
-        },
         collapseKey: payload.tag || undefined,
       },
       apns: {
@@ -307,14 +301,17 @@ export async function sendFCMToDevices(
     const isEmergency = payload.type === 'emergency';
     const isHighPriority = payload.priority === 'high' || payload.priority === 'urgent';
 
+    // ── DATA-ONLY MULTICAST MESSAGE ────────────────────────────────────
+    // Same rationale as sendFCMToDevice: no top-level `notification` field
+    // so that Android always delivers to our custom messaging service.
+    // ──────────────────────────────────────────────────────────────────
     const message: admin.messaging.MulticastMessage = {
       tokens: fcmTokens,
-      notification: {
+      data: {
         title: payload.title,
         body: payload.body,
+        ...(payload.icon ? { icon: payload.icon } : {}),
         ...(payload.image ? { image: payload.image } : {}),
-      },
-      data: {
         ...(payload.data || {}),
         type: payload.type || 'system',
         priority: payload.priority || 'medium',
@@ -326,24 +323,7 @@ export async function sendFCMToDevices(
       },
       android: {
         priority: isHighPriority ? 'high' : 'normal',
-        notification: {
-          icon: 'ic_launcher_foreground',
-          color: '#14b8a6',
-          sound: payload.sound !== false ? 'notification_sound.wav' : undefined,
-          tag: payload.tag || undefined,
-          clickAction: 'OPEN_ACTIVITY',
-          channelId: isEmergency ? 'aafiatak_emergency' : 'aafiatak_notifications',
-          priority: isEmergency
-            ? ('max' as const)
-            : isHighPriority
-            ? ('high' as const)
-            : ('default' as const),
-          defaultSound: payload.sound !== false,
-          defaultVibrateTimings: true,
-          notificationCount: 1,
-          sticky: isEmergency,
-          localOnly: false,
-        },
+        collapseKey: payload.tag || undefined,
       },
       apns: {
         payload: {

@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <application
         android:allowBackup="true"
@@ -22,6 +23,13 @@
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+
+            <!-- Intent filter for FCM click_action – opens the app when user
+                 taps a notification that was built with clickAction=OPEN_ACTIVITY -->
+            <intent-filter>
+                <action android:name="OPEN_ACTIVITY" />
+                <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
 
         </activity>
@@ -54,7 +62,9 @@
             android:name="com.aafiatak.app.services.AafiatakFirebaseMessagingService"
             android:exported="false"
             android:directBootAware="true"
-            android:stopWithTask="false">
+            android:stopWithTask="false"
+            tools:node="replace"
+            tools:replace="android:exported,android:directBootAware,android:stopWithTask">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
