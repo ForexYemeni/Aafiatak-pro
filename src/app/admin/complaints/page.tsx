@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { MessageSquare, Eye, RefreshCw, CheckCircle, XCircle, Clock, SearchCircle, AlertTriangle } from 'lucide-react';
+import { MessageSquare, Eye, RefreshCw, CheckCircle, XCircle, Clock, Search, AlertTriangle } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';

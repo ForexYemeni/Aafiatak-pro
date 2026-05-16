@@ -8,7 +8,7 @@ import {
   Eye,
   CheckCircle,
   XCircle,
-  SearchCircle,
+  Search,
   AlertTriangle,
   MessageSquare,
   Loader2,
@@ -45,7 +45,7 @@ interface Complaint {
 
 const statusConfig: Record<string, { label: string; icon: React.ElementType; color: string; bg: string }> = {
   open: { label: 'جديد', icon: Clock, color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-900/30' },
-  under_review: { label: 'قيد المراجعة', icon: SearchCircle, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
+  under_review: { label: 'قيد المراجعة', icon: Search, color: 'text-amber-600 dark:text-amber-400', bg: 'bg-amber-100 dark:bg-amber-900/30' },
   resolved: { label: 'تم الحل', icon: CheckCircle, color: 'text-green-600 dark:text-green-400', bg: 'bg-green-100 dark:bg-green-900/30' },
   dismissed: { label: 'مرفوض', icon: XCircle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30' },
 };
