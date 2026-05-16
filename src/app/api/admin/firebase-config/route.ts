@@ -69,34 +69,49 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { projectId, clientEmail, privateKey, storageBucket } = body;
 
-    // Validate required fields
-    if (!projectId || !clientEmail || !privateKey) {
+    // Validate required fields — privateKey is only required for new configs
+    if (!projectId || !clientEmail) {
       return createErrorResponse(
-        'حقول مطلوبة: معرف المشروع، البريد الإلكتروني، المفتاح الخاص',
+        'حقول مطلوبة: معرف المشروع، البريد الإلكتروني',
         400,
         'VALIDATION_ERROR'
       );
     }
 
-    // Validate private key format (should contain BEGIN PRIVATE KEY)
-    const processedKey = privateKey.replace(/\\n/g, '\n');
-    if (!processedKey.includes('-----BEGIN PRIVATE KEY-----')) {
-      // Try base64 decode
-      try {
-        const decoded = Buffer.from(privateKey, 'base64').toString('utf-8');
-        if (!decoded.includes('-----BEGIN PRIVATE KEY-----')) {
+    // Check if there's an existing active config
+    const existingConfig = await FirebaseConfig.findOne({ isActive: true }).lean();
+    const isNewConfig = !existingConfig;
+
+    // For new configs, privateKey is required
+    if (isNewConfig && !privateKey) {
+      return createErrorResponse(
+        'المفتاح الخاص مطلوب عند إعداد Firebase لأول مرة',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
+    // Validate private key format if provided
+    if (privateKey) {
+      const processedKey = privateKey.replace(/\\n/g, '\n');
+      if (!processedKey.includes('-----BEGIN PRIVATE KEY-----')) {
+        // Try base64 decode
+        try {
+          const decoded = Buffer.from(privateKey, 'base64').toString('utf-8');
+          if (!decoded.includes('-----BEGIN PRIVATE KEY-----')) {
+            return createErrorResponse(
+              'صيغة المفتاح الخاص غير صالحة. يجب أن يكون بتنسيق PEM أو Base64',
+              400,
+              'INVALID_KEY_FORMAT'
+            );
+          }
+        } catch {
           return createErrorResponse(
             'صيغة المفتاح الخاص غير صالحة. يجب أن يكون بتنسيق PEM أو Base64',
             400,
             'INVALID_KEY_FORMAT'
           );
         }
-      } catch {
-        return createErrorResponse(
-          'صيغة المفتاح الخاص غير صالحة. يجب أن يكون بتنسيق PEM أو Base64',
-          400,
-          'INVALID_KEY_FORMAT'
-        );
       }
     }
 
@@ -115,11 +130,22 @@ export async function POST(request: NextRequest) {
       { isActive: false }
     );
 
+    // Use existing private key if not provided (for updates without changing the key)
+    const finalPrivateKey = privateKey || (existingConfig ? existingConfig.privateKey : '');
+
+    if (!finalPrivateKey) {
+      return createErrorResponse(
+        'المفتاح الخاص مطلوب',
+        400,
+        'VALIDATION_ERROR'
+      );
+    }
+
     // Create new config
     const config = await FirebaseConfig.create({
       projectId: projectId.trim(),
       clientEmail: clientEmail.trim(),
-      privateKey: privateKey, // Store as-is (already encrypted in transit)
+      privateKey: finalPrivateKey, // Use new key or keep existing
       storageBucket: storageBucket?.trim() || '',
       isActive: true,
     });

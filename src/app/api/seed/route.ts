@@ -7,6 +7,7 @@ import { connectDB } from '@/lib/mongodb';
 import { User, Nurse, Beneficiary } from '@/models/mongoose';
 import { Service } from '@/models/mongoose/Service';
 import { AdminSettings } from '@/models/mongoose/AdminSettings';
+import { FirebaseConfig } from '@/models/mongoose/FirebaseConfig';
 import { hashPassword, generateReferralCode } from '@/lib/auth';
 
 const defaultServices = [
@@ -250,6 +251,35 @@ export async function POST(request: NextRequest) {
         loyaltyPoints: 100,
       });
       results.push('تم إنشاء حساب مستفيد تجريبي (722222222 / Benef@123)');
+    }
+
+    // 6. Seed Firebase Config from environment variables (if available)
+    const envProjectId = process.env.FIREBASE_PROJECT_ID;
+    const envClientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+    const envPrivateKey = process.env.FIREBASE_PRIVATE_KEY;
+    const existingFirebaseConfig = await FirebaseConfig.findOne({ isActive: true });
+    if (!existingFirebaseConfig && envProjectId && envClientEmail && envPrivateKey) {
+      // Process private key (handle escaped newlines)
+      let processedKey = envPrivateKey.replace(/\\n/g, '\n');
+      // Try base64 decode
+      try {
+        const decoded = Buffer.from(envPrivateKey, 'base64').toString('utf-8');
+        if (decoded.includes('-----BEGIN PRIVATE KEY-----')) {
+          processedKey = decoded;
+        }
+      } catch {}
+      await FirebaseConfig.create({
+        projectId: envProjectId,
+        clientEmail: envClientEmail,
+        privateKey: processedKey,
+        storageBucket: process.env.FIREBASE_STORAGE_BUCKET || `${envProjectId}.firebasestorage.app`,
+        isActive: true,
+      });
+      results.push('تم إعداد Firebase من متغيرات البيئة');
+    } else if (existingFirebaseConfig) {
+      results.push('إعدادات Firebase موجودة بالفعل');
+    } else {
+      results.push('لم يتم العثور على متغيرات Firebase البيئية — يمكن إعدادها من لوحة الإدارة');
     }
 
     return Response.json({

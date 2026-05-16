@@ -7,7 +7,7 @@ import {
   Phone, MessageSquare, FileText, Wrench, MapPin, Users,
   Heart, Gift, Zap, Clock, AlertTriangle, Globe, Briefcase, Building2,
   Database, CheckCircle, Eye, EyeOff, RefreshCw, AlertOctagon, CreditCard,
-  Trash2, TriangleAlert, Upload, Download, Archive, Info
+  Trash2, TriangleAlert, Upload, Download, Archive, Info, Flame
 } from 'lucide-react';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { useAuthFetch, invalidateAuthFetchCache } from '@/hooks/use-auth';
@@ -171,6 +171,14 @@ export default function AdminSettingsPage() {
   const [restoreMode, setRestoreMode] = useState<'replace' | 'merge'>('replace');
   const [restoreResult, setRestoreResult] = useState<{ totalRestored: number; totalErrors: number; backupDate: string | null; results: { collection: string; count: number; status: string }[] } | null>(null);
 
+  // ── Firebase Config State ──────────────────────────────────────────
+  const [firebaseConfig, setFirebaseConfig] = useState<{ projectId: string; clientEmail: string; privateKey: string; storageBucket: string; isActive: boolean } | null>(null);
+  const [firebaseForm, setFirebaseForm] = useState({ projectId: '', clientEmail: '', privateKey: '', storageBucket: '' });
+  const [isSavingFirebase, setIsSavingFirebase] = useState(false);
+  const [isLoadingFirebase, setIsLoadingFirebase] = useState(false);
+  const [showPrivateKey, setShowPrivateKey] = useState(false);
+  const [firebaseTestResult, setFirebaseTestResult] = useState<{ success: boolean; message: string } | null>(null);
+
   // ── Reset All Data State ──────────────────────────────────────────
   const [showResetSection, setShowResetSection] = useState(false);
   const [resetPassword, setResetPassword] = useState('');
@@ -178,6 +186,125 @@ export default function AdminSettingsPage() {
   const [showResetPassword, setShowResetPassword] = useState(false);
   const [isResetting, setIsResetting] = useState(false);
   const [resetResult, setResetResult] = useState<{ totalDeleted: number; summary: Record<string, number> } | null>(null);
+
+  // Fetch Firebase config when section is opened
+  useEffect(() => {
+    if (activeSection === 'firebase' && !firebaseConfig) {
+      const fetchFirebaseConfig = async () => {
+        setIsLoadingFirebase(true);
+        try {
+          const res = await authFetch('/api/admin/firebase-config');
+          const json = await res.json();
+          if (json.success && json.data) {
+            setFirebaseConfig(json.data);
+            setFirebaseForm({
+              projectId: json.data.projectId || '',
+              clientEmail: json.data.clientEmail || '',
+              privateKey: '', // Don't pre-fill private key for security
+              storageBucket: json.data.storageBucket || '',
+            });
+          }
+        } catch {
+          toast.error('فشل تحميل إعدادات Firebase');
+        } finally {
+          setIsLoadingFirebase(false);
+        }
+      };
+      void fetchFirebaseConfig();
+    }
+  }, [activeSection, authFetch, firebaseConfig]);
+
+  const handleSaveFirebaseConfig = async () => {
+    if (!firebaseForm.projectId.trim()) {
+      toast.error('معرف مشروع Firebase مطلوب');
+      return;
+    }
+    if (!firebaseForm.clientEmail.trim()) {
+      toast.error('البريد الإلكتروني لحساب الخدمة مطلوب');
+      return;
+    }
+    // Only require private key if it's a new config or user wants to update it
+    if (!firebaseConfig?.isActive && !firebaseForm.privateKey.trim()) {
+      toast.error('المفتاح الخاص مطلوب للإعداد الأول');
+      return;
+    }
+
+    setIsSavingFirebase(true);
+    setFirebaseTestResult(null);
+    try {
+      const payload: Record<string, string> = {
+        projectId: firebaseForm.projectId.trim(),
+        clientEmail: firebaseForm.clientEmail.trim(),
+        storageBucket: firebaseForm.storageBucket.trim(),
+      };
+      // Only send private key if user entered a new one
+      if (firebaseForm.privateKey.trim()) {
+        payload.privateKey = firebaseForm.privateKey.trim();
+      }
+
+      const res = await authFetch('/api/admin/firebase-config', {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم حفظ إعدادات Firebase بنجاح — سيتم تفعيل الإشعارات الفورية خلال لحظات');
+        setFirebaseConfig(json.data);
+        setFirebaseForm((prev) => ({ ...prev, privateKey: '' })); // Clear private key after save
+        setShowPrivateKey(false);
+        // Reload config to get updated masked key
+        try {
+          const getRes = await authFetch('/api/admin/firebase-config');
+          const getJson = await getRes.json();
+          if (getJson.success && getJson.data) {
+            setFirebaseConfig(getJson.data);
+          }
+        } catch {}
+      } else {
+        toast.error(json.error?.message ?? json.message ?? 'فشل حفظ إعدادات Firebase');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء حفظ إعدادات Firebase');
+    } finally {
+      setIsSavingFirebase(false);
+    }
+  };
+
+  const handleTestFirebasePush = async () => {
+    setFirebaseTestResult(null);
+    try {
+      const res = await authFetch('/api/notifications/test-push', {
+        method: 'POST',
+        body: JSON.stringify({}),
+      });
+      const json = await res.json();
+      setFirebaseTestResult({
+        success: json.success,
+        message: json.success ? 'تم إرسال إشعار اختبار بنجاح!' : (json.error?.message ?? json.message ?? 'فشل إرسال إشعار الاختبار'),
+      });
+    } catch {
+      setFirebaseTestResult({ success: false, message: 'فشل الاتصال بالخادم لاختبار الإشعارات' });
+    }
+  };
+
+  const handleDeleteFirebaseConfig = async () => {
+    const confirmed = window.confirm('هل أنت متأكد من تعطيل إعدادات Firebase؟ لن يتم إرسال إشعارات فورية حتى يتم إعداد Firebase مرة أخرى.');
+    if (!confirmed) return;
+
+    try {
+      const res = await authFetch('/api/admin/firebase-config', { method: 'DELETE' });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم تعطيل إعدادات Firebase');
+        setFirebaseConfig(null);
+        setFirebaseForm({ projectId: '', clientEmail: '', privateKey: '', storageBucket: '' });
+      } else {
+        toast.error(json.error?.message ?? 'فشل تعطيل إعدادات Firebase');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء تعطيل إعدادات Firebase');
+    }
+  };
 
   // Fetch current database info when database section is opened
   useEffect(() => {
@@ -474,6 +601,7 @@ export default function AdminSettingsPage() {
     { id: 'support', label: 'أرقام التواصل', icon: Phone },
     { id: 'legal', label: 'المستندات القانونية', icon: FileText },
     { id: 'maintenance', label: 'وضع الصيانة', icon: Wrench },
+    { id: 'firebase', label: 'Firebase والإشعارات', icon: Flame },
     { id: 'database', label: 'قاعدة البيانات', icon: Database },
     { id: 'backup-admin', label: 'النسخ الاحتياطية', icon: Shield },
     { id: 'restore-admin', label: 'استعادة النسخة', icon: Upload },
@@ -1343,6 +1471,280 @@ export default function AdminSettingsPage() {
                     />
                   </div>
                 )}
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Firebase & Push Notifications */}
+      {activeSection === 'firebase' && (
+        <motion.div variants={itemAnim} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+          {/* Firebase Config Card */}
+          <GlassCard variant="admin">
+            <GlassCardHeader>
+              <GlassCardTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                  <Flame className="w-4 h-4 text-orange-600 dark:text-orange-400" />
+                </div>
+                إعدادات Firebase والإشعارات الفورية
+              </GlassCardTitle>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="space-y-6">
+                {/* Status Banner */}
+                {firebaseConfig?.isActive ? (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50">
+                    <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">Firebase مفعّل ونشط</p>
+                      <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70 leading-relaxed">
+                        المشروع: {firebaseConfig.projectId} — الإشعارات الفورية تعمل على أجهزة Android
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50">
+                    <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-amber-700 dark:text-amber-400">Firebase غير مُعد</p>
+                      <p className="text-xs text-amber-600/80 dark:text-amber-400/70 leading-relaxed">
+                        الإشعارات الفورية لن تعمل حتى يتم إعداد حساب Firebase. أدخل بيانات Service Account أدناه.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Banner */}
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50">
+                  <Info className="w-5 h-5 text-orange-600 dark:text-orange-400 shrink-0 mt-0.5" />
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-orange-700 dark:text-orange-400">كيفية الحصول على بيانات Firebase</p>
+                    <ol className="text-xs text-orange-600/80 dark:text-orange-400/70 leading-relaxed space-y-1 list-decimal list-inside">
+                      <li>اذهب إلى <span className="font-mono text-[10px] bg-orange-100 dark:bg-orange-900/40 px-1 rounded">console.firebase.google.com</span></li>
+                      <li>اختر مشروعك واضغط على إعدادات المشروع</li>
+                      <li>اذهب إلى تبويب &quot;Service Accounts&quot;</li>
+                      <li>اضغط &quot;Generate New Private Key&quot; لتحميل ملف JSON</li>
+                      <li>انسخ البيانات من الملف إلى الحقول أدناه</li>
+                    </ol>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                  {/* Project ID */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Globe className="w-3.5 h-3.5 text-orange-500" />
+                      معرف المشروع (Project ID)
+                    </Label>
+                    <Input
+                      value={firebaseForm.projectId}
+                      onChange={(e) => setFirebaseForm((prev) => ({ ...prev, projectId: e.target.value }))}
+                      placeholder="مثال: aafiatak-a23fa"
+                      dir="ltr"
+                      className="bg-background/50"
+                    />
+                    <p className="text-[10px] text-muted-foreground">تجده في إعدادات المشروع في Firebase Console</p>
+                  </div>
+
+                  {/* Client Email */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <MessageSquare className="w-3.5 h-3.5 text-orange-500" />
+                      البريد الإلكتروني (Client Email)
+                    </Label>
+                    <Input
+                      value={firebaseForm.clientEmail}
+                      onChange={(e) => setFirebaseForm((prev) => ({ ...prev, clientEmail: e.target.value }))}
+                      placeholder="firebase-adminsdk-xxx@project.iam.gserviceaccount.com"
+                      dir="ltr"
+                      className="bg-background/50"
+                    />
+                    <p className="text-[10px] text-muted-foreground">البريد الإلكتروني لحساب الخدمة</p>
+                  </div>
+
+                  {/* Storage Bucket */}
+                  <div className="space-y-2">
+                    <Label className="text-sm font-medium flex items-center gap-1.5">
+                      <Database className="w-3.5 h-3.5 text-orange-500" />
+                      حاوية التخزين (Storage Bucket)
+                    </Label>
+                    <Input
+                      value={firebaseForm.storageBucket}
+                      onChange={(e) => setFirebaseForm((prev) => ({ ...prev, storageBucket: e.target.value }))}
+                      placeholder="مثال: aafiatak-a23fa.firebasestorage.app"
+                      dir="ltr"
+                      className="bg-background/50"
+                    />
+                    <p className="text-[10px] text-muted-foreground">اختياري — لحاوية Firebase Storage</p>
+                  </div>
+                </div>
+
+                <Separator />
+
+                {/* Private Key */}
+                <div className="space-y-2">
+                  <Label className="text-sm font-medium flex items-center gap-1.5">
+                    <Shield className="w-3.5 h-3.5 text-orange-500" />
+                    المفتاح الخاص (Private Key)
+                  </Label>
+                  {firebaseConfig?.isActive && !firebaseForm.privateKey && (
+                    <p className="text-[10px] text-emerald-600 dark:text-emerald-400">
+                      المفتاح الحالي محفوظ ومخفي — اترك الحقل فارغاً للإبقاء على المفتاح الحالي، أو أدخل مفتاحاً جديداً لتحديثه
+                    </p>
+                  )}
+                  <div className="relative">
+                    <Textarea
+                      value={firebaseForm.privateKey}
+                      onChange={(e) => setFirebaseForm((prev) => ({ ...prev, privateKey: e.target.value }))}
+                      placeholder="-----BEGIN PRIVATE KEY-----&#10;MIIEvQIBADANBgkqhkiG9w0BAQEF...&#10;-----END PRIVATE KEY-----"
+                      dir="ltr"
+                      rows={4}
+                      className="bg-background/50 font-mono text-xs pr-10"
+                      type={showPrivateKey ? 'text' : 'password'}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPrivateKey(!showPrivateKey)}
+                      className="absolute left-3 top-3 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPrivateKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                    </button>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">
+                    الصق محتوى المفتاح الخاص من ملف Service Account JSON (يدعم تنسيق PEM أو Base64)
+                  </p>
+                </div>
+
+                <Separator />
+
+                {/* Action Buttons */}
+                <div className="flex flex-wrap gap-3">
+                  <Button
+                    onClick={handleSaveFirebaseConfig}
+                    disabled={isSavingFirebase}
+                    className="bg-orange-600 hover:bg-orange-700 gap-2 shadow-lg shadow-orange-600/20"
+                  >
+                    {isSavingFirebase ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        جارٍ الحفظ...
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        حفظ إعدادات Firebase
+                      </>
+                    )}
+                  </Button>
+
+                  {firebaseConfig?.isActive && (
+                    <>
+                      <Button
+                        onClick={handleTestFirebasePush}
+                        variant="outline"
+                        className="gap-2 border-orange-300 dark:border-orange-700 text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                      >
+                        <RefreshCw className="w-4 h-4" />
+                        إرسال إشعار اختبار
+                      </Button>
+                      <Button
+                        onClick={handleDeleteFirebaseConfig}
+                        variant="outline"
+                        className="gap-2 border-red-300 dark:border-red-700 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        تعطيل Firebase
+                      </Button>
+                    </>
+                  )}
+                </div>
+
+                {/* Test Result */}
+                {firebaseTestResult && (
+                  <div className={`flex items-start gap-3 p-4 rounded-xl ${
+                    firebaseTestResult.success
+                      ? 'bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50'
+                      : 'bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50'
+                  }`}>
+                    {firebaseTestResult.success ? (
+                      <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    ) : (
+                      <AlertOctagon className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                    )}
+                    <div>
+                      <p className={`text-sm font-medium ${firebaseTestResult.success ? 'text-emerald-700 dark:text-emerald-400' : 'text-red-700 dark:text-red-400'}`}>
+                        {firebaseTestResult.success ? 'نجح الاختبار' : 'فشل الاختبار'}
+                      </p>
+                      <p className={`text-xs ${firebaseTestResult.success ? 'text-emerald-600/80 dark:text-emerald-400/70' : 'text-red-600/80 dark:text-red-400/70'}`}>
+                        {firebaseTestResult.message}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Current Config Info */}
+                {firebaseConfig?.isActive && (
+                  <div className="p-3 rounded-xl bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/50">
+                    <p className="text-[10px] text-orange-600 dark:text-orange-400 mb-2 font-medium">الإعدادات الحالية:</p>
+                    <div className="space-y-1.5 text-xs">
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">معرف المشروع</span>
+                        <span className="font-medium" dir="ltr">{firebaseConfig.projectId}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">البريد الإلكتروني</span>
+                        <span className="font-medium" dir="ltr">{firebaseConfig.clientEmail}</span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">المفتاح الخاص</span>
+                        <span className="font-medium" dir="ltr">{firebaseConfig.privateKey}</span>
+                      </div>
+                      {firebaseConfig.storageBucket && (
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">حاوية التخزين</span>
+                          <span className="font-medium" dir="ltr">{firebaseConfig.storageBucket}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+
+          {/* How Push Notifications Work */}
+          <GlassCard variant="admin">
+            <GlassCardHeader>
+              <GlassCardTitle className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
+                  <Info className="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                </div>
+                كيف تعمل الإشعارات الفورية
+              </GlassCardTitle>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="space-y-3 text-sm text-muted-foreground leading-relaxed">
+                <p>
+                  يستخدم تطبيق عافيتك نظام إشعارات مزدوج لضمان وصول الإشعارات على جميع المنصات:
+                </p>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="p-3 rounded-lg bg-teal-50 dark:bg-teal-900/20 border border-teal-200 dark:border-teal-800/50">
+                    <p className="text-xs font-medium text-teal-700 dark:text-teal-400 mb-1">أجهزة Android (APK)</p>
+                    <p className="text-[10px] text-teal-600/80 dark:text-teal-400/70">
+                      Firebase Cloud Messaging (FCM) — إشعارات فورية مع صوت واهتزاز حتى عند إغلاق التطبيق
+                    </p>
+                  </div>
+                  <div className="p-3 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/50">
+                    <p className="text-xs font-medium text-violet-700 dark:text-violet-400 mb-1">متصفح الويب</p>
+                    <p className="text-[10px] text-violet-600/80 dark:text-violet-400/70">
+                      Web Push (VAPID) — إشعارات عبر المتصفح باستخدام Service Worker
+                    </p>
+                  </div>
+                </div>
+                <p className="text-[10px]">
+                  بعد حفظ إعدادات Firebase، تأكد من منح تطبيق APK إذن الإشعارات من إعدادات الجهاز.
+                </p>
               </div>
             </GlassCardContent>
           </GlassCard>
