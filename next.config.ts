@@ -30,7 +30,7 @@
       "frame-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      "frame-ancestors 'self'",
+      "frame-ancestors 'self' https://aafiatak-pro.vercel.app",
     ].join("; "),
   };
 
@@ -104,6 +104,7 @@
       "socket.io",
       "web-push",
       "jszip",
+      "firebase-admin",
     ],
 
     // ============================================================================

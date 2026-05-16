@@ -37,20 +37,18 @@
         </provider>
 
         <!-- Custom Firebase Cloud Messaging Service -->
+        <!-- This is the ONLY service that handles FCM messages.
+             The Capacitor PushNotificationsService is REMOVED because it
+             conflicts with our custom service (both register for MESSAGING_EVENT).
+             Our custom service handles notification display with proper sound,
+             vibration, and channel routing. The Capacitor plugin still works
+             for token registration and foreground event delivery via JS. -->
         <service
             android:name="com.aafiatak.app.services.AafiatakFirebaseMessagingService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync">
+            android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
-        </service>
-
-        <!-- Capacitor Push Notifications Service (fallback) -->
-        <service
-            android:name="com.capacitorjs.plugins.pushnotifications.PushNotificationsService"
-            android:exported="false"
-            android:foregroundServiceType="dataSync">
         </service>
 
         <!-- Background location service -->
@@ -76,18 +74,18 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-    
+
     <!-- Location permissions -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
-    
+
     <!-- Camera permissions -->
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
     <uses-permission android:name="android.permission.READ_MEDIA_IMAGES" />
-    
+
     <!-- Notification permissions -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -96,13 +94,13 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
-    
+
     <!-- Audio for voice notifications -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
-    
+
     <!-- Boot for restart on device reboot -->
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
-    
+
     <!-- Features -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
     <uses-feature android:name="android.hardware.location.gps" android:required="false" />

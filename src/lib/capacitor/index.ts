@@ -12,6 +12,7 @@ export {
   onNotificationReceived,
   onNotificationClicked,
   requestNotificationPermissions,
+  syncFCMTokenWithServer,
 } from './notifications';
 export {
   getCurrentPosition,

@@ -1031,6 +1031,42 @@ function DeferredComponent({ children, delayMs }: { children: ReactNode; delayMs
   return <>{children}</>;
 }
 
+// ============================================================================
+// Capacitor Native Initializer - Registers for FCM push on Android/iOS
+// Initializes Capacitor plugins and syncs FCM token with server after login.
+// Only runs in Capacitor native environment (does nothing in browser).
+// ============================================================================
+
+function CapacitorNativeInitializer() {
+  const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
+  const hasHydrated = useAuthStore((s) => s._hasHydrated);
+
+  useEffect(() => {
+    if (!hasHydrated || typeof window === 'undefined') return;
+
+    // Initialize Capacitor native plugins (including push notifications)
+    import('@/lib/capacitor').then(({ initCapacitor }) => {
+      initCapacitor().catch((err: any) => {
+        console.warn('[Capacitor] Init failed:', err);
+      });
+    }).catch(() => {
+      // Not in Capacitor environment - ignore
+    });
+  }, [hasHydrated]);
+
+  // Sync FCM token with server after login
+  useEffect(() => {
+    if (!hasHydrated || !isAuthenticated || typeof window === 'undefined') return;
+
+    // After login, try to sync the FCM token with the server
+    import('@/lib/capacitor').then(({ syncFCMTokenWithServer }) => {
+      syncFCMTokenWithServer().catch(() => {});
+    }).catch(() => {});
+  }, [hasHydrated, isAuthenticated]);
+
+  return null;
+}
+
 export function PWAInitializer() {
   return (
     <>
@@ -1039,6 +1075,11 @@ export function PWAInitializer() {
 
       {/* CRITICAL (0ms) — Emergency sounds must be ready immediately */}
       <EmergencySoundPlayer />
+
+      {/* CRITICAL (1s) — Capacitor native init (FCM push for Android/iOS) */}
+      <DeferredComponent delayMs={1000}>
+        <CapacitorNativeInitializer />
+      </DeferredComponent>
 
       {/* HIGH (1.5s) — Service worker registration (non-blocking) */}
       <DeferredComponent delayMs={1500}>

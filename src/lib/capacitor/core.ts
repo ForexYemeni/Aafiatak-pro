@@ -35,14 +35,18 @@ export async function initCapacitor(): Promise<void> {
 
   try {
     // Dynamically import notification setup
-    const { registerPushNotifications, requestNotificationPermissions } = await import('./notifications');
+    const { registerPushNotifications, requestNotificationPermissions, syncFCMTokenWithServer } = await import('./notifications');
 
     // Request notification permissions
     const granted = await requestNotificationPermissions();
     if (granted) {
-      // Register for push notifications
+      // Register for push notifications (gets FCM token)
       await registerPushNotifications();
     }
+
+    // Try to sync any previously stored FCM token with server
+    // (in case token was received before auth was available)
+    await syncFCMTokenWithServer();
 
     // Set default status bar style
     const { setStatusBarStyle, setStatusBarColor } = await import('./status-bar');
