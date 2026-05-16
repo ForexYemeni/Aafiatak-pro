@@ -250,8 +250,18 @@ export async function sendFCMToDevice(
         timestamp: String(Date.now()),
       },
       android: {
-        priority: isHighPriority ? 'high' : 'normal',
+        // CRITICAL: Always use 'high' priority for FCM delivery!
+        // When the app is in background or killed, Android's Doze mode
+        // will NOT deliver 'normal' priority data-only messages. They
+        // are batched and delayed until the device wakes up naturally.
+        // Only 'high' priority guarantees immediate delivery and wakes
+        // the app's FirebaseMessagingService.onMessageReceived().
+        // Our internal 'priority' field (low/medium/high/urgent) controls
+        // the notification's visual/sound behavior, NOT the FCM delivery.
+        priority: 'high',
         collapseKey: payload.tag || undefined,
+        // TTL: 4 weeks — ensures messages aren't dropped if device is offline
+        ttl: 2419200,
       },
       apns: {
         payload: {
@@ -322,8 +332,13 @@ export async function sendFCMToDevices(
         timestamp: String(Date.now()),
       },
       android: {
-        priority: isHighPriority ? 'high' : 'normal',
+        // CRITICAL: Always use 'high' priority for FCM delivery!
+        // Same rationale as sendFCMToDevice — 'normal' priority messages
+        // are NOT delivered when the app is in background/killed on
+        // modern Android versions (Doze mode, App Standby buckets).
+        priority: 'high',
         collapseKey: payload.tag || undefined,
+        ttl: 2419200, // 4 weeks
       },
       apns: {
         payload: {

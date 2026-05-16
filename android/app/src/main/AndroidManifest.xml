@@ -106,7 +106,7 @@
         <!-- Notification Channel metadata -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="aafiatak_notifications" />
+            android:value="aafiatak_notifications_v3" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color" />
@@ -145,6 +145,10 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- CRITICAL for Android 14+ (API 34+): Required for full-screen intent notifications
+         (heads-up popup when app is in background/killed). Without this, the system
+         silently ignores setFullScreenIntent() and notifications appear without popup. -->
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
 
     <!-- Audio for voice notifications -->
     <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
