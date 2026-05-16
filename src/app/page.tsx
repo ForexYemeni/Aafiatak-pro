@@ -18,6 +18,15 @@ import {
   CheckCircle2,
   Loader2,
   AlertTriangle,
+  Search,
+  FlaskConical,
+  Radiation,
+  HeartPulse,
+  Baby,
+  Syringe,
+  Siren,
+  Home,
+  MoreHorizontal,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -25,13 +34,6 @@ import { z } from 'zod';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { cn } from '@/lib/utils';
@@ -124,33 +126,136 @@ type BeneficiaryRegisterFormValues = z.infer<typeof beneficiaryRegisterSchema>;
 // Constants
 // ============================================================================
 
+// ── Category Config ──────────────────────────────────────────────────────────
+
+const CATEGORY_CONFIG: Record<string, {
+  icon: React.ElementType;
+  color: string;
+  bg: string;
+  border: string;
+  activeBg: string;
+  activeText: string;
+  ring: string;
+}> = {
+  'تمريض': {
+    icon: Stethoscope,
+    color: 'text-teal-400',
+    bg: 'bg-teal-500/15',
+    border: 'border-teal-500/30',
+    activeBg: 'bg-teal-500',
+    activeText: 'text-white',
+    ring: 'ring-teal-500/40',
+  },
+  'مختبر': {
+    icon: FlaskConical,
+    color: 'text-purple-400',
+    bg: 'bg-purple-500/15',
+    border: 'border-purple-500/30',
+    activeBg: 'bg-purple-500',
+    activeText: 'text-white',
+    ring: 'ring-purple-500/40',
+  },
+  'أشعة': {
+    icon: Radiation,
+    color: 'text-blue-400',
+    bg: 'bg-blue-500/15',
+    border: 'border-blue-500/30',
+    activeBg: 'bg-blue-500',
+    activeText: 'text-white',
+    ring: 'ring-blue-500/40',
+  },
+  'طبي': {
+    icon: HeartPulse,
+    color: 'text-indigo-400',
+    bg: 'bg-indigo-500/15',
+    border: 'border-indigo-500/30',
+    activeBg: 'bg-indigo-500',
+    activeText: 'text-white',
+    ring: 'ring-indigo-500/40',
+  },
+  'توليد': {
+    icon: Baby,
+    color: 'text-pink-400',
+    bg: 'bg-pink-500/15',
+    border: 'border-pink-500/30',
+    activeBg: 'bg-pink-500',
+    activeText: 'text-white',
+    ring: 'ring-pink-500/40',
+  },
+  'علاج': {
+    icon: Syringe,
+    color: 'text-amber-400',
+    bg: 'bg-amber-500/15',
+    border: 'border-amber-500/30',
+    activeBg: 'bg-amber-500',
+    activeText: 'text-white',
+    ring: 'ring-amber-500/40',
+  },
+  'طوارئ': {
+    icon: Siren,
+    color: 'text-red-400',
+    bg: 'bg-red-500/15',
+    border: 'border-red-500/30',
+    activeBg: 'bg-red-500',
+    activeText: 'text-white',
+    ring: 'ring-red-500/40',
+  },
+  'رعاية': {
+    icon: Home,
+    color: 'text-green-400',
+    bg: 'bg-green-500/15',
+    border: 'border-green-500/30',
+    activeBg: 'bg-green-500',
+    activeText: 'text-white',
+    ring: 'ring-green-500/40',
+  },
+  'أخرى': {
+    icon: MoreHorizontal,
+    color: 'text-gray-400',
+    bg: 'bg-gray-500/15',
+    border: 'border-gray-500/30',
+    activeBg: 'bg-gray-500',
+    activeText: 'text-white',
+    ring: 'ring-gray-500/40',
+  },
+};
+
+// Specializations with categories (from lib/constants)
 const specializations = [
-  { value: 'general_nursing', label: 'تمريض عام' },
-  { value: 'critical_care', label: 'الرعاية الحرجة' },
-  { value: 'pediatric', label: 'طب الأطفال' },
-  { value: 'elderly_care', label: 'رعاية المسنين' },
-  { value: 'physiotherapy', label: 'العلاج الطبيعي' },
-  { value: 'wound_care', label: 'علاج الجروح' },
-  { value: 'iv_therapy', label: 'العلاج الوريدي' },
-  { value: 'mental_health', label: 'الصحة النفسية' },
-  { value: 'post_surgery', label: 'رعاية ما بعد الجراحة' },
-  { value: 'emergency', label: 'الطوارئ' },
-  { value: 'lab_technician', label: 'مخبري' },
-  { value: 'medical_assistant', label: 'مساعد طبيب' },
-  { value: 'general_practitioner', label: 'طبيب عام' },
-  { value: 'critical_care_doctor', label: 'طبيب عناية' },
-  { value: 'nursery_nurse', label: 'ممرض حضانة' },
-  { value: 'anesthesia', label: 'التخدير' },
-  { value: 'radiology', label: 'الأشعة' },
-  { value: 'pharmacy', label: 'الصيدلة' },
-  { value: 'dentistry', label: 'طب الأسنان' },
-  { value: 'obstetrics', label: 'التوليد والنساء' },
-  { value: 'cardiology_nursing', label: 'تمريض القلب' },
-  { value: 'oncology_nursing', label: 'تمريض الأورام' },
-  { value: 'dialysis_nursing', label: 'تمريض الكلى والغسيل' },
-  { value: 'respiratory_therapy', label: 'العلاج التنفسي' },
-  { value: 'nutrition', label: 'التغذية العلاجية' },
+  { value: 'general_nursing', label: 'ممرض عام', category: 'تمريض' },
+  { value: 'emergency_nursing', label: 'ممرض طوارئ', category: 'تمريض' },
+  { value: 'critical_care', label: 'ممرض عناية مركزة', category: 'تمريض' },
+  { value: 'home_care_nursing', label: 'ممرض منزلي', category: 'تمريض' },
+  { value: 'pediatric', label: 'ممرض أطفال', category: 'تمريض' },
+  { value: 'surgery_nursing', label: 'ممرض عمليات', category: 'تمريض' },
+  { value: 'anesthesia_nursing', label: 'ممرض تخدير', category: 'تمريض' },
+  { value: 'dialysis', label: 'ممرض غسيل كلى', category: 'تمريض' },
+  { value: 'cardiac_nursing', label: 'ممرض قلب', category: 'تمريض' },
+  { value: 'oncology', label: 'ممرض أورام', category: 'تمريض' },
+  { value: 'mental_health', label: 'ممرض نفسي', category: 'تمريض' },
+  { value: 'elderly_care', label: 'ممرض كبار سن', category: 'تمريض' },
+  { value: 'neonatal', label: 'ممرض حديثي الولادة', category: 'تمريض' },
+  { value: 'iv_therapy', label: 'تركيب محاليل', category: 'تمريض' },
+  { value: 'wound_care', label: 'رعاية جروح', category: 'تمريض' },
+  { value: 'post_surgery', label: 'رعاية ما بعد الجراحة', category: 'تمريض' },
+  { value: 'lab_specialist', label: 'أخصائي مختبر', category: 'مختبر' },
+  { value: 'lab_tech', label: 'فني مختبر', category: 'مختبر' },
+  { value: 'blood_draw', label: 'سحب عينات', category: 'مختبر' },
+  { value: 'radiology_specialist', label: 'أخصائي أشعة', category: 'أشعة' },
+  { value: 'radiology_tech', label: 'فني أشعة', category: 'أشعة' },
+  { value: 'physician_assistant', label: 'مساعد طبيب', category: 'طبي' },
+  { value: 'respiratory_specialist', label: 'أخصائي تنفسية', category: 'طبي' },
+  { value: 'midwife', label: 'قابلة', category: 'توليد' },
+  { value: 'physiotherapy', label: 'علاج طبيعي', category: 'علاج' },
+  { value: 'nutrition_therapy', label: 'تغذية علاجية', category: 'علاج' },
+  { value: 'respiratory_therapy', label: 'علاج تنفسي', category: 'علاج' },
+  { value: 'paramedic', label: 'مسعف', category: 'طوارئ' },
+  { value: 'emergency_tech', label: 'فني طوارئ', category: 'طوارئ' },
+  { value: 'home_care', label: 'رعاية منزلية', category: 'رعاية' },
+  { value: 'other', label: 'تخصصات أخرى', category: 'أخرى' },
 ];
+
+const SPEC_CATEGORIES = ['تمريض', 'مختبر', 'أشعة', 'طبي', 'توليد', 'علاج', 'طوارئ', 'رعاية', 'أخرى'];
 
 // ============================================================================
 // Role Configuration for Auto-Detected Display
@@ -613,6 +718,10 @@ function LoginPageContent() {
   const [emergencySuccess, setEmergencySuccess] = useState(false);
   const [showEmergencyPassword, setShowEmergencyPassword] = useState(false);
   const heartClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Specialization Selection State ────────────────────────────────────
+  const [selectedSpecCategory, setSelectedSpecCategory] = useState<string>('');
+  const [specSearch, setSpecSearch] = useState('');
 
   // On mount: detect if we arrived after a logout
   useEffect(() => {
@@ -1377,24 +1486,127 @@ function LoginPageContent() {
                           {nurseForm.formState.errors.phone && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.phone.message}</p>}
                         </div>
 
-                        {/* Specialization select */}
-                        <div className="space-y-1.5">
-                          <Select onValueChange={(value) => nurseForm.setValue('specialization', value)} defaultValue={nurseForm.getValues('specialization')}>
-                            <SelectTrigger className="h-[46px] rounded-[12px] text-sm text-white border-0 focus:ring-0 focus:outline-none transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.specialization ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}>
-                              <SelectValue placeholder="اختر التخصص" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-[#1a2235] border-white/[0.1] max-h-60">
-                              {specializations.map((spec) => (
-                                <SelectItem
-                                  key={spec.value}
-                                  value={spec.value}
-                                  className="text-white/80 focus:bg-white/[0.08] focus:text-white"
+                        {/* Specialization Categorized Selection */}
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(20,184,166,0.75)' }}>التخصص</span>
+                            {nurseForm.watch('specialization') && (
+                              <span className="flex items-center gap-1 text-[11px] text-emerald-400">
+                                <CheckCircle2 className="w-3 h-3" />
+                                {specializations.find(s => s.value === nurseForm.watch('specialization'))?.label}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Search */}
+                          <div className="relative">
+                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                            <Input
+                              value={specSearch}
+                              onChange={(e) => setSpecSearch(e.target.value)}
+                              placeholder="ابحث عن تخصص..."
+                              className="h-9 pr-9 text-sm text-white placeholder-white/22 rounded-[10px] border-0 focus:outline-none focus:ring-0"
+                              dir="rtl"
+                              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                            />
+                          </div>
+
+                          {/* Category Chips */}
+                          <div className="flex gap-1 flex-wrap">
+                            {SPEC_CATEGORIES.filter(cat => {
+                              const catSpecs = specializations.filter(s => s.category === cat);
+                              const matchSearch = !specSearch || catSpecs.some(s => s.label.includes(specSearch) || s.value.includes(specSearch) || s.category.includes(specSearch));
+                              return catSpecs.length > 0 && matchSearch;
+                            }).map((cat) => {
+                              const config = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['أخرى'];
+                              const Icon = config.icon;
+                              const isActive = selectedSpecCategory === cat;
+                              const catSpecs = specializations.filter(s => s.category === cat);
+                              return (
+                                <button
+                                  key={cat}
+                                  type="button"
+                                  onClick={() => setSelectedSpecCategory(isActive ? '' : cat)}
+                                  className={cn(
+                                    'flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-all duration-200 border',
+                                    isActive
+                                      ? `${config.activeBg} ${config.activeText} border-transparent`
+                                      : `${config.bg} ${config.color} ${config.border} hover:opacity-80`,
+                                  )}
                                 >
-                                  {spec.label}
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
+                                  <Icon className="w-2.5 h-2.5" />
+                                  {cat}
+                                  <span className="opacity-60">({catSpecs.length})</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+
+                          {/* Specializations Grid */}
+                          <div className="max-h-36 overflow-y-auto rounded-[12px] p-2 space-y-1.5 custom-scrollbar" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
+                            {(() => {
+                              const grouped = SPEC_CATEGORIES.reduce<Record<string, typeof specializations>>((acc, cat) => {
+                                const items = specializations.filter(s => s.category === cat);
+                                if (items.length > 0) acc[cat] = items;
+                                return acc;
+                              }, {});
+                              const filteredGrouped = Object.entries(grouped).reduce<Record<string, typeof specializations>>((acc, [cat, items]) => {
+                                const filtered = items.filter(s =>
+                                  !specSearch || s.label.includes(specSearch) || s.value.includes(specSearch) || s.category.includes(specSearch)
+                                );
+                                if (filtered.length > 0) acc[cat] = filtered;
+                                return acc;
+                              }, {});
+                              const displayGrouped = selectedSpecCategory
+                                ? { [selectedSpecCategory]: filteredGrouped[selectedSpecCategory] || [] }
+                                : filteredGrouped;
+                              return Object.entries(displayGrouped).map(([cat, items]) => (
+                                <div key={cat}>
+                                  {!selectedSpecCategory && (
+                                    <div className="flex items-center gap-1 px-1 py-0.5 mb-0.5">
+                                      {(() => {
+                                        const config = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['أخرى'];
+                                        const Icon = config.icon;
+                                        return (
+                                          <>
+                                            <Icon className={cn('w-2.5 h-2.5', config.color)} />
+                                            <span className={cn('text-[8px] font-bold uppercase tracking-wider', config.color)}>{cat}</span>
+                                            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
+                                          </>
+                                        );
+                                      })()}
+                                    </div>
+                                  )}
+                                  <div className="grid grid-cols-2 gap-1">
+                                    {items.map((spec) => {
+                                      const isSelected = nurseForm.watch('specialization') === spec.value;
+                                      const config = CATEGORY_CONFIG[spec.category] || CATEGORY_CONFIG['أخرى'];
+                                      return (
+                                        <button
+                                          key={spec.value}
+                                          type="button"
+                                          onClick={() => nurseForm.setValue('specialization', spec.value, { shouldValidate: true })}
+                                          className={cn(
+                                            'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 border text-right',
+                                            isSelected
+                                              ? `${config.activeBg} text-white border-transparent shadow-md ring-1 ${config.ring}`
+                                              : `${config.bg} ${config.color} ${config.border} hover:opacity-80 active:scale-[0.98]`,
+                                          )}
+                                        >
+                                          {isSelected && <CheckCircle2 className="w-3 h-3 shrink-0" />}
+                                          <span className="truncate">{spec.label}</span>
+                                        </button>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ));
+                            })()}
+                            {!specSearch && specializations.length === 0 && (
+                              <div className="text-center py-3 text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>لا توجد تخصصات</div>
+                            )}
+                          </div>
+
                           {nurseForm.formState.errors.specialization && (
                             <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.specialization.message}</p>
                           )}
