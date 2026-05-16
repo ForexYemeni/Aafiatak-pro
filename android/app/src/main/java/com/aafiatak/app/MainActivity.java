@@ -3,11 +3,14 @@ package com.aafiatak.app;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.Manifest;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
+import android.webkit.WebView;
 import android.widget.Toast;
 
 import com.getcapacitor.BridgeActivity;
@@ -41,6 +44,87 @@ public class MainActivity extends BridgeActivity {
         createNotificationChannels();
         requestNotificationPermission();
         requestFullScreenIntentPermission();
+    }
+
+    /**
+     * Handle deep links and notification tap intents.
+     * When a notification is tapped, the FCM service puts a "url" extra
+     * in the intent. We navigate the WebView to that URL.
+     * Also handles custom scheme deep links like aafiatak://path
+     */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        handleDeepLink(intent);
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        // Handle intent when app is brought to foreground from notification
+        if (getIntent() != null) {
+            handleDeepLink(getIntent());
+        }
+    }
+
+    /**
+     * Process deep link / notification tap URL.
+     * If the intent contains a "url" extra (from FCM notification tap),
+     * navigate the Capacitor WebView to that page.
+     */
+    private void handleDeepLink(Intent intent) {
+        if (intent == null) return;
+
+        String url = null;
+
+        // Check for notification tap URL
+        if (intent.hasExtra("url")) {
+            url = intent.getStringExtra("url");
+        }
+
+        // Check for deep link data (aafiatak:// scheme)
+        Uri data = intent.getData();
+        if (data != null) {
+            String scheme = data.getScheme();
+            if ("aafiatak".equals(scheme) || "https".equals(scheme)) {
+                // Convert aafiatak://path to /path for the WebView
+                url = data.getPath();
+                if (url == null || url.isEmpty()) {
+                    url = "/";
+                }
+                // Include query parameters
+                if (data.getQuery() != null) {
+                    url = url + "?" + data.getQuery();
+                }
+            }
+        }
+
+        if (url != null && !url.isEmpty()) {
+            Log.d(TAG, "Deep link / notification URL: " + url);
+            // Navigate the Capacitor WebView to the URL
+            final String targetUrl = url;
+            runOnUiThread(() -> {
+                try {
+                    WebView webView = getBridge().getWebView();
+                    if (webView != null) {
+                        // Build full URL relative to the server URL
+                        String baseUrl = "https://aafiatak-pro.vercel.app";
+                        String fullUrl;
+                        if (targetUrl.startsWith("http")) {
+                            fullUrl = targetUrl;
+                        } else if (targetUrl.startsWith("/")) {
+                            fullUrl = baseUrl + targetUrl;
+                        } else {
+                            fullUrl = baseUrl + "/" + targetUrl;
+                        }
+                        Log.d(TAG, "Navigating WebView to: " + fullUrl);
+                        webView.loadUrl(fullUrl);
+                    }
+                } catch (Exception e) {
+                    Log.e(TAG, "Error navigating to deep link: " + e.getMessage());
+                }
+            });
+        }
     }
 
     /**
@@ -170,19 +254,12 @@ public class MainActivity extends BridgeActivity {
      * This permission is required for setFullScreenIntent() to work,
      * which shows the heads-up notification popup when the app is in
      * background or killed.
-     *
-     * On Android 14+, this is a special permission that the user must
-     * grant through the system settings. We check if it's already granted
-     * and if not, direct the user to the settings page.
      */
     private void requestFullScreenIntentPermission() {
         if (Build.VERSION.SDK_INT >= 34) { // Android 14 (API 34)
             try {
-                // Check if the permission is already granted
                 if (checkSelfPermission(Manifest.permission.USE_FULL_SCREEN_INTENT) != PackageManager.PERMISSION_GRANTED) {
                     Log.w(TAG, "USE_FULL_SCREEN_INTENT permission not granted - requesting");
-                    // On Android 14+, this permission requires user action in settings
-                    // We request it and show a toast explaining why
                     requestPermissions(
                         new String[]{Manifest.permission.USE_FULL_SCREEN_INTENT},
                         REQUEST_FULL_SCREEN_INTENT_PERMISSION
