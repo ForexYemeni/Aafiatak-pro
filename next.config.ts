@@ -13,9 +13,12 @@
 
   const SECURITY_HEADERS: Record<string, string> = {
     "X-Content-Type-Options": "nosniff",
+    // Capacitor WebView doesn't use frames; SAMEORIGIN is fine for web browsers.
     "X-Frame-Options": "SAMEORIGIN",
     "X-XSS-Protection": "1; mode=block",
     "Referrer-Policy": "strict-origin-when-cross-origin",
+    // Capacitor WebView: camera/mic/geolocation permissions are intercepted
+    // natively by Android/iOS — (self) works because the origin IS the server URL.
     "Permissions-Policy": "camera=(self), microphone=(self), geolocation=(self)",
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "Content-Security-Policy": [
@@ -25,9 +28,9 @@
       "font-src 'self' https://fonts.gstatic.com",
       "img-src 'self' data: https: blob:",
       "connect-src 'self' https: ws: wss: blob:",
-      "media-src 'self' blob:",
+      "media-src 'self' blob: https:",  // blob: for camera/captured streams, https: for remote media
       "object-src 'none'",
-      "frame-src 'none'",
+      "frame-src 'self'",  // needed for embedded content in Capacitor WebView
       "base-uri 'self'",
       "form-action 'self'",
       "frame-ancestors 'self' https://aafiatak-pro.vercel.app",

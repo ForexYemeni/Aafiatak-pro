@@ -73,3 +73,7 @@ export type { IWithdrawalRequest } from './WithdrawalRequest';
 // Deployment/Assignment model (تكليف)
 export { Deployment } from './Deployment';
 export type { IDeployment, IDeploymentApplication } from './Deployment';
+
+// Firebase Config model (Admin SDK credentials stored in DB)
+export { default as FirebaseConfig } from './FirebaseConfig';
+export type { IFirebaseConfig } from './FirebaseConfig';

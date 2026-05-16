@@ -3,13 +3,20 @@
 // ============================================================================
 // Server-side Firebase Admin SDK for sending FCM push notifications
 // to Android/iOS devices. Web browsers use Web Push (VAPID) instead.
+//
+// Credential resolution order:
+//   1. Environment variables (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)
+//   2. MongoDB FirebaseConfig collection (admin-configured from dashboard)
 // ============================================================================
 
 import * as admin from 'firebase-admin';
+import { connectDB } from '@/lib/mongodb';
+import FirebaseConfig from '@/models/mongoose/FirebaseConfig';
 
 // ── Firebase Admin Initialization ────────────────────────────────────
-// Uses environment variables for credentials.
-// Required env vars:
+// Uses environment variables for credentials first, then falls back to
+// the FirebaseConfig MongoDB collection.
+// Required env vars (primary):
 //   FIREBASE_PROJECT_ID       — Firebase project ID
 //   FIREBASE_CLIENT_EMAIL     — Firebase service account client email
 //   FIREBASE_PRIVATE_KEY      — Firebase service account private key (base64 or raw)
@@ -38,18 +45,81 @@ function getPrivateKey(): string | undefined {
   return raw.replace(/\\n/g, '\n');
 }
 
-export function initializeFirebaseAdmin(): admin.app.App | null {
+/**
+ * Process a private key value: handles base64 encoding and escaped newlines.
+ */
+function processPrivateKey(raw: string): string {
+  // Try base64 decode first
+  try {
+    const decoded = Buffer.from(raw, 'base64').toString('utf-8');
+    if (decoded.includes('-----BEGIN PRIVATE KEY-----')) {
+      return decoded;
+    }
+  } catch {
+    // Not base64, continue with raw value
+  }
+
+  // Replace escaped newlines with real newlines
+  return raw.replace(/\\n/g, '\n');
+}
+
+/**
+ * Try to read Firebase credentials from the MongoDB FirebaseConfig collection.
+ * Returns the credentials or null if not available.
+ */
+async function getCredentialsFromDB(): Promise<{
+  projectId: string;
+  clientEmail: string;
+  privateKey: string;
+  storageBucket?: string;
+} | null> {
+  try {
+    await connectDB();
+    const config = await FirebaseConfig.findOne({ isActive: true }).lean();
+    if (!config) {
+      console.log('[FIREBASE-ADMIN] No active Firebase config found in database');
+      return null;
+    }
+
+    return {
+      projectId: config.projectId,
+      clientEmail: config.clientEmail,
+      privateKey: processPrivateKey(config.privateKey),
+      storageBucket: config.storageBucket || undefined,
+    };
+  } catch (error) {
+    console.warn('[FIREBASE-ADMIN] Could not read Firebase config from database:', error);
+    return null;
+  }
+}
+
+export async function initializeFirebaseAdmin(): Promise<admin.app.App | null> {
   if (isInitialized) return firebaseApp;
 
-  const projectId = process.env.FIREBASE_PROJECT_ID;
-  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  const privateKey = getPrivateKey();
+  // 1. Try environment variables first
+  let projectId = process.env.FIREBASE_PROJECT_ID;
+  let clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  let privateKey = getPrivateKey();
+  let source = 'environment variables';
+
+  // 2. If env vars are incomplete, try MongoDB fallback
+  if (!projectId || !clientEmail || !privateKey) {
+    console.log('[FIREBASE-ADMIN] Env vars incomplete, trying database fallback...');
+    const dbCreds = await getCredentialsFromDB();
+    if (dbCreds) {
+      projectId = dbCreds.projectId;
+      clientEmail = dbCreds.clientEmail;
+      privateKey = dbCreds.privateKey;
+      source = 'database (FirebaseConfig collection)';
+    }
+  }
 
   if (!projectId || !clientEmail || !privateKey) {
     console.warn(
-      '[FIREBASE-ADMIN] Missing environment variables. ' +
+      '[FIREBASE-ADMIN] Missing credentials (checked env vars + database). ' +
       'FCM push notifications to Android/iOS will not work. ' +
-      'Required: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY'
+      'Required: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY ' +
+      '— either as env vars or configured in the admin dashboard.'
     );
     isInitialized = true;
     return null;
@@ -69,7 +139,7 @@ export function initializeFirebaseAdmin(): admin.app.App | null {
     });
 
     isInitialized = true;
-    console.log('[FIREBASE-ADMIN] Initialized successfully — FCM push enabled');
+    console.log(`[FIREBASE-ADMIN] Initialized successfully from ${source} — FCM push enabled`);
     return firebaseApp;
   } catch (error: any) {
     // If already initialized, reuse existing app
@@ -86,10 +156,32 @@ export function initializeFirebaseAdmin(): admin.app.App | null {
   }
 }
 
+/**
+ * Force re-initialization of Firebase Admin SDK.
+ * Call this after admin updates Firebase config in the dashboard.
+ */
+export async function reinitializeFirebaseAdmin(): Promise<admin.app.App | null> {
+  // Delete the existing app if it exists
+  try {
+    if (firebaseApp) {
+      await admin.app().delete();
+    }
+  } catch {
+    // App may not exist or already deleted, that's fine
+  }
+
+  // Reset state
+  firebaseApp = null;
+  isInitialized = false;
+
+  // Re-initialize (will pick up new credentials from DB)
+  return initializeFirebaseAdmin();
+}
+
 // ── Get Firebase Messaging instance ─────────────────────────────────
 
-export function getFirebaseMessaging(): admin.messaging.Messaging | null {
-  const app = initializeFirebaseAdmin();
+export async function getFirebaseMessaging(): Promise<admin.messaging.Messaging | null> {
+  const app = await initializeFirebaseAdmin();
   if (!app) return null;
 
   try {
@@ -120,7 +212,7 @@ export async function sendFCMToDevice(
   fcmToken: string,
   payload: FCMPayload
 ): Promise<boolean> {
-  const messaging = getFirebaseMessaging();
+  const messaging = await getFirebaseMessaging();
   if (!messaging) return false;
 
   try {
@@ -206,7 +298,7 @@ export async function sendFCMToDevices(
   fcmTokens: string[],
   payload: FCMPayload
 ): Promise<{ successCount: number; failureCount: number; invalidTokens: string[] }> {
-  const messaging = getFirebaseMessaging();
+  const messaging = await getFirebaseMessaging();
   if (!messaging || fcmTokens.length === 0) {
     return { successCount: 0, failureCount: 0, invalidTokens: [] };
   }
