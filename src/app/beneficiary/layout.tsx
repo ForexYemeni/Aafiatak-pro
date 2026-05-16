@@ -3,6 +3,7 @@
 import { type ReactNode } from 'react';
 import { AppShell } from '@/components/layout/app-shell';
 import { AuthHydrationGuard } from '@/components/providers/auth-hydration-guard';
+import { ErrorBoundary } from '@/lib/monitoring/error-boundary';
 
 export default function BeneficiaryLayout({ children }: { children: ReactNode }) {
   return (
@@ -12,9 +13,11 @@ export default function BeneficiaryLayout({ children }: { children: ReactNode })
       gradientClass="bg-gradient-beneficiary"
       spinnerColorClass="border-beneficiary"
     >
-      <div className="bg-gradient-beneficiary h-full overflow-hidden">
-        <AppShell>{children}</AppShell>
-      </div>
+      <ErrorBoundary>
+        <div className="bg-gradient-beneficiary h-full overflow-hidden">
+          <AppShell>{children}</AppShell>
+        </div>
+      </ErrorBoundary>
     </AuthHydrationGuard>
   );
 }

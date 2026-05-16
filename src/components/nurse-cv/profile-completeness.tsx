@@ -1,5 +1,6 @@
 'use client';
 
+import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { CheckCircle2, Circle, AlertCircle, Lightbulb } from 'lucide-react';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
@@ -20,6 +21,13 @@ const tips = [
 ];
 
 export function ProfileCompleteness({ completeness, missingItems }: ProfileCompletenessProps) {
+  // FIX: Use deterministic tip selection instead of Math.random()
+  // Math.random() causes hydration mismatch (SSR vs client produce different values)
+  const [tipIndex, setTipIndex] = useState(0);
+  useEffect(() => {
+    setTipIndex(Math.floor(Math.random() * tips.length));
+  }, []);
+
   const circumference = 2 * Math.PI * 42;
   const strokeDashoffset = circumference - (completeness / 100) * circumference;
 
@@ -99,7 +107,7 @@ export function ProfileCompleteness({ completeness, missingItems }: ProfileCompl
               <div className="flex items-start gap-2">
                 <Lightbulb className="w-4 h-4 text-nurse shrink-0 mt-0.5" />
                 <p className="text-xs text-muted-foreground leading-relaxed">
-                  {tips[Math.floor(Math.random() * tips.length)]}
+                  {tips[tipIndex]}
                 </p>
               </div>
             </div>

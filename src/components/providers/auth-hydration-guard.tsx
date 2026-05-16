@@ -50,25 +50,11 @@ export function AuthHydrationGuard({
   // Check if auth is cached (skip guard entirely)
   const authCached = _authVerifiedAt > 0 && Date.now() - _authVerifiedAt < AUTH_CACHE_TTL;
 
-  // FAST PATH: If already hydrated and auth is valid, render children immediately
-  if (zustandHydrated && isAuthenticated && user && requiredRoles.includes(user.role)) {
-    _authVerifiedAt = Date.now();
-    _lastVerifiedUserId = user.id;
-    _lastVerifiedRole = user.role;
-    return <>{children}</>;
-  }
-
-  // If auth was recently verified but state temporarily changed (e.g., token refresh),
-  // still render children to avoid flash
-  if (authCached && isAuthenticated && user && requiredRoles.includes(user.role)) {
-    return <>{children}</>;
-  }
-
-  // If the same user was verified recently, allow immediate render
-  if (user && user.id === _lastVerifiedUserId && user.role === _lastVerifiedRole && requiredRoles.includes(user.role)) {
-    _authVerifiedAt = Date.now();
-    return <>{children}</>;
-  }
+  // ═══════════════════════════════════════════════════════════════════════
+  // CRITICAL: ALL hooks MUST be called BEFORE any early returns.
+  // Violating the Rules of Hooks (conditional hook calls) causes
+  // React error #300 "Rendered fewer hooks than expected".
+  // ═══════════════════════════════════════════════════════════════════════
 
   // Force hydration after timeout if Zustand hasn't hydrated yet
   useEffect(() => {
@@ -109,6 +95,30 @@ export function AuthHydrationGuard({
     _lastVerifiedUserId = user.id;
     _lastVerifiedRole = user.role;
   }, [zustandHydrated, isAuthenticated, user, requiredRoles, redirectPath, router, authCached]);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // EARLY RETURNS — all placed AFTER all hooks to obey the Rules of Hooks
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // FAST PATH: If already hydrated and auth is valid, render children immediately
+  if (zustandHydrated && isAuthenticated && user && requiredRoles.includes(user.role)) {
+    _authVerifiedAt = Date.now();
+    _lastVerifiedUserId = user.id;
+    _lastVerifiedRole = user.role;
+    return <>{children}</>;
+  }
+
+  // If auth was recently verified but state temporarily changed (e.g., token refresh),
+  // still render children to avoid flash
+  if (authCached && isAuthenticated && user && requiredRoles.includes(user.role)) {
+    return <>{children}</>;
+  }
+
+  // If the same user was verified recently, allow immediate render
+  if (user && user.id === _lastVerifiedUserId && user.role === _lastVerifiedRole && requiredRoles.includes(user.role)) {
+    _authVerifiedAt = Date.now();
+    return <>{children}</>;
+  }
 
   // KEY FIX: Instead of showing a BLANK div during hydration,
   // show a minimal loading indicator with a spinner so the user

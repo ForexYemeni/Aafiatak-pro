@@ -14,6 +14,15 @@ export function NotificationPermissionBanner() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const [showBanner, setShowBanner] = useState(false);
   const [isRequesting, setIsRequesting] = useState(false);
+  // FIX: Use state for isDenied to avoid accessing Notification.permission during render
+  // which causes hydration mismatch (server: false, client: true when denied)
+  const [isDenied, setIsDenied] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window) {
+      setIsDenied(Notification.permission === 'denied');
+    }
+  }, []);
 
   useEffect(() => {
     if (!isAuthenticated) return;
@@ -39,6 +48,7 @@ export function NotificationPermissionBanner() {
         const permission = await Notification.requestPermission();
         if (permission === 'granted') {
           setShowBanner(false);
+          setIsDenied(false);
           // Trigger a test notification to confirm it works
           setTimeout(() => {
             new Notification('عافيتك - تم تفعيل الإشعارات ✓', {
@@ -66,9 +76,8 @@ export function NotificationPermissionBanner() {
     localStorage.setItem('aafiatak-notif-banner-dismissed', 'true');
   };
 
+  // All hooks are above this line — early returns are safe here
   if (!showBanner) return null;
-
-  const isDenied = typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'denied';
 
   return (
     <div className="fixed top-0 left-0 right-0 z-[100] animate-slide-down">
