@@ -73,3 +73,7 @@ export type { IWithdrawalRequest } from './WithdrawalRequest';
 // Deployment/Assignment model (تكليف)
 export { Deployment } from './Deployment';
 export type { IDeployment, IDeploymentApplication } from './Deployment';
+
+// Specialization model (تخصصات)
+export { Specialization } from './Specialization';
+export type { ISpecialization } from './Specialization';

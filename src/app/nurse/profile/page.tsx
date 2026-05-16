@@ -1,3 +1,4 @@
+import { SPECIALIZATION_LABELS, YEMEN_GOVERNORATES } from '@/lib/constants';
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
@@ -97,11 +98,7 @@ const specializationLabels: Record<string, string> = {
   emergency: 'طوارئ',
 };
 
-const governorateOptions = [
-  'أمانة العاصمة', 'عدن', 'تعز', 'الحديدة', 'إب', 'ذمار', 'حضرموت',
-  'المكلا', 'عمران', 'صعدة', 'البيضاء', 'مأرب', 'لحج', 'أبين',
-  'شبوة', 'حجة', 'صنعاء', 'الضالع', 'ريمة', 'سقطرى',
-];
+const governorateOptions = YEMEN_GOVERNORATES;
 
 // ---- Component ----
 

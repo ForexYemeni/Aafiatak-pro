@@ -35,6 +35,7 @@ import {
   Banknote,
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
+import { SPECIALIZATION_LABELS, YEMEN_GOVERNORATES, SPECIALIZATION_CATEGORIES, DEFAULT_SPECIALIZATIONS } from '@/lib/constants';
 import { GlassCard } from '@/components/common/glass-card';
 import { SearchInput } from '@/components/common/search-input';
 import { BadgeStatus } from '@/components/common/badge-status';
@@ -122,18 +123,7 @@ interface WithdrawalItem {
 }
 
 // ─── Constants ───────────────────────────────────────────────────
-const specializationLabels: Record<string, string> = {
-  general_nursing: 'تمريض عام',
-  critical_care: 'رعاية حرجة',
-  pediatric: 'طب الأطفال',
-  elderly_care: 'رعاية المسنين',
-  physiotherapy: 'علاج طبيعي',
-  wound_care: 'علاج الجروح',
-  iv_therapy: 'العلاج الوريدي',
-  mental_health: 'صحة نفسية',
-  post_surgery: 'ما بعد الجراحة',
-  emergency: 'طوارئ',
-};
+// SPECIALIZATION_LABELS is imported from @/lib/constants as SPECIALIZATION_LABELS
 
 const wStatusLabels: Record<string, string> = {
   pending: 'قيد المراجعة',
@@ -527,7 +517,7 @@ export default function AdminNursesPage() {
         <div className="rounded-xl bg-muted/40 backdrop-blur-sm p-3 border border-border/30">
           <p className="text-[11px] text-muted-foreground mb-1">التخصص</p>
           <p className="text-sm font-medium">
-            {(nurse.specialization || []).map((s) => specializationLabels[s] ?? s).join('، ') || 'غير محدد'}
+            {(nurse.specialization || []).map((s) => SPECIALIZATION_LABELS[s] ?? s).join('، ') || 'غير محدد'}
           </p>
         </div>
         <div className="rounded-xl bg-muted/40 backdrop-blur-sm p-3 border border-border/30">
@@ -864,7 +854,7 @@ export default function AdminNursesPage() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">جميع التخصصات</SelectItem>
-                    {Object.entries(specializationLabels).map(([key, label]) => (
+                    {Object.entries(SPECIALIZATION_LABELS).map(([key, label]) => (
                       <SelectItem key={key} value={key}>{label}</SelectItem>
                     ))}
                   </SelectContent>
@@ -978,7 +968,7 @@ export default function AdminNursesPage() {
                             variant="outline"
                             className="text-[10px] h-5 px-2 bg-muted/40 border-border/40"
                           >
-                            {specializationLabels[s] ?? s}
+                            {SPECIALIZATION_LABELS[s] ?? s}
                           </Badge>
                         ))}
                         {(nurse.specialization || []).length > 3 && (

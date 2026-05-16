@@ -1,3 +1,4 @@
+import { SPECIALIZATION_LABELS, YEMEN_GOVERNORATES } from '@/lib/constants';
 'use client';
 
 import { useEffect, useState, useCallback, useRef } from 'react';
@@ -169,11 +170,7 @@ const requirementLabelMap: Record<string, string> = {
   patient_monitoring: 'شاطر في مراقبة المرضى',
 };
 
-const governorateOptions = [
-  'أمانة العاصمة', 'عدن', 'تعز', 'الحديدة', 'إب', 'ذمار', 'حضرموت',
-  'المكلا', 'عمران', 'صعدة', 'البيضاء', 'مأرب', 'لحج', 'أبين',
-  'شبوة', 'حجة', 'صنعاء', 'الضالع', 'ريمة', 'سقطرى',
-];
+const governorateOptions = YEMEN_GOVERNORATES;
 
 const deploymentStatusMap: Record<string, string> = {
   open: 'pending',

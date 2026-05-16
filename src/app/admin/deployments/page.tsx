@@ -11,6 +11,7 @@ import {
   Zap, Activity, Heart, Stethoscope, Tag
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
+import { SPECIALIZATION_LABELS, YEMEN_GOVERNORATES } from '@/lib/constants';
 import { GlassCard } from '@/components/common/glass-card';
 import { BadgeStatus } from '@/components/common/badge-status';
 import { EmptyState } from '@/components/common/empty-state';
@@ -129,23 +130,7 @@ const typeColors: Record<string, { bg: string; text: string; icon: string }> = {
   other:      { bg: 'bg-gray-500',    text: 'text-gray-600 dark:text-gray-400',      icon: 'bg-gray-100 dark:bg-gray-900/30' },
 };
 
-const specializationLabels: Record<string, string> = {
-  general_nursing: 'تمريض عام',
-  critical_care: 'الرعاية الحرجة',
-  pediatric: 'طب الأطفال',
-  elderly_care: 'رعاية المسنين',
-  lab_technician: 'مخبري',
-  emergency: 'الطوارئ',
-  anesthesia: 'التخدير',
-  radiology: 'الأشعة',
-  pharmacy: 'الصيدلة',
-  dentistry: 'طب الأسنان',
-  obstetrics: 'التوليد والنساء',
-  cardiology_nursing: 'تمريض القلب',
-  dialysis_nursing: 'تمريض الكلى والغسيل',
-  respiratory_therapy: 'العلاج التنفسي',
-  nutrition: 'التغذية العلاجية',
-};
+// SPECIALIZATION_LABELS → uses SPECIALIZATION_LABELS from @/lib/constants
 
 const departmentLabels: Record<string, string> = {
   inpatient: 'رقود',
@@ -167,11 +152,7 @@ const requirementOptions = [
   { id: 'patient_monitoring', label: 'شاطر في مراقبة المرضى', icon: Activity },
 ];
 
-const governorateOptions = [
-  'أمانة العاصمة', 'عدن', 'تعز', 'الحديدة', 'إب', 'ذمار', 'حضرموت',
-  'المكلا', 'عمران', 'صعدة', 'البيضاء', 'مأرب', 'لحج', 'أبين',
-  'شبوة', 'حجة', 'صنعاء', 'الضالع', 'ريمة', 'سقطرى',
-];
+const governorateOptions = YEMEN_GOVERNORATES;
 
 const deploymentStatusMap: Record<string, string> = {
   open: 'pending',

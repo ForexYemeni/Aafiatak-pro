@@ -11,6 +11,7 @@ import {
   Smartphone, Building2,
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
+import { SPECIALIZATION_LABELS } from '@/lib/constants';
 import { SearchInput } from '@/components/common/search-input';
 import { Currency, formatYemeniRial } from '@/components/common/currency';
 import { useAuthFetch, _GET_CACHE_readSync } from '@/hooks/use-auth';
@@ -98,11 +99,7 @@ const paymentStatusConfig: Record<string, { label: string; color: string; bg: st
   awaiting_confirmation: { label: 'بانتظار التأكيد', color: 'text-orange-700', bg: 'bg-orange-100' },
 };
 
-const specializationLabels: Record<string, string> = {
-  general_nursing: 'تمريض عام', critical_care: 'رعاية حرجة', pediatric: 'أطفال',
-  elderly_care: 'مسنين', physiotherapy: 'علاج طبيعي', wound_care: 'جروح',
-  iv_therapy: 'علاج وريدي', mental_health: 'صحة نفسية', post_surgery: 'بعد الجراحة', emergency: 'طوارئ',
-};
+// SPECIALIZATION_LABELS → imported from @/lib/constants as SPECIALIZATION_LABELS
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } };
 const itemAnim = { hidden: { opacity: 0, y: 20 }, show: { opacity: 1, y: 0 } };
@@ -413,7 +410,7 @@ export default function AdminOrdersPage() {
     return (
       n.name.toLowerCase().includes(q) ||
       n.phone?.includes(q) ||
-      n.specialization.some(s => (specializationLabels[s] ?? s).toLowerCase().includes(q))
+      n.specialization.some(s => (SPECIALIZATION_LABELS[s] ?? s).toLowerCase().includes(q))
     );
   });
 
@@ -458,7 +455,7 @@ export default function AdminOrdersPage() {
             {nurse.isOnline && <Badge className="text-[9px] px-1 py-0 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400">متصل</Badge>}
           </div>
           <p className="text-[10px] text-muted-foreground truncate">
-            {nurse.specialization.slice(0, 2).map(s => specializationLabels[s] ?? s).join(' • ')}
+            {nurse.specialization.slice(0, 2).map(s => SPECIALIZATION_LABELS[s] ?? s).join(' • ')}
           </p>
         </div>
         <div className="text-left shrink-0 space-y-1">

@@ -23,6 +23,7 @@ import {
   UserCog,
   UserCircle,
   Briefcase,
+  ListChecks,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -54,6 +55,7 @@ const adminNavItems: NavItem[] = [
   { label: 'التقييمات', href: '/admin/ratings', icon: Star, permission: 'view_reports', group: 'reports' },
   { label: 'الشكاوى', href: '/admin/complaints', icon: MessageSquare, permission: 'manage_chat', group: 'reports' },
   { label: 'المحادثات', href: '/admin/chat', icon: MessageSquare, permission: 'manage_chat', group: 'reports' },
+  { label: 'التخصصات', href: '/admin/specializations', icon: ListChecks, permission: 'manage_nurses', group: 'management' },
   { label: 'المديرون الفرعيون', href: '/admin/subadmins', icon: Shield, adminOnly: true, group: 'system' },
   { label: 'سجل النشاط', href: '/admin/activity/page', icon: ScrollText, permission: 'view_reports', group: 'system' },
   { label: 'الملف الشخصي', href: '/admin/subadmin-settings', icon: UserCircle, alwaysVisibleToSubadmin: true, group: 'system' },
