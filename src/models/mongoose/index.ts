@@ -81,3 +81,7 @@ export type { ISpecialization } from './Specialization';
 // Firebase Config model (إعدادات Firebase)
 export { default as FirebaseConfig } from './FirebaseConfig';
 export type { IFirebaseConfig } from './FirebaseConfig';
+
+// Complaint model (الشكاوى والبلاغات)
+export { Complaint } from './Complaint';
+export type { IComplaint, ComplaintStatus, ComplaintPriority } from './Complaint';

@@ -1,14 +1,11 @@
-// GET /api/admin/complaints - List complaints
+// GET /api/admin/complaints - List all complaints
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { Rating } from '@/models/mongoose';
-import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
-
+import { Complaint } from '@/models/mongoose';
+import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
-// Since there's no dedicated Complaint mongoose model, we use Rating with low scores as complaints proxy
-// In production, a Complaint model should be added
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,23 +16,37 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const page = parseInt(searchParams.get('page') || '1');
     const limit = parseInt(searchParams.get('limit') || '20');
+    const status = searchParams.get('status') || '';
+    const priority = searchParams.get('priority') || '';
+    const category = searchParams.get('category') || '';
+    const search = searchParams.get('search') || '';
 
-    // Using ratings with comments as complaints proxy
-    const filter: any = { comment: { $exists: true, $ne: '' } };
+    const filter: any = {};
+
+    if (status && status !== 'all') filter.status = status;
+    if (priority) filter.priority = priority;
+    if (category) filter.category = category;
+    if (search) {
+      filter.$or = [
+        { subject: { $regex: search, $options: 'i' } },
+        { description: { $regex: search, $options: 'i' } },
+        { fromUserName: { $regex: search, $options: 'i' } },
+      ];
+    }
 
     const [complaints, total] = await Promise.all([
-      Rating.find(filter)
+      Complaint.find(filter)
         .sort({ createdAt: -1 })
         .skip((page - 1) * limit)
         .limit(limit)
         .lean(),
-      Rating.countDocuments(filter),
+      Complaint.countDocuments(filter),
     ]);
 
     return Response.json({
       success: true,
       data: {
-        complaints: complaints.map((c: any) => (serializeDoc(c))),
+        complaints: serializeDocs(complaints),
         total,
         page,
         pages: Math.ceil(total / limit),
@@ -43,6 +54,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error('[ADMIN COMPLAINTS ERROR]', error);
-    return createErrorResponse('حدث خطأ أثناء جبل الشكاوى', 500, 'INTERNAL_ERROR');
+    return createErrorResponse('حدث خطأ أثناء جلب الشكاوى', 500, 'INTERNAL_ERROR');
   }
 }

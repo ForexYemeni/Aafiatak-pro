@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import {
   HelpCircle,
   MessageSquare,
@@ -12,7 +13,9 @@ import {
   Mail,
   ChevronDown,
   ChevronUp,
+  ChevronLeft,
   Loader2,
+  ClipboardList,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -155,15 +158,30 @@ export default function HelpPage() {
       toast({ title: 'يرجى ملء جميع الحقول', variant: 'destructive' });
       return;
     }
+    if (reportDescription.trim().length < 10) {
+      toast({ title: 'التفاصيل يجب أن تكون 10 أحرف على الأقل', variant: 'destructive' });
+      return;
+    }
     setIsSending(true);
     try {
-      // Simulate sending
-      await new Promise((r) => setTimeout(r, 1000));
-      toast({ title: 'تم إرسال البلاغ بنجاح' });
-      setReportSubject('');
-      setReportDescription('');
+      const res = await authFetch('/api/beneficiary/complaints', {
+        method: 'POST',
+        body: JSON.stringify({
+          subject: reportSubject.trim(),
+          description: reportDescription.trim(),
+          category: 'general',
+        }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast({ title: 'تم إرسال البلاغ بنجاح', description: 'سيتم مراجعته من قبل فريق الدعم' });
+        setReportSubject('');
+        setReportDescription('');
+      } else {
+        toast({ title: data.message || 'فشل إرسال البلاغ', variant: 'destructive' });
+      }
     } catch {
-      toast({ title: 'فشل إرسال البلاغ', variant: 'destructive' });
+      toast({ title: 'فشل إرسال البلاغ', description: 'تحقق من اتصالك بالإنترنت وحاول مرة أخرى', variant: 'destructive' });
     } finally {
       setIsSending(false);
     }
@@ -288,6 +306,20 @@ export default function HelpPage() {
           </div>
         )}
       </GlassCard>
+
+      {/* My Complaints Link */}
+      <Link href="/beneficiary/complaints">
+        <GlassCard variant="beneficiary" className="flex items-center justify-between p-4 hover:bg-accent/50 transition-colors cursor-pointer">
+          <div className="flex items-center gap-3">
+            <ClipboardList className="w-5 h-5 text-beneficiary" />
+            <div>
+              <p className="text-sm font-medium">بلاغاتي</p>
+              <p className="text-xs text-muted-foreground">متابعة حالة البلاغات المرسلة</p>
+            </div>
+          </div>
+          <ChevronLeft className="w-4 h-4 text-muted-foreground" />
+        </GlassCard>
+      </Link>
 
       {/* Report a Problem */}
       <GlassCard variant="beneficiary" className="space-y-4">

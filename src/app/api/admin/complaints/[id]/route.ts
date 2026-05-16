@@ -1,13 +1,13 @@
-// PATCH /api/admin/complaints/[id] - Update complaint (respond)
+// PATCH /api/admin/complaints/[id] - Update complaint (respond, change status)
 // MongoDB/Mongoose based - NO Prisma, NO Firebase
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { Rating } from '@/models/mongoose';
-import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { Complaint } from '@/models/mongoose';
+import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { serializeDoc } from '@/lib/mongoose/serialize';
 
-import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -17,28 +17,54 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     const { id } = await params;
     const body = await request.json();
 
-    const rating = await Rating.findByIdAndUpdate(
+    const updateData: any = {};
+
+    // Update status
+    if (body.status) {
+      updateData.status = body.status;
+      if (body.status === 'resolved' || body.status === 'dismissed') {
+        updateData.resolvedBy = user!.userId;
+        updateData.resolvedAt = new Date();
+      }
+    }
+
+    // Update resolution
+    if (body.resolution !== undefined) {
+      updateData.resolution = body.resolution;
+    }
+
+    // Update admin notes
+    if (body.adminNotes !== undefined) {
+      updateData.adminNotes = body.adminNotes;
+    }
+
+    // Update priority
+    if (body.priority) {
+      updateData.priority = body.priority;
+    }
+
+    const complaint = await Complaint.findByIdAndUpdate(
       id,
-      { response: body.response },
+      updateData,
       { new: true }
     ).lean();
 
-    if (!rating) return createErrorResponse('الشكوى غير موجودة', 404, 'NOT_FOUND');
+    if (!complaint) return createErrorResponse('الشكوى غير موجودة', 404, 'NOT_FOUND');
 
     await logActivity({
       userId: user!.userId,
       userRole: user!.role,
-      action: 'respond_complaint',
-      entity: 'Rating',
+      action: 'update_complaint',
+      entity: 'Complaint',
       entityId: id,
-      details: 'الرد على شكوى',
+      details: `تحديث الشكوى: ${body.status ? `الحالة=${body.status}` : ''} ${body.resolution ? `الحل=${body.resolution}` : ''}`,
       request,
     });
 
     return Response.json({
       success: true,
-      data: serializeDoc(rating),
-      message: 'تم الرد على الشكوى بنجاح',
+      data: serializeDoc(complaint),
+      message: 'تم تحديث الشكوى بنجاح',
     });
   } catch (error) {
     console.error('[ADMIN COMPLAINT UPDATE ERROR]', error);

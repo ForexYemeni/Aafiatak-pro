@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { MessageSquare, Eye, RefreshCw, CheckCircle } from 'lucide-react';
+import { MessageSquare, Eye, RefreshCw, CheckCircle, XCircle, Clock, SearchCircle, AlertTriangle } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -13,6 +13,7 @@ import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -26,13 +27,18 @@ import type { ColumnDef } from '@tanstack/react-table';
 
 interface ComplaintItem {
   id: string;
+  _id: string;
+  fromUserId: string;
   fromUserName: string;
-  againstUserName: string;
+  fromUserRole: string;
+  againstUserName?: string;
   subject: string;
   description: string;
   status: string;
   priority: string;
+  category: string;
   resolution: string | null;
+  adminNotes: string | null;
   resolvedBy: string | null;
   resolvedAt: string | null;
   createdAt: string;
@@ -43,6 +49,22 @@ const priorityColors: Record<string, string> = {
   medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
   high: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
   urgent: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
+};
+
+const statusLabels: Record<string, string> = {
+  open: 'جديد',
+  under_review: 'قيد المراجعة',
+  resolved: 'تم الحل',
+  dismissed: 'مرفوض',
+};
+
+const categoryLabels: Record<string, string> = {
+  general: 'عام',
+  service: 'خدمة',
+  nurse: 'ممرض/ـة',
+  payment: 'دفع',
+  technical: 'تقني',
+  other: 'أخرى',
 };
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -91,7 +113,8 @@ export default function AdminComplaintsPage() {
     if (!resolveTarget || !resolution) return;
     setIsResolving(true);
     try {
-      const res = await authFetch(`/api/admin/complaints/${resolveTarget.id}`, {
+      const id = resolveTarget._id || resolveTarget.id;
+      const res = await authFetch(`/api/admin/complaints/${id}`, {
         method: 'PATCH',
         body: JSON.stringify({ status: 'resolved', resolution }),
       });
@@ -111,6 +134,46 @@ export default function AdminComplaintsPage() {
     }
   };
 
+  const handleDismiss = async (complaint: ComplaintItem) => {
+    const confirmed = window.confirm('هل أنت متأكد من رفض هذه الشكوى؟');
+    if (!confirmed) return;
+    try {
+      const id = complaint._id || complaint.id;
+      const res = await authFetch(`/api/admin/complaints/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: 'dismissed' }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم رفض الشكوى');
+        void fetchComplaints();
+      } else {
+        toast.error(json.message ?? 'فشل الرفض');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    }
+  };
+
+  const handleUpdateStatus = async (complaint: ComplaintItem, newStatus: string) => {
+    try {
+      const id = complaint._id || complaint.id;
+      const res = await authFetch(`/api/admin/complaints/${id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({ status: newStatus }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success('تم تحديث الحالة');
+        void fetchComplaints();
+      } else {
+        toast.error(json.message ?? 'فشل التحديث');
+      }
+    } catch {
+      toast.error('حدث خطأ');
+    }
+  };
+
   const columns: ColumnDef<ComplaintItem, unknown>[] = [
     {
       accessorKey: 'subject',
@@ -118,8 +181,20 @@ export default function AdminComplaintsPage() {
       cell: ({ row }) => (
         <div>
           <p className="font-medium text-sm line-clamp-1">{row.original.subject}</p>
-          <p className="text-xs text-muted-foreground">{row.original.fromUserName} → {row.original.againstUserName}</p>
+          <p className="text-xs text-muted-foreground">
+            {row.original.fromUserName}
+            {row.original.againstUserName ? ` → ${row.original.againstUserName}` : ''}
+          </p>
         </div>
+      ),
+    },
+    {
+      accessorKey: 'category',
+      header: 'التصنيف',
+      cell: ({ row }) => (
+        <span className="text-xs text-muted-foreground">
+          {categoryLabels[row.original.category] || row.original.category}
+        </span>
       ),
     },
     {
@@ -151,11 +226,27 @@ export default function AdminComplaintsPage() {
       onClick: (row: Record<string, unknown>) => setViewTarget(row as unknown as ComplaintItem),
     },
     {
+      label: 'وضع قيد المراجعة',
+      onClick: (row: Record<string, unknown>) => {
+        const c = row as unknown as ComplaintItem;
+        if (c.status === 'open') handleUpdateStatus(c, 'under_review');
+      },
+    },
+    {
       label: 'حل الشكوى',
       onClick: (row: Record<string, unknown>) => {
         const c = row as unknown as ComplaintItem;
         if (c.status !== 'resolved' && c.status !== 'dismissed') {
           setResolveTarget(c);
+        }
+      },
+    },
+    {
+      label: 'رفض الشكوى',
+      onClick: (row: Record<string, unknown>) => {
+        const c = row as unknown as ComplaintItem;
+        if (c.status !== 'resolved' && c.status !== 'dismissed') {
+          handleDismiss(c);
         }
       },
     },
@@ -178,7 +269,7 @@ export default function AdminComplaintsPage() {
       <motion.div variants={itemAnim}>
         <GlassCard variant="admin">
           <div className="flex flex-col gap-4 mb-6">
-            <Tabs value={statusTab} onValueChange={setStatusTab}>
+            <Tabs value={statusTab} onValueChange={(v) => { setStatusTab(v); setPage(1); }}>
               <TabsList className="flex-wrap h-auto gap-1">
                 {tabs.map((tab) => (
                   <TabsTrigger key={tab.value} value={tab.value} className="text-xs">
@@ -223,6 +314,9 @@ export default function AdminComplaintsPage() {
                    viewTarget.priority === 'high' ? 'مرتفع' :
                    viewTarget.priority === 'medium' ? 'متوسط' : 'منخفض'}
                 </span>
+                <Badge variant="outline" className="text-[10px]">
+                  {categoryLabels[viewTarget.category] || viewTarget.category}
+                </Badge>
               </div>
               <div className="glass rounded-xl p-3">
                 <p className="text-xs text-muted-foreground mb-1">الموضوع</p>
@@ -230,16 +324,17 @@ export default function AdminComplaintsPage() {
               </div>
               <div className="glass rounded-xl p-3">
                 <p className="text-xs text-muted-foreground mb-1">التفاصيل</p>
-                <p className="text-sm">{viewTarget.description}</p>
+                <p className="text-sm whitespace-pre-line">{viewTarget.description}</p>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div className="glass rounded-xl p-3">
                   <p className="text-xs text-muted-foreground">من</p>
                   <p className="text-sm font-medium">{viewTarget.fromUserName}</p>
+                  <p className="text-[10px] text-muted-foreground">{viewTarget.fromUserRole === 'beneficiary' ? 'مستفيد' : 'ممرض/ـة'}</p>
                 </div>
                 <div className="glass rounded-xl p-3">
                   <p className="text-xs text-muted-foreground">ضد</p>
-                  <p className="text-sm font-medium">{viewTarget.againstUserName}</p>
+                  <p className="text-sm font-medium">{viewTarget.againstUserName || 'غير محدد'}</p>
                 </div>
               </div>
               {viewTarget.resolution && (
@@ -251,6 +346,12 @@ export default function AdminComplaintsPage() {
                       <DateFormatter date={viewTarget.resolvedAt} format="full" />
                     </p>
                   )}
+                </div>
+              )}
+              {viewTarget.adminNotes && (
+                <div className="bg-blue-50 dark:bg-blue-950/20 rounded-xl p-3">
+                  <p className="text-xs text-blue-700 dark:text-blue-400 mb-1">ملاحظات الإدارة</p>
+                  <p className="text-sm">{viewTarget.adminNotes}</p>
                 </div>
               )}
               <div className="text-xs text-muted-foreground">
