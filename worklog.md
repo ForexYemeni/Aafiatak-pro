@@ -63,3 +63,23 @@ Stage Summary:
 - APK built: /home/z/my-project/download/aafiatak-v3-fix.apk
 - Download link: https://tmpfiles.org/dl/wOwJegg5Uqq2/aafiatak-v3-fix.apk
 - Also available: https://gofile.io/d/QVjYec
+---
+Task ID: 1
+Agent: Main Agent
+Task: Fix React Error #300 on login and build new APK
+
+Work Log:
+- Cloned latest code from GitHub
+- Investigated React Error #300 root cause: all API routes spread raw Mongoose documents via `{ ...doc, id: doc._id.toString() }` which leaks ObjectId/Date/nested objects
+- Created serializeDoc utility at src/lib/mongoose/serialize.ts that recursively converts ObjectId→string, Date→ISOString, removes _id/__v
+- Applied serializeDoc to ALL 45+ API routes (61 files changed)
+- Pushed fix to GitHub (commit b322197)
+- Deployed to Vercel production successfully
+- Built new APK (v5) with Android SDK
+- Uploaded APK as zip to tmpfiles.org
+
+Stage Summary:
+- React Error #300 root cause identified and fixed across entire API layer
+- Vercel deployment: https://aafiatak-pro.vercel.app
+- APK download: https://tmpfiles.org/dl/wsw7ebKlTPt9/aafiatak-v5.zip
+- All API responses now properly serialize Mongoose documents to plain JSON objects
