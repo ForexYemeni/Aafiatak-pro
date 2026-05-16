@@ -168,6 +168,9 @@ export const useNurseStore = create<NurseState>()(
     }),
     {
       name: 'aafiatak-nurse-storage',
+      // CRITICAL: skipHydration prevents Zustand from reading localStorage
+      // synchronously during store creation, avoiding React Error #300.
+      skipHydration: true,
       storage: createJSONStorage(() => safeStorage()),
       partialize: (state) => ({
         isAvailable: state.isAvailable,

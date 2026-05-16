@@ -347,6 +347,15 @@ export const useAuthStore = create<AuthState>()(
     }),
     {
       name: 'aafiatak-auth-storage',
+      // CRITICAL: skipHydration prevents Zustand from reading localStorage
+      // synchronously during store creation. Without this, the store would
+      // hydrate from localStorage BEFORE the first React render, causing
+      // the client to render with isAuthenticated=true while the server
+      // rendered with isAuthenticated=false → React Error #300.
+      //
+      // Instead, rehydration is triggered manually in StoreHydrationManager
+      // (inside a useEffect) so the initial client render matches the SSR output.
+      skipHydration: true,
       storage: createJSONStorage(() => {
         // Use localStorage on client, return a no-op for SSR
         if (typeof window !== 'undefined') {

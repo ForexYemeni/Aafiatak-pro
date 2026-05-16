@@ -54,8 +54,11 @@ export function SocketProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
-  const [isConnected, setIsConnected] = useState(socketServiceV2.isConnected);
-  const [connectionState, setConnectionState] = useState<ConnectionState>(socketServiceV2.connectionState);
+  // CRITICAL: Initialize with hardcoded false values to match SSR output.
+  // Reading from socketServiceV2 at render time causes hydration mismatch
+  // because the singleton state can differ between server and client.
+  const [isConnected, setIsConnected] = useState(false);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('disconnected');
 
   // Subscribe to connection state changes from the unified socket-v2
   useEffect(() => {

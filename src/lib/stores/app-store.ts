@@ -45,11 +45,14 @@ function safeStorage() {
 export const useAppStore = create<AppState>()(
   persist(
     (set) => ({
-      // Initial State
+      // Initial State — all values must match SSR output exactly
+      // to prevent React hydration mismatch (Error #300).
+      // navigator.onLine differs between server (undefined) and client (true/false),
+      // so we default to true and update in useEffect.
       sidebarOpen: false,
       theme: 'system',
       language: 'ar',
-      isOnline: typeof navigator !== 'undefined' ? navigator.onLine : true,
+      isOnline: true,
       isSocketConnected: false,
 
       // ---- Actions ----
@@ -89,6 +92,11 @@ export const useAppStore = create<AppState>()(
     }),
     {
       name: 'aafiatak-app-storage',
+      // CRITICAL: skipHydration prevents Zustand from reading localStorage
+      // synchronously during store creation. Without this, the store would
+      // hydrate from localStorage BEFORE the first React render, causing
+      // the client to render different values than the server → React Error #300.
+      skipHydration: true,
       storage: createJSONStorage(() => safeStorage()),
       partialize: (state) => ({
         theme: state.theme,

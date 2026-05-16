@@ -54,6 +54,7 @@ export default function RootLayout({
       </head>
       <body
         className={`${notoArabic.variable} antialiased bg-background text-foreground font-sans`}
+        suppressHydrationWarning
       >
         <AppProvider>
           <HydrationSafeProvider>

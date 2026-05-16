@@ -278,6 +278,11 @@ export const useNotificationStore = create<NotificationState>()(
     }),
     {
       name: 'aafiatak-notification-storage',
+      // CRITICAL: skipHydration prevents Zustand from reading localStorage
+      // synchronously during store creation. Without this, the store would
+      // hydrate from localStorage BEFORE the first React render, causing
+      // the client to render different values than the server → React Error #300.
+      skipHydration: true,
       storage: createJSONStorage(() => {
         if (typeof window !== 'undefined') {
           return localStorage;

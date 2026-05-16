@@ -6,6 +6,7 @@
   import { SocketProvider } from './socket-provider';
   import { RealtimeSyncProvider } from './realtime-sync-provider';
   import { RoutePrefetcher } from './route-prefetcher';
+  import { StoreHydrationManager } from './store-hydration-manager';
 
   function makeQueryClient() {
     return new QueryClient({
@@ -42,6 +43,7 @@
           <SocketProvider>
             <RealtimeSyncProvider>
               <RoutePrefetcher />
+              <StoreHydrationManager />
               {children}
             </RealtimeSyncProvider>
           </SocketProvider>
