@@ -24,14 +24,14 @@ import { resolve } from "path";
     "Strict-Transport-Security": "max-age=31536000; includeSubDomains; preload",
     "Content-Security-Policy": [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' blob:",  // blob: for workers, unsafe-eval for some libs
       "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
       "font-src 'self' https://fonts.gstatic.com",
-      "img-src 'self' data: https: blob:",
-      "connect-src 'self' https: ws: wss: blob:",
+      "img-src 'self' data: https: blob:",  // data: for inline SVGs, https: for external images
+      "connect-src 'self' https: ws: wss: blob:",  // ws:/wss: for WebSocket, blob: for streaming
       "media-src 'self' blob: https:",  // blob: for camera/captured streams, https: for remote media
       "object-src 'none'",
-      "frame-src 'self'",  // needed for embedded content in Capacitor WebView
+      "frame-src 'self'",  // needed for embedded content
       "base-uri 'self'",
       "form-action 'self'",
       "frame-ancestors 'self' https://aafiatak-pro.vercel.app",

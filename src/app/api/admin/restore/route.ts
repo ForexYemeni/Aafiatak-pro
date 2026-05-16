@@ -40,22 +40,104 @@ export async function POST(request: NextRequest) {
     const { user, error, isEmergency } = requireEmergencyOrAdmin(request, ['admin']);
     if (error) return error;
 
-    // ── Parse multipart form data ───────────────────────────────────────
-    let formData: FormData;
-    try {
-      formData = await request.formData();
-    } catch (formErr) {
-      console.error('[RESTORE] Failed to parse form data:', formErr);
-      return createErrorResponse('فشل في قراءة الملف المرفوع — تأكد أن حجم الملف أقل من 50 ميجابايت', 400, 'FORM_PARSE_ERROR');
-    }
-    const file = formData.get('file') as File | null;
-    const password = formData.get('password') as string | null;
-    const mode = (formData.get('mode') as string) || 'replace';
-    const skipCollectionsStr = (formData.get('skipCollections') as string) || '';
-    const skipCollections = skipCollectionsStr ? skipCollectionsStr.split(',').map(s => s.trim()) : [];
+    // ── Check if this is a chunked upload request ──────────────────────
+    // If the request body contains an `uploadId`, it means the file was
+    // uploaded in chunks via /api/admin/restore/chunk and we need to
+    // reassemble it from MongoDB. Otherwise, it's a direct file upload.
+    let buffer: Buffer;
+    let fileName = 'backup.zip';
+    let fileSize = 0;
+    let password: string | null = null;
+    let mode = 'replace';
+    let skipCollections: string[] = [];
 
-    if (!file) {
-      return createErrorResponse('ملف النسخة الاحتياطية مطلوب', 400, 'VALIDATION_ERROR');
+    const contentType = request.headers.get('content-type') || '';
+
+    if (contentType.includes('application/json')) {
+      // ── Chunked upload: reassemble from MongoDB ──────────────────────
+      const body = await request.json();
+      const { uploadId, password: pwd, mode: m, skipCollections: sc } = body;
+
+      if (!uploadId) {
+        return createErrorResponse('معرف الرفع مطلوب', 400, 'VALIDATION_ERROR');
+      }
+
+      password = pwd || null;
+      mode = m || 'replace';
+      skipCollections = sc || [];
+
+      await connectDB();
+      const mongoose = await import('mongoose');
+      const db = mongoose.default.connection.db;
+      if (!db) return createErrorResponse('لا يوجد اتصال بقاعدة البيانات', 500, 'DB_ERROR');
+
+      const tempUploads = db.collection('_temp_uploads');
+      const uploadDoc = await tempUploads.findOne({
+        uploadId,
+        userId: user!.userId,
+      });
+
+      if (!uploadDoc) {
+        return createErrorResponse('لم يتم العثور على بيانات الرفع — قد انتهت صلاحيتها', 404, 'UPLOAD_NOT_FOUND');
+      }
+
+      if (!uploadDoc.chunks || Object.keys(uploadDoc.chunks).length !== uploadDoc.totalChunks) {
+        return createErrorResponse(
+          `أجزاء غير مكتملة — تم استلام ${Object.keys(uploadDoc.chunks || {}).length} من ${uploadDoc.totalChunks}`,
+          400,
+          'INCOMPLETE_UPLOAD'
+        );
+      }
+
+      // Reassemble chunks (they're stored as base64)
+      const chunkBuffers: Buffer[] = [];
+      for (let i = 0; i < uploadDoc.totalChunks; i++) {
+        const chunkBase64 = uploadDoc.chunks[i];
+        if (!chunkBase64) {
+          return createErrorResponse(`الجزء ${i + 1} مفقود`, 400, 'MISSING_CHUNK');
+        }
+        chunkBuffers.push(Buffer.from(chunkBase64, 'base64'));
+      }
+      buffer = Buffer.concat(chunkBuffers);
+      fileName = uploadDoc.fileName || 'backup.zip';
+      fileSize = buffer.length;
+
+      // Clean up temp data
+      try {
+        await tempUploads.deleteOne({ uploadId, userId: user!.userId });
+      } catch {}
+
+      console.log(`[RESTORE] Chunked upload reassembled: ${fileName}, ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
+    } else {
+      // ── Direct file upload (small files < 4.5MB) ────────────────────
+      let formData: FormData;
+      try {
+        formData = await request.formData();
+      } catch (formErr) {
+        console.error('[RESTORE] Failed to parse form data:', formErr);
+        return createErrorResponse('فشل في قراءة الملف المرفوع — الملف كبير جداً. استخدم الرفع المقسم.', 400, 'FORM_PARSE_ERROR');
+      }
+      const file = formData.get('file') as File | null;
+      password = formData.get('password') as string | null;
+      mode = (formData.get('mode') as string) || 'replace';
+      const skipCollectionsStr = (formData.get('skipCollections') as string) || '';
+      skipCollections = skipCollectionsStr ? skipCollectionsStr.split(',').map(s => s.trim()) : [];
+
+      if (!file) {
+        return createErrorResponse('ملف النسخة الاحتياطية مطلوب', 400, 'VALIDATION_ERROR');
+      }
+
+      fileName = file.name;
+      fileSize = file.size;
+
+      let arrayBuffer: ArrayBuffer;
+      try {
+        arrayBuffer = await file.arrayBuffer();
+      } catch (bufErr) {
+        console.error('[RESTORE] Failed to read file buffer:', bufErr);
+        return createErrorResponse('فشل في قراءة الملف — قد يكون الملف تالفاً أو كبيراً جداً. استخدم الرفع المقسم.', 400, 'FILE_READ_ERROR');
+      }
+      buffer = Buffer.from(arrayBuffer);
     }
 
     // ── Verify admin password (skip for emergency tokens) ───────────────
@@ -81,16 +163,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Parse ZIP file ──────────────────────────────────────────────────
-    console.log(`${logPrefix} Reading file: ${file.name}, size: ${(file.size / 1024 / 1024).toFixed(2)} MB`);
-
-    let arrayBuffer: ArrayBuffer;
-    try {
-      arrayBuffer = await file.arrayBuffer();
-    } catch (bufErr) {
-      console.error(`${logPrefix} Failed to read file buffer:`, bufErr);
-      return createErrorResponse('فشل في قراءة الملف — قد يكون الملف تالفاً أو كبيراً جداً', 400, 'FILE_READ_ERROR');
-    }
-    const buffer = Buffer.from(arrayBuffer);
+    console.log(`${logPrefix} Reading file: ${fileName}, size: ${(fileSize / 1024 / 1024).toFixed(2)} MB`);
 
     let zip: import('jszip');
     try {
