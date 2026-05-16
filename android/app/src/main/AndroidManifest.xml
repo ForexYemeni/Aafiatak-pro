@@ -65,10 +65,25 @@
             android:stopWithTask="false"
             tools:node="replace"
             tools:replace="android:exported,android:directBootAware,android:stopWithTask">
-            <intent-filter>
+            <intent-filter android:priority="999">
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />
             </intent-filter>
         </service>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             REMOVE Capacitor PushNotifications MessagingService!
+             ═══════════════════════════════════════════════════════════════
+             This is THE ROOT CAUSE of notifications not working properly.
+             Capacitor's MessagingService registers for MESSAGING_EVENT
+             and intercepts FCM messages BEFORE our custom service can
+             handle them. It shows notifications WITHOUT our custom
+             sound, channel, or heads-up popup.
+             tools:node="remove" completely eliminates it from the
+             merged manifest so ONLY our service handles FCM.
+             ═══════════════════════════════════════════════════════════════ -->
+        <service
+            android:name="com.capacitorjs.plugins.pushnotifications.MessagingService"
+            tools:node="remove" />
 
         <!-- Background location service -->
         <service
