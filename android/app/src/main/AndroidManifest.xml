@@ -66,15 +66,6 @@
             android:exported="false"
             android:foregroundServiceType="location" />
 
-        <!-- Firebase Instance ID service for token refresh -->
-        <service
-            android:name="com.aafiatak.app.services.AafiatakInstanceIDService"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="com.google.firebase.INSTANCE_ID_EVENT" />
-            </intent-filter>
-        </service>
-
         <!-- Boot receiver to re-register for notifications after device restart -->
         <receiver
             android:name="com.aafiatak.app.receivers.BootReceiver"
