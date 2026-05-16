@@ -80,7 +80,12 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
     @Override
     public void onCreate() {
         super.onCreate();
+        // Initialize the token holder with application context
+        // so it can restore the FCM token from SharedPreferences
+        // after the app process is killed and restarted by FCM
+        AafiatakFCMTokenHolder.init(getApplicationContext());
         createNotificationChannels();
+        Log.d(TAG, "FCM Service created — token holder initialized, channels ready");
     }
 
     /**
@@ -496,9 +501,20 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
                 PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
             );
 
-            // Set full-screen intent for ALL notifications, not just emergency
-            // This is what makes the heads-up popup appear outside the app
-            builder.setFullScreenIntent(fullScreenPendingIntent, true);
+            // ═══════════════════════════════════════════════════════
+            // FULL-SCREEN INTENT — Only for emergency/urgent notifications!
+            //
+            // FIX: On Android 14+, USE_FULL_SCREEN_INTENT is auto-revoked
+            // for non-calling apps. Using it for ALL notifications causes
+            // the system to deprioritize our notifications entirely.
+            // Only use setFullScreenIntent for emergency/urgent.
+            // For other notifications, IMPORTANCE_HIGH channel + PRIORITY_HIGH
+            // + CATEGORY_CALL is enough for heads-up popup.
+            // ═══════════════════════════════════════════════════════
+            if (isEmergency || isHighPriority) {
+                builder.setFullScreenIntent(fullScreenPendingIntent, true);
+                Log.d(TAG, "setFullScreenIntent applied for emergency/high priority");
+            }
 
             // Add action button for all notifications
             builder.addAction(

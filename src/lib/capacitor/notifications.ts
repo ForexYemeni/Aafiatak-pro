@@ -4,6 +4,12 @@
 // Wrapper for Capacitor Push Notifications plugin.
 // Registers FCM token with server for push notification delivery.
 // Gracefully degrades when not running in a native environment.
+//
+// CRITICAL FIX: Robust token registration flow:
+// 1. On app start: Register for push notifications
+// 2. On FCM token received: Try to send to server (may fail if not logged in)
+// 3. On login: Sync any pending FCM token to server
+// 4. On page reload: Re-register and re-sync token
 // ============================================================================
 
 /** Push notification data received from the server */
@@ -35,6 +41,10 @@ let pushToken: string | null = null;
 let listenersRegistered = false;
 let tokenSentToServer = false;
 
+// Persist token in localStorage so it survives page reloads
+const TOKEN_STORAGE_KEY = 'aafiatak-fcm-token';
+const TOKEN_SENT_KEY = 'aafiatak-fcm-token-sent';
+
 /**
  * Get or generate a persistent device ID.
  */
@@ -50,23 +60,32 @@ function getDeviceId(): string {
 }
 
 /**
+ * Get auth token from localStorage.
+ */
+function getAuthToken(): string | null {
+  try {
+    const authStorage = localStorage.getItem('auth-storage');
+    if (authStorage) {
+      const parsed = JSON.parse(authStorage);
+      return parsed?.state?.token || null;
+    }
+  } catch {}
+  return null;
+}
+
+/**
  * Send FCM token to the server so it can send push notifications.
+ * Returns true if successfully sent, false otherwise.
  */
 async function sendTokenToServer(token: string): Promise<boolean> {
   try {
-    // Get auth token from localStorage
-    const authStorage = localStorage.getItem('auth-storage');
-    let authToken = '';
-
-    if (authStorage) {
-      try {
-        const parsed = JSON.parse(authStorage);
-        authToken = parsed?.state?.token || '';
-      } catch {}
-    }
+    const authToken = getAuthToken();
 
     if (!authToken) {
-      console.warn('[Capacitor] No auth token found — will send FCM token after login');
+      console.warn('[Capacitor] No auth token — will send FCM token after login');
+      // Store the token so we can send it after login
+      localStorage.setItem(TOKEN_STORAGE_KEY, token);
+      localStorage.setItem(TOKEN_SENT_KEY, 'pending');
       return false;
     }
 
@@ -87,36 +106,69 @@ async function sendTokenToServer(token: string): Promise<boolean> {
       const data = await response.json();
       if (data.success) {
         tokenSentToServer = true;
-        console.log('[Capacitor] FCM token sent to server successfully');
+        localStorage.setItem(TOKEN_SENT_KEY, 'true');
+        localStorage.setItem(TOKEN_STORAGE_KEY, token);
+        console.log('[Capacitor] ✅ FCM token sent to server successfully');
         return true;
       }
     }
 
     console.warn('[Capacitor] Failed to send FCM token to server:', response.status);
+    localStorage.setItem(TOKEN_SENT_KEY, 'failed');
     return false;
   } catch (error) {
     console.error('[Capacitor] Error sending FCM token to server:', error);
+    localStorage.setItem(TOKEN_SENT_KEY, 'failed');
     return false;
   }
 }
 
 /**
- * Try to send the stored FCM token to server.
- * Called after login when the token might have been received before auth was available.
+ * Sync FCM token with server after login.
+ * This is THE critical function for ensuring the server can send
+ * push notifications to this device.
+ *
+ * Called from:
+ * 1. CapacitorNativeInitializer after auth state changes
+ * 2. PWAInitializer on mount
+ * 3. After login success
  */
 export async function syncFCMTokenWithServer(): Promise<void> {
-  if (tokenSentToServer || !pushToken) return;
+  // If already sent, skip (unless page reloaded)
+  if (tokenSentToServer && localStorage.getItem(TOKEN_SENT_KEY) === 'true') return;
 
-  // Check if we now have an auth token
-  const authStorage = localStorage.getItem('auth-storage');
-  if (!authStorage) return;
+  // Check if we have an auth token now
+  const authToken = getAuthToken();
+  if (!authToken) return;
 
+  // Try in-memory token first
+  if (pushToken) {
+    console.log('[Capacitor] Syncing in-memory FCM token with server...');
+    await sendTokenToServer(pushToken);
+    return;
+  }
+
+  // Try localStorage cached token
+  const cachedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (cachedToken && localStorage.getItem(TOKEN_SENT_KEY) !== 'true') {
+    console.log('[Capacitor] Syncing cached FCM token with server...');
+    pushToken = cachedToken;
+    await sendTokenToServer(cachedToken);
+    return;
+  }
+
+  // Try to get token from Capacitor plugin directly
   try {
-    const parsed = JSON.parse(authStorage);
-    if (parsed?.state?.token) {
-      await sendTokenToServer(pushToken);
+    const { PushNotifications } = await import('@capacitor/push-notifications');
+    const result = await PushNotifications.getToken();
+    if (result.token) {
+      console.log('[Capacitor] Got FCM token from plugin, syncing...');
+      pushToken = result.token;
+      await sendTokenToServer(result.token);
     }
-  } catch {}
+  } catch (error) {
+    console.info('[Capacitor] Could not get FCM token from plugin:', error);
+  }
 }
 
 /**
@@ -138,7 +190,11 @@ export async function registerPushNotifications(): Promise<void> {
         console.info('[Capacitor] FCM token received:', token.value.substring(0, 20) + '...');
 
         // Immediately try to send token to server
-        await sendTokenToServer(token.value);
+        const sent = await sendTokenToServer(token.value);
+        if (!sent) {
+          // Will be retried by syncFCMTokenWithServer after login
+          console.info('[Capacitor] Token will be synced after login');
+        }
       });
 
       PushNotifications.addListener('registrationError', (error: { error: string }) => {
@@ -203,6 +259,13 @@ export async function getPushToken(): Promise<string | null> {
 
   // Return cached token if available
   if (pushToken) return pushToken;
+
+  // Try localStorage
+  const cachedToken = localStorage.getItem(TOKEN_STORAGE_KEY);
+  if (cachedToken) {
+    pushToken = cachedToken;
+    return pushToken;
+  }
 
   try {
     const { PushNotifications } = await import('@capacitor/push-notifications');

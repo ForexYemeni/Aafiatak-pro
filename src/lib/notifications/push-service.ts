@@ -64,16 +64,21 @@ export async function sendPushToUser(
   userId: string,
   payload: PushPayload
 ): Promise<PushResult> {
-  if (!VAPID_CONFIGURED) {
-    console.warn('[PUSH] VAPID not configured — skipping push for user:', userId);
-    return { sent: 0, failed: 0 };
-  }
+  // ═══════════════════════════════════════════════════════════════════
+  // CRITICAL FIX: VAPID check should ONLY gate Web Push, NOT FCM!
+  // Previously, if VAPID wasn't configured, ALL push notifications
+  // (including FCM for Android/iOS) were silently dropped.
+  // Now we proceed with FCM even if VAPID is missing.
+  // ═══════════════════════════════════════════════════════════════════
 
   try {
     await connectDB();
 
     const tokens = await FCMToken.find({ userId, isActive: true }).lean();
-    if (!tokens.length) return { sent: 0, failed: 0 };
+    if (!tokens.length) {
+      console.log('[PUSH] No active tokens found for user:', userId);
+      return { sent: 0, failed: 0 };
+    }
 
     // Separate tokens by platform
     const webTokens = tokens.filter((t) => t.platform === 'web' && t.endpoint);
@@ -85,7 +90,8 @@ export async function sendPushToUser(
     let failed = 0;
 
     // ── Send via Web Push (VAPID) to browsers ──────────────────────
-    if (webTokens.length > 0) {
+    // Only attempt web push if VAPID is configured
+    if (webTokens.length > 0 && VAPID_CONFIGURED) {
       const pushPayload = JSON.stringify({
         title: payload.title,
         body: payload.body,
@@ -141,6 +147,8 @@ export async function sendPushToUser(
         if (result.status === 'fulfilled' && result.value) sent++;
         else failed++;
       }
+    } else if (webTokens.length > 0 && !VAPID_CONFIGURED) {
+      console.warn('[PUSH] VAPID not configured — skipping Web Push for', webTokens.length, 'web tokens');
     }
 
     // ── Send via FCM to Android/iOS devices ────────────────────────
