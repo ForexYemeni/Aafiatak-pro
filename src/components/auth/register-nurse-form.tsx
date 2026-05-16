@@ -18,19 +18,11 @@ import {
   Sparkles,
   Shield,
   Activity,
+  Check,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectGroup,
-  SelectItem,
-  SelectLabel,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { YEMEN_GOVERNORATES } from '@/lib/constants/governorates';
 import { GpsLocationButton } from '@/components/common/gps-location-button';
@@ -39,6 +31,7 @@ import {
   DEFAULT_SPECIALIZATIONS,
   SPECIALIZATION_CATEGORIES,
   SPECIALIZATION_CATEGORIES_META,
+  getCategoryMeta,
 } from '@/lib/constants';
 
 const nurseRegisterSchema = z
@@ -135,6 +128,7 @@ const inputClass = cn(
 export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps) {
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [selectedCategory, setSelectedCategory] = useState<string>('تمريض');
   const registerNurse = useAuthStore((s) => s.registerNurse);
   const isLoading = useAuthStore((s) => s.isLoading);
   const error = useAuthStore((s) => s.error);
@@ -144,6 +138,7 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
     register,
     handleSubmit,
     setValue,
+    watch,
     formState: { errors },
   } = useForm<NurseRegisterFormValues>({
     resolver: zodResolver(nurseRegisterSchema),
@@ -157,6 +152,18 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
       governorate: '',
     },
   });
+
+  const selectedSpec = watch('specialization');
+  const selectedSpecMeta = selectedSpec ? DEFAULT_SPECIALIZATIONS.find((s) => s.id === selectedSpec) : null;
+
+  const handleSelectSpec = (specId: string) => {
+    setValue('specialization', specId, { shouldValidate: true });
+  };
+
+  // Get items for current category
+  const currentCategoryItems = DEFAULT_SPECIALIZATIONS
+    .filter((s) => s.category === selectedCategory)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
 
   const onSubmit = async (data: NurseRegisterFormValues) => {
     clearError();
@@ -294,74 +301,137 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
             </AnimatePresence>
           </motion.div>
 
-          {/* Specialization + License in a row */}
-          <motion.div {...fieldAnim(0.43)} className="grid grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <Label className="text-sm font-semibold">التخصص</Label>
-              <Select onValueChange={(value) => setValue('specialization', value, { shouldValidate: true })}>
-                <SelectTrigger
-                  className={cn(
-                    'text-right h-12 rounded-xl text-[14px]',
-                    'bg-white/60 dark:bg-slate-800/60',
-                    'border-2 border-slate-200/80 dark:border-slate-700/80',
-                    'hover:border-sky-300 dark:hover:border-sky-700',
-                    'focus:ring-2 focus:ring-sky-400/20 focus:border-sky-400',
-                    'transition-all duration-200',
-                    errors.specialization && 'border-red-400',
-                  )}
+          {/* Specialization Selection - Visual Grid */}
+          <motion.div {...fieldAnim(0.43)} className="space-y-3">
+            <Label className="text-sm font-semibold flex items-center gap-1.5">
+              <Stethoscope className="w-4 h-4 text-sky-500" />
+              التخصص
+            </Label>
+
+            {/* Category Tabs */}
+            <div className="flex gap-1.5 overflow-x-auto scrollbar-none pb-1 -mx-1 px-1">
+              {SPECIALIZATION_CATEGORIES_META.map((cat) => {
+                const isActive = selectedCategory === cat.id;
+                const hasSelected = selectedSpec && DEFAULT_SPECIALIZATIONS.some((s) => s.id === selectedSpec && s.category === cat.id);
+                return (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={cn(
+                      'shrink-0 px-3 py-2 rounded-xl text-xs font-medium transition-all duration-200 border-2',
+                      isActive
+                        ? 'bg-sky-50 dark:bg-sky-900/30 border-sky-300 dark:border-sky-700 text-sky-700 dark:text-sky-300 shadow-sm'
+                        : hasSelected
+                          ? 'bg-green-50 dark:bg-green-900/20 border-green-200 dark:border-green-800 text-green-700 dark:text-green-400'
+                          : 'bg-white/40 dark:bg-slate-800/40 border-slate-200/60 dark:border-slate-700/60 text-muted-foreground hover:border-sky-200 dark:hover:border-sky-800',
+                    )}
+                  >
+                    <span className="ml-1">{cat.icon}</span>
+                    {cat.label}
+                    {hasSelected && <Check className="w-3 h-3 inline mr-1 text-green-500" />}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Specialization Items Grid */}
+            <div className="grid grid-cols-2 gap-2 min-h-[80px]">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={selectedCategory}
+                  initial={{ opacity: 0, x: 10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -10 }}
+                  transition={{ duration: 0.2 }}
+                  className="col-span-2 grid grid-cols-2 gap-2"
                 >
-                  <SelectValue placeholder="اختر" />
-                </SelectTrigger>
-                <SelectContent>
-                  {specializationGroups.map((group) => (
-                    <SelectGroup key={group.category}>
-                      <SelectLabel className="text-xs font-bold text-muted-foreground">
-                        {group.icon} {group.category}
-                      </SelectLabel>
-                      {group.items.map((spec) => (
-                        <SelectItem key={spec.id} value={spec.id}>
-                          {spec.label}
-                        </SelectItem>
-                      ))}
-                    </SelectGroup>
-                  ))}
-                </SelectContent>
-              </Select>
-              <AnimatePresence mode="wait">
-                {errors.specialization && (
-                  <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-xs text-destructive mr-1">
-                    {errors.specialization.message}
-                  </motion.p>
-                )}
+                  {currentCategoryItems.map((spec) => {
+                    const isSelected = selectedSpec === spec.id;
+                    const catMeta = getCategoryMeta(spec.category);
+                    return (
+                      <button
+                        key={spec.id}
+                        type="button"
+                        onClick={() => handleSelectSpec(spec.id)}
+                        className={cn(
+                          'relative flex items-center gap-2 px-3 py-2.5 rounded-xl text-sm transition-all duration-200 border-2 text-right',
+                          isSelected
+                            ? 'bg-sky-100 dark:bg-sky-900/40 border-sky-400 dark:border-sky-600 text-sky-800 dark:text-sky-200 shadow-md shadow-sky-200/50 dark:shadow-sky-900/30 scale-[1.02]'
+                            : 'bg-white/50 dark:bg-slate-800/50 border-slate-200/60 dark:border-slate-700/60 hover:border-sky-200 dark:hover:border-sky-800 hover:bg-white/80 dark:hover:bg-slate-800/80',
+                        )}
+                      >
+                        {isSelected && (
+                          <motion.div
+                            initial={{ scale: 0 }}
+                            animate={{ scale: 1 }}
+                            className="absolute -top-1.5 -left-1.5 w-5 h-5 rounded-full bg-sky-500 flex items-center justify-center"
+                          >
+                            <Check className="w-3 h-3 text-white" />
+                          </motion.div>
+                        )}
+                        <span className="text-base shrink-0">{catMeta?.icon || '📋'}</span>
+                        <span className="font-medium text-[13px] leading-tight">{spec.label}</span>
+                      </button>
+                    );
+                  })}
+                </motion.div>
               </AnimatePresence>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="nurse-license" className="text-sm font-semibold">رقم الترخيص</Label>
-              <div className="relative">
-                <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
-                <Input
-                  id="nurse-license"
-                  placeholder="رقم الترخيص"
-                  className={cn(
-                    'pr-10 text-right h-12 rounded-xl text-[14px]',
-                    'bg-white/60 dark:bg-slate-800/60',
-                    'border-2 border-slate-200/80 dark:border-slate-700/80',
-                    'hover:border-sky-300 dark:hover:border-sky-700',
-                    'focus:ring-2 focus:ring-sky-400/20 focus:border-sky-400',
-                    'placeholder:text-muted-foreground/40 transition-all duration-200',
-                    errors.licenseNumber && 'border-red-400',
-                  )}
-                  {...register('licenseNumber')}
-                />
-              </div>
-              <AnimatePresence mode="wait">
-                {errors.licenseNumber && (
-                  <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-xs text-destructive mr-1">
-                    {errors.licenseNumber.message}
-                  </motion.p>
+
+            {/* Selected specialization display */}
+            <AnimatePresence mode="wait">
+              {selectedSpecMeta && (
+                <motion.div
+                  initial={{ opacity: 0, y: -5 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -5 }}
+                  className="flex items-center gap-2 px-3 py-2 rounded-xl bg-sky-50 dark:bg-sky-900/20 border border-sky-200 dark:border-sky-800"
+                >
+                  <Check className="w-4 h-4 text-sky-600 dark:text-sky-400 shrink-0" />
+                  <span className="text-xs text-sky-700 dark:text-sky-300">
+                    التخصص المختار: <span className="font-bold">{selectedSpecMeta.label}</span>
+                  </span>
+                </motion.div>
+              )}
+            </AnimatePresence>
+
+            <AnimatePresence mode="wait">
+              {errors.specialization && (
+                <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-xs text-destructive mr-1">
+                  {errors.specialization.message}
+                </motion.p>
+              )}
+            </AnimatePresence>
+          </motion.div>
+
+          {/* License Number - Full Width */}
+          <motion.div {...fieldAnim(0.46)} className="space-y-2">
+            <Label htmlFor="nurse-license" className="text-sm font-semibold">رقم الترخيص</Label>
+            <div className="relative">
+              <CreditCard className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/60 pointer-events-none" />
+              <Input
+                id="nurse-license"
+                placeholder="رقم الترخيص"
+                className={cn(
+                  'pr-10 text-right h-12 rounded-xl text-[14px]',
+                  'bg-white/60 dark:bg-slate-800/60',
+                  'border-2 border-slate-200/80 dark:border-slate-700/80',
+                  'hover:border-sky-300 dark:hover:border-sky-700',
+                  'focus:ring-2 focus:ring-sky-400/20 focus:border-sky-400',
+                  'placeholder:text-muted-foreground/40 transition-all duration-200',
+                  errors.licenseNumber && 'border-red-400',
                 )}
-              </AnimatePresence>
+                {...register('licenseNumber')}
+              />
             </div>
+            <AnimatePresence mode="wait">
+              {errors.licenseNumber && (
+                <motion.p initial={{ opacity: 0, y: -5 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -5 }} className="text-xs text-destructive mr-1">
+                  {errors.licenseNumber.message}
+                </motion.p>
+              )}
+            </AnimatePresence>
           </motion.div>
 
           {/* Location GPS */}
