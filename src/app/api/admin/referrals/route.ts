@@ -2,11 +2,12 @@
 // Returns: users with referralCode, referralCount, and their referred users
 // MongoDB/Mongoose based
 // CRITICAL: Always returns fresh data from DB (no caching)
+// CRITICAL: Uses native MongoDB queries to bypass Mongoose discriminator/casting issues
 
 import { NextRequest } from 'next/server';
 import mongoose from 'mongoose';
 import { connectDB } from '@/lib/mongodb';
-import { Beneficiary, Referral } from '@/models/mongoose';
+import { Beneficiary } from '@/models/mongoose';
 import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
 import { serializeDoc } from '@/lib/mongoose/serialize';
 
@@ -32,29 +33,50 @@ export async function GET(request: NextRequest) {
       ];
     }
 
-    // Get referral counts per referrer from BOTH sources:
-    // 1. Referral collection (tracking records)
-    // 2. Direct referredBy field (fallback for missing Referral records)
-    const [referralCounts, directReferredCounts] = await Promise.all([
-      Referral.aggregate([
+    // Use native MongoDB for referral counts - bypasses Mongoose discriminator/casting issues
+    const db = mongoose.connection.db;
+    const usersCollection = db.collection('users');
+    const referralsCollection = db.collection('referrals');
+
+    // Get referral counts from BOTH sources:
+    // 1. Referral collection (try both ObjectId and String for referrerId)
+    // 2. Direct referredBy field (try both ObjectId and String)
+    const [referralCountsByObjectId, referralCountsByString, directCountsByObjectId, directCountsByString] = await Promise.all([
+      referralsCollection.aggregate([
         { $group: { _id: '$referrerId', count: { $sum: 1 } } },
-      ]),
-      Beneficiary.aggregate([
-        { $match: { referredBy: { $ne: null, $exists: true } } },
+      ]).toArray(),
+      // Also try matching referrerId as string (in case it was stored as string)
+      referralsCollection.aggregate([
+        { $addFields: { referrerIdStr: { $toString: '$referrerId' } } },
+        { $group: { _id: '$referrerIdStr', count: { $sum: 1 } } },
+      ]).toArray(),
+      usersCollection.aggregate([
+        { $match: { referredBy: { $ne: null, $exists: true }, role: 'beneficiary' } },
         { $group: { _id: '$referredBy', count: { $sum: 1 } } },
-      ]),
+      ]).toArray(),
+      usersCollection.aggregate([
+        { $match: { referredBy: { $ne: null, $exists: true }, role: 'beneficiary' } },
+        { $addFields: { referredByStr: { $toString: '$referredBy' } } },
+        { $group: { _id: '$referredByStr', count: { $sum: 1 } } },
+      ]).toArray(),
     ]);
 
-    // Merge both count sources - take the MAX for each referrer
+    // Merge all count sources - normalize all IDs to strings for comparison
     const countMap = new Map<string, number>();
-    for (const r of referralCounts) {
-      countMap.set(r._id.toString(), r.count);
+
+    function mergeCounts(counts: any[], maxCount: number = 0) {
+      for (const r of counts) {
+        const id = r._id?.toString();
+        if (!id) continue;
+        const existing = countMap.get(id) || 0;
+        countMap.set(id, Math.max(existing, r.count));
+      }
     }
-    for (const r of directReferredCounts) {
-      const id = r._id.toString();
-      const existing = countMap.get(id) || 0;
-      countMap.set(id, Math.max(existing, r.count));
-    }
+
+    mergeCounts(referralCountsByObjectId);
+    mergeCounts(referralCountsByString);
+    mergeCounts(directCountsByObjectId);
+    mergeCounts(directCountsByString);
 
     // If filtering to users with referrals only
     if (withReferralsOnly) {
@@ -83,9 +105,13 @@ export async function GET(request: NextRequest) {
       const serialized = serializeDoc(b);
       const id = (b._id as any).toString();
       const referredBy = b.referredBy ? referrerMap.get(b.referredBy.toString()) || null : null;
+
+      // Try multiple lookup keys for the referral count
+      const referralCount = countMap.get(id) || countMap.get(id.toLowerCase()) || countMap.get(id.toUpperCase()) || 0;
+
       return {
         ...serialized,
-        referralCount: countMap.get(id) || 0,
+        referralCount,
         referredByName: referredBy?.name || null,
         referredByCode: referredBy?.referralCode || null,
       };

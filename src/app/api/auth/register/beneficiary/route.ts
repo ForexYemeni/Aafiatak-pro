@@ -3,6 +3,7 @@
 // Supports referral code validation and referral record creation
 
 import { NextRequest } from 'next/server';
+import mongoose from 'mongoose';
 import { connectDB } from '@/lib/mongodb';
 import { Beneficiary, Referral } from '@/models/mongoose';
 import {
@@ -54,18 +55,18 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Validate referral code if provided ─────────────────────────
-    let referrerId: string | null = null;
-    let referrerCode: string | null = null; // Store the actual referrer's code for the Referral record
+    let referrerId: mongoose.Types.ObjectId | null = null;
+    let referrerCode: string | null = null;
     if (usedReferralCode && typeof usedReferralCode === 'string') {
       const normalizedCode = usedReferralCode.trim().toUpperCase();
-      // Support both AF-XXXXXX and AFK-XXXXXX (legacy) formats
       const referrer = await Beneficiary.findOne({ referralCode: normalizedCode }).select('_id referralCode').lean();
       if (referrer) {
-        referrerId = referrer._id.toString();
-        referrerCode = referrer.referralCode; // The referrer's actual code (not the new user's code)
+        // CRITICAL: Store as ObjectId, NOT string, to ensure type consistency in DB
+        referrerId = referrer._id instanceof mongoose.Types.ObjectId
+          ? referrer._id
+          : new mongoose.Types.ObjectId(referrer._id.toString());
+        referrerCode = referrer.referralCode;
       }
-      // If code not found, we still proceed but without linking (no error thrown)
-      // This prevents registration failure due to typos in referral codes
     }
 
     const hashedPassword = await hashPassword(password);
