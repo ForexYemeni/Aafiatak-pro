@@ -9,7 +9,7 @@ import { connectDB } from '@/lib/mongodb';
 import { verifyPassword, createErrorResponse } from '@/lib/auth';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_SECRET = process.env.JWT_SECRET ?? '';
 const EMERGENCY_TOKEN_EXPIRY = 15 * 60; // 15 minutes in seconds
 
 export async function POST(request: NextRequest) {

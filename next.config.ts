@@ -6,6 +6,7 @@
   // ============================================================================
 
   import type { NextConfig } from "next";
+import { resolve } from "path";
 
   // ============================================================================
   // Security Headers (defined inline to avoid import issues during build)
@@ -148,9 +149,9 @@
     // Experimental Features
     // ============================================================================
 
-    // Turbopack root — silence the workspace root warning
+    // Turbopack root — set to project directory to avoid workspace root detection issues
     turbopack: {
-      root: '..',
+      root: resolve(__dirname),
     },
 
     experimental: {

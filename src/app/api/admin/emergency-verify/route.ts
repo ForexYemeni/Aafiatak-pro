@@ -9,7 +9,7 @@ import { createErrorResponse } from '@/lib/auth/middleware';
 import { connectDB } from '@/lib/mongodb';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET!;
+const JWT_SECRET = process.env.JWT_SECRET ?? '';
 
 interface EmergencyTokenPayload {
   type: string;

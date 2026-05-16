@@ -13,31 +13,28 @@ const SALT_ROUNDS = 12;
 const JWT_EXPIRY = process.env.JWT_EXPIRY ?? '7d';
 const JWT_REFRESH_EXPIRY = process.env.JWT_REFRESH_EXPIRY ?? '30d';
 
-// ── JWT Secrets — REQUIRED. Crash immediately if missing. ──────────────────
+// ── JWT Secrets — REQUIRED at runtime. ────────────────────────────────────
 // A missing secret means every JWT would be signed with `undefined`, which
 // node-jsonwebtoken converts to the string "undefined" — trivially forgeable.
-// Failing fast here is far safer than silently allowing broken auth.
-if (!process.env.JWT_SECRET) {
-  const msg =
-    '[AUTH FATAL] JWT_SECRET is not set. ' +
-    'Set it in your .env file or deployment environment variables. ' +
-    'The server will not start without it.';
-  console.error(msg);
-  // In Next.js API routes (Node runtime) throw will bubble up as a 500.
-  // In edge runtime (middleware), throw terminates the process cleanly.
-  throw new Error(msg);
-}
-if (!process.env.JWT_REFRESH_SECRET) {
-  const msg =
-    '[AUTH FATAL] JWT_REFRESH_SECRET is not set. ' +
-    'Set it in your .env file or deployment environment variables. ' +
-    'The server will not start without it.';
-  console.error(msg);
-  throw new Error(msg);
-}
+// We use lazy initialization so the build succeeds without env vars, but
+// the server will crash at runtime if they are missing.
+const JWT_SECRET: string = process.env.JWT_SECRET ?? '';
+const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET ?? '';
 
-const JWT_SECRET: string = process.env.JWT_SECRET;
-const JWT_REFRESH_SECRET: string = process.env.JWT_REFRESH_SECRET;
+function ensureSecrets(): void {
+  if (!JWT_SECRET) {
+    throw new Error(
+      '[AUTH FATAL] JWT_SECRET is not set. ' +
+      'Set it in your .env file or deployment environment variables.'
+    );
+  }
+  if (!JWT_REFRESH_SECRET) {
+    throw new Error(
+      '[AUTH FATAL] JWT_REFRESH_SECRET is not set. ' +
+      'Set it in your .env file or deployment environment variables.'
+    );
+  }
+}
 
 // ---- Password Hashing ----
 
@@ -62,6 +59,7 @@ export async function verifyPassword(password: string, hash: string): Promise<bo
  * Generate a JWT access token.
  */
 export function generateToken(payload: { userId: string; phone: string; role: string }): string {
+  ensureSecrets();
   const expiresIn = parseExpiry(JWT_EXPIRY);
   return jwt.sign(payload, JWT_SECRET, { expiresIn });
 }
@@ -70,6 +68,7 @@ export function generateToken(payload: { userId: string; phone: string; role: st
  * Generate a JWT refresh token.
  */
 export function generateRefreshToken(payload: { userId: string; phone: string; role: string }): string {
+  ensureSecrets();
   const expiresIn = parseExpiry(JWT_REFRESH_EXPIRY);
   return jwt.sign(payload, JWT_REFRESH_SECRET, { expiresIn });
 }
@@ -91,6 +90,7 @@ function parseExpiry(value: string): string | number {
  * Returns the decoded payload or null if invalid/expired.
  */
 export function verifyToken(token: string): { userId: string; phone: string; role: string } | null {
+  if (!JWT_SECRET) return null;
   try {
     const decoded = jwt.verify(token, JWT_SECRET) as { userId: string; phone: string; role: string };
     return { userId: decoded.userId, phone: decoded.phone, role: decoded.role };
@@ -104,6 +104,7 @@ export function verifyToken(token: string): { userId: string; phone: string; rol
  * Returns the decoded payload or null if invalid/expired.
  */
 export function verifyRefreshToken(token: string): { userId: string; phone: string; role: string } | null {
+  if (!JWT_REFRESH_SECRET) return null;
   try {
     const decoded = jwt.verify(token, JWT_REFRESH_SECRET) as { userId: string; phone: string; role: string };
     return { userId: decoded.userId, phone: decoded.phone, role: decoded.role };
