@@ -1003,7 +1003,7 @@ function LoginPageContent() {
               >
                 <div className="flex items-start gap-3 p-4 rounded-2xl text-[13px] text-red-300" style={{ background: 'rgba(239,68,68,0.09)', border: '1px solid rgba(239,68,68,0.22)' }}>
                   <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5 text-red-400" />
-                  <span className="leading-relaxed">{error}</span>
+                  <span className="leading-relaxed">{typeof error === 'string' ? error : String(error)}</span>
                 </div>
               </motion.div>
             )}

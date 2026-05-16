@@ -26,9 +26,49 @@ export async function GET(request: NextRequest) {
       return createErrorResponse('المستخدم غير موجود', 404, 'USER_NOT_FOUND');
     }
 
+    // CRITICAL: Build a CLEAN user object with only serializable fields.
+    // NEVER spread the raw MongoDB document — it contains ObjectId objects,
+    // Date objects, and nested sub-documents that cause React error #300
+    // ("Objects are not valid as a React child") when rendered in JSX.
+    const cleanUser: Record<string, any> = {
+      id: userData._id.toString(),
+      name: userData.name || '',
+      phone: userData.phone || '',
+      role: userData.role || 'beneficiary',
+      isActive: userData.isActive ?? true,
+      createdAt: userData.createdAt ? new Date(userData.createdAt).toISOString() : null,
+      updatedAt: userData.updatedAt ? new Date(userData.updatedAt).toISOString() : null,
+    };
+
+    // Add role-specific fields (only serializable primitives/arrays)
+    if (userData.role === 'nurse') {
+      cleanUser.specialization = userData.specialization || [];
+      cleanUser.licenseNumber = userData.licenseNumber || '';
+      cleanUser.verificationStatus = userData.verificationStatus || 'unverified';
+      cleanUser.isAvailable = userData.isAvailable ?? false;
+      cleanUser.isOnline = userData.isOnline ?? false;
+      cleanUser.rating = userData.rating || 0;
+      cleanUser.reviewCount = userData.reviewCount || 0;
+      cleanUser.completedJobs = userData.completedJobs || 0;
+      cleanUser.governorate = userData.governorate || '';
+      cleanUser.address = userData.address || '';
+      cleanUser.bio = userData.bio || '';
+      cleanUser.professionalTitle = userData.professionalTitle || '';
+      cleanUser.avatar = userData.avatar || '';
+    } else if (userData.role === 'beneficiary') {
+      cleanUser.governorate = userData.governorate || '';
+      cleanUser.address = userData.address || '';
+      cleanUser.loyaltyPoints = userData.loyaltyPoints || 0;
+      cleanUser.loyaltyTier = userData.loyaltyTier || 'bronze';
+      cleanUser.referralCode = userData.referralCode || '';
+    } else if (userData.role === 'admin' || userData.role === 'subadmin') {
+      cleanUser.permissions = userData.permissions || [];
+      cleanUser.email = userData.email || '';
+    }
+
     return Response.json({
       success: true,
-      data: { ...userData, id: userData._id.toString() },
+      data: cleanUser,
     });
   } catch (error) {
     console.error('[AUTH ME ERROR]', error);

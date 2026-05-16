@@ -67,7 +67,16 @@ async function apiRequest<T>(url: string, options: RequestInit = {}): Promise<Ap
 
   if (!data.success) {
     // Handle nested error structure: { success: false, error: { message, code } }
-    const errorMessage = data.error?.message || data.message || data.error || 'حدث خطأ في الطلب';
+    // CRITICAL: data.error can be either a string OR an object { message, code }
+    // We must NEVER pass an object to Error() — it would become "[object Object]"
+    let errorMessage: string;
+    if (typeof data.error === 'object' && data.error !== null) {
+      errorMessage = data.error.message || data.message || 'حدث خطأ في الطلب';
+    } else if (typeof data.error === 'string' && data.error) {
+      errorMessage = data.error;
+    } else {
+      errorMessage = data.message || 'حدث خطأ في الطلب';
+    }
     throw new Error(errorMessage);
   }
 

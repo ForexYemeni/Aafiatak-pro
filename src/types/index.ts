@@ -755,10 +755,15 @@ export interface PaginationMeta {
 }
 
 /** Standard API response wrapper */
+export interface ApiError {
+  message: string;
+  code: string;
+}
+
 export interface ApiResponse<T> {
   success: boolean;
   data?: T;
-  error?: string;
+  error?: ApiError | string;
   message?: string;
   pagination?: PaginationMeta;
   statusCode?: number;

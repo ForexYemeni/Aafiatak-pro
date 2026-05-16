@@ -22,7 +22,7 @@ export default function RootError({
         </div>
         <h2 className="text-xl font-bold text-foreground mb-2">حدث خطأ غير متوقع</h2>
         <p className="text-muted-foreground mb-6 text-sm">
-          {error.message || 'يرجى المحاولة مرة أخرى أو العودة للصفحة الرئيسية.'}
+          {typeof error.message === 'string' ? error.message : 'يرجى المحاولة مرة أخرى أو العودة للصفحة الرئيسية.'}
         </p>
         <div className="flex gap-3 justify-center">
           <button
