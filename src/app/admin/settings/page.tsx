@@ -316,7 +316,7 @@ export default function AdminSettingsPage() {
     }
   };
 
-  // ── Restore Backup Handler ────────────────────────────────────────
+  // ── Restore Backup Handler (Chunked Upload) ──────────────────────────
   const handleRestoreBackup = async () => {
     if (!restoreFile) {
       toast.error('اختر ملف النسخة الاحتياطية أولاً');
@@ -330,29 +330,94 @@ export default function AdminSettingsPage() {
     setIsRestoring(true);
     setRestoreResult(null);
     try {
-      const formData = new FormData();
-      formData.append('file', restoreFile);
-      formData.append('password', restorePassword);
-      formData.append('mode', restoreMode);
+      const CHUNK_SIZE = 2 * 1024 * 1024; // 2 MB per chunk (well under Vercel's 4.5 MB limit)
+      const fileSizeMB = (restoreFile.size / 1024 / 1024).toFixed(2);
+      const uploadId = `restore_${Date.now()}_${Math.random().toString(36).slice(2)}`;
 
-      const res = await authFetch('/api/admin/restore', {
+      // ── Step 1: Read file as base64 ──────────────────────────────
+      toast.loading('جارٍ قراءة الملف...', { id: 'restore-progress' });
+      const arrayBuffer = await restoreFile.arrayBuffer();
+      const uint8Array = new Uint8Array(arrayBuffer);
+      let binary = '';
+      const chunkSizeBin = 8192;
+      for (let i = 0; i < uint8Array.length; i += chunkSizeBin) {
+        const slice = uint8Array.slice(i, i + chunkSizeBin);
+        binary += String.fromCharCode(...slice);
+      }
+      const base64Data = btoa(binary);
+
+      // ── Step 2: Split into chunks and upload ─────────────────────
+      const totalChunks = Math.ceil(base64Data.length / CHUNK_SIZE);
+      console.log(`[RESTORE] File: ${fileSizeMB} MB, Chunks: ${totalChunks}`);
+
+      for (let i = 0; i < totalChunks; i++) {
+        const chunk = base64Data.slice(i * CHUNK_SIZE, (i + 1) * CHUNK_SIZE);
+
+        toast.loading(`جارٍ رفع الجزء ${i + 1} من ${totalChunks}...`, { id: 'restore-progress' });
+
+        const res = await authFetch('/api/admin/restore-chunk', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            action: 'upload-chunk',
+            uploadId,
+            chunkIndex: i,
+            totalChunks,
+            data: chunk,
+          }),
+        });
+
+        // Safe JSON parsing
+        let json: any;
+        try {
+          const text = await res.text();
+          json = JSON.parse(text);
+        } catch {
+          throw new Error(`استجابة غير صالحة من السيرفر عند رفع الجزء ${i + 1}. قد يكون الملف كبيراً جداً.`);
+        }
+
+        if (!json.success) {
+          throw new Error(json.error?.message ?? json.message ?? `فشل رفع الجزء ${i + 1}`);
+        }
+      }
+
+      // ── Step 3: Complete the restore ─────────────────────────────
+      toast.loading('جارٍ استعادة البيانات...', { id: 'restore-progress' });
+
+      const completeRes = await authFetch('/api/admin/restore-chunk', {
         method: 'POST',
-        body: formData,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'complete-restore',
+          uploadId,
+          password: restorePassword,
+          mode: restoreMode,
+        }),
       });
-      const json = await res.json();
-      if (json.success) {
-        setRestoreResult(json.data);
+
+      // Safe JSON parsing
+      let result: any;
+      try {
+        const text = await completeRes.text();
+        result = JSON.parse(text);
+      } catch {
+        throw new Error('استجابة غير صالحة من السيرفر. قد يكون الملف كبيراً جداً أو حدث خطأ في الخادم.');
+      }
+
+      if (result.success) {
+        setRestoreResult(result.data);
         setRestorePassword('');
         setRestoreFile(null);
-        toast.success(json.message || 'تمت الاستعادة بنجاح');
+        toast.success(result.message || 'تمت الاستعادة بنجاح', { id: 'restore-progress' });
       } else {
-        toast.error(json.error?.message ?? json.message ?? 'فشل الاستعادة');
+        toast.error(result.error?.message ?? result.message ?? 'فشل الاستعادة', { id: 'restore-progress' });
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'حدث خطأ أثناء استعادة النسخة الاحتياطية';
-      toast.error(errorMsg);
+      toast.error(errorMsg, { id: 'restore-progress' });
     } finally {
       setIsRestoring(false);
+      toast.dismiss('restore-progress');
     }
   };
 

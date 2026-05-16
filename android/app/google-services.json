@@ -1,26 +1,21 @@
 {
   "project_info": {
-    "project_number": "109876543210",
-    "project_id": "aafiatak-prod",
-    "storage_bucket": "aafiatak-prod.appspot.com"
+    "project_number": "845103366416",
+    "project_id": "aafiatak-a23fa",
+    "storage_bucket": "aafiatak-a23fa.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:109876543210:android:abc123def456",
+        "mobilesdk_app_id": "1:845103366416:android:38511d932f55881166e595",
         "android_client_info": {
           "package_name": "com.aafiatak.app"
         }
       },
-      "oauth_client": [
-        {
-          "client_id": "109876543210-abc123def456.apps.googleusercontent.com",
-          "client_type": 3
-        }
-      ],
+      "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyDummyKeyForBuildOnly-ReplaceWithRealKey"
+          "current_key": "AIzaSyAROZ526PN4qt53Cal4M7OvBSuoWCQJY3g"
         }
       ],
       "services": {
