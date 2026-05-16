@@ -6,40 +6,38 @@ import {
   useEffect,
   useState,
   useMemo,
-  useRef,
   type ReactNode,
 } from 'react';
-import { io, type Socket } from 'socket.io-client';
+import { socketService as socketServiceV2, type ConnectionState } from '@/lib/socket-v2';
 import { useAuthStore } from '@/lib/stores/auth-store';
 
 // ============================================================================
-// Socket Provider (PERFORMANCE v2 — DEFERRED CONNECTION)
+// Socket Provider (UNIFIED — uses socket-v2 singleton)
 // ============================================================================
-// PERFORMANCE FIXES:
-// 1. Defers socket connection until 2 seconds after mount (non-blocking)
-// 2. Only creates socket when authenticated AND hydrated
-// 3. Skips connection if page is hidden (saves resources)
-// 4. Uses lazy initialization pattern to avoid blocking first paint
+// UNIFICATION FIX:
+// Previously, this provider created its OWN socket connection (3rd duplicate!).
+// Now it delegates to the socket-v2 singleton which is also used by
+// the PWA provider's SocketConnector. This eliminates the triple-connection
+// bug and ensures all event listeners share one connection.
 // ============================================================================
 
 interface SocketContextValue {
-  socket: Socket | null;
+  /** Whether the unified socket is connected */
   isConnected: boolean;
+  /** Current connection state */
+  connectionState: ConnectionState;
 }
 
 const SocketContext = createContext<SocketContextValue>({
-  socket: null,
   isConnected: false,
+  connectionState: 'disconnected',
 });
 
 export function useSocketContext(): SocketContextValue {
   return useContext(SocketContext);
 }
 
-const SOCKET_PORT = 3003;
-
 // Track the currently active chat ID to avoid duplicate sounds
-// when the user is already viewing the chat page
 let _activeChatId: string | null = null;
 
 /** Set the currently active chat ID (called from chat pages) */
@@ -52,89 +50,31 @@ export function getActiveChatId(): string | null {
   return _activeChatId;
 }
 
-// Module-level socket instance — persisted across re-renders
-let _socketInstance: Socket | null = null;
-let _socketToken: string | null = null;
-
 export function SocketProvider({ children }: { children: ReactNode }) {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const token = useAuthStore((s) => s.token);
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
-  const [isConnected, setIsConnected] = useState(false);
-  const [socketReady, setSocketReady] = useState(false);
-  const mountedRef = useRef(false);
+  const [isConnected, setIsConnected] = useState(socketServiceV2.isConnected);
+  const [connectionState, setConnectionState] = useState<ConnectionState>(socketServiceV2.connectionState);
 
-  // Defer socket creation until 2 seconds after mount
-  // This prevents socket connection from blocking the initial page render
+  // Subscribe to connection state changes from the unified socket-v2
   useEffect(() => {
-    if (mountedRef.current) return;
-    mountedRef.current = true;
-
-    // If page is hidden, wait for it to become visible
-    if (document.hidden) {
-      const handler = () => {
-        if (!document.hidden) {
-          document.removeEventListener('visibilitychange', handler);
-          setSocketReady(true);
-        }
-      };
-      document.addEventListener('visibilitychange', handler);
-      return () => document.removeEventListener('visibilitychange', handler);
-    }
-
-    // Defer socket connection to avoid blocking first paint
-    const timer = setTimeout(() => setSocketReady(true), 2000);
-    return () => clearTimeout(timer);
-  }, []);
-
-  // Create/reuse socket instance
-  const socket = useMemo<Socket | null>(() => {
-    if (!socketReady || !hasHydrated || !isAuthenticated || !token) {
-      return null;
-    }
-
-    // Reuse existing socket if token hasn't changed
-    if (_socketInstance && _socketToken === token) {
-      return _socketInstance;
-    }
-
-    // Disconnect old socket if token changed
-    if (_socketInstance) {
-      _socketInstance.disconnect();
-      _socketInstance = null;
-    }
-
-    _socketToken = token;
-    _socketInstance = io('/?XTransformPort=' + SOCKET_PORT, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 5,
-      reconnectionDelay: 1000,
+    const unsubState = socketServiceV2.onConnectionStateChange((state) => {
+      setConnectionState(state);
+      setIsConnected(state === 'connected');
     });
 
-    return _socketInstance;
-  }, [socketReady, hasHydrated, isAuthenticated, token]);
+    // Set initial state
+    setIsConnected(socketServiceV2.isConnected);
+    setConnectionState(socketServiceV2.connectionState);
 
-  useEffect(() => {
-    if (!socket) {
-      setIsConnected(false);
-      return;
-    }
+    return unsubState;
+  }, []);
 
-    const onConnect = () => setIsConnected(true);
-    const onDisconnect = () => setIsConnected(false);
+  // Note: Socket connection is managed by SocketConnector in pwa-provider.tsx
+  // which calls socketServiceV2.connect(token). We just read the state here.
 
-    socket.on('connect', onConnect);
-    socket.on('disconnect', onDisconnect);
-
-    return () => {
-      socket.off('connect', onConnect);
-      socket.off('disconnect', onDisconnect);
-    };
-  }, [socket]);
-
-  const value = useMemo(() => ({ socket, isConnected }), [socket, isConnected]);
+  const value = useMemo(() => ({ isConnected, connectionState }), [isConnected, connectionState]);
 
   return (
     <SocketContext.Provider value={value}>

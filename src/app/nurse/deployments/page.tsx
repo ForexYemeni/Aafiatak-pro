@@ -1,7 +1,7 @@
 'use client';
 
 import { YEMEN_GOVERNORATES } from '@/lib/constants';
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useDeployments, useApplyForDeployment, useSubmitPayment, useChangeDeploymentStatus, useCreateDeployment, useSelectApplicant } from '@/hooks/use-deployments';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -236,9 +237,8 @@ export default function NurseDeploymentsPage() {
   const authUser = useAuthStore((s) => s.user);
   const currentUserId = authUser?.id || '';
 
-  // Data state
-  const [deployments, setDeployments] = useState<DeploymentItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Use React Query hook for cached, real-time synced data
+  const { data: deployments = [], isLoading } = useDeployments();
   const [activeTab, setActiveTab] = useState('available');
 
   // Apply modal state
@@ -292,25 +292,12 @@ export default function NurseDeploymentsPage() {
   const [applicantServiceFee, setApplicantServiceFee] = useState(500);
   const [isCreating, setIsCreating] = useState(false);
 
-  /* ── Fetch deployments ── */
-  const fetchDeployments = useCallback(async () => {
-    try {
-      const res = await authFetch('/api/deployments?limit=100');
-      const json = await res.json();
-      if (json.success && json.data) {
-        const deps = json.data.deployments ?? json.data;
-        setDeployments(Array.isArray(deps) ? deps : []);
-      }
-    } catch {
-      // silent
-    } finally {
-      setIsLoading(false);
-    }
-  }, [authFetch]);
-
-  useEffect(() => {
-    void fetchDeployments();
-  }, [fetchDeployments]);
+  // Mutations for actions
+  const applyMutation = useApplyForDeployment();
+  const submitPaymentMutation = useSubmitPayment();
+  const changeStatusMutation = useChangeDeploymentStatus();
+  const createDeploymentMutation = useCreateDeployment();
+  const selectApplicantMutation = useSelectApplicant();
 
   /* ── Fetch admin settings for commission ── */
   useEffect(() => {
@@ -384,21 +371,12 @@ export default function NurseDeploymentsPage() {
     if (!applyTarget) return;
     setIsApplying(true);
     try {
-      const res = await authFetch(`/api/deployments/${applyTarget.id}/apply`, {
-        method: 'POST',
-        body: JSON.stringify({ coverLetter }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('تم التقديم بنجاح. سيتم إشعارك عند اختيارك من قبل صاحب التكليف');
-        void fetchDeployments();
-        setApplyTarget(null);
-        setCoverLetter('');
-      } else {
-        toast.error(json.message ?? 'فشل التقديم');
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء التقديم');
+      await applyMutation.mutateAsync({ deploymentId: applyTarget.id, coverLetter });
+      toast.success('تم التقديم بنجاح. سيتم إشعارك عند اختيارك من قبل صاحب التكليف');
+      setApplyTarget(null);
+      setCoverLetter('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل التقديم');
     } finally {
       setIsApplying(false);
     }
@@ -409,25 +387,17 @@ export default function NurseDeploymentsPage() {
     if (!paymentTarget || (!paymentProof && !paymentProofImage)) return;
     setIsSubmittingPayment(true);
     try {
-      const res = await authFetch(`/api/deployments/${paymentTarget.id}/submit-payment`, {
-        method: 'POST',
-        body: JSON.stringify({
-          paymentProofData: paymentProof || undefined,
-          paymentProofImage: paymentProofImage || undefined,
-        }),
+      await submitPaymentMutation.mutateAsync({
+        deploymentId: paymentTarget.id,
+        paymentProofData: paymentProof || undefined,
+        paymentProofImage: paymentProofImage || undefined,
       });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('تم تقديم إثبات الدفع بنجاح. سيتم مراجعته قريباً');
-        void fetchDeployments();
-        setPaymentTarget(null);
-        setPaymentProof('');
-        setPaymentProofImage('');
-      } else {
-        toast.error(json.message ?? 'فشل تقديم إثبات الدفع');
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء تقديم إثبات الدفع');
+      toast.success('تم تقديم إثبات الدفع بنجاح. سيتم مراجعته قريباً');
+      setPaymentTarget(null);
+      setPaymentProof('');
+      setPaymentProofImage('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل تقديم إثبات الدفع');
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -437,20 +407,11 @@ export default function NurseDeploymentsPage() {
   const handleSelectApplicant = async (deploymentId: string, applicationId: string) => {
     setIsSelecting(true);
     try {
-      const res = await authFetch(`/api/deployments/${deploymentId}/select-applicant`, {
-        method: 'PATCH',
-        body: JSON.stringify({ applicationId }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success(`تم اختيار المتقدم وتعيينه على التكليف. يرجى تقديم إشعار الدفع`);
-        void fetchDeployments();
-        setManageTarget(null);
-      } else {
-        toast.error(json.message ?? 'فشل اختيار المتقدم');
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء اختيار المتقدم');
+      await selectApplicantMutation.mutateAsync({ deploymentId, applicationId });
+      toast.success(`تم اختيار المتقدم وتعيينه على التكليف. يرجى تقديم إشعار الدفع`);
+      setManageTarget(null);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل اختيار المتقدم');
     } finally {
       setIsSelecting(false);
     }
@@ -460,19 +421,10 @@ export default function NurseDeploymentsPage() {
   const handleStartDeployment = async (deploymentId: string) => {
     setExecLoading(deploymentId);
     try {
-      const res = await authFetch(`/api/deployments/${deploymentId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'in_progress' }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('تم بدء تنفيذ التكليف');
-        void fetchDeployments();
-      } else {
-        toast.error(json.message ?? 'فشل بدء التنفيذ');
-      }
-    } catch {
-      toast.error('حدث خطأ');
+      await changeStatusMutation.mutateAsync({ deploymentId, status: 'in_progress' });
+      toast.success('تم بدء تنفيذ التكليف');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل بدء التنفيذ');
     } finally {
       setExecLoading(null);
     }
@@ -482,19 +434,10 @@ export default function NurseDeploymentsPage() {
   const handleCompleteDeployment = async (deploymentId: string) => {
     setExecLoading(deploymentId);
     try {
-      const res = await authFetch(`/api/deployments/${deploymentId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: 'completed' }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('تم إكمال التكليف بنجاح!');
-        void fetchDeployments();
-      } else {
-        toast.error(json.message ?? 'فشل إكمال التكليف');
-      }
-    } catch {
-      toast.error('حدث خطأ');
+      await changeStatusMutation.mutateAsync({ deploymentId, status: 'completed' });
+      toast.success('تم إكمال التكليف بنجاح!');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل إكمال التكليف');
     } finally {
       setExecLoading(null);
     }
@@ -535,51 +478,42 @@ export default function NurseDeploymentsPage() {
     }
     setIsCreating(true);
     try {
-      const res = await authFetch('/api/deployments', {
-        method: 'POST',
-        body: JSON.stringify({
-          type: createForm.type,
-          gender: createForm.gender,
-          department: createForm.department,
-          specialization: createForm.specialization,
-          hours: createForm.hours,
-          location: {
-            ...createForm.location,
-            governorate: createForm.governorate || undefined,
-            district: createForm.district || undefined,
-          },
-          amount: createForm.amount,
-          requirements: createForm.requirementTags.length > 0
-            ? createForm.requirementTags.join(', ')
-            : createForm.requirements || undefined,
-          notes: createForm.notes || undefined,
-        }),
+      await createDeploymentMutation.mutateAsync({
+        type: createForm.type,
+        gender: createForm.gender,
+        department: createForm.department,
+        specialization: createForm.specialization,
+        hours: createForm.hours,
+        location: {
+          ...createForm.location,
+          governorate: createForm.governorate || undefined,
+          district: createForm.district || undefined,
+        },
+        amount: createForm.amount,
+        requirements: createForm.requirementTags.length > 0
+          ? createForm.requirementTags.join(', ')
+          : createForm.requirements || undefined,
+        notes: createForm.notes || undefined,
       });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('تم إنشاء التكليف بنجاح');
-        await fetchDeployments();
-        setCreateForm({
-          type: 'nursing',
-          specialization: [],
-          hours: 1,
-          location: {},
-          governorate: '',
-          district: '',
-          amount: 0,
-          requirements: '',
-          notes: '',
-          gender: '',
-          department: '',
-          requirementTags: [],
-        });
-        setCustomReq('');
-        setActiveTab('mycreated');
-      } else {
-        toast.error(json.message ?? 'فشل إنشاء التكليف');
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء إنشاء التكليف');
+      toast.success('تم إنشاء التكليف بنجاح');
+      setCreateForm({
+        type: 'nursing',
+        specialization: [],
+        hours: 1,
+        location: {},
+        governorate: '',
+        district: '',
+        amount: 0,
+        requirements: '',
+        notes: '',
+        gender: '',
+        department: '',
+        requirementTags: [],
+      });
+      setCustomReq('');
+      setActiveTab('mycreated');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل إنشاء التكليف');
     } finally {
       setIsCreating(false);
     }
@@ -611,24 +545,16 @@ export default function NurseDeploymentsPage() {
     if (!mandatoryPaymentDep || (!mandatoryPaymentProof && !mandatoryPaymentProofImage)) return;
     setIsSubmittingMandatoryPayment(true);
     try {
-      const res = await authFetch(`/api/deployments/${mandatoryPaymentDep.id}/submit-payment`, {
-        method: 'POST',
-        body: JSON.stringify({
-          paymentProofData: mandatoryPaymentProof || undefined,
-          paymentProofImage: mandatoryPaymentProofImage || undefined,
-        }),
+      await submitPaymentMutation.mutateAsync({
+        deploymentId: mandatoryPaymentDep.id,
+        paymentProofData: mandatoryPaymentProof || undefined,
+        paymentProofImage: mandatoryPaymentProofImage || undefined,
       });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('تم تقديم إثبات الدفع بنجاح. سيتم مراجعته قريباً');
-        void fetchDeployments();
-        setMandatoryPaymentProof('');
-        setMandatoryPaymentProofImage('');
-      } else {
-        toast.error(json.message ?? 'فشل تقديم إثبات الدفع');
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء تقديم إثبات الدفع');
+      toast.success('تم تقديم إثبات الدفع بنجاح. سيتم مراجعته قريباً');
+      setMandatoryPaymentProof('');
+      setMandatoryPaymentProofImage('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل تقديم إثبات الدفع');
     } finally {
       setIsSubmittingMandatoryPayment(false);
     }

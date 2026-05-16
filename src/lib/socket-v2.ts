@@ -309,6 +309,63 @@ export interface SocketErrorEvent {
 export type OrderUpdateEvent = OrderStatusChangedEvent;
 
 // ============================================================================
+// DEPLOYMENT EVENT TYPES (NEW - Real-time sync for تكليفات)
+// ============================================================================
+
+/** Deployment status types */
+export type DeploymentStatus = 'open' | 'creator_selected' | 'admin_approved' | 'assigned' | 'in_progress' | 'completed' | 'cancelled';
+
+/** Application status types */
+export type ApplicationStatus = 'pending' | 'selected_by_creator' | 'admin_approved' | 'payment_pending' | 'payment_submitted' | 'payment_verified' | 'accepted' | 'rejected';
+
+/** Deployment updated event - fired when ANY deployment field changes */
+export interface DeploymentUpdatedEvent {
+  deploymentId: string;
+  status: DeploymentStatus;
+  updatedBy: string;
+  updatedByRole: string;
+  updatedAt: string;
+  /** The full updated deployment data (for instant UI update) */
+  deployment: Record<string, unknown>;
+}
+
+/** Deployment application updated event */
+export interface ApplicationUpdatedEvent {
+  deploymentId: string;
+  applicationId: string;
+  applicantId: string;
+  status: ApplicationStatus;
+  updatedBy: string;
+  updatedByRole: string;
+  updatedAt: string;
+}
+
+/** Payment updated event */
+export interface PaymentUpdatedEvent {
+  deploymentId: string;
+  applicationId: string;
+  applicantId: string;
+  status: ApplicationStatus;
+  /** 'submitted' | 'verified' | 'rejected' */
+  paymentAction: string;
+  updatedBy: string;
+  updatedByRole: string;
+  updatedAt: string;
+}
+
+/** Generic data change event for any entity */
+export interface DataChangeEvent {
+  entity: 'deployment' | 'application' | 'payment' | 'order' | 'emergency' | 'user' | 'notification';
+  entityId: string;
+  action: 'created' | 'updated' | 'deleted' | 'status_changed';
+  changedBy: string;
+  changedByRole: string;
+  timestamp: string;
+  /** Partial entity data with changed fields */
+  data: Record<string, unknown>;
+}
+
+// ============================================================================
 // v2 ADDITIONS — extended types
 // ============================================================================
 
@@ -1340,6 +1397,54 @@ class SocketService {
       queuedEventCount: this.eventQueue.length,
       socketId: this.socket?.id,
     };
+  }
+
+  // ==========================================================================
+  // DEPLOYMENT METHODS (NEW - Real-time sync for تكليفات)
+  // ==========================================================================
+
+  /** Emit deployment updated event */
+  emitDeploymentUpdated(data: DeploymentUpdatedEvent): void {
+    this.emitOrQueue('deployment_updated', data);
+  }
+
+  /** Emit application updated event */
+  emitApplicationUpdated(data: ApplicationUpdatedEvent): void {
+    this.emitOrQueue('application_updated', data);
+  }
+
+  /** Emit payment updated event */
+  emitPaymentUpdated(data: PaymentUpdatedEvent): void {
+    this.emitOrQueue('payment_updated', data);
+  }
+
+  /** Emit generic data change event */
+  emitDataChange(data: DataChangeEvent): void {
+    this.emitOrQueue('data_change', data);
+  }
+
+  // ==========================================================================
+  // DEPLOYMENT EVENT LISTENERS (NEW - Real-time sync for تكليفات)
+  // ==========================================================================
+
+  /** Listen for deployment updated events */
+  onDeploymentUpdated(callback: (data: DeploymentUpdatedEvent) => void): () => void {
+    return this.trackListener('deployment_updated', callback as (...args: unknown[]) => void);
+  }
+
+  /** Listen for application updated events */
+  onApplicationUpdated(callback: (data: ApplicationUpdatedEvent) => void): () => void {
+    return this.trackListener('application_updated', callback as (...args: unknown[]) => void);
+  }
+
+  /** Listen for payment updated events */
+  onPaymentUpdated(callback: (data: PaymentUpdatedEvent) => void): () => void {
+    return this.trackListener('payment_updated', callback as (...args: unknown[]) => void);
+  }
+
+  /** Listen for generic data change events */
+  onDataChange(callback: (data: DataChangeEvent) => void): () => void {
+    return this.trackListener('data_change', callback as (...args: unknown[]) => void);
   }
 }
 

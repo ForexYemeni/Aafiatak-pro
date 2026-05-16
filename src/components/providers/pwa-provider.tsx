@@ -237,7 +237,33 @@ function NotificationPoller() {
       seenIdsRef.current.clear();
       isFirstPollRef.current = true;
       pollForNotifications();
-      intervalRef.current = setInterval(pollForNotifications, 15000);
+      
+      // Adaptive polling: reduce frequency when socket is connected
+      const getPollInterval = () => {
+        // If socket is connected, poll less frequently (45s) since real-time events handle most updates
+        // If socket is disconnected, poll more frequently (15s) as fallback
+        return socketServiceV2.isConnected ? 45000 : 15000;
+      };
+      
+      intervalRef.current = setInterval(pollForNotifications, getPollInterval());
+      
+      // Adjust interval when socket connection state changes
+      const handleConnectionChange = () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = setInterval(pollForNotifications, getPollInterval());
+        }
+      };
+      
+      const unsub = socketServiceV2.onConnectionStateChange(handleConnectionChange);
+      
+      return () => {
+        if (intervalRef.current) {
+          clearInterval(intervalRef.current);
+          intervalRef.current = null;
+        }
+        unsub();
+      };
     }
 
     return () => {

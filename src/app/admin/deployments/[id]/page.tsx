@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import {
@@ -16,6 +16,7 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { EmptyState } from '@/components/common/empty-state';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useDeployment, useVerifyPayment, useAdminApprove, useSelectApplicant, useChangeDeploymentStatus } from '@/hooks/use-deployments';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
@@ -196,8 +197,8 @@ export default function AdminDeploymentDetailPage() {
   const deploymentId = params.id as string;
   const authFetch = useAuthFetch();
 
-  const [deployment, setDeployment] = useState<DeploymentDetail | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  // Use React Query hook for cached, real-time synced data
+  const { data: deployment, isLoading, refetch: refetchDeployment } = useDeployment(deploymentId);
 
   // Action states
   const [verifyingApp, setVerifyingApp] = useState<DeploymentApplication | null>(null);
@@ -221,42 +222,20 @@ export default function AdminDeploymentDetailPage() {
   const [statusChangeTarget, setStatusChangeTarget] = useState<{ status: string; label: string } | null>(null);
   const [isChangingStatus, setIsChangingStatus] = useState(false);
 
-  /* ── Fetch deployment ── */
-  const fetchDeployment = useCallback(async () => {
-    if (!deploymentId) return;
-    try {
-      const res = await authFetch(`/api/deployments/${deploymentId}`);
-      const json = await res.json();
-      if (json.success && json.data) {
-        setDeployment(json.data);
-      }
-    } catch {
-      // silent
-    } finally {
-      setIsLoading(false);
-    }
-  }, [authFetch, deploymentId]);
-
-  useEffect(() => {
-    void fetchDeployment();
-  }, [fetchDeployment]);
+  // Mutations for actions
+  const adminApproveMutation = useAdminApprove();
+  const verifyPaymentMutation = useVerifyPayment();
+  const selectApplicantMutation = useSelectApplicant();
+  const changeStatusMutation = useChangeDeploymentStatus();
 
   /* ── Admin approve selection ── */
   const handleAdminApprove = async () => {
     setIsApproving(true);
     try {
-      const res = await authFetch(`/api/deployments/${deploymentId}/admin-approve`, {
-        method: 'PATCH',
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success('تمت الموافقة على الاختيار بنجاح. تم إرسال إشعار للمتقدم بالدفع.');
-        void fetchDeployment();
-      } else {
-        toast.error(json.message ?? 'فشل الموافقة على الاختيار');
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء الموافقة');
+      await adminApproveMutation.mutateAsync({ deploymentId });
+      toast.success('تمت الموافقة على الاختيار بنجاح. تم إرسال إشعار للمتقدم بالدفع.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل الموافقة على الاختيار');
     } finally {
       setIsApproving(false);
       setShowApproveDialog(false);
@@ -268,19 +247,13 @@ export default function AdminDeploymentDetailPage() {
     if (!selectingApp) return;
     setIsSelecting(true);
     try {
-      const res = await authFetch(`/api/deployments/${deploymentId}/select-applicant`, {
-        method: 'PATCH',
-        body: JSON.stringify({ applicationId: selectingApp.id }),
+      await selectApplicantMutation.mutateAsync({ 
+        deploymentId, 
+        applicationId: selectingApp.id || selectingApp._id || '' 
       });
-      const json = await res.json();
-      if (json.success) {
-        toast.success(`تم اختيار ${selectingApp.applicantName} بنجاح. بانتظار موافقة الإدارة.`);
-        void fetchDeployment();
-      } else {
-        toast.error(json.error?.message ?? json.message ?? 'فشل اختيار المتقدم');
-      }
-    } catch {
-      toast.error('حدث خطأ أثناء اختيار المتقدم');
+      toast.success(`تم اختيار ${selectingApp.applicantName} بنجاح. بانتظار موافقة الإدارة.`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل اختيار المتقدم');
     } finally {
       setIsSelecting(false);
       setSelectingApp(null);
@@ -292,19 +265,15 @@ export default function AdminDeploymentDetailPage() {
     if (!verifyingApp) return;
     setIsVerifying(true);
     try {
-      const res = await authFetch(`/api/deployments/${deploymentId}/verify-payment`, {
-        method: 'PATCH',
-        body: JSON.stringify({ applicationId: verifyingApp.id, verified }),
+      await verifyPaymentMutation.mutateAsync({ 
+        deploymentId, 
+        applicationId: verifyingApp.id || verifyingApp._id || '', 
+        verified,
+        rejectionReason: !verified ? rejectReason : undefined
       });
-      const json = await res.json();
-      if (json.success) {
-        toast.success(verified ? 'تم التحقق من الدفع بنجاح وتم تعيين المتقدم' : 'تم رفض إثبات الدفع');
-        void fetchDeployment();
-      } else {
-        toast.error(json.message ?? 'فشل العملية');
-      }
-    } catch {
-      toast.error('حدث خطأ');
+      toast.success(verified ? 'تم التحقق من الدفع بنجاح وتم تعيين المتقدم' : 'تم رفض إثبات الدفع');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل العملية');
     } finally {
       setIsVerifying(false);
       setVerifyingApp(null);
@@ -325,7 +294,7 @@ export default function AdminDeploymentDetailPage() {
       const json = await res.json();
       if (json.success) {
         toast.success(`تم قبول ${acceptingApp.applicantName} على التكليف بنجاح`);
-        void fetchDeployment();
+        void refetchDeployment();
       } else {
         toast.error(json.message ?? 'فشل قبول التقديم');
       }
@@ -342,19 +311,10 @@ export default function AdminDeploymentDetailPage() {
     if (!statusChangeTarget || !deployment) return;
     setIsChangingStatus(true);
     try {
-      const res = await authFetch(`/api/deployments/${deploymentId}`, {
-        method: 'PATCH',
-        body: JSON.stringify({ status: statusChangeTarget.status }),
-      });
-      const json = await res.json();
-      if (json.success) {
-        toast.success(`تم تحديث حالة التكليف إلى: ${statusChangeTarget.label}`);
-        void fetchDeployment();
-      } else {
-        toast.error(json.message ?? 'فشل تحديث الحالة');
-      }
-    } catch {
-      toast.error('حدث خطأ');
+      await changeStatusMutation.mutateAsync({ deploymentId, status: statusChangeTarget.status });
+      toast.success(`تم تحديث حالة التكليف إلى: ${statusChangeTarget.label}`);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'فشل تحديث الحالة');
     } finally {
       setIsChangingStatus(false);
       setStatusChangeTarget(null);
