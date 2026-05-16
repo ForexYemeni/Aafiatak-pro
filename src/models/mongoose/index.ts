@@ -77,3 +77,7 @@ export type { IDeployment, IDeploymentApplication } from './Deployment';
 // Specialization model (تخصصات)
 export { Specialization } from './Specialization';
 export type { ISpecialization } from './Specialization';
+
+// Firebase Config model (إعدادات Firebase)
+export { default as FirebaseConfig } from './FirebaseConfig';
+export type { IFirebaseConfig } from './FirebaseConfig';

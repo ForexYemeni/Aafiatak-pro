@@ -1,6 +1,6 @@
-import { SPECIALIZATION_LABELS, YEMEN_GOVERNORATES } from '@/lib/constants';
 'use client';
 
+import { YEMEN_GOVERNORATES } from '@/lib/constants';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
