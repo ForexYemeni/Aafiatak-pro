@@ -7,7 +7,7 @@ import { connectDB } from '@/lib/mongodb';
 import { User, Nurse, Beneficiary } from '@/models/mongoose';
 import { Service } from '@/models/mongoose/Service';
 import { AdminSettings } from '@/models/mongoose/AdminSettings';
-import { FirebaseConfig } from '@/models/mongoose/FirebaseConfig';
+import FirebaseConfig from '@/models/mongoose/FirebaseConfig';
 import { hashPassword, generateReferralCode } from '@/lib/auth';
 
 const defaultServices = [
