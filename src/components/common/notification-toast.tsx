@@ -5,6 +5,7 @@ import { toast } from 'sonner';
 import { useRouter } from 'next/navigation';
 import type { NotificationType, NotificationPriority } from '@/types';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { notificationLogger } from '@/lib/notifications/notification-logger';
 
 // ============================================================================
 // Notification Toast Utilities
@@ -184,6 +185,12 @@ export function NotificationToastListener() {
         type: notification.type,
         priority: notification.priority,
         actionUrl,
+      });
+
+      notificationLogger.logNotification('displayed', notification.id, {
+        type: notification.type,
+        priority: notification.priority,
+        channel: 'toast',
       });
 
       // Also show a browser notification if the app is in the background
