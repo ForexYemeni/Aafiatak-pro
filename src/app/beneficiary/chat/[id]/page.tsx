@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthFetch, invalidateAuthFetchCache } from '@/hooks/use-auth';
 import { useSocket } from '@/hooks/use-socket';
 import { setActiveChatId } from '@/components/providers/socket-provider';
 import { toast } from 'sonner';
@@ -110,6 +110,7 @@ export default function ChatDetailPage() {
   const fetchMessages = useCallback(async () => {
     if (!chatId) return;
     try {
+      invalidateAuthFetchCache(`/api/chat/${chatId}/messages`);
       const res = await authFetch(`/api/chat/${chatId}/messages?limit=50`);
       const data = await res.json();
       if (data.success && data.data) {
@@ -118,7 +119,8 @@ export default function ChatDetailPage() {
           setMessages((prev) => {
             const serverIds = new Set(msgs.map((m) => m.id));
             const stillPending = prev.filter((m) => (m.isPending || m.isFailed) && !serverIds.has(m.id));
-            return [...msgs, ...stillPending];
+            const confirmedNotInServer = prev.filter((m) => !m.isPending && !m.isFailed && !serverIds.has(m.id));
+            return [...msgs, ...confirmedNotInServer, ...stillPending];
           });
         }
       }
@@ -142,7 +144,7 @@ export default function ChatDetailPage() {
     }).catch(() => {});
   }, [chatId, authFetch]);
 
-  // Polling — smart merge preserving optimistic messages
+  // Polling — smart merge preserving optimistic + recently confirmed messages
   useEffect(() => {
     if (!chatId) return;
     const interval = setInterval(async () => {
@@ -155,7 +157,9 @@ export default function ChatDetailPage() {
             setMessages((prev) => {
               const serverIds = new Set(msgs.map((m) => m.id));
               const stillPending = prev.filter((m) => (m.isPending || m.isFailed) && !serverIds.has(m.id));
-              return [...msgs, ...stillPending];
+              // Also keep confirmed messages not yet in server response (cache timing)
+              const confirmedNotInServer = prev.filter((m) => !m.isPending && !m.isFailed && !serverIds.has(m.id));
+              return [...msgs, ...confirmedNotInServer, ...stillPending];
             });
           }
         }
@@ -229,6 +233,9 @@ export default function ChatDetailPage() {
       });
       const data = await res.json();
       if (data.success && data.data) {
+        // Invalidate cache so next poll gets fresh data including this message
+        invalidateAuthFetchCache(`/api/chat/${chatId}/messages`);
+        invalidateAuthFetchCache('/api/chat');
         setMessages((prev) => [
           ...prev.filter((m) => m.id !== tempId),
           { ...data.data } as ChatMessage,

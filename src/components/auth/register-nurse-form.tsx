@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -25,7 +25,9 @@ import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
+  SelectGroup,
   SelectItem,
+  SelectLabel,
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
@@ -33,6 +35,11 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 import { YEMEN_GOVERNORATES } from '@/lib/constants/governorates';
 import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { cn } from '@/lib/utils';
+import {
+  DEFAULT_SPECIALIZATIONS,
+  SPECIALIZATION_CATEGORIES,
+  SPECIALIZATION_CATEGORIES_META,
+} from '@/lib/constants';
 
 const nurseRegisterSchema = z
   .object({
@@ -65,18 +72,18 @@ interface RegisterNurseFormProps {
   className?: string;
 }
 
-const specializations = [
-  { value: 'general_nursing', label: 'تمريض عام' },
-  { value: 'critical_care', label: 'الرعاية الحرجة' },
-  { value: 'pediatric', label: 'طب الأطفال' },
-  { value: 'elderly_care', label: 'رعاية المسنين' },
-  { value: 'physiotherapy', label: 'العلاج الطبيعي' },
-  { value: 'wound_care', label: 'علاج الجروح' },
-  { value: 'iv_therapy', label: 'العلاج الوريدي' },
-  { value: 'mental_health', label: 'الصحة النفسية' },
-  { value: 'post_surgery', label: 'رعاية ما بعد الجراحة' },
-  { value: 'emergency', label: 'الطوارئ' },
-];
+// Dynamic specializations grouped by category
+const specializationGroups = SPECIALIZATION_CATEGORIES.map((cat) => {
+  const meta = SPECIALIZATION_CATEGORIES_META.find((m) => m.id === cat);
+  const items = DEFAULT_SPECIALIZATIONS
+    .filter((s) => s.category === cat)
+    .sort((a, b) => (a.order || 0) - (b.order || 0));
+  return {
+    category: cat,
+    icon: meta?.icon || '📋',
+    items,
+  };
+}).filter((g) => g.items.length > 0);
 
 function FloatingParticles() {
   return (
@@ -306,10 +313,17 @@ export function RegisterNurseForm({ onBack, className }: RegisterNurseFormProps)
                   <SelectValue placeholder="اختر" />
                 </SelectTrigger>
                 <SelectContent>
-                  {specializations.map((spec) => (
-                    <SelectItem key={spec.value} value={spec.value}>
-                      {spec.label}
-                    </SelectItem>
+                  {specializationGroups.map((group) => (
+                    <SelectGroup key={group.category}>
+                      <SelectLabel className="text-xs font-bold text-muted-foreground">
+                        {group.icon} {group.category}
+                      </SelectLabel>
+                      {group.items.map((spec) => (
+                        <SelectItem key={spec.id} value={spec.id}>
+                          {spec.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
                   ))}
                 </SelectContent>
               </Select>

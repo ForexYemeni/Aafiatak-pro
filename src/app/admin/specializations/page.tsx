@@ -4,16 +4,21 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Plus, Pencil, Trash2, ToggleLeft, ToggleRight, Search,
-  Stethoscope, Save, X, ChevronDown, ChevronUp, AlertCircle, Check,
+  Stethoscope, Save, X, AlertCircle, Check, GripVertical,
+  ChevronDown, ChevronUp, ArrowUpDown,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { GlassCard } from '@/components/common/glass-card';
-import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthFetch, invalidateAuthFetchCache } from '@/hooks/use-auth';
 import { toast } from 'sonner';
-import { SPECIALIZATION_CATEGORIES } from '@/lib/constants';
+import {
+  SPECIALIZATION_CATEGORIES,
+  SPECIALIZATION_CATEGORIES_META,
+  getCategoryMeta,
+} from '@/lib/constants';
 
 interface SpecItem {
   _id?: string;
@@ -25,18 +30,6 @@ interface SpecItem {
   order: number;
 }
 
-const categoryColors: Record<string, string> = {
-  'تمريض': 'bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400',
-  'مختبر': 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400',
-  'أشعة': 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400',
-  'طبي': 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-400',
-  'توليد': 'bg-pink-100 text-pink-700 dark:bg-pink-900/30 dark:text-pink-400',
-  'علاج': 'bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400',
-  'طوارئ': 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400',
-  'رعاية': 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
-  'أخرى': 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400',
-};
-
 export default function AdminSpecializationsPage() {
   const authFetch = useAuthFetch();
   const [specs, setSpecs] = useState<SpecItem[]>([]);
@@ -46,6 +39,7 @@ export default function AdminSpecializationsPage() {
   const [showAdd, setShowAdd] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [collapsedCats, setCollapsedCats] = useState<Set<string>>(new Set());
 
   // Form state
   const [formId, setFormId] = useState('');
@@ -55,9 +49,19 @@ export default function AdminSpecializationsPage() {
 
   const fetchSpecs = useCallback(async () => {
     try {
+      invalidateAuthFetchCache('/api/admin/specializations');
       const res = await authFetch('/api/admin/specializations');
       const data = await res.json();
-      if (data.success) setSpecs(data.data);
+      if (data.success) {
+        // Sort by order then by category order
+        const sorted = (data.data as SpecItem[]).sort((a, b) => {
+          const catA = SPECIALIZATION_CATEGORIES.indexOf(a.category);
+          const catB = SPECIALIZATION_CATEGORIES.indexOf(b.category);
+          if (catA !== catB) return catA - catB;
+          return (a.order || 0) - (b.order || 0);
+        });
+        setSpecs(sorted);
+      }
     } catch {
       toast.error('فشل جلب التخصصات');
     } finally {
@@ -76,8 +80,11 @@ export default function AdminSpecializationsPage() {
     return matchSearch && matchCat;
   });
 
+  // Group by category in proper order
   const grouped = SPECIALIZATION_CATEGORIES.reduce<Record<string, SpecItem[]>>((acc, cat) => {
-    const items = filtered.filter((s) => s.category === cat);
+    const items = filtered
+      .filter((s) => s.category === cat)
+      .sort((a, b) => (a.order || 0) - (b.order || 0));
     if (items.length > 0) acc[cat] = items;
     return acc;
   }, {});
@@ -85,9 +92,19 @@ export default function AdminSpecializationsPage() {
   // Add any uncategorized
   filtered.forEach((s) => {
     if (!SPECIALIZATION_CATEGORIES.includes(s.category)) {
-      grouped[s.category] = [...(grouped[s.category] || []), s];
+      if (!grouped[s.category]) grouped[s.category] = [];
+      grouped[s.category].push(s);
     }
   });
+
+  const toggleCollapse = (cat: string) => {
+    setCollapsedCats((prev) => {
+      const next = new Set(prev);
+      if (next.has(cat)) next.delete(cat);
+      else next.add(cat);
+      return next;
+    });
+  };
 
   const handleAddNew = async () => {
     if (!formId.trim() || !formLabel.trim()) {
@@ -179,6 +196,7 @@ export default function AdminSpecializationsPage() {
 
   const activeCount = specs.filter((s) => s.isActive).length;
   const totalCount = specs.length;
+  const inactiveCount = totalCount - activeCount;
 
   return (
     <div className="space-y-6">
@@ -188,8 +206,8 @@ export default function AdminSpecializationsPage() {
           style={{ backgroundImage: 'radial-gradient(circle at 20% 50%, white 1px, transparent 1px)', backgroundSize: '24px 24px' }} />
         <div className="relative flex items-start justify-between gap-4 flex-wrap">
           <div className="flex items-center gap-4">
-            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center">
-              <Stethoscope className="w-7 h-7" />
+            <div className="w-14 h-14 rounded-2xl bg-white/20 flex items-center justify-center text-2xl">
+              🩺
             </div>
             <div>
               <h1 className="text-xl font-bold">إدارة التخصصات</h1>
@@ -197,9 +215,16 @@ export default function AdminSpecializationsPage() {
             </div>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
-            <div className="px-3 py-1.5 rounded-xl bg-white/20 text-sm font-medium">
-              {activeCount} / {totalCount} مفعّل
+            <div className="px-3 py-1.5 rounded-xl bg-white/20 text-sm font-medium flex items-center gap-2">
+              <span className="inline-block w-2 h-2 rounded-full bg-green-400" />
+              {activeCount} مفعّل
             </div>
+            {inactiveCount > 0 && (
+              <div className="px-3 py-1.5 rounded-xl bg-white/10 text-sm font-medium flex items-center gap-2">
+                <span className="inline-block w-2 h-2 rounded-full bg-white/40" />
+                {inactiveCount} معطّل
+              </div>
+            )}
             <Button
               onClick={() => setShowAdd(true)}
               className="bg-white text-admin hover:bg-white/90 gap-2 font-semibold"
@@ -254,8 +279,8 @@ export default function AdminSpecializationsPage() {
                     className="w-full h-9 px-3 rounded-md border bg-background text-sm"
                     dir="rtl"
                   >
-                    {SPECIALIZATION_CATEGORIES.map((cat) => (
-                      <option key={cat} value={cat}>{cat}</option>
+                    {SPECIALIZATION_CATEGORIES_META.map((cat) => (
+                      <option key={cat.id} value={cat.id}>{cat.icon} {cat.label}</option>
                     ))}
                   </select>
                 </div>
@@ -297,15 +322,15 @@ export default function AdminSpecializationsPage() {
             >
               الكل ({specs.length})
             </button>
-            {SPECIALIZATION_CATEGORIES.filter((cat) =>
-              specs.some((s) => s.category === cat)
+            {SPECIALIZATION_CATEGORIES_META.filter((cat) =>
+              specs.some((s) => s.category === cat.id)
             ).map((cat) => (
               <button
-                key={cat}
-                onClick={() => setSelectedCategory(cat === selectedCategory ? '' : cat)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${selectedCategory === cat ? 'bg-admin text-white border-admin' : 'border-border hover:bg-muted/50'}`}
+                key={cat.id}
+                onClick={() => setSelectedCategory(cat.id === selectedCategory ? '' : cat.id)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors border ${selectedCategory === cat.id ? 'bg-admin text-white border-admin' : `${cat.bgColor} ${cat.borderColor} ${cat.color} hover:opacity-80`}`}
               >
-                {cat} ({specs.filter((s) => s.category === cat).length})
+                {cat.icon} {cat.label} ({specs.filter((s) => s.category === cat.id).length})
               </button>
             ))}
           </div>
@@ -325,35 +350,76 @@ export default function AdminSpecializationsPage() {
         </GlassCard>
       ) : (
         <div className="space-y-4">
-          {Object.entries(grouped).map(([category, items]) => (
-            <GlassCard key={category} variant="admin" className="p-4">
-              <div className="flex items-center gap-2 mb-3 pb-3 border-b border-border">
-                <span className={`px-2.5 py-1 rounded-lg text-xs font-semibold ${categoryColors[category] || 'bg-gray-100 text-gray-700'}`}>
-                  {category}
-                </span>
-                <span className="text-xs text-muted-foreground">{items.length} تخصص</span>
-              </div>
-              <div className="space-y-2">
-                {items.map((spec) => (
-                  <SpecRow
-                    key={spec.id}
-                    spec={spec}
-                    isEditing={editingId === spec.id}
-                    isDeleting={deletingId === spec.id}
-                    onEdit={() => setEditingId(spec.id)}
-                    onCancelEdit={() => setEditingId(null)}
-                    onSaveEdit={handleSaveEdit}
-                    onToggle={handleToggle}
-                    onDeleteRequest={() => setDeletingId(spec.id)}
-                    onDeleteConfirm={() => handleDelete(spec)}
-                    onDeleteCancel={() => setDeletingId(null)}
-                    formSaving={formSaving}
-                    categoryColors={categoryColors}
-                  />
-                ))}
-              </div>
-            </GlassCard>
-          ))}
+          {Object.entries(grouped).map(([category, items]) => {
+            const meta = getCategoryMeta(category);
+            const isCollapsed = collapsedCats.has(category);
+            const catActiveCount = items.filter((s) => s.isActive).length;
+
+            return (
+              <GlassCard key={category} variant="admin" className="overflow-hidden p-0">
+                {/* Category Header */}
+                <button
+                  onClick={() => toggleCollapse(category)}
+                  className={`w-full flex items-center gap-3 p-4 text-right transition-colors hover:bg-muted/30 ${meta?.bgColor || 'bg-muted/20'}`}
+                >
+                  <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg ${meta?.bgColor || 'bg-muted/50'}`}>
+                    {meta?.icon || '📋'}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className={`font-bold text-sm ${meta?.color || ''}`}>{category}</h3>
+                      <span className="text-[10px] text-muted-foreground">({catActiveCount}/{items.length} مفعّل)</span>
+                    </div>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">{meta?.description || 'تخصصات'}</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Badge variant="outline" className={`text-[10px] h-5 ${meta?.borderColor || ''} ${meta?.color || ''}`}>
+                      {items.length}
+                    </Badge>
+                    {isCollapsed ? (
+                      <ChevronDown className="w-4 h-4 text-muted-foreground" />
+                    ) : (
+                      <ChevronUp className="w-4 h-4 text-muted-foreground" />
+                    )}
+                  </div>
+                </button>
+
+                {/* Category Items */}
+                <AnimatePresence>
+                  {!isCollapsed && (
+                    <motion.div
+                      initial={{ height: 0, opacity: 0 }}
+                      animate={{ height: 'auto', opacity: 1 }}
+                      exit={{ height: 0, opacity: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="overflow-hidden"
+                    >
+                      <div className="divide-y divide-border/50 px-2 pb-2">
+                        {items.map((spec, index) => (
+                          <SpecRow
+                            key={spec.id}
+                            spec={spec}
+                            index={index + 1}
+                            isEditing={editingId === spec.id}
+                            isDeleting={deletingId === spec.id}
+                            onEdit={() => setEditingId(spec.id)}
+                            onCancelEdit={() => setEditingId(null)}
+                            onSaveEdit={handleSaveEdit}
+                            onToggle={handleToggle}
+                            onDeleteRequest={() => setDeletingId(spec.id)}
+                            onDeleteConfirm={() => handleDelete(spec)}
+                            onDeleteCancel={() => setDeletingId(null)}
+                            formSaving={formSaving}
+                            categoryMeta={meta}
+                          />
+                        ))}
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </GlassCard>
+            );
+          })}
         </div>
       )}
     </div>
@@ -364,6 +430,7 @@ export default function AdminSpecializationsPage() {
 
 interface SpecRowProps {
   spec: SpecItem;
+  index: number;
   isEditing: boolean;
   isDeleting: boolean;
   onEdit: () => void;
@@ -374,13 +441,13 @@ interface SpecRowProps {
   onDeleteConfirm: () => void;
   onDeleteCancel: () => void;
   formSaving: boolean;
-  categoryColors: Record<string, string>;
+  categoryMeta: ReturnType<typeof getCategoryMeta>;
 }
 
 function SpecRow({
-  spec, isEditing, isDeleting, onEdit, onCancelEdit, onSaveEdit,
+  spec, index, isEditing, isDeleting, onEdit, onCancelEdit, onSaveEdit,
   onToggle, onDeleteRequest, onDeleteConfirm, onDeleteCancel,
-  formSaving, categoryColors,
+  formSaving, categoryMeta,
 }: SpecRowProps) {
   const [editLabel, setEditLabel] = useState(spec.label);
   const [editCategory, setEditCategory] = useState(spec.category);
@@ -390,7 +457,7 @@ function SpecRow({
   }, [isEditing, spec.label, spec.category]);
 
   return (
-    <div className={`rounded-xl border p-3 transition-colors ${spec.isActive ? 'bg-card' : 'bg-muted/30 opacity-60'}`}>
+    <div className={`py-2.5 px-3 transition-colors ${spec.isActive ? 'hover:bg-muted/20' : 'opacity-50'}`}>
       {isEditing ? (
         <div className="space-y-2">
           <div className="grid grid-cols-2 gap-2">
@@ -406,8 +473,8 @@ function SpecRow({
                 className="w-full h-8 px-2 rounded-md border bg-background text-sm"
                 dir="rtl"
               >
-                {SPECIALIZATION_CATEGORIES.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
+                {SPECIALIZATION_CATEGORIES_META.map((cat) => (
+                  <option key={cat.id} value={cat.id}>{cat.icon} {cat.label}</option>
                 ))}
               </select>
             </div>
@@ -431,12 +498,20 @@ function SpecRow({
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          {/* Order Number */}
+          <span className="w-6 h-6 rounded-md bg-muted/50 flex items-center justify-center text-[10px] text-muted-foreground font-mono shrink-0">
+            {index}
+          </span>
+
+          {/* Spec Info */}
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
               <span className="font-medium text-sm">{spec.label}</span>
               {spec.isDefault && (
-                <Badge variant="outline" className="text-[9px] h-4 px-1.5">افتراضي</Badge>
+                <Badge variant="outline" className="text-[9px] h-4 px-1.5 bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800 text-blue-600 dark:text-blue-400">
+                  افتراضي
+                </Badge>
               )}
               {!spec.isActive && (
                 <Badge variant="secondary" className="text-[9px] h-4 px-1.5">معطّل</Badge>
@@ -444,7 +519,9 @@ function SpecRow({
             </div>
             <p className="text-[10px] text-muted-foreground mt-0.5 font-mono">{spec.id}</p>
           </div>
-          <div className="flex items-center gap-1.5 shrink-0">
+
+          {/* Actions */}
+          <div className="flex items-center gap-1 shrink-0">
             <button
               onClick={onToggle}
               className={`p-1.5 rounded-lg transition-colors ${spec.isActive ? 'text-green-600 hover:bg-green-50 dark:hover:bg-green-900/20' : 'text-muted-foreground hover:bg-muted/50'}`}

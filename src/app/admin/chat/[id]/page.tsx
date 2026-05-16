@@ -9,7 +9,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/common/empty-state';
-import { useAuthFetch } from '@/hooks/use-auth';
+import { useAuthFetch, invalidateAuthFetchCache } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { formatTimeOnly } from '@/components/common/date-formatter';
 import { setActiveChatId } from '@/components/providers/socket-provider';
@@ -76,6 +76,7 @@ export default function AdminChatDetailPage({ params }: { params: Promise<{ id: 
   const fetchMessages = useCallback(async () => {
     if (!chatId) return;
     try {
+      invalidateAuthFetchCache(`/api/chat/${chatId}/messages`);
       const res = await authFetch(`/api/chat/${chatId}/messages?limit=100`);
       const data = await res.json();
       if (data.success && data.data) {
@@ -84,7 +85,8 @@ export default function AdminChatDetailPage({ params }: { params: Promise<{ id: 
           setMessages((prev) => {
             const serverIds = new Set(msgs.map((m) => m.id));
             const stillPending = prev.filter((m) => (m.isPending || m.isFailed) && !serverIds.has(m.id));
-            return [...msgs, ...stillPending];
+            const confirmedNotInServer = prev.filter((m) => !m.isPending && !m.isFailed && !serverIds.has(m.id));
+            return [...msgs, ...confirmedNotInServer, ...stillPending];
           });
         }
       }
@@ -107,7 +109,7 @@ export default function AdminChatDetailPage({ params }: { params: Promise<{ id: 
     }).catch(() => {});
   }, [chatId, authFetch]);
 
-  // Polling — smart merge preserving optimistic messages
+  // Polling — smart merge preserving optimistic + recently confirmed messages
   useEffect(() => {
     if (!chatId) return;
     const interval = setInterval(async () => {
@@ -120,7 +122,8 @@ export default function AdminChatDetailPage({ params }: { params: Promise<{ id: 
             setMessages((prev) => {
               const serverIds = new Set(msgs.map((m) => m.id));
               const stillPending = prev.filter((m) => (m.isPending || m.isFailed) && !serverIds.has(m.id));
-              return [...msgs, ...stillPending];
+              const confirmedNotInServer = prev.filter((m) => !m.isPending && !m.isFailed && !serverIds.has(m.id));
+              return [...msgs, ...confirmedNotInServer, ...stillPending];
             });
           }
         }
@@ -161,6 +164,9 @@ export default function AdminChatDetailPage({ params }: { params: Promise<{ id: 
       });
       const data = await res.json();
       if (data.success && data.data) {
+        // Invalidate cache so next poll gets fresh data including this message
+        invalidateAuthFetchCache(`/api/chat/${chatId}/messages`);
+        invalidateAuthFetchCache('/api/chat');
         setMessages((prev) => [
           ...prev.filter((m) => m.id !== tempId),
           { ...data.data } as ChatMessage,
