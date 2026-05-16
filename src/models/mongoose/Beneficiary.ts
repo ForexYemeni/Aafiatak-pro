@@ -1,4 +1,4 @@
-import mongoose, { Schema, Document } from 'mongoose';
+import mongoose, { Schema, Document, Types } from 'mongoose';
 import { User } from './User';
 
 export interface IBeneficiary extends Document {
@@ -7,7 +7,7 @@ export interface IBeneficiary extends Document {
   password: string;
   role: 'beneficiary';
   referralCode: string;
-  referredBy?: string;
+  referredBy?: Types.ObjectId;
   address?: string;
   city?: string;
   governorate?: string;
@@ -30,7 +30,7 @@ export interface IBeneficiary extends Document {
 
 const BeneficiarySchema = new Schema({
   referralCode: { type: String, required: true, unique: true },
-  referredBy: { type: String },
+  referredBy: { type: Schema.Types.ObjectId, ref: 'Beneficiary' },
   address: { type: String },
   city: { type: String },
   governorate: { type: String },
@@ -53,6 +53,8 @@ const BeneficiarySchema = new Schema({
 // ── Performance Indexes ──────────────────────────────────────────────
   BeneficiarySchema.index({ governorate: 1 });
   BeneficiarySchema.index({ loyaltyTier: 1, loyaltyPoints: -1 });
+  BeneficiarySchema.index({ referredBy: 1 });
+  BeneficiarySchema.index({ referralCode: 1 }, { unique: true });
 
   // Safe discriminator registration - prevents "Discriminator with name already exists" error
 function getBeneficiaryModel() {

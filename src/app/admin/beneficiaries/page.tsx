@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Eye, RefreshCw, MapPin, Phone, MessageCircle, Ban, Trash2, Shield, Heart, Navigation, Activity, TrendingUp, UserCheck } from 'lucide-react';
+import { Users, Eye, RefreshCw, MapPin, Phone, MessageCircle, Ban, Trash2, Shield, Heart, Navigation, Activity, TrendingUp, UserCheck, UserPlus, Copy, CheckCircle2, Loader2 } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -47,6 +47,9 @@ interface BeneficiaryItem {
   totalSpent: number;
   orderCount: number;
   referralCode: string;
+  referralCount?: number;
+  referredByName?: string | null;
+  referredByCode?: string | null;
   gender: string | null;
   bloodType?: string | null;
   medicalConditions?: string[];
@@ -98,6 +101,12 @@ export default function AdminBeneficiariesPage() {
   const [deleteTarget, setDeleteTarget] = useState<BeneficiaryItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
 
+  // Referral detail state
+  const [referralTarget, setReferralTarget] = useState<BeneficiaryItem | null>(null);
+  const [referredUsers, setReferredUsers] = useState<any[]>([]);
+  const [isLoadingReferrals, setIsLoadingReferrals] = useState(false);
+  const [copiedCode, setCopiedCode] = useState('');
+
   const fetchBeneficiaries = useCallback(async () => {
     setIsLoading(true);
     try {
@@ -107,7 +116,8 @@ export default function AdminBeneficiariesPage() {
         search,
         ...(statusFilter !== 'all' ? { status: statusFilter } : {}),
       });
-      const res = await authFetch(`/api/admin/beneficiaries?${params}`);
+      // Use referrals API which includes referralCount
+      const res = await authFetch(`/api/admin/referrals?${params}`);
       const json = await res.json();
       if (json.success && json.data) {
         const items = json.data.beneficiaries ?? json.data;
@@ -164,6 +174,23 @@ export default function AdminBeneficiariesPage() {
       toast.error('فشل تغيير حالة الحظر');
     } finally {
       setBlockTarget(null);
+    }
+  };
+
+  const fetchReferralDetails = async (ben: BeneficiaryItem) => {
+    setReferralTarget(ben);
+    setIsLoadingReferrals(true);
+    try {
+      const res = await authFetch(`/api/admin/referrals/${ben.id}`);
+      const json = await res.json();
+      if (json.success && json.data) {
+        setReferredUsers(json.data.referredUsers || []);
+      }
+    } catch {
+      toast.error('فشل تحميل تفاصيل الإحالات');
+      setReferredUsers([]);
+    } finally {
+      setIsLoadingReferrals(false);
     }
   };
 
@@ -243,6 +270,18 @@ export default function AdminBeneficiariesPage() {
       cell: ({ row }) => <span className="text-sm font-medium">{row.original.orderCount}</span>,
     },
     {
+      accessorKey: 'referralCount',
+      header: 'الإحالات',
+      cell: ({ row }) => {
+        const count = row.original.referralCount || 0;
+        return (
+          <span className={`text-sm font-medium ${count > 0 ? 'text-beneficiary' : 'text-muted-foreground'}`}>
+            {count}
+          </span>
+        );
+      },
+    },
+    {
       accessorKey: 'status',
       header: 'الحالة',
       cell: ({ row }) => (
@@ -263,6 +302,10 @@ export default function AdminBeneficiariesPage() {
     {
       label: 'عرض التفاصيل',
       onClick: (row: Record<string, unknown>) => setViewTarget(row as unknown as BeneficiaryItem),
+    },
+    {
+      label: 'عرض التابعين',
+      onClick: (row: Record<string, unknown>) => fetchReferralDetails(row as unknown as BeneficiaryItem),
     },
     {
       label: (row: Record<string, unknown>) => ((row as unknown as BeneficiaryItem).status === 'active' ? 'تعطيل' : 'تفعيل'),
@@ -342,8 +385,40 @@ export default function AdminBeneficiariesPage() {
         </div>
         <div className="glass rounded-xl p-3">
           <p className="text-xs text-muted-foreground">كود الإحالة</p>
-          <p className="text-sm font-mono font-bold">{ben.referralCode}</p>
+          <div className="flex items-center gap-1.5">
+            <p className="text-sm font-mono font-bold">{ben.referralCode}</p>
+            <button
+              onClick={async () => {
+                try {
+                  await navigator.clipboard.writeText(ben.referralCode);
+                  setCopiedCode(ben.referralCode);
+                  setTimeout(() => setCopiedCode(''), 2000);
+                } catch {}
+              }}
+              className="text-muted-foreground hover:text-foreground"
+            >
+              {copiedCode === ben.referralCode ? <CheckCircle2 className="w-3.5 h-3.5 text-green-500" /> : <Copy className="w-3.5 h-3.5" />}
+            </button>
+          </div>
         </div>
+        <div className="glass rounded-xl p-3">
+          <p className="text-xs text-muted-foreground">عدد التابعين</p>
+          <p className={`text-sm font-bold ${(ben.referralCount || 0) > 0 ? 'text-beneficiary' : ''}`}>{ben.referralCount || 0}</p>
+        </div>
+        {(ben.referralCount || 0) > 0 && (
+          <div className="glass rounded-xl p-3 flex items-end">
+            <Button size="sm" variant="outline" className="gap-1.5 text-xs w-full" onClick={() => fetchReferralDetails(ben)}>
+              <UserPlus className="w-3.5 h-3.5" />
+              عرض التابعين
+            </Button>
+          </div>
+        )}
+        {ben.referredByName && (
+          <div className="glass rounded-xl p-3 col-span-2">
+            <p className="text-xs text-muted-foreground">تمت إحالته بواسطة</p>
+            <p className="text-sm font-medium">{ben.referredByName} {ben.referredByCode ? `(${ben.referredByCode})` : ''}</p>
+          </div>
+        )}
         {ben.bloodType && (
           <div className="glass rounded-xl p-3">
             <p className="text-xs text-muted-foreground">فصيلة الدم</p>
@@ -572,6 +647,69 @@ export default function AdminBeneficiariesPage() {
         onConfirm={handleDelete}
         isLoading={isDeleting}
       />
+
+      {/* Referral Details Dialog */}
+      <Dialog open={!!referralTarget} onOpenChange={(open) => { if (!open) { setReferralTarget(null); setReferredUsers([]); } }}>
+        <DialogContent dir="rtl" className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <UserPlus className="w-5 h-5 text-beneficiary" />
+              تابعو {referralTarget?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {/* Referrer Summary */}
+            <div className="glass rounded-xl p-3 flex items-center justify-between">
+              <div>
+                <p className="text-xs text-muted-foreground">كود الإحالة</p>
+                <p className="text-lg font-mono font-bold text-beneficiary">{referralTarget?.referralCode}</p>
+              </div>
+              <div className="text-left">
+                <p className="text-xs text-muted-foreground">عدد التابعين</p>
+                <p className="text-2xl font-bold text-beneficiary">{referredUsers.length}</p>
+              </div>
+            </div>
+
+            {/* Referred Users List */}
+            {isLoadingReferrals ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+              </div>
+            ) : referredUsers.length === 0 ? (
+              <div className="text-center py-8">
+                <Users className="w-10 h-10 text-muted-foreground mx-auto mb-2" />
+                <p className="text-sm text-muted-foreground">لا يوجد تابعون لهذا المستخدم</p>
+              </div>
+            ) : (
+              <div className="space-y-2 max-h-72 overflow-y-auto custom-scrollbar">
+                {referredUsers.map((ru: any, i: number) => (
+                  <div key={ru.id || i} className="glass rounded-xl p-3 flex items-center gap-3">
+                    <Avatar className="w-9 h-9">
+                      <AvatarFallback className="bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400 text-xs">
+                        {(ru.name || 'م').slice(0, 2)}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium">{ru.name || 'مستخدم'}</p>
+                      {ru.phone && <p className="text-xs text-muted-foreground">{ru.phone}</p>}
+                    </div>
+                    <div className="text-left">
+                      <Badge variant={ru.isActive !== false ? 'default' : 'secondary'} className="text-[10px]">
+                        {ru.isActive !== false ? 'نشط' : 'غير نشط'}
+                      </Badge>
+                      {ru.joinedAt && (
+                        <p className="text-[10px] text-muted-foreground mt-1">
+                          {new Date(ru.joinedAt).toLocaleDateString('ar-YE', { month: 'short', day: 'numeric' })}
+                        </p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 }

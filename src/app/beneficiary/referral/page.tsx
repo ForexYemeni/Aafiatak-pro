@@ -14,7 +14,6 @@ import {
   MessageSquare,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Separator } from '@/components/ui/separator';
 import { GlassCard } from '@/components/common/glass-card';
 import { Currency, toArabicNumerals } from '@/components/common/currency';
@@ -31,17 +30,31 @@ const referralStatusLabels: Record<ReferralStatus, { label: string; color: strin
   expired: { label: 'منتهي', color: 'text-red-500' },
 };
 
+interface ReferralData {
+  referralCode: string;
+  code: string;
+  referredBy: { name: string; referralCode: string } | null;
+  loyaltyPoints: number;
+  totalReferrals: number;
+  completedReferrals: number;
+  totalRewards: number;
+  reward: number;
+  referrals: (Referral & { referredName?: string; referredPhone?: string })[];
+}
+
 export default function ReferralPage() {
   const token = useAuthStore((s) => s.token);
   const user = useAuthStore((s) => s.user);
   const { toast } = useToast();
   const [referralCode, setReferralCode] = useState('');
   const [rewardPoints, setRewardPoints] = useState(0);
-  const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [referredByInfo, setReferredByInfo] = useState<{ name: string; referralCode: string } | null>(null);
+  const [referrals, setReferrals] = useState<(Referral & { referredName?: string; referredPhone?: string })[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [copied, setCopied] = useState(false);
 
-  const referralCodeFromUser = (user as { referralCode?: string } | null)?.referralCode ?? referralCode;
+  // Prefer code from API response, then user store, then empty
+  const activeCode = referralCode || (user as { referralCode?: string } | null)?.referralCode || '';
 
   const fetchReferral = useCallback(async () => {
     if (!token) return;
@@ -50,29 +63,35 @@ export default function ReferralPage() {
       const res = await fetch('/api/beneficiary/referral', {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const data: ApiResponse<{ code: string; reward: number; referrals: Referral[] }> = await res.json();
+      const data: ApiResponse<ReferralData> = await res.json();
       if (data.success && data.data) {
-        setReferralCode(data.data.code);
-        setRewardPoints(data.data.reward);
+        // API returns both `referralCode` and `code` for compatibility
+        const code = data.data.referralCode || data.data.code || '';
+        setReferralCode(code);
+        setRewardPoints(data.data.totalRewards || data.data.reward || 0);
+        setReferredByInfo(data.data.referredBy || null);
         if (Array.isArray(data.data.referrals)) {
           setReferrals(data.data.referrals);
         }
       }
     } catch {
-      // Error handled silently
+      toast({ title: 'فشل تحميل بيانات الإحالة', variant: 'destructive' });
     } finally {
       setIsLoading(false);
     }
-  }, [token]);
+  }, [token, toast]);
 
   useEffect(() => {
     fetchReferral();
   }, [fetchReferral]);
 
   const copyCode = async () => {
-    const code = referralCodeFromUser || 'AF000000';
+    if (!activeCode) {
+      toast({ title: 'لا يوجد كود إحالة حالياً', variant: 'destructive' });
+      return;
+    }
     try {
-      await navigator.clipboard.writeText(code);
+      await navigator.clipboard.writeText(activeCode);
       setCopied(true);
       toast({ title: 'تم نسخ الكود' });
       setTimeout(() => setCopied(false), 2000);
@@ -82,7 +101,11 @@ export default function ReferralPage() {
   };
 
   const copyLink = async () => {
-    const link = `https://aafiatak.com/register?ref=${referralCodeFromUser || 'AF000000'}`;
+    if (!activeCode) {
+      toast({ title: 'لا يوجد كود إحالة حالياً', variant: 'destructive' });
+      return;
+    }
+    const link = `${typeof window !== 'undefined' ? window.location.origin : 'https://aafiatak.com'}/register?ref=${activeCode}`;
     try {
       await navigator.clipboard.writeText(link);
       toast({ title: 'تم نسخ الرابط' });
@@ -92,17 +115,17 @@ export default function ReferralPage() {
   };
 
   const shareWhatsApp = () => {
-    const code = referralCodeFromUser || 'AF000000';
+    if (!activeCode) return;
     const text = encodeURIComponent(
-      `سجّل في عافيتك - منصة الرعاية الصحية المنزلية واستخدم كود الإحالة ${code} للحصول على خصم!`
+      `سجّل في عافيتك - منصة الرعاية الصحية المنزلية واستخدم كود الإحالة ${activeCode} للحصول على نقاط مجانية!`
     );
     window.open(`https://wa.me/?text=${text}`, '_blank');
   };
 
   const shareTelegram = () => {
-    const code = referralCodeFromUser || 'AF000000';
+    if (!activeCode) return;
     const text = encodeURIComponent(
-      `سجّل في عافيتك - منصة الرعاية الصحية المنزلية واستخدم كود الإحالة ${code} للحصول على خصم!`
+      `سجّل في عافيتك - منصة الرعاية الصحية المنزلية واستخدم كود الإحالة ${activeCode} للحصول على نقاط مجانية!`
     );
     window.open(`https://t.me/share/url?url=https://aafiatak.com&text=${text}`, '_blank');
   };
@@ -136,54 +159,72 @@ export default function ReferralPage() {
               <p className="text-sm text-muted-foreground mb-2">كود الإحالة الخاص بك</p>
               <div className="flex items-center justify-center gap-2">
                 <span className="text-3xl font-bold tracking-widest text-beneficiary">
-                  {referralCodeFromUser || 'AF------'}
+                  {activeCode || '---'}
                 </span>
-                <Button
-                  variant="outline"
-                  size="icon"
-                  className="h-9 w-9 shrink-0"
-                  onClick={copyCode}
-                >
-                  {copied ? (
-                    <CheckCircle2 className="w-4 h-4 text-green-600" />
-                  ) : (
-                    <Copy className="w-4 h-4" />
-                  )}
-                </Button>
+                {activeCode && (
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9 shrink-0"
+                    onClick={copyCode}
+                  >
+                    {copied ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-600" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )}
+                  </Button>
+                )}
               </div>
             </div>
 
-            {/* Share buttons */}
-            <div className="flex gap-2 justify-center">
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={shareWhatsApp}
-              >
-                <MessageSquare className="w-4 h-4" />
-                واتساب
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={shareTelegram}
-              >
-                <Share2 className="w-4 h-4" />
-                تيليجرام
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="gap-2"
-                onClick={copyLink}
-              >
-                <LinkIcon className="w-4 h-4" />
-                نسخ الرابط
-              </Button>
-            </div>
+            {/* Share buttons - only show when code exists */}
+            {activeCode && (
+              <div className="flex gap-2 justify-center">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={shareWhatsApp}
+                >
+                  <MessageSquare className="w-4 h-4" />
+                  واتساب
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={shareTelegram}
+                >
+                  <Share2 className="w-4 h-4" />
+                  تيليجرام
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="gap-2"
+                  onClick={copyLink}
+                >
+                  <LinkIcon className="w-4 h-4" />
+                  نسخ الرابط
+                </Button>
+              </div>
+            )}
           </GlassCard>
+
+          {/* Referred By Info */}
+          {referredByInfo && (
+            <GlassCard variant="beneficiary" className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
+                <Users className="w-6 h-6 text-blue-600 dark:text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">تمت إحالتك بواسطة</p>
+                <p className="text-sm font-medium">{referredByInfo.name}</p>
+                <p className="text-xs text-muted-foreground">كود: {referredByInfo.referralCode}</p>
+              </div>
+            </GlassCard>
+          )}
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
@@ -239,7 +280,7 @@ export default function ReferralPage() {
                           <Users className="w-4 h-4 text-beneficiary" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium">كود: {ref.code}</p>
+                          <p className="text-sm font-medium">{ref.referredName || `كود: ${ref.code}`}</p>
                           <p className="text-xs text-muted-foreground">
                             {new Date(ref.createdAt).toLocaleDateString('ar-YE', {
                               month: 'short',

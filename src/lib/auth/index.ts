@@ -176,14 +176,15 @@ export function createErrorResponse(message: string, status: number, code: strin
 // ---- Referral Code Generator ----
 
 /**
- * Generate a cryptographically secure referral code with prefix AFK-.
+ * Generate a cryptographically secure referral code with prefix AF-.
  * Uses crypto.getRandomValues() instead of Math.random() for unpredictability.
+ * Format: AF-XXXXXX (6 alphanumeric characters, excluding ambiguous chars)
  */
 export function generateReferralCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
   const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
-  let code = 'AFK-';
+  let code = 'AF-';
   for (let i = 0; i < 6; i++) {
     code += chars[bytes[i] % chars.length];
   }
