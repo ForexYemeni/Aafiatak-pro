@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Transaction, Nurse, Beneficiary, EmergencyRequest } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -55,7 +56,7 @@ export async function GET(request: NextRequest) {
           .limit(50)
           .lean();
         reportData = {
-          nurses: nurses.map((n: any) => ({ ...n, id: n._id.toString() })),
+          nurses: nurses.map((n: any) => (serializeDoc(n))),
         };
         break;
       }
@@ -73,7 +74,7 @@ export async function GET(request: NextRequest) {
         reportData = {
           totalBeneficiaries,
           newBeneficiaries,
-          topSpenders: topSpenders.map((b: any) => ({ ...b, id: b._id.toString() })),
+          topSpenders: topSpenders.map((b: any) => (serializeDoc(b))),
         };
         break;
       }

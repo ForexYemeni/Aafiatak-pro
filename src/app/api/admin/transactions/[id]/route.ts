@@ -7,6 +7,7 @@ import { Transaction, Beneficiary, Nurse } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -67,7 +68,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     });
 
-    return Response.json({ success: true, data: { ...transaction, id: transaction._id.toString() }, message: 'تم تحديث المعاملة بنجاح' });
+    return Response.json({ success: true, data: serializeDoc(transaction), message: 'تم تحديث المعاملة بنجاح' });
   } catch (error) {
     console.error('[ADMIN TRANSACTION UPDATE ERROR]', error);
     return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');

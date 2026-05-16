@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { EmergencyRequest, Notification, Nurse, AdminSettings } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { serializeDoc } from '@/lib/mongoose/serialize';
 
 export async function GET(request: NextRequest) {
   try {
@@ -30,8 +31,7 @@ export async function GET(request: NextRequest) {
     const nurseMap = new Map(nurses.map((n: any) => [n._id.toString(), n]));
 
     const populatedEmergencies = emergencies.map((e: any) => ({
-      ...e,
-      id: e._id.toString(),
+      ...serializeDoc(e),
       nurseName: e.nurseId ? (nurseMap.get(e.nurseId?.toString())?.name || null) : null,
     }));
 
@@ -208,7 +208,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...emergency.toObject(), id: emergency._id.toString(), emergencyFee },
+      data: { ...serializeDoc(emergency.toObject()), emergencyFee },
       message: 'تم إرسال طلب الطوارئ بنجاح. سيتم إرسال مساعدة فوراً',
     }, { status: 201 });
   } catch (error) {

@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { EmergencyRequest, Beneficiary, Nurse } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();

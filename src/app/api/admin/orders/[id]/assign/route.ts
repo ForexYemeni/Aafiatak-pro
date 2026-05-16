@@ -7,6 +7,7 @@ import { ServiceRequest, Nurse, Service, Beneficiary, Notification } from '@/mod
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { serializeDoc } from '@/lib/mongoose/serialize';
 
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
@@ -166,7 +167,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return Response.json({
       success: true,
-      data: { ...order, id: orderId },
+      data: serializeDoc({ ...order, id: orderId }),
       message: 'تم تعيين الممرض للطلب بنجاح',
     });
   } catch (error) {

@@ -4,6 +4,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Nurse } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function PATCH(request: NextRequest) {
   try {
     await connectDB();
@@ -56,7 +57,7 @@ export async function PATCH(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...nurse, id: nurse._id.toString() },
+      data: serializeDoc(nurse),
       message: 'تم تحديث السيرة الذاتية بنجاح',
     });
   } catch (error) {

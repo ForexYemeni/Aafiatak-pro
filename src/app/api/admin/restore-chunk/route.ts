@@ -10,6 +10,7 @@ import { connectDB } from '@/lib/mongodb';
 import { requireEmergencyOrAdmin, createErrorResponse } from '@/lib/auth/middleware';
 import { verifyPassword } from '@/lib/auth';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 // ── Deserialize MongoDB extended JSON ─────────────────────────────────────
 function deserializeDoc(value: unknown): unknown {
   if (value === null || value === undefined) return value;

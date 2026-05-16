@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import PaymentMethod from '@/models/PaymentMethod';
 import { createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();

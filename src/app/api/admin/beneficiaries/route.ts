@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Beneficiary } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -40,7 +41,7 @@ export async function GET(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        beneficiaries: beneficiaries.map((b: any) => ({ ...b, id: b._id.toString() })),
+        beneficiaries: beneficiaries.map((b: any) => (serializeDoc(b))),
         total,
         page,
         pages: Math.ceil(total / limit),

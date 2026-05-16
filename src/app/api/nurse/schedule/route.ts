@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -44,7 +45,7 @@ export async function GET(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: schedule.map((s: any) => ({ ...s, id: s._id.toString() })),
+      data: schedule.map((s: any) => (serializeDoc(s))),
     });
   } catch (error) {
     console.error('[NURSE SCHEDULE ERROR]', error);

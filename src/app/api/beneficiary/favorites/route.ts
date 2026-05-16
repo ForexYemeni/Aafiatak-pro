@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Nurse } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 // Simple in-memory favorites store (in production, use a dedicated MongoDB model)
 // For now, we'll use a simplified approach with the Nurse model
 
@@ -31,7 +32,7 @@ export async function GET(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: nurses.map((n: any) => ({ ...n, id: n._id.toString() })),
+      data: nurses.map((n: any) => (serializeDoc(n))),
     });
   } catch (error) {
     console.error('[BENEFICIARY FAVORITES ERROR]', error);

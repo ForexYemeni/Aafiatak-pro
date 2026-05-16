@@ -7,6 +7,7 @@ import { ServiceRequest, Beneficiary, Nurse, Service, Notification } from '@/mod
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -193,7 +194,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return Response.json({
       success: true,
-      data: { ...order.toObject(), id: order._id.toString() },
+      data: serializeDoc(order.toObject()),
       message: 'تم إلغاء الطلب بنجاح',
     });
   } catch (error) {

@@ -7,6 +7,7 @@ import { Rating } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -36,7 +37,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return Response.json({
       success: true,
-      data: { ...rating, id: rating._id.toString() },
+      data: serializeDoc(rating),
       message: 'تم الرد على الشكوى بنجاح',
     });
   } catch (error) {

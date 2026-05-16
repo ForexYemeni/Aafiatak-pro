@@ -22,6 +22,7 @@ import { connectDB } from '@/lib/mongodb';
 import { requireEmergencyOrAdmin, createErrorResponse } from '@/lib/auth/middleware';
 import { verifyPassword } from '@/lib/auth';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 // ── BSON-safe serializer ──────────────────────────────────────────────────────
 function serializeBSON(value: unknown): unknown {
   if (value === null || value === undefined) return value;

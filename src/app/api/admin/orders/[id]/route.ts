@@ -8,6 +8,7 @@ import { requireSubadminPermission, requireRole, createErrorResponse } from '@/l
 import { logActivity, creditNurseEarnings } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const order = await ServiceRequest.findById(id).lean();
     if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
-    return Response.json({ success: true, data: { ...order, id: order._id.toString() } });
+    return Response.json({ success: true, data: serializeDoc(order) });
   } catch (error) {
     console.error('[ADMIN ORDER DETAIL ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
@@ -137,7 +138,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         request,
       });
 
-      return Response.json({ success: true, data: { ...order.toObject(), id: order._id.toString() }, message: 'تم تحديث الطلب بنجاح' });
+      return Response.json({ success: true, data: serializeDoc(order.toObject()), message: 'تم تحديث الطلب بنجاح' });
     }
 
     // For cancellation by admin
@@ -216,7 +217,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         request,
       });
 
-      return Response.json({ success: true, data: { ...order.toObject(), id: order._id.toString() }, message: 'تم إلغاء الطلب بنجاح' });
+      return Response.json({ success: true, data: serializeDoc(order.toObject()), message: 'تم إلغاء الطلب بنجاح' });
     }
 
     // For other status changes, use simple update and notify all parties
@@ -312,7 +313,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     });
 
-    return Response.json({ success: true, data: { ...order, id: order._id.toString() }, message: 'تم تحديث الطلب بنجاح' });
+    return Response.json({ success: true, data: serializeDoc(order), message: 'تم تحديث الطلب بنجاح' });
   } catch (error) {
     console.error('[ADMIN ORDER UPDATE ERROR]', error);
     return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');

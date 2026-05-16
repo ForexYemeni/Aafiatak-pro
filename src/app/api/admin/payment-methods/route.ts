@@ -7,6 +7,7 @@ import PaymentMethod from '@/models/PaymentMethod';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 const walletNames: Record<string, { ar: string; en: string }> = {
   jeep: { ar: 'جيب', en: 'Jeeb' },
   jawali: { ar: 'جوالي', en: 'Jawali' },
@@ -34,7 +35,7 @@ export async function GET(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        paymentMethods: methods.map((m: any) => ({ ...m, id: m._id.toString() })),
+        paymentMethods: methods.map((m: any) => (serializeDoc(m))),
       },
     });
   } catch (error) {
@@ -113,7 +114,7 @@ export async function POST(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...pm.toObject(), id: pm._id.toString() },
+      data: serializeDoc(pm.toObject()),
       message: 'تم إنشاء طريقة الدفع بنجاح',
     }, { status: 201 });
   } catch (error) {

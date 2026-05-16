@@ -10,6 +10,7 @@ import { requireAuth } from '@/lib/auth/middleware';
 import { calculatePricing } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
   try {
     await connectDB();
@@ -326,8 +327,7 @@ export async function POST(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        ...firstOrder.toObject(),
-        id: firstOrder._id.toString(),
+        ...serializeDoc(firstOrder.toObject()),
         groupId,
         serviceCount: createdOrders.length,
         orderIds: createdOrders.map((o: any) => o._id.toString()),

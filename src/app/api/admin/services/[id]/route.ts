@@ -7,6 +7,7 @@ import { Service } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -17,7 +18,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const service = await Service.findById(id).lean();
     if (!service) return createErrorResponse('الخدمة غير موجودة', 404, 'NOT_FOUND');
 
-    return Response.json({ success: true, data: { ...service, id: service._id.toString() } });
+    return Response.json({ success: true, data: serializeDoc(service) });
   } catch (error) {
     console.error('[ADMIN SERVICE DETAIL ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
@@ -47,7 +48,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     });
 
-    return Response.json({ success: true, data: { ...service, id: service._id.toString() }, message: 'تم تحديث الخدمة بنجاح' });
+    return Response.json({ success: true, data: serializeDoc(service), message: 'تم تحديث الخدمة بنجاح' });
   } catch (error) {
     console.error('[ADMIN SERVICE UPDATE ERROR]', error);
     return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');

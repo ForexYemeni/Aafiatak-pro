@@ -7,6 +7,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -32,7 +33,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return Response.json({
       success: true,
-      data: { ...notification, id: notification._id.toString() },
+      data: serializeDoc(notification),
       message: 'تم قراءة الإشعار',
     });
   } catch (err) {
@@ -69,7 +70,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     return Response.json({
       success: true,
-      data: { ...notification, id: notification._id.toString() },
+      data: serializeDoc(notification),
       message: 'تم تحديث الإشعار',
     });
   } catch (err) {

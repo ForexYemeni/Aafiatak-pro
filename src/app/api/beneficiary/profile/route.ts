@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Beneficiary } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { serializeDoc } from '@/lib/mongoose/serialize';
 
 export async function GET(request: NextRequest) {
   try {
@@ -19,7 +20,9 @@ export async function GET(request: NextRequest) {
     const beneficiary = await Beneficiary.findById(user.userId).select('-password').lean();
     if (!beneficiary) return createErrorResponse('المستفيد غير موجود', 404, 'NOT_FOUND');
 
-    return Response.json({ success: true, data: { ...beneficiary, id: beneficiary._id.toString() } });
+    // CRITICAL: Use serializeDoc to prevent React Error #300
+    // Raw Mongoose docs contain ObjectId, Date objects that crash React
+    return Response.json({ success: true, data: serializeDoc(beneficiary) });
   } catch (error) {
     console.error('[BENEFICIARY PROFILE GET ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
@@ -52,7 +55,7 @@ export async function PATCH(request: NextRequest) {
 
     return Response.json({
       success: true,
-      data: { ...beneficiary, id: beneficiary._id.toString() },
+      data: serializeDoc(beneficiary),
       message: 'تم تحديث الملف الشخصي بنجاح',
     });
   } catch (error) {

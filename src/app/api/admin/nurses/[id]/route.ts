@@ -8,6 +8,7 @@ import { requireSubadminPermission, requireRole, createErrorResponse } from '@/l
 import { logActivity } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -19,7 +20,7 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const nurse = await Nurse.findById(id).select('-password -identityDocumentData -licenseDocumentData').lean();
     if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
 
-    return Response.json({ success: true, data: { ...nurse, id: nurse._id.toString() } });
+    return Response.json({ success: true, data: serializeDoc(nurse) });
   } catch (error) {
     console.error('[ADMIN NURSE DETAIL ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');
@@ -101,7 +102,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       return Response.json({
         success: true,
-        data: { ...nurse, id: nurse._id.toString() },
+        data: serializeDoc(nurse),
         message: isBlocked ? 'تم حظر الممرض بنجاح' : 'تم إلغاء حظر الممرض بنجاح',
       });
     }
@@ -121,7 +122,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     });
 
-    return Response.json({ success: true, data: { ...nurse, id: nurse._id.toString() }, message: 'تم تحديث بيانات الممرض بنجاح' });
+    return Response.json({ success: true, data: serializeDoc(nurse), message: 'تم تحديث بيانات الممرض بنجاح' });
   } catch (error) {
     console.error('[ADMIN NURSE UPDATE ERROR]', error);
     return createErrorResponse('حدث خطأ أثناء التحديث', 500, 'INTERNAL_ERROR');

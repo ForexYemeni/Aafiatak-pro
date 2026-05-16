@@ -9,6 +9,7 @@ import { Deployment, Notification, Nurse, AdminSettings, User } from '@/models/m
 import { requireAuth, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 // ── GET: List deployments with filters ──────────────────────────────────────
 
 export async function GET(request: NextRequest) {
@@ -59,7 +60,7 @@ export async function GET(request: NextRequest) {
       // Handle createdBy: if populated, it's an object; if not, it's an ObjectId string
       let createdBySerialized = null;
       if (d.createdBy && typeof d.createdBy === 'object' && d.createdBy._id) {
-        createdBySerialized = { ...d.createdBy, id: d.createdBy._id.toString() };
+        createdBySerialized = serializeDoc(d.createdBy);
       } else if (d.createdBy) {
         // createdBy wasn't populated (still an ObjectId) — create minimal object
         createdBySerialized = { id: d.createdBy.toString() };
@@ -67,18 +68,17 @@ export async function GET(request: NextRequest) {
 
       let assignedToSerialized = null;
       if (d.assignedTo && typeof d.assignedTo === 'object' && d.assignedTo._id) {
-        assignedToSerialized = { ...d.assignedTo, id: d.assignedTo._id.toString() };
+        assignedToSerialized = serializeDoc(d.assignedTo);
       } else if (d.assignedTo) {
         assignedToSerialized = { id: d.assignedTo.toString() };
       }
 
       return {
-        ...d,
-        id: d._id.toString(),
+        ...serializeDoc(d),
         createdBy: createdBySerialized,
         assignedTo: assignedToSerialized,
         applications: (d.applications || []).map((a: any) => ({
-          ...a,
+          ...serializeDoc(a),
           applicantId: a.applicantId?.toString(),
           paymentVerifiedBy: a.paymentVerifiedBy?.toString(),
         })),
@@ -365,8 +365,7 @@ export async function POST(request: NextRequest) {
     return Response.json({
       success: true,
       data: {
-        ...deployment.toObject(),
-        id: deployment._id.toString(),
+        ...serializeDoc(deployment.toObject()),
       },
       message: 'تم إنشاء التكليف بنجاح',
     }, { status: 201 });

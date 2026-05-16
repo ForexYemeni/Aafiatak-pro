@@ -8,6 +8,7 @@ import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middl
 import { logActivity } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 
+import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     await connectDB();
@@ -82,7 +83,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     return Response.json({
       success: true,
-      data: { ...nurse, id: nurse._id.toString() },
+      data: serializeDoc(nurse),
       message: status === 'verified' ? 'تم توثيق الممرض بنجاح' : 'تم رفض التوثيق',
     });
   } catch (error) {
