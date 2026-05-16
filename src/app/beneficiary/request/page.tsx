@@ -621,8 +621,8 @@ function MultiServiceRequestPageInner() {
                 onLocationDetected={(loc) => {
                   setLat(loc.latitude);
                   setLng(loc.longitude);
-                  // Only set human-readable address, never raw coordinates
-                  if (loc.address && !/^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(loc.address.trim())) {
+                  // Accept any address — coordinates initially, then enriched address via callback
+                  if (loc.address) {
                     setAddress(loc.address);
                   }
                 }}

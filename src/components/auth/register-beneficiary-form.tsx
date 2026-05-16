@@ -278,8 +278,8 @@ export function RegisterBeneficiaryForm({ onBack, className }: RegisterBeneficia
             <Label htmlFor="ben-address" className="text-sm font-semibold">العنوان</Label>
             <GpsLocationButton
               onLocationDetected={(loc) => {
-                // Only set human-readable address, never raw coordinates
-                if (loc.address && !/^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(loc.address.trim())) {
+                // Accept any address — coordinates initially, then enriched address via callback
+                if (loc.address) {
                   setValue('address', loc.address);
                 }
                 if (loc.governorateValue) {
