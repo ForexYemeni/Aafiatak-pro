@@ -752,9 +752,12 @@ export default function NurseProfilePage() {
             </div>
             <GpsLocationButton
               onLocationDetected={(loc) => {
-                setEditGovernorate(loc.governorate || editGovernorate);
-                setEditCity(loc.district || loc.city || editCity);
-                setEditAddress(loc.address || editAddress);
+                if (loc.governorate) setEditGovernorate(loc.governorate);
+                if (loc.district || loc.city) setEditCity(loc.district || loc.city || editCity);
+                // Only set human-readable address, never raw coordinates
+                if (loc.address && !/^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(loc.address.trim())) {
+                  setEditAddress(loc.address);
+                }
               }}
               value={editAddress}
               placeholder='اضغط "تحديد موقعي" لرفع موقعك الجغرافي'

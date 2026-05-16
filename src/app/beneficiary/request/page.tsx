@@ -621,10 +621,9 @@ function MultiServiceRequestPageInner() {
                 onLocationDetected={(loc) => {
                   setLat(loc.latitude);
                   setLng(loc.longitude);
-                  if (loc.address && loc.address !== `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`) {
+                  // Only set human-readable address, never raw coordinates
+                  if (loc.address && !/^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(loc.address.trim())) {
                     setAddress(loc.address);
-                  } else if (!address) {
-                    setAddress(`${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`);
                   }
                 }}
                 value={address}

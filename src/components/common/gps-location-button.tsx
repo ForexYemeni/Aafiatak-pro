@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Loader2, CheckCircle2, AlertCircle, Navigation, ExternalLink } from 'lucide-react';
-import { useGeolocation, type LocationData } from '@/hooks/use-geolocation';
+import { useGeolocation, isRawCoordinates, type LocationData } from '@/hooks/use-geolocation';
 import { Input } from '@/components/ui/input';
 
 interface GpsLocationButtonProps {
@@ -23,14 +23,15 @@ export function GpsLocationButton({
   className = '',
   label = 'تحديد موقعي',
 }: GpsLocationButtonProps) {
-  const { location, isDetecting, error, detectLocation, onAddressEnriched, clearError } = useGeolocation();
+  const { location, isDetecting, isResolvingAddress, error, detectLocation, onAddressEnriched, clearError } = useGeolocation();
   const [detected, setDetected] = useState(false);
   const [enrichedAddress, setEnrichedAddress] = useState('');
 
   // Listen for background address enrichment
   useEffect(() => {
     onAddressEnriched((loc) => {
-      if (loc.address && loc.address !== `${loc.latitude.toFixed(6)}, ${loc.longitude.toFixed(6)}`) {
+      // Only accept non-coordinate, non-empty addresses from enrichment
+      if (loc.address && !isRawCoordinates(loc.address)) {
         setEnrichedAddress(loc.address);
         // Also notify parent with enriched data
         onLocationDetected(loc);
@@ -42,18 +43,28 @@ export function GpsLocationButton({
     clearError();
     setDetected(false);
     setEnrichedAddress('');
-    
+
     const result = await detectLocation();
     if (result) {
       setDetected(true);
-      onLocationDetected(result);
-      // Keep detected state persistent - don't reset after timeout
-      // Location should remain visible until user navigates away
+      // Only pass to parent if we have a real address (not raw coordinates)
+      if (result.address && !isRawCoordinates(result.address)) {
+        onLocationDetected(result);
+      } else {
+        // Still pass location for lat/lng, but don't set coordinates as address
+        onLocationDetected(result);
+      }
     }
   }, [detectLocation, onLocationDetected, clearError]);
 
-  // Show enriched address if available, otherwise show value
-  const displayValue = enrichedAddress || value;
+  // Build the display value:
+  // 1. Enriched address (real human-readable) — always preferred
+  // 2. Incoming value prop — but only if it's not raw coordinates
+  // 3. Loading message — while reverse geocoding is in progress
+  // 4. Placeholder — nothing detected yet
+  const displayValue = enrichedAddress
+    || (value && !isRawCoordinates(value) ? value : '')
+    || (detected && isResolvingAddress ? 'جارٍ تحديد العنوان...' : '');
 
   return (
     <div className="space-y-1">
@@ -61,22 +72,34 @@ export function GpsLocationButton({
         {/* Location display field */}
         <div className="relative flex-1">
           <MapPin className={`absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 transition-colors ${
-            detected ? 'text-emerald-500' : isDetecting ? 'text-amber-500 animate-pulse' : 'text-muted-foreground'
+            enrichedAddress
+              ? 'text-emerald-500'
+              : detected && isResolvingAddress
+                ? 'text-amber-500 animate-pulse'
+                : detected
+                  ? 'text-emerald-500'
+                  : isDetecting
+                    ? 'text-amber-500 animate-pulse'
+                    : 'text-muted-foreground'
           }`} />
           <Input
             value={displayValue}
             readOnly
             placeholder={placeholder}
             className={`pr-9 pl-3 text-sm transition-colors ${
-              detected 
-                ? 'border-emerald-400 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20' 
-                : isDetecting 
+              enrichedAddress
+                ? 'border-emerald-400 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20'
+                : detected && isResolvingAddress
                   ? 'border-amber-400 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10'
-                  : ''
+                  : detected
+                    ? 'border-emerald-400 dark:border-emerald-700 bg-emerald-50/50 dark:bg-emerald-950/20'
+                    : isDetecting
+                      ? 'border-amber-400 dark:border-amber-700 bg-amber-50/30 dark:bg-amber-950/10'
+                      : ''
             }`}
           />
         </div>
-        
+
         {/* Detect button */}
         <motion.button
           type="button"
@@ -84,11 +107,15 @@ export function GpsLocationButton({
           disabled={isDetecting}
           whileTap={{ scale: 0.95 }}
           className={`shrink-0 flex items-center justify-center gap-1.5 h-10 px-4 rounded-xl text-sm font-medium transition-all ${
-            detected
+            enrichedAddress
               ? 'bg-emerald-500 text-white'
-              : isDetecting
+              : detected && isResolvingAddress
                 ? 'bg-amber-500 text-white'
-                : 'bg-primary text-primary-foreground shadow-md hover:shadow-lg active:scale-95'
+                : detected
+                  ? 'bg-emerald-500 text-white'
+                  : isDetecting
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-primary text-primary-foreground shadow-md hover:shadow-lg active:scale-95'
           } ${className}`}
         >
           <AnimatePresence mode="wait">
@@ -102,6 +129,28 @@ export function GpsLocationButton({
               >
                 <Loader2 className="w-4 h-4 animate-spin" />
                 <span>جارٍ التحديد...</span>
+              </motion.div>
+            ) : enrichedAddress ? (
+              <motion.div
+                key="detected"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                className="flex items-center gap-1.5"
+              >
+                <CheckCircle2 className="w-4 h-4" />
+                <span>تم التحديد</span>
+              </motion.div>
+            ) : detected && isResolvingAddress ? (
+              <motion.div
+                key="resolving"
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                exit={{ scale: 0 }}
+                className="flex items-center gap-1.5"
+              >
+                <Loader2 className="w-4 h-4 animate-spin" />
+                <span>تحديد العنوان...</span>
               </motion.div>
             ) : detected ? (
               <motion.div
@@ -131,7 +180,7 @@ export function GpsLocationButton({
       </div>
 
       {/* Map link - show whenever location is available */}
-      {location && (
+      {location && location.latitude !== 0 && location.longitude !== 0 && (
         <a
           href={`https://www.google.com/maps?q=${location.latitude},${location.longitude}`}
           target="_blank"

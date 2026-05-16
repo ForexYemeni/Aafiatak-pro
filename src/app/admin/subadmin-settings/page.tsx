@@ -315,7 +315,10 @@ export default function SubadminSettingsPage() {
               onLocationDetected={(loc) => {
                 setProfile(prev => ({
                   ...prev,
-                  address: loc.address || prev.address,
+                  // Only set human-readable address, never raw coordinates
+                  address: (loc.address && !/^-?\d+\.?\d*\s*,\s*-?\d+\.?\d*$/.test(loc.address.trim()))
+                    ? loc.address
+                    : prev.address,
                   lat: loc.latitude,
                   lng: loc.longitude,
                 }));
