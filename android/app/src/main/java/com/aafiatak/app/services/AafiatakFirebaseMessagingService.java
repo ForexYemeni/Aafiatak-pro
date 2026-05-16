@@ -98,7 +98,12 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
         emergencyChannel.setVibrationPattern(new long[]{0, 500, 200, 500, 200, 500});
         emergencyChannel.setSound(notificationSoundUri, audioAttributes);
         emergencyChannel.setShowBadge(true);
-        emergencyChannel.setBypassDndMode(true);
+        // Bypass DND for emergency notifications (API 28+)
+        try {
+            if (Build.VERSION.SDK_INT >= 28) {
+                emergencyChannel.setBypassDnd(true);
+            }
+        } catch (NoSuchMethodError ignored) {}
         emergencyChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         notificationManager.createNotificationChannel(emergencyChannel);
 
