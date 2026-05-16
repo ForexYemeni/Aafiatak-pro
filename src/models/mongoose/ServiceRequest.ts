@@ -1,12 +1,22 @@
 import mongoose, { Schema, Document, Types } from 'mongoose';
 
-export interface IServiceRequest extends Document {
+// Sub-document for each service within a unified order
+export interface IOrderServiceItem {
   serviceId: Types.ObjectId;
+  nameAr: string;
+  basePrice: number;
+  quantity: number;
+  duration: number; // minutes
+}
+
+export interface IServiceRequest extends Document {
+  serviceId: Types.ObjectId;       // Kept for backward compat — first service ID for unified orders
+  services: IOrderServiceItem[];   // NEW: array of services for unified orders
   beneficiaryId: Types.ObjectId;
   nurseId?: Types.ObjectId;
   groupId?: string;
   status: 'pending' | 'assigned' | 'accepted' | 'in_progress' | 'completed' | 'cancelled' | 'awaiting_payment';
-  basePrice: number;
+  basePrice: number;               // For unified orders: sum of all service base prices
   nightFee: number;
   fridayFee: number;
   emergencyFee: number;
@@ -32,10 +42,20 @@ export interface IServiceRequest extends Document {
   hasPaymentProof?: boolean;
   paymentProofData?: string;
   couponId?: Types.ObjectId;
+  isUnifiedOrder: boolean;         // Virtual helper — true if services[] has items
 }
+
+const OrderServiceItemSchema = new Schema<IOrderServiceItem>({
+  serviceId: { type: Schema.Types.ObjectId, ref: 'Service', required: true },
+  nameAr: { type: String, required: true },
+  basePrice: { type: Number, required: true },
+  quantity: { type: Number, default: 1 },
+  duration: { type: Number, default: 0 },
+}, { _id: false });
 
 const ServiceRequestSchema = new Schema<IServiceRequest>({
   serviceId: { type: Schema.Types.ObjectId, ref: 'Service', required: true },
+  services: { type: [OrderServiceItemSchema], default: [] },
   beneficiaryId: { type: Schema.Types.ObjectId, ref: 'Beneficiary', required: true },
   nurseId: { type: Schema.Types.ObjectId, ref: 'Nurse' },
   groupId: { type: String },
@@ -67,6 +87,11 @@ const ServiceRequestSchema = new Schema<IServiceRequest>({
   paymentProofData: { type: String },
   couponId: { type: Schema.Types.ObjectId, ref: 'Coupon' },
 }, { timestamps: true });
+
+// Virtual: isUnifiedOrder — checks if services[] has items
+ServiceRequestSchema.virtual('isUnifiedOrder').get(function(this: IServiceRequest) {
+  return Array.isArray(this.services) && this.services.length > 0;
+});
 
 ServiceRequestSchema.index({ beneficiaryId: 1 });
 ServiceRequestSchema.index({ nurseId: 1 });

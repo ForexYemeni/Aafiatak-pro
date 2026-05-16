@@ -106,13 +106,24 @@ export async function GET(request: NextRequest) {
     const nurseIds = [...new Set(orders.map((o: any) => o.nurseId?.toString()).filter(Boolean))];
     const serviceIds = [...new Set(orders.map((o: any) => o.serviceId?.toString()).filter(Boolean))];
 
+    // Also collect service IDs from unified orders' services[] arrays
+    for (const o of orders) {
+      if (Array.isArray(o.services)) {
+        for (const s of o.services) {
+          const sid = s.serviceId?.toString();
+          if (sid) serviceIds.push(sid);
+        }
+      }
+    }
+    const uniqueServiceIds = [...new Set(serviceIds)];
+
     // Collect payment method IDs for batch lookup
     const paymentMethodIds = [...new Set(orders.map((o: any) => o.paymentMethodId?.toString()).filter(Boolean))];
 
     const [beneficiaries, nurses, services, paymentMethods] = await Promise.all([
       Beneficiary.find({ _id: { $in: beneficiaryIds } }).select('name phone').lean(),
       Nurse.find({ _id: { $in: nurseIds } }).select('name phone').lean(),
-      Service.find({ _id: { $in: serviceIds } }).select('nameAr').lean(),
+      Service.find({ _id: { $in: uniqueServiceIds } }).select('nameAr').lean(),
       paymentMethodIds.length > 0
         ? PaymentMethod.find({ _id: { $in: paymentMethodIds } }).select('nameAr nameEn type walletType exchangeType accountName accountNumber instructions').lean()
         : [],
@@ -125,6 +136,17 @@ export async function GET(request: NextRequest) {
 
     const populatedOrders = orders.map((o: any) => {
       const pm = o.paymentMethodId ? paymentMethodMap.get(o.paymentMethodId.toString()) : null;
+      const isUnified = Array.isArray(o.services) && o.services.length > 0;
+
+      // For unified orders, use snapshot names from services[]
+      // For legacy orders, look up from serviceMap
+      let serviceName: string;
+      if (isUnified) {
+        serviceName = o.services.map((s: any) => s.nameAr).filter(Boolean).join('، ') || 'خدمة غير معروفة';
+      } else {
+        serviceName = serviceMap.get(o.serviceId?.toString())?.nameAr || 'خدمة غير معروفة';
+      }
+
       return {
         ...o,
         id: o._id.toString(),
@@ -132,7 +154,9 @@ export async function GET(request: NextRequest) {
         beneficiaryPhone: beneficiaryMap.get(o.beneficiaryId?.toString())?.phone || '',
         nurseName: o.nurseId ? (nurseMap.get(o.nurseId?.toString())?.name || 'غير معروف') : null,
         nursePhone: o.nurseId ? (nurseMap.get(o.nurseId?.toString())?.phone || '') : '',
-        serviceName: serviceMap.get(o.serviceId?.toString())?.nameAr || 'خدمة غير معروفة',
+        serviceName,
+        isUnifiedOrder: isUnified,
+        services: isUnified ? o.services : undefined,
         // Detailed payment method info
         paymentMethodName: pm?.nameAr || null,
         paymentMethodAccountName: pm?.accountName || null,

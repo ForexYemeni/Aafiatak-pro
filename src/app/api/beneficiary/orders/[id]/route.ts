@@ -35,6 +35,17 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       .select('nameAr category basePrice duration')
       .lean();
 
+    // Determine if this is a unified order
+    const isUnified = Array.isArray((order as any).services) && (order as any).services.length > 0;
+
+    // For unified orders, build serviceName from services[] snapshots
+    let serviceName: string;
+    if (isUnified) {
+      serviceName = (order as any).services.map((s: any) => s.nameAr).filter(Boolean).join('، ') || 'خدمة طبية';
+    } else {
+      serviceName = serviceData?.nameAr || 'خدمة طبية';
+    }
+
     const result: any = {
       ...order,
       id: order._id.toString(),
@@ -59,7 +70,9 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
       }).join(' • ') || null,
       nurseIsOnline: nurseData?.isOnline || false,
       // Service details
-      serviceName: serviceData?.nameAr || 'خدمة طبية',
+      serviceName,
+      isUnifiedOrder: isUnified,
+      services: isUnified ? (order as any).services : undefined,
       // Pricing for compatibility
       pricing: {
         basePrice: order.basePrice,

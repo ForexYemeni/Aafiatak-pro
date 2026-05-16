@@ -3,7 +3,7 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
+import { ServiceRequest, Nurse, Service, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity, creditNurseEarnings } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
@@ -19,7 +19,26 @@ export async function GET(request: NextRequest, { params }: { params: Promise<{ 
     const order = await ServiceRequest.findById(id).lean();
     if (!order) return createErrorResponse('الطلب غير موجود', 404, 'NOT_FOUND');
 
-    return Response.json({ success: true, data: serializeDoc(order) });
+    // Determine if this is a unified order
+    const isUnified = Array.isArray((order as any).services) && (order as any).services.length > 0;
+
+    // Enrich with service name
+    let serviceName: string | null = null;
+    if (isUnified) {
+      serviceName = (order as any).services.map((s: any) => s.nameAr).filter(Boolean).join('، ') || null;
+    } else if (order.serviceId) {
+      const serviceData = await Service.findById(order.serviceId).select('nameAr').lean();
+      serviceName = serviceData?.nameAr || null;
+    }
+
+    const result = {
+      ...serializeDoc(order),
+      serviceName,
+      isUnifiedOrder: isUnified,
+      services: isUnified ? (order as any).services : undefined,
+    };
+
+    return Response.json({ success: true, data: result });
   } catch (error) {
     console.error('[ADMIN ORDER DETAIL ERROR]', error);
     return createErrorResponse('حدث خطأ', 500, 'INTERNAL_ERROR');

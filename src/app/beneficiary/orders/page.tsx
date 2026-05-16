@@ -49,6 +49,14 @@ interface OrderWithDetails extends ServiceRequest {
   nursePhone?: string;
   nurseRating?: number;
   nurseIsOnline?: boolean;
+  isUnifiedOrder?: boolean;
+  services?: Array<{
+    serviceId: string;
+    nameAr: string;
+    basePrice: number;
+    quantity: number;
+    duration: number;
+  }>;
 }
 
 // --- Emergency types ---
@@ -653,7 +661,19 @@ export default function OrdersPage() {
 
               {/* Service name */}
               {order.serviceName && (
-                <p className="text-xs text-muted-foreground">{order.serviceName}</p>
+                <p className="text-xs text-muted-foreground">
+                  {order.isUnifiedOrder && order.services && order.services.length > 1 ? (
+                    <span className="flex items-center gap-1">
+                      <PackageCheck className="w-3 h-3 text-beneficiary shrink-0" />
+                      <span>{order.serviceName}</span>
+                      <span className="text-[10px] bg-beneficiary/10 text-beneficiary px-1 py-0.5 rounded-full shrink-0">
+                        {toArabicNumerals(order.services.length)} خدمات
+                      </span>
+                    </span>
+                  ) : (
+                    order.serviceName
+                  )}
+                </p>
               )}
 
               {/* Nurse phone for assigned/accepted/in_progress */}

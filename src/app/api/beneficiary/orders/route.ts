@@ -56,13 +56,24 @@ export async function GET(request: NextRequest) {
     const nurseIds = [...new Set(orders.map((o: any) => o.nurseId?.toString()).filter(Boolean))];
     const serviceIds = [...new Set(orders.map((o: any) => o.serviceId?.toString()).filter(Boolean))];
 
+    // Also collect service IDs from unified orders' services[] arrays
+    for (const o of orders) {
+      if (Array.isArray(o.services)) {
+        for (const s of o.services) {
+          const sid = s.serviceId?.toString();
+          if (sid) serviceIds.push(sid);
+        }
+      }
+    }
+    const uniqueServiceIds = [...new Set(serviceIds)];
+
     // Batch fetch nurse and service data
     const [nurses, services] = await Promise.all([
       nurseIds.length > 0
         ? Nurse.find({ _id: { $in: nurseIds } }).select('name phone rating isOnline').lean()
         : [],
-      serviceIds.length > 0
-        ? Service.find({ _id: { $in: serviceIds } }).select('nameAr category basePrice').lean()
+      uniqueServiceIds.length > 0
+        ? Service.find({ _id: { $in: uniqueServiceIds } }).select('nameAr category basePrice').lean()
         : [],
     ]);
 
@@ -72,7 +83,18 @@ export async function GET(request: NextRequest) {
 
     const enrichedOrders = orders.map((o: any) => {
       const nurse = nurseMap.get(o.nurseId?.toString());
-      const service = serviceMap.get(o.serviceId?.toString());
+      const isUnified = Array.isArray(o.services) && o.services.length > 0;
+
+      // For unified orders, build serviceName from services[] snapshot names
+      // For legacy orders, look up from serviceMap
+      let serviceName: string | null;
+      if (isUnified) {
+        serviceName = o.services.map((s: any) => s.nameAr).filter(Boolean).join('، ') || null;
+      } else {
+        const service = serviceMap.get(o.serviceId?.toString());
+        serviceName = service?.nameAr || null;
+      }
+
       return {
         ...o,
         id: o._id.toString(),
@@ -80,7 +102,9 @@ export async function GET(request: NextRequest) {
         nursePhone: nurse?.phone || null,
         nurseRating: nurse?.rating || 0,
         nurseIsOnline: nurse?.isOnline || false,
-        serviceName: service?.nameAr || null,
+        serviceName,
+        isUnifiedOrder: isUnified,
+        services: isUnified ? o.services : undefined,
         // Wrap flat pricing fields into pricing object for frontend compatibility
         pricing: {
           basePrice: o.basePrice || 0,
@@ -165,13 +189,10 @@ export async function POST(request: NextRequest) {
     const isCashPayment = paymentMethod === 'cash';
     const orderStatus = isCashPayment ? 'pending' : 'awaiting_payment';
 
-    // Generate a groupId for multi-service orders
-    const groupId = ids.length > 1 ? `GRP-${Date.now()}-${Math.random().toString(36).substring(2, 8)}` : undefined;
-
     // Calculate total base price for coupon validation
     const totalBasePrice = services.reduce((sum: number, s: any) => sum + s.basePrice, 0);
 
-    // Coupon discount - applied proportionally across services
+    // Coupon discount - applied at the order level
     let couponDiscount = 0;
     let couponId: string | undefined;
     if (couponCode) {
@@ -185,81 +206,78 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Create ServiceRequest for each service
-    const createdOrders: any[] = [];
-    const totalCouponDiscount = couponDiscount;
+    // ── Create ONE unified ServiceRequest with all services ──
+    // Build the services[] array with snapshots of each service's details
+    const orderServices = services.map((s: any) => ({
+      serviceId: s._id,
+      nameAr: s.nameAr,
+      basePrice: s.basePrice,
+      quantity: 1,
+      duration: s.duration || 0,
+    }));
 
-    for (let i = 0; i < services.length; i++) {
-      const service = services[i];
+    // Calculate pricing ONCE at the order level
+    const pricing = calculatePricing({
+      basePrice: totalBasePrice,
+      isEmergency: isEmergency || false,
+      isNightService,
+      isFridayService,
+      commissionRate: settings.commissionRate,
+      emergencyFee: settings.emergencyFee,
+      nightFeePercent: settings.nightFeePercent,
+      fridayFeePercent: settings.fridayFeePercent,
+      couponDiscount,
+    });
 
-      // Proportional coupon discount per service
-      const serviceCouponDiscount = services.length > 1
-        ? Math.round(totalCouponDiscount * (service.basePrice / totalBasePrice))
-        : totalCouponDiscount;
+    // Set serviceId to the FIRST service's ID for backward compatibility
+    const firstServiceId = services[0]._id;
 
-      const pricing = calculatePricing({
-        basePrice: service.basePrice,
-        isEmergency: isEmergency || false,
-        isNightService,
-        isFridayService,
-        commissionRate: settings.commissionRate,
-        emergencyFee: settings.emergencyFee,
-        nightFeePercent: settings.nightFeePercent,
-        fridayFeePercent: settings.fridayFeePercent,
-        couponDiscount: serviceCouponDiscount,
-      });
-
-      const order = await ServiceRequest.create({
-        serviceId: service._id,
-        beneficiaryId: user.userId,
-        groupId,
-        status: orderStatus,
-        basePrice: pricing.basePrice,
-        nightFee: pricing.nightFee,
-        fridayFee: pricing.fridayFee,
-        emergencyFee: pricing.emergencyFee,
-        discount: pricing.discount,
-        totalPrice: pricing.totalPrice,
-        commission: pricing.commission,
-        nursePayout: pricing.nursePayout,
-        beneficiaryLat: lat,
-        beneficiaryLng: lng,
-        beneficiaryAddress: address,
-        notes,
-        scheduledAt: scheduledDate,
-        isEmergency: isEmergency || false,
-        isNightService,
-        isFridayService,
-        paymentStatus: isCashPayment ? 'pending' : 'awaiting_confirmation',
-        paymentMethod: paymentMethod || 'cash',
-        paymentMethodId: paymentMethodId || null,
-        hasPaymentProof: hasPaymentProof || false,
-        paymentProofData: paymentProofData || null,
-        couponId,
-      });
-
-      createdOrders.push(order);
-    }
+    const order = await ServiceRequest.create({
+      serviceId: firstServiceId,
+      services: orderServices,
+      beneficiaryId: user.userId,
+      status: orderStatus,
+      basePrice: pricing.basePrice,
+      nightFee: pricing.nightFee,
+      fridayFee: pricing.fridayFee,
+      emergencyFee: pricing.emergencyFee,
+      discount: pricing.discount,
+      totalPrice: pricing.totalPrice,
+      commission: pricing.commission,
+      nursePayout: pricing.nursePayout,
+      beneficiaryLat: lat,
+      beneficiaryLng: lng,
+      beneficiaryAddress: address,
+      notes,
+      scheduledAt: scheduledDate,
+      isEmergency: isEmergency || false,
+      isNightService,
+      isFridayService,
+      paymentStatus: isCashPayment ? 'pending' : 'awaiting_confirmation',
+      paymentMethod: paymentMethod || 'cash',
+      paymentMethodId: paymentMethodId || null,
+      hasPaymentProof: hasPaymentProof || false,
+      paymentProofData: paymentProofData || null,
+      couponId,
+    });
 
     // Update coupon usage
     if (couponId) {
       await Coupon.findByIdAndUpdate(couponId, { $inc: { usedCount: 1 } });
     }
 
-    // Update beneficiary order count
-    await Beneficiary.findByIdAndUpdate(user.userId, { $inc: { orderCount: services.length } });
+    // Update beneficiary order count (1 order, not N services)
+    await Beneficiary.findByIdAndUpdate(user.userId, { $inc: { orderCount: 1 } });
 
     // ── Notifications for ALL parties ──
     try {
       const beneficiary = await Beneficiary.findById(user.userId).select('name phone').lean();
       const beneficiaryName = beneficiary?.name || 'مستفيد';
       const serviceNames = services.map((s: any) => s.nameAr).join('، ');
-      const firstOrderId = createdOrders[0]._id.toString();
-      const totalAmount = createdOrders.reduce((sum: number, o: any) => sum + o.totalPrice, 0);
+      const orderId = order._id.toString();
+      const totalAmount = order.totalPrice;
 
       // 1️⃣ Notify BENEFICIARY (confirmation only — low priority, no loud voice alert)
-      //    The beneficiary doesn't need a loud voice alert for their own action.
-      //    They just get a quiet confirmation that the order was received.
       await Notification.create({
         userId: user.userId,
         userRole: 'beneficiary',
@@ -268,10 +286,10 @@ export async function POST(request: NextRequest) {
           ? `تم استلام طلب الطوارئ لخدمة ${serviceNames} وسيتم التعامل معه بأولوية عالية`
           : `تم استلام طلبك لخدمة ${serviceNames} بنجاح${isCashPayment ? '' : ' - يرجى إرسال إثبات الدفع'}`,
         type: isEmergency ? 'emergency' : 'system',
-        priority: isEmergency ? 'medium' : 'low',  // Low priority for beneficiary (just confirmation)
-        data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: isEmergency ? 'true' : 'false', voiceText: isEmergency ? 'تم استلام طلب الطوارئ وسيتم التعامل معه بأولوية عالية' : '' },
-        actionUrl: `/beneficiary/orders/${firstOrderId}`,
-        voiceEnabled: isEmergency ? true : false,  // Only voice for emergency, not for regular orders
+        priority: isEmergency ? 'medium' : 'low',
+        data: { orderId, serviceIds: ids, voiceAlert: isEmergency ? 'true' : 'false', voiceText: isEmergency ? 'تم استلام طلب الطوارئ وسيتم التعامل معه بأولوية عالية' : '' },
+        actionUrl: `/beneficiary/orders/${orderId}`,
+        voiceEnabled: isEmergency ? true : false,
         read: false,
       });
 
@@ -281,10 +299,10 @@ export async function POST(request: NextRequest) {
           ? `تم استلام طلب الطوارئ لخدمة ${serviceNames} وسيتم التعامل معه بأولوية عالية`
           : `تم استلام طلبك لخدمة ${serviceNames} بنجاح`,
         type: isEmergency ? 'emergency' : 'system',
-        priority: isEmergency ? 'medium' : 'low',  // Low priority — beneficiary doesn't need alert
-        url: `/beneficiary/orders/${firstOrderId}`,
+        priority: isEmergency ? 'medium' : 'low',
+        url: `/beneficiary/orders/${orderId}`,
         userRole: 'beneficiary',
-        data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: isEmergency ? true : false, voiceText: isEmergency ? 'تم استلام طلب الطوارئ وسيتم التعامل معه بأولوية عالية' : '' },
+        data: { orderId, serviceIds: ids, voiceAlert: isEmergency ? true : false, voiceText: isEmergency ? 'تم استلام طلب الطوارئ وسيتم التعامل معه بأولوية عالية' : '' },
       }).catch(() => {});
 
       // 2️⃣ Notify ADMIN
@@ -302,7 +320,7 @@ export async function POST(request: NextRequest) {
           bodyAr: adminMsg,
           type: isEmergency ? 'emergency' : 'assignment',
           priority: isEmergency ? 'urgent' : 'high',
-          data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: 'true', voiceText: isEmergency ? `طلب طوارئ من ${beneficiaryName}` : `طلب خدمة جديد من ${beneficiaryName} - ${totalAmount} ريال` },
+          data: { orderId, serviceIds: ids, voiceAlert: 'true', voiceText: isEmergency ? `طلب طوارئ من ${beneficiaryName}` : `طلب خدمة جديد من ${beneficiaryName} - ${totalAmount} ريال` },
           actionUrl: '/admin/orders',
           voiceEnabled: true,
           read: false,
@@ -315,27 +333,25 @@ export async function POST(request: NextRequest) {
           priority: isEmergency ? 'urgent' : 'high',
           url: '/admin/orders',
           userRole: 'admin',
-          data: { orderId: firstOrderId, serviceIds: ids, groupId: groupId || '', voiceAlert: true, voiceText: isEmergency ? `طلب طوارئ من ${beneficiaryName}` : `طلب خدمة جديد من ${beneficiaryName} - ${totalAmount} ريال` },
+          data: { orderId, serviceIds: ids, voiceAlert: true, voiceText: isEmergency ? `طلب طوارئ من ${beneficiaryName}` : `طلب خدمة جديد من ${beneficiaryName} - ${totalAmount} ريال` },
         }).catch(() => {});
       }
     } catch {
       // Notification creation should not block order creation
     }
 
-    // Return the first order for backward compatibility, plus group info
-    const firstOrder = createdOrders[0];
+    // Return the unified order
     return Response.json({
       success: true,
       data: {
-        ...serializeDoc(firstOrder.toObject()),
-        groupId,
-        serviceCount: createdOrders.length,
-        orderIds: createdOrders.map((o: any) => o._id.toString()),
-        totalAmount: createdOrders.reduce((sum: number, o: any) => sum + o.totalPrice, 0),
+        ...serializeDoc(order.toObject()),
+        serviceCount: orderServices.length,
+        totalAmount: order.totalPrice,
+        isUnifiedOrder: true,
       },
       message: isCashPayment
-        ? `تم إنشاء ${createdOrders.length > 1 ? `${createdOrders.length} طلبات` : 'الطلب'} بنجاح`
-        : `تم إنشاء ${createdOrders.length > 1 ? `${createdOrders.length} طلبات` : 'الطلب'} - يرجى إرسال إثبات الدفع عبر الواتساب`,
+        ? 'تم إنشاء الطلب بنجاح'
+        : 'تم إنشاء الطلب - يرجى إرسال إثبات الدفع عبر الواتساب',
     }, { status: 201 });
   } catch (error) {
     console.error('[BENEFICIARY ORDERS CREATE ERROR]', error);

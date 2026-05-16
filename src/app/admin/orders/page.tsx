@@ -64,6 +64,14 @@ interface OrderItem {
   createdAt: string;
   notes?: string;
   cancelReason?: string;
+  isUnifiedOrder?: boolean;
+  services?: Array<{
+    serviceId: string;
+    nameAr: string;
+    basePrice: number;
+    quantity: number;
+    duration: number;
+  }>;
 }
 
 interface NurseOption {
@@ -524,6 +532,11 @@ export default function AdminOrdersPage() {
                 </div>
                 <div className="flex items-center gap-2 mt-0.5">
                   <p className="text-xs text-muted-foreground truncate">{order.serviceName}</p>
+                  {order.isUnifiedOrder && order.services && order.services.length > 1 && (
+                    <Badge className="text-[9px] px-1.5 py-0 bg-teal-100 text-teal-700 dark:bg-teal-900/30 dark:text-teal-400 shrink-0">
+                      {order.services.length} خدمات
+                    </Badge>
+                  )}
                   {order.isEmergency && <Badge variant="destructive" className="text-[9px] px-1.5 py-0 shrink-0">طوارئ</Badge>}
                   {order.isNightService && <Badge className="text-[9px] px-1.5 py-0 bg-indigo-100 text-indigo-700 shrink-0">ليلي</Badge>}
                   {order.isFridayService && <Badge className="text-[9px] px-1.5 py-0 bg-amber-100 text-amber-700 shrink-0">جمعة</Badge>}
@@ -874,6 +887,16 @@ export default function AdminOrdersPage() {
                     <p className="text-[11px]">الخدمة</p>
                   </div>
                   <p className="text-sm font-bold">{viewTarget.serviceName}</p>
+                  {viewTarget.isUnifiedOrder && viewTarget.services && viewTarget.services.length > 1 && (
+                    <div className="mt-2 space-y-1">
+                      {viewTarget.services.map((s, idx) => (
+                        <div key={idx} className="flex items-center justify-between text-[10px] text-muted-foreground bg-muted/50 rounded-md px-2 py-1">
+                          <span>{s.nameAr}</span>
+                          <span className="font-medium">{formatYemeniRial(s.basePrice)}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
                 <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/10 border border-emerald-200 dark:border-emerald-800">
                   <div className="flex items-center gap-1.5 text-emerald-600 mb-1.5">

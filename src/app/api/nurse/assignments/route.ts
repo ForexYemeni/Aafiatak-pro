@@ -96,10 +96,20 @@ export async function GET(request: NextRequest) {
 
     // Populate service and beneficiary data for service requests
     const serviceIds = [...new Set(serviceAssignments.map((a: any) => a.serviceId?.toString()).filter(Boolean))];
+    // Also collect service IDs from unified orders' services[] arrays
+    for (const a of serviceAssignments) {
+      if (Array.isArray((a as any).services)) {
+        for (const s of (a as any).services) {
+          const sid = s.serviceId?.toString();
+          if (sid) serviceIds.push(sid);
+        }
+      }
+    }
+    const uniqueServiceIds = [...new Set(serviceIds)];
     const serviceBeneficiaryIds = [...new Set(serviceAssignments.map((a: any) => a.beneficiaryId?.toString()).filter(Boolean))];
 
     const [services, serviceBeneficiaries] = await Promise.all([
-      Service.find({ _id: { $in: serviceIds } }).lean(),
+      Service.find({ _id: { $in: uniqueServiceIds } }).lean(),
       Beneficiary.find({ _id: { $in: serviceBeneficiaryIds } }).select('name phone').lean(),
     ]);
 
@@ -121,6 +131,45 @@ export async function GET(request: NextRequest) {
       const service = serviceMap.get(a.serviceId?.toString());
       const beneficiary = serviceBeneficiaryMap.get(a.beneficiaryId?.toString());
       const reveal = isContactRevealed(a);
+      const isUnified = Array.isArray(a.services) && a.services.length > 0;
+
+      // For unified orders, build service info from the services[] snapshots
+      // For legacy orders, use the single service lookup
+      let serviceInfo: any;
+      let serviceNameAr: string;
+      if (isUnified) {
+        serviceNameAr = a.services.map((s: any) => s.nameAr).filter(Boolean).join('، ') || 'خدمة';
+        serviceInfo = {
+          id: a.services[0]?.serviceId?.toString() || '',
+          nameAr: serviceNameAr,
+          category: service?.category || 'nursing',
+          basePrice: a.basePrice || 0,
+          duration: a.services.reduce((sum: number, s: any) => sum + (s.duration || 0), 0),
+          // Include the full services list for detailed view
+          servicesList: a.services.map((s: any) => ({
+            id: s.serviceId?.toString() || '',
+            nameAr: s.nameAr || 'خدمة',
+            basePrice: s.basePrice || 0,
+            quantity: s.quantity || 1,
+            duration: s.duration || 0,
+          })),
+        };
+      } else {
+        serviceNameAr = service?.nameAr || 'خدمة';
+        serviceInfo = service ? {
+          id: service._id.toString(),
+          nameAr: service.nameAr || 'خدمة',
+          category: service.category || 'nursing',
+          basePrice: service.basePrice || 0,
+          duration: service.duration || 0,
+        } : {
+          id: '',
+          nameAr: 'خدمة',
+          category: 'nursing',
+          basePrice: 0,
+          duration: 0,
+        };
+      }
 
       return {
         id: a._id.toString(),
@@ -131,6 +180,7 @@ export async function GET(request: NextRequest) {
         respondedAt: a.updatedAt?.toISOString() || null,
         estimatedArrivalMinutes: null,
         assignmentType: 'service' as const,
+        isUnifiedOrder: isUnified || undefined,
         request: {
           id: a._id.toString(),
           status: a.status,
@@ -145,19 +195,7 @@ export async function GET(request: NextRequest) {
           isEmergency: a.isEmergency || false,
           paymentStatus: a.paymentStatus || 'pending',
           paymentMethod: a.paymentMethod || 'cash',
-          service: service ? {
-            id: service._id.toString(),
-            nameAr: service.nameAr || 'خدمة',
-            category: service.category || 'nursing',
-            basePrice: service.basePrice || 0,
-            duration: service.duration || 0,
-          } : {
-            id: '',
-            nameAr: 'خدمة',
-            category: 'nursing',
-            basePrice: 0,
-            duration: 0,
-          },
+          service: serviceInfo,
           beneficiary: beneficiary ? {
             id: beneficiary._id.toString(),
             // Name is always shown (not sensitive)
