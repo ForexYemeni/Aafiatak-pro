@@ -122,7 +122,7 @@
         <!-- Notification Channel metadata -->
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_channel_id"
-            android:value="aafiatak_notifications_v3" />
+            android:value="aafiatak_notifications_v4" />
         <meta-data
             android:name="com.google.firebase.messaging.default_notification_color"
             android:resource="@color/notification_color" />

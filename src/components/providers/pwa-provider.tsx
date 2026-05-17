@@ -912,6 +912,7 @@ function DeferredComponent({ children, delayMs }: { children: ReactNode; delayMs
 function CapacitorNativeInitializer() {
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const hasHydrated = useAuthStore((s) => s._hasHydrated);
+  const prevAuthRef = useRef(isAuthenticated);
 
   useEffect(() => {
     if (!hasHydrated || typeof window === 'undefined') return;
@@ -922,11 +923,20 @@ function CapacitorNativeInitializer() {
     }).catch(() => {});
   }, [hasHydrated]);
 
+  // v2: Force re-sync FCM token on EVERY login
+  // This ensures the server always has the latest token
   useEffect(() => {
     if (!hasHydrated || !isAuthenticated || typeof window === 'undefined') return;
+
+    // Detect fresh login (was not authenticated, now is)
+    const isFreshLogin = !prevAuthRef.current && isAuthenticated;
+
     import('@/lib/capacitor').then(({ syncFCMTokenWithServer }) => {
-      syncFCMTokenWithServer().catch(() => {});
+      // Force sync on fresh login, normal sync on re-render
+      syncFCMTokenWithServer(isFreshLogin).catch(() => {});
     }).catch(() => {});
+
+    prevAuthRef.current = isAuthenticated;
   }, [hasHydrated, isAuthenticated]);
 
   return null;

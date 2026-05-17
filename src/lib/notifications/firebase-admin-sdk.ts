@@ -1,12 +1,15 @@
 // ============================================================================
-// عافيتك (Aafiatak) Healthcare Platform - Firebase Admin SDK
+// عافيتك (Aafiatak) Healthcare Platform - Firebase Admin SDK v2
 // ============================================================================
 // Server-side Firebase Admin SDK for sending FCM push notifications
 // to Android/iOS devices. Web browsers use Web Push (VAPID) instead.
 //
-// Credential resolution order:
-//   1. Environment variables (FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY)
-//   2. MongoDB FirebaseConfig collection (admin-configured from dashboard)
+// v2 Changes:
+// 1. Better error messages with specific diagnostic codes
+// 2. Auto-retry initialization from DB (in case env vars fail)
+// 3. Comprehensive health check function
+// 4. Better private key processing (handles more formats)
+// 5. Force re-init capability for hot-reload
 // ============================================================================
 
 import * as admin from 'firebase-admin';
@@ -14,41 +17,14 @@ import { connectDB } from '@/lib/mongodb';
 import FirebaseConfig from '@/models/mongoose/FirebaseConfig';
 
 // ── Firebase Admin Initialization ────────────────────────────────────
-// Uses environment variables for credentials first, then falls back to
-// the FirebaseConfig MongoDB collection.
-// Required env vars (primary):
-//   FIREBASE_PROJECT_ID       — Firebase project ID
-//   FIREBASE_CLIENT_EMAIL     — Firebase service account client email
-//   FIREBASE_PRIVATE_KEY      — Firebase service account private key (base64 or raw)
-//   FIREBASE_DATABASE_URL     — (optional) Firebase Realtime Database URL
-
 let firebaseApp: admin.app.App | null = null;
 let isInitialized = false;
+let initError: string | null = null;
+let credentialSource: string | null = null;
 
-function getPrivateKey(): string | undefined {
-  const raw = process.env.FIREBASE_PRIVATE_KEY;
-  if (!raw) return undefined;
-
-  // The private key may be base64-encoded (common in Vercel env vars)
-  // or contain literal \n characters that need to be replaced
-  try {
-    // Try base64 decode first
-    const decoded = Buffer.from(raw, 'base64').toString('utf-8');
-    if (decoded.includes('-----BEGIN PRIVATE KEY-----')) {
-      return decoded;
-    }
-  } catch {
-    // Not base64, continue with raw value
-  }
-
-  // Replace escaped newlines with real newlines
-  return raw.replace(/\\n/g, '\n');
-}
-
-/**
- * Process a private key value: handles base64 encoding and escaped newlines.
- */
 function processPrivateKey(raw: string): string {
+  if (!raw) return raw;
+
   // Try base64 decode first
   try {
     const decoded = Buffer.from(raw, 'base64').toString('utf-8');
@@ -59,13 +35,25 @@ function processPrivateKey(raw: string): string {
     // Not base64, continue with raw value
   }
 
+  // Try URL-safe base64 decode
+  try {
+    const padded = raw.replace(/-/g, '+').replace(/_/g, '/');
+    const padLen = (4 - (padded.length % 4)) % 4;
+    const paddedFull = padded + '='.repeat(padLen);
+    const decoded = Buffer.from(paddedFull, 'base64').toString('utf-8');
+    if (decoded.includes('-----BEGIN PRIVATE KEY-----')) {
+      return decoded;
+    }
+  } catch {
+    // Not URL-safe base64
+  }
+
   // Replace escaped newlines with real newlines
   return raw.replace(/\\n/g, '\n');
 }
 
 /**
  * Try to read Firebase credentials from the MongoDB FirebaseConfig collection.
- * Returns the credentials or null if not available.
  */
 async function getCredentialsFromDB(): Promise<{
   projectId: string;
@@ -78,6 +66,11 @@ async function getCredentialsFromDB(): Promise<{
     const config = await FirebaseConfig.findOne({ isActive: true }).lean();
     if (!config) {
       console.log('[FIREBASE-ADMIN] No active Firebase config found in database');
+      return null;
+    }
+
+    if (!config.projectId || !config.clientEmail || !config.privateKey) {
+      console.warn('[FIREBASE-ADMIN] Firebase config in DB is incomplete');
       return null;
     }
 
@@ -99,8 +92,8 @@ export async function initializeFirebaseAdmin(): Promise<admin.app.App | null> {
   // 1. Try environment variables first
   let projectId = process.env.FIREBASE_PROJECT_ID;
   let clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
-  let privateKey = getPrivateKey();
-  let source = 'environment variables';
+  let privateKey = process.env.FIREBASE_PRIVATE_KEY ? processPrivateKey(process.env.FIREBASE_PRIVATE_KEY) : undefined;
+  credentialSource = 'environment variables';
 
   // 2. If env vars are incomplete, try MongoDB fallback
   if (!projectId || !clientEmail || !privateKey) {
@@ -110,17 +103,22 @@ export async function initializeFirebaseAdmin(): Promise<admin.app.App | null> {
       projectId = dbCreds.projectId;
       clientEmail = dbCreds.clientEmail;
       privateKey = dbCreds.privateKey;
-      source = 'database (FirebaseConfig collection)';
+      credentialSource = 'database (FirebaseConfig collection)';
     }
   }
 
   if (!projectId || !clientEmail || !privateKey) {
-    console.warn(
-      '[FIREBASE-ADMIN] Missing credentials (checked env vars + database). ' +
-      'FCM push notifications to Android/iOS will not work. ' +
-      'Required: FIREBASE_PROJECT_ID, FIREBASE_CLIENT_EMAIL, FIREBASE_PRIVATE_KEY ' +
-      '— either as env vars or configured in the admin dashboard.'
-    );
+    initError = `Missing credentials — checked env vars and database. ` +
+      `Missing: ${!projectId ? 'FIREBASE_PROJECT_ID ' : ''}${!clientEmail ? 'FIREBASE_CLIENT_EMAIL ' : ''}${!privateKey ? 'FIREBASE_PRIVATE_KEY ' : ''}`;
+    console.warn(`[FIREBASE-ADMIN] ${initError}`);
+    isInitialized = true;
+    return null;
+  }
+
+  // Validate private key format
+  if (!privateKey.includes('-----BEGIN PRIVATE KEY-----')) {
+    initError = 'Private key format is invalid — must contain -----BEGIN PRIVATE KEY-----';
+    console.error(`[FIREBASE-ADMIN] ${initError}`);
     isInitialized = true;
     return null;
   }
@@ -132,25 +130,27 @@ export async function initializeFirebaseAdmin(): Promise<admin.app.App | null> {
         clientEmail,
         privateKey,
       }),
-      // databaseURL is optional but recommended
       ...(process.env.FIREBASE_DATABASE_URL
         ? { databaseURL: process.env.FIREBASE_DATABASE_URL }
         : {}),
     });
 
     isInitialized = true;
-    console.log(`[FIREBASE-ADMIN] Initialized successfully from ${source} — FCM push enabled`);
+    initError = null;
+    console.log(`[FIREBASE-ADMIN] Initialized successfully from ${credentialSource} — FCM push enabled`);
     return firebaseApp;
   } catch (error: any) {
     // If already initialized, reuse existing app
     if (error?.code === 'app/duplicate-app') {
       firebaseApp = admin.app();
       isInitialized = true;
+      initError = null;
       console.log('[FIREBASE-ADMIN] Reusing existing Firebase app');
       return firebaseApp;
     }
 
-    console.error('[FIREBASE-ADMIN] Failed to initialize:', error);
+    initError = `Initialization failed: ${error?.message || error}`;
+    console.error('[FIREBASE-ADMIN]', initError);
     isInitialized = true;
     return null;
   }
@@ -161,21 +161,80 @@ export async function initializeFirebaseAdmin(): Promise<admin.app.App | null> {
  * Call this after admin updates Firebase config in the dashboard.
  */
 export async function reinitializeFirebaseAdmin(): Promise<admin.app.App | null> {
-  // Delete the existing app if it exists
   try {
     if (firebaseApp) {
       await admin.app().delete();
     }
   } catch {
-    // App may not exist or already deleted, that's fine
+    // App may not exist or already deleted
   }
 
-  // Reset state
   firebaseApp = null;
   isInitialized = false;
+  initError = null;
+  credentialSource = null;
 
-  // Re-initialize (will pick up new credentials from DB)
   return initializeFirebaseAdmin();
+}
+
+// ── Health Check ────────────────────────────────────────────────────
+
+export interface FirebaseHealthCheck {
+  initialized: boolean;
+  hasApp: boolean;
+  credentialSource: string | null;
+  error: string | null;
+  envVarsPresent: {
+    projectId: boolean;
+    clientEmail: boolean;
+    privateKey: boolean;
+    privateKeyFormat: 'valid' | 'invalid' | 'missing';
+  };
+  dbConfigPresent: boolean;
+}
+
+/**
+ * Comprehensive health check for Firebase Admin SDK.
+ * Returns diagnostic information about the SDK state.
+ */
+export async function checkFirebaseHealth(): Promise<FirebaseHealthCheck> {
+  const rawKey = process.env.FIREBASE_PRIVATE_KEY;
+  const processedKey = rawKey ? processPrivateKey(rawKey) : undefined;
+
+  const health: FirebaseHealthCheck = {
+    initialized: isInitialized,
+    hasApp: firebaseApp !== null,
+    credentialSource,
+    error: initError,
+    envVarsPresent: {
+      projectId: !!process.env.FIREBASE_PROJECT_ID,
+      clientEmail: !!process.env.FIREBASE_CLIENT_EMAIL,
+      privateKey: !!rawKey,
+      privateKeyFormat: !rawKey ? 'missing' :
+        (processedKey?.includes('-----BEGIN PRIVATE KEY-----') ? 'valid' : 'invalid'),
+    },
+    dbConfigPresent: false,
+  };
+
+  // Check DB config
+  try {
+    await connectDB();
+    const config = await FirebaseConfig.findOne({ isActive: true }).lean();
+    health.dbConfigPresent = !!config;
+  } catch {
+    // DB not accessible
+  }
+
+  // If not initialized yet, try to initialize
+  if (!isInitialized) {
+    await initializeFirebaseAdmin();
+    health.initialized = isInitialized;
+    health.hasApp = firebaseApp !== null;
+    health.error = initError;
+    health.credentialSource = credentialSource;
+  }
+
+  return health;
 }
 
 // ── Get Firebase Messaging instance ─────────────────────────────────
@@ -213,33 +272,19 @@ export async function sendFCMToDevice(
   payload: FCMPayload
 ): Promise<boolean> {
   const messaging = await getFirebaseMessaging();
-  if (!messaging) return false;
+  if (!messaging) {
+    console.warn('[FIREBASE-ADMIN] Cannot send FCM — messaging instance is null. Check Firebase credentials.');
+    return false;
+  }
 
   try {
-    const isEmergency = payload.type === 'emergency';
-    const isHighPriority = payload.priority === 'high' || payload.priority === 'urgent';
-
-    // ── DATA-ONLY MESSAGE ──────────────────────────────────────────────
-    // CRITICAL: Do NOT include a top-level `notification` field.
-    // When `notification` is present alongside `data`, Android auto-displays
-    // the notification using system defaults and BYPASSES
-    // onMessageReceived() while the app is in the background.
-    //
-    // By sending data-only messages, our custom
-    // AafiatakFirebaseMessagingService.onMessageReceived() is ALWAYS
-    // invoked — in foreground AND background — giving us full control
-    // over sound, channel, heads-up popup, and emergency full-screen.
-    // ──────────────────────────────────────────────────────────────────
     const message: admin.messaging.Message = {
       token: fcmToken,
       data: {
-        // Core notification fields moved into data so our service can
-        // build the Android Notification manually with the correct channel.
         title: payload.title,
         body: payload.body,
         ...(payload.icon ? { icon: payload.icon } : {}),
         ...(payload.image ? { image: payload.image } : {}),
-        // Custom metadata
         ...(payload.data || {}),
         type: payload.type || 'system',
         priority: payload.priority || 'medium',
@@ -250,18 +295,9 @@ export async function sendFCMToDevice(
         timestamp: String(Date.now()),
       },
       android: {
-        // CRITICAL: Always use 'high' priority for FCM delivery!
-        // When the app is in background or killed, Android's Doze mode
-        // will NOT deliver 'normal' priority data-only messages. They
-        // are batched and delayed until the device wakes up naturally.
-        // Only 'high' priority guarantees immediate delivery and wakes
-        // the app's FirebaseMessagingService.onMessageReceived().
-        // Our internal 'priority' field (low/medium/high/urgent) controls
-        // the notification's visual/sound behavior, NOT the FCM delivery.
         priority: 'high',
         collapseKey: payload.tag || undefined,
-        // TTL: 4 weeks — ensures messages aren't dropped if device is offline
-        ttl: 2419200,
+        ttl: 2419200, // 4 weeks
       },
       apns: {
         payload: {
@@ -291,7 +327,7 @@ export async function sendFCMToDevice(
       return false;
     }
 
-    console.error('[FIREBASE-ADMIN] Error sending FCM:', error?.message || error);
+    console.error('[FIREBASE-ADMIN] Error sending FCM:', error?.code || error?.message || error);
     return false;
   }
 }
@@ -308,13 +344,6 @@ export async function sendFCMToDevices(
   }
 
   try {
-    const isEmergency = payload.type === 'emergency';
-    const isHighPriority = payload.priority === 'high' || payload.priority === 'urgent';
-
-    // ── DATA-ONLY MULTICAST MESSAGE ────────────────────────────────────
-    // Same rationale as sendFCMToDevice: no top-level `notification` field
-    // so that Android always delivers to our custom messaging service.
-    // ──────────────────────────────────────────────────────────────────
     const message: admin.messaging.MulticastMessage = {
       tokens: fcmTokens,
       data: {
@@ -332,13 +361,9 @@ export async function sendFCMToDevices(
         timestamp: String(Date.now()),
       },
       android: {
-        // CRITICAL: Always use 'high' priority for FCM delivery!
-        // Same rationale as sendFCMToDevice — 'normal' priority messages
-        // are NOT delivered when the app is in background/killed on
-        // modern Android versions (Doze mode, App Standby buckets).
         priority: 'high',
         collapseKey: payload.tag || undefined,
-        ttl: 2419200, // 4 weeks
+        ttl: 2419200,
       },
       apns: {
         payload: {

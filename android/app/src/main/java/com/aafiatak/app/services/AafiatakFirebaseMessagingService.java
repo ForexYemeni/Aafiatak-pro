@@ -5,7 +5,6 @@ import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
@@ -29,7 +28,7 @@ import java.util.Map;
 
 /**
  * ============================================================================
- * عافيتك (Aafiatak) - Firebase Cloud Messaging Service
+ * عافيتك (Aafiatak) - Firebase Cloud Messaging Service v4
  * ============================================================================
  *
  * Handles ALL FCM messages in ALL app states:
@@ -37,39 +36,36 @@ import java.util.Map;
  * - BACKGROUND: sound + heads-up popup (WakeLock ensures delivery)
  * - KILLED: sound + heads-up popup (Firebase auto-starts this service)
  *
- * CRITICAL FIXES applied (v3):
- * 1. ALL FCM messages sent with android.priority='high' from server
- *    (normal priority data-only messages are NOT delivered in background on modern Android)
- * 2. Delete old channels & recreate with IMPORTANCE_HIGH (Android caches old settings)
- * 3. WakeLock before showing notification (ensures CPU is active in background)
- * 4. Play sound MANUALLY via MediaPlayer (bypasses channel sound caching issues)
- * 5. setDefaults(DEFAULT_ALL) as additional fallback for sound
- * 6. setFullScreenIntent for ALL notifications (heads-up popup outside app)
- * 7. USE_FULL_SCREEN_INTENT permission added in manifest (Android 14+ requirement)
- * 8. high-priority intent-filter to ensure this service gets FCM messages first
- * 9. Notification channel version bumped to v3 to force Android to re-read settings
+ * v4 Changes:
+ * 1. Channel IDs bumped to v4 to force Android to re-read importance settings
+ * 2. Added setGroup() for grouped notification display
+ * 3. Improved sound fallback: try custom sound → default notification → ringtone
+ * 4. Added notification summary for multiple notifications
+ * 5. Better WakeLock handling with timeout safety
+ * 6. Explicit FirebaseApp initialization on service create
+ * 7. Fixed: setDefaults(DEFAULT_ALL) can override channel sound on Android 8+;
+ *    removed it for API 26+ and rely on channel settings instead
  * ============================================================================
  */
 public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
 
     private static final String TAG = "AafiatakFCM";
 
-    // Notification Channel IDs - versioned to force recreation with correct importance
-    // Bumped to v3 because v2 channels may still be cached with wrong settings on some devices
-    private static final String CHANNEL_ID = "aafiatak_notifications_v3";
-    private static final String EMERGENCY_CHANNEL_ID = "aafiatak_emergency_v3";
-    private static final String CHAT_CHANNEL_ID = "aafiatak_chat_v3";
-    private static final String SERVICE_CHANNEL_ID = "aafiatak_services_v3";
+    // Notification Channel IDs - v4 to force recreation with correct importance
+    private static final String CHANNEL_ID = "aafiatak_notifications_v4";
+    private static final String EMERGENCY_CHANNEL_ID = "aafiatak_emergency_v4";
+    private static final String CHAT_CHANNEL_ID = "aafiatak_chat_v4";
+    private static final String SERVICE_CHANNEL_ID = "aafiatak_services_v4";
 
-    // OLD channel IDs to delete (forces Android to use new channel settings)
-    private static final String OLD_CHANNEL_ID_V1 = "aafiatak_notifications";
-    private static final String OLD_EMERGENCY_CHANNEL_ID_V1 = "aafiatak_emergency";
-    private static final String OLD_CHAT_CHANNEL_ID_V1 = "aafiatak_chat";
-    private static final String OLD_SERVICE_CHANNEL_ID_V1 = "aafiatak_services";
-    private static final String OLD_CHANNEL_ID_V2 = "aafiatak_notifications_v2";
-    private static final String OLD_EMERGENCY_CHANNEL_ID_V2 = "aafiatak_emergency_v2";
-    private static final String OLD_CHAT_CHANNEL_ID_V2 = "aafiatak_chat_v2";
-    private static final String OLD_SERVICE_CHANNEL_ID_V2 = "aafiatak_services_v2";
+    // Group key for grouped notifications
+    private static final String GROUP_KEY = "com.aafiatak.app.NOTIFICATIONS";
+
+    // All old channel IDs to delete (v1, v2, v3)
+    private static final String[] OLD_CHANNEL_IDS = {
+        "aafiatak_notifications", "aafiatak_emergency", "aafiatak_chat", "aafiatak_services",
+        "aafiatak_notifications_v2", "aafiatak_emergency_v2", "aafiatak_chat_v2", "aafiatak_services_v2",
+        "aafiatak_notifications_v3", "aafiatak_emergency_v3", "aafiatak_chat_v3", "aafiatak_services_v3"
+    };
 
     // SharedPreferences for storing FCM token
     private static final String PREFS_NAME = "aafiatak_prefs";
@@ -80,9 +76,17 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
     @Override
     public void onCreate() {
         super.onCreate();
-        // Initialize the token holder with application context
-        // so it can restore the FCM token from SharedPreferences
-        // after the app process is killed and restarted by FCM
+
+        // CRITICAL: Initialize FirebaseApp in case this service is started
+        // by FCM after the app process was killed
+        try {
+            com.google.firebase.FirebaseApp.initializeApp(this);
+            Log.d(TAG, "FirebaseApp initialized in FCM Service onCreate");
+        } catch (Exception e) {
+            Log.w(TAG, "FirebaseApp already initialized or error: " + e.getMessage());
+        }
+
+        // Initialize the token holder
         AafiatakFCMTokenHolder.init(getApplicationContext());
         createNotificationChannels();
         Log.d(TAG, "FCM Service created — token holder initialized, channels ready");
@@ -90,11 +94,7 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
 
     /**
      * Create notification channels for Android 8.0+ (API 26+).
-     *
-     * CRITICAL: We delete ALL old channels first, then create new versioned ones.
-     * Android caches channel settings — once a channel is created with a certain
-     * importance level, it CANNOT be upgraded programmatically. The only way
-     * to ensure IMPORTANCE_HIGH is active is to use a new channel ID.
+     * v4: Deletes all v1/v2/v3 channels first.
      */
     private void createNotificationChannels() {
         if (channelsCreated) return;
@@ -110,48 +110,27 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
             return;
         }
 
-        // ═══════════════════════════════════════════════════════════
-        // DELETE ALL OLD CHANNELS — forces Android to use new settings
-        // ═══════════════════════════════════════════════════════════
-        try {
-            // Delete v1 channels
-            notificationManager.deleteNotificationChannel(OLD_CHANNEL_ID_V1);
-            notificationManager.deleteNotificationChannel(OLD_EMERGENCY_CHANNEL_ID_V1);
-            notificationManager.deleteNotificationChannel(OLD_CHAT_CHANNEL_ID_V1);
-            notificationManager.deleteNotificationChannel(OLD_SERVICE_CHANNEL_ID_V1);
-            // Delete v2 channels
-            notificationManager.deleteNotificationChannel(OLD_CHANNEL_ID_V2);
-            notificationManager.deleteNotificationChannel(OLD_EMERGENCY_CHANNEL_ID_V2);
-            notificationManager.deleteNotificationChannel(OLD_CHAT_CHANNEL_ID_V2);
-            notificationManager.deleteNotificationChannel(OLD_SERVICE_CHANNEL_ID_V2);
-            Log.d(TAG, "Deleted all old notification channels (v1+v2)");
-        } catch (Exception e) {
-            // Channels may not exist yet, that's fine
+        // Delete ALL old channels
+        for (String oldId : OLD_CHANNEL_IDS) {
+            try {
+                notificationManager.deleteNotificationChannel(oldId);
+            } catch (Exception e) {
+                // Channel may not exist
+            }
         }
+        Log.d(TAG, "Deleted all old notification channels (v1+v2+v3)");
 
         AudioAttributes audioAttributes = new AudioAttributes.Builder()
                 .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
                 .setUsage(AudioAttributes.USAGE_NOTIFICATION_RINGTONE)
                 .build();
 
-        // Default notification sound URI
-        Uri notificationSoundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
-        try {
-            int resId = getResources().getIdentifier("notification_sound", "raw", getPackageName());
-            if (resId != 0) {
-                notificationSoundUri = Uri.parse("android.resource://" + getPackageName() + "/" + resId);
-            }
-        } catch (Exception e) {
-            // Use default
-        }
+        // Default notification sound URI — try custom, fallback to default
+        Uri notificationSoundUri = resolveSoundUri();
 
-        // ═══════════════════════════════════════════════════════════
-        // MAIN NOTIFICATIONS CHANNEL — IMPORTANCE_HIGH = sound + popup
-        // ═══════════════════════════════════════════════════════════
+        // ═══ MAIN NOTIFICATIONS CHANNEL — IMPORTANCE_HIGH ═══
         NotificationChannel defaultChannel = new NotificationChannel(
-                CHANNEL_ID,
-                "إشعارات عافيتك",
-                NotificationManager.IMPORTANCE_HIGH
+                CHANNEL_ID, "إشعارات عافيتك", NotificationManager.IMPORTANCE_HIGH
         );
         defaultChannel.setDescription("إشعارات التطبيق العامة — صوت وتنبيه منبثق");
         defaultChannel.enableLights(true);
@@ -164,13 +143,9 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
         defaultChannel.setBypassDnd(false);
         notificationManager.createNotificationChannel(defaultChannel);
 
-        // ═══════════════════════════════════════════════════════════
-        // EMERGENCY CHANNEL — IMPORTANCE_HIGH + bypass DND
-        // ═══════════════════════════════════════════════════════════
+        // ═══ EMERGENCY CHANNEL — IMPORTANCE_HIGH + bypass DND ═══
         NotificationChannel emergencyChannel = new NotificationChannel(
-                EMERGENCY_CHANNEL_ID,
-                "إشعارات الطوارئ",
-                NotificationManager.IMPORTANCE_HIGH
+                EMERGENCY_CHANNEL_ID, "إشعارات الطوارئ", NotificationManager.IMPORTANCE_HIGH
         );
         emergencyChannel.setDescription("إشعارات حالات الطوارئ — أولوية قصوى");
         emergencyChannel.enableLights(true);
@@ -187,13 +162,9 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
         } catch (NoSuchMethodError ignored) {}
         notificationManager.createNotificationChannel(emergencyChannel);
 
-        // ═══════════════════════════════════════════════════════════
-        // CHAT CHANNEL — IMPORTANCE_HIGH for sound + popup
-        // ═══════════════════════════════════════════════════════════
+        // ═══ CHAT CHANNEL — IMPORTANCE_HIGH ═══
         NotificationChannel chatChannel = new NotificationChannel(
-                CHAT_CHANNEL_ID,
-                "رسائل المحادثة",
-                NotificationManager.IMPORTANCE_HIGH
+                CHAT_CHANNEL_ID, "رسائل المحادثة", NotificationManager.IMPORTANCE_HIGH
         );
         chatChannel.setDescription("إشعارات الرسائل والمحادثات");
         chatChannel.enableLights(true);
@@ -205,13 +176,9 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
         chatChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
         notificationManager.createNotificationChannel(chatChannel);
 
-        // ═══════════════════════════════════════════════════════════
-        // SERVICE CHANNEL — IMPORTANCE_HIGH too (for reliable delivery)
-        // ═══════════════════════════════════════════════════════════
+        // ═══ SERVICE CHANNEL — IMPORTANCE_HIGH ═══
         NotificationChannel serviceChannel = new NotificationChannel(
-                SERVICE_CHANNEL_ID,
-                "تحديثات الخدمات",
-                NotificationManager.IMPORTANCE_HIGH
+                SERVICE_CHANNEL_ID, "تحديثات الخدمات", NotificationManager.IMPORTANCE_HIGH
         );
         serviceChannel.setDescription("إشعارات تحديثات الخدمات");
         serviceChannel.enableVibration(true);
@@ -221,7 +188,25 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
         notificationManager.createNotificationChannel(serviceChannel);
 
         channelsCreated = true;
-        Log.d(TAG, "Notification channels created v3 with IMPORTANCE_HIGH (sound + popup)");
+        Log.d(TAG, "Notification channels created v4 with IMPORTANCE_HIGH (sound + popup)");
+    }
+
+    /**
+     * Resolve the notification sound URI.
+     * Tries: custom notification_sound → default notification → default ringtone
+     */
+    private Uri resolveSoundUri() {
+        try {
+            int resId = getResources().getIdentifier("notification_sound", "raw", getPackageName());
+            if (resId != 0) {
+                return Uri.parse("android.resource://" + getPackageName() + "/" + resId);
+            }
+        } catch (Exception e) { /* fallback */ }
+
+        Uri defaultNotif = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+        if (defaultNotif != null) return defaultNotif;
+
+        return RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
     }
 
     @Override
@@ -241,23 +226,12 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
      * ═══════════════════════════════════════════════════════════════
      * MOST IMPORTANT METHOD — Called when FCM message is received
      * ═══════════════════════════════════════════════════════════════
-     * This method is called in ALL app states for data-only messages
-     * sent with android.priority='high'.
-     *
-     * CRITICAL for background/killed:
-     * 1. FCM messages MUST be sent with android.priority='high' (server-side)
-     * 2. We acquire a WakeLock to ensure the CPU processes the notification
-     * 3. We play sound manually via MediaPlayer as a fallback
-     * 4. We use IMPORTANCE_HIGH channels with new IDs to bypass Android caching
-     * 5. We use setFullScreenIntent for heads-up popup (requires USE_FULL_SCREEN_INTENT)
-     * ═══════════════════════════════════════════════════════════════
      */
     @Override
     public void onMessageReceived(RemoteMessage remoteMessage) {
         super.onMessageReceived(remoteMessage);
         Log.d(TAG, "=== FCM message received from: " + remoteMessage.getFrom() + " ===");
         Log.d(TAG, "Message ID: " + remoteMessage.getMessageId());
-        Log.d(TAG, "Message priority: " + remoteMessage.getPriority());
         Log.d(TAG, "Data payload present: " + (remoteMessage.getData() != null && !remoteMessage.getData().isEmpty()));
 
         // Acquire WakeLock to ensure CPU is active (critical for background/killed)
@@ -269,7 +243,7 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
                     PowerManager.PARTIAL_WAKE_LOCK,
                     "Aafiatak::FCMReceive"
                 );
-                wakeLock.acquire(15000); // Hold for 15 seconds max
+                wakeLock.acquire(30000); // Hold for 30 seconds max
                 Log.d(TAG, "WakeLock acquired for background notification");
             }
         } catch (Exception e) {
@@ -279,7 +253,6 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
         try {
             // Reset channels flag to force recreation (in case process was killed)
             channelsCreated = false;
-            // Ensure channels exist
             createNotificationChannels();
 
             // Parse message
@@ -294,7 +267,7 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
 
             Map<String, String> data = remoteMessage.getData();
             if (data != null && !data.isEmpty()) {
-                Log.d(TAG, "Data payload: " + data.toString());
+                Log.d(TAG, "Data payload keys: " + data.keySet().toString());
                 type = data.getOrDefault("type", "system");
                 priority = data.getOrDefault("priority", "medium");
                 url = data.getOrDefault("url", "/");
@@ -373,13 +346,48 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
 
     /**
      * Play notification sound manually using MediaPlayer.
-     * This is a FALLBACK — if the NotificationChannel sound doesn't play
-     * (e.g., Android cached the old channel settings), this ensures the
-     * user still hears the notification sound.
+     * FALLBACK: If the channel sound doesn't play (Android caches old channel settings),
+     * this ensures the user still hears the notification sound.
+     *
+     * Tries: custom notification_sound → default notification → default ringtone
      */
     private void playNotificationSound() {
+        // Try custom sound first
         try {
-            Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            int resId = getResources().getIdentifier("notification_sound", "raw", getPackageName());
+            if (resId != 0) {
+                Uri customUri = Uri.parse("android.resource://" + getPackageName() + "/" + resId);
+                playSoundFromUri(customUri);
+                return;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Custom sound failed: " + e.getMessage());
+        }
+
+        // Try default notification sound
+        try {
+            Uri defaultNotifUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
+            if (defaultNotifUri != null) {
+                playSoundFromUri(defaultNotifUri);
+                return;
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Default notification sound failed: " + e.getMessage());
+        }
+
+        // Last resort: try default ringtone
+        try {
+            Uri ringtoneUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_RINGTONE);
+            if (ringtoneUri != null) {
+                playSoundFromUri(ringtoneUri);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "All sound fallbacks failed: " + e.getMessage());
+        }
+    }
+
+    private void playSoundFromUri(Uri soundUri) {
+        try {
             MediaPlayer mediaPlayer = new MediaPlayer();
             mediaPlayer.setDataSource(this, soundUri);
             mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
@@ -389,39 +397,29 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
             mediaPlayer.setLooping(false);
             mediaPlayer.setOnCompletionListener(MediaPlayer::release);
             mediaPlayer.setOnErrorListener((mp, what, extra) -> {
-                mp.release();
+                try { mp.release(); } catch (Exception ignored) {}
                 return true;
             });
             mediaPlayer.prepareAsync();
             mediaPlayer.setOnPreparedListener(MediaPlayer::start);
-            Log.d(TAG, "Playing notification sound via MediaPlayer");
+            Log.d(TAG, "Playing sound from URI: " + soundUri);
         } catch (Exception e) {
-            Log.w(TAG, "Could not play notification sound via MediaPlayer: " + e.getMessage());
-            // Fallback: try RingtoneManager
+            Log.w(TAG, "MediaPlayer failed for URI " + soundUri + ": " + e.getMessage());
+
+            // Ultra-fallback: RingtoneManager
             try {
-                Uri soundUri = RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION);
                 android.media.Ringtone ringtone = RingtoneManager.getRingtone(this, soundUri);
                 if (ringtone != null) {
                     ringtone.play();
                 }
             } catch (Exception e2) {
-                Log.w(TAG, "Could not play via RingtoneManager either: " + e2.getMessage());
+                Log.w(TAG, "RingtoneManager also failed: " + e2.getMessage());
             }
         }
     }
 
     /**
      * Show the notification with proper sound, vibration, and heads-up display.
-     *
-     * KEY POINTS for making notifications work in BACKGROUND/KILLED:
-     * 1. Channel MUST have IMPORTANCE_HIGH — NEW channel IDs (v3) to bypass caching
-     * 2. WakeLock acquired before showing (ensures CPU processes it)
-     * 3. Sound played manually via MediaPlayer as fallback
-     * 4. setDefaults(DEFAULT_ALL) for additional fallback
-     * 5. setFullScreenIntent for ALL notifications (shows heads-up popup even outside app)
-     * 6. USE_FULL_SCREEN_INTENT permission in manifest (Android 14+ requirement)
-     * 7. PRIORITY_HIGH on the notification builder for pre-Android 8.0 devices
-     * 8. CATEGORY_CALL or CATEGORY_ALARM for high-priority visual treatment
      */
     private void showNotification(String title, String body, Map<String, String> data,
                                    String channelId, String type, String priority, String url,
@@ -442,6 +440,7 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
             intent.putExtra("url", url);
             intent.putExtra("type", type);
             intent.putExtra("notificationId", notificationId);
+            intent.putExtra("fromNotification", true);
 
             PendingIntent pendingIntent = PendingIntent.getActivity(
                 this,
@@ -469,54 +468,43 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
                 .setShowWhen(true)
                 .setWhen(System.currentTimeMillis())
                 .setOnlyAlertOnce(false)
-                // CRITICAL: setDefaults as fallback for sound/vibration
-                .setDefaults(Notification.DEFAULT_ALL)
                 // Show on lock screen
                 .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
                 .setColor(0xFF14b8a6)
                 .setTicker(body)
+                // Group notifications for cleaner notification tray
+                .setGroup(GROUP_KEY)
                 // Timeout after 30 seconds for auto-dismiss
                 .setTimeoutAfter(30000);
 
-            // ═══════════════════════════════════════════════════════
-            // FULL-SCREEN INTENT — The key to showing popup OUTSIDE the app!
-            //
-            // This is what makes the notification appear as a heads-up
-            // banner when the app is in the background or killed.
-            // Without this, Android may show the notification silently
-            // in the status bar without any popup or sound.
-            //
-            // Requires USE_FULL_SCREEN_INTENT permission on Android 14+.
-            // ═══════════════════════════════════════════════════════
-            Intent fullScreenIntent = new Intent(this, MainActivity.class);
-            fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-            fullScreenIntent.putExtra("type", type);
-            fullScreenIntent.putExtra("url", url);
-            fullScreenIntent.putExtra("fromNotification", true);
-
-            PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
-                this,
-                notificationId + 1000,
-                fullScreenIntent,
-                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
-            );
+            // CRITICAL FIX: On Android 8+ (API 26+), setDefaults(DEFAULT_ALL)
+            // can OVERRIDE the channel's sound settings. Only use setDefaults
+            // for pre-Android 8 devices where channels don't exist.
+            if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+                builder.setDefaults(Notification.DEFAULT_ALL);
+            }
 
             // ═══════════════════════════════════════════════════════
-            // FULL-SCREEN INTENT — Only for emergency/urgent notifications!
-            //
-            // FIX: On Android 14+, USE_FULL_SCREEN_INTENT is auto-revoked
-            // for non-calling apps. Using it for ALL notifications causes
-            // the system to deprioritize our notifications entirely.
-            // Only use setFullScreenIntent for emergency/urgent.
-            // For other notifications, IMPORTANCE_HIGH channel + PRIORITY_HIGH
-            // + CATEGORY_CALL is enough for heads-up popup.
+            // FULL-SCREEN INTENT for emergency/high priority
             // ═══════════════════════════════════════════════════════
             if (isEmergency || isHighPriority) {
+                Intent fullScreenIntent = new Intent(this, MainActivity.class);
+                fullScreenIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                fullScreenIntent.putExtra("type", type);
+                fullScreenIntent.putExtra("url", url);
+                fullScreenIntent.putExtra("fromNotification", true);
+
+                PendingIntent fullScreenPendingIntent = PendingIntent.getActivity(
+                    this,
+                    notificationId + 1000,
+                    fullScreenIntent,
+                    PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+                );
                 builder.setFullScreenIntent(fullScreenPendingIntent, true);
                 Log.d(TAG, "setFullScreenIntent applied for emergency/high priority");
             }
 
-            // Add action button for all notifications
+            // Add action button
             builder.addAction(
                 getNotificationIcon(),
                 "فتح التطبيق",
@@ -554,12 +542,13 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
 
             notificationManager.notify(notificationId, notification);
 
-            Log.d(TAG, "=== Notification shown successfully: " + title + " [channel=" + channelId + ", type=" + type + ", priority=" + priority + "] ===");
+            // Also show a group summary notification for better tray display
+            showGroupSummary(notificationManager, title, body, channelId, type);
+
+            Log.d(TAG, "=== Notification shown: " + title + " [channel=" + channelId + ", type=" + type + ", priority=" + priority + "] ===");
 
             // ═══════════════════════════════════════════════════════
             // FALLBACK: Play sound manually via MediaPlayer
-            // This ensures sound even if channel settings are cached wrong
-            // or the app process was killed and recreated without channels
             // ═══════════════════════════════════════════════════════
             if (soundEnabled) {
                 new Handler(Looper.getMainLooper()).post(() -> {
@@ -573,6 +562,47 @@ public class AafiatakFirebaseMessagingService extends FirebaseMessagingService {
 
         } catch (Exception e) {
             Log.e(TAG, "Error showing notification: " + e.getMessage(), e);
+        }
+    }
+
+    /**
+     * Show a group summary notification so multiple notifications
+     * are grouped together in the notification tray.
+     */
+    private void showGroupSummary(NotificationManagerCompat notificationManager,
+                                   String title, String body, String channelId,
+                                   String type) {
+        try {
+            Intent summaryIntent = new Intent(this, MainActivity.class);
+            summaryIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
+            summaryIntent.setAction("NOTIFICATION_SUMMARY_" + System.currentTimeMillis());
+            summaryIntent.putExtra("url", "/notifications");
+
+            PendingIntent summaryPendingIntent = PendingIntent.getActivity(
+                this,
+                999999, // Fixed ID for summary
+                summaryIntent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+            );
+
+            NotificationCompat.Builder summaryBuilder = new NotificationCompat.Builder(this, channelId)
+                .setSmallIcon(getNotificationIcon())
+                .setContentTitle("عافيتك")
+                .setContentText("لديك إشعارات جديدة")
+                .setAutoCancel(true)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_CALL)
+                .setShowWhen(true)
+                .setWhen(System.currentTimeMillis())
+                .setGroup(GROUP_KEY)
+                .setGroupSummary(true)
+                .setContentIntent(summaryPendingIntent)
+                .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+                .setColor(0xFF14b8a6);
+
+            notificationManager.notify(999999, summaryBuilder.build());
+        } catch (Exception e) {
+            Log.w(TAG, "Group summary failed: " + e.getMessage());
         }
     }
 

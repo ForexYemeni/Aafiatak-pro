@@ -4,6 +4,7 @@ import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
 import android.Manifest;
 import android.net.Uri;
@@ -14,26 +15,25 @@ import android.webkit.WebView;
 import android.widget.Toast;
 
 import com.getcapacitor.BridgeActivity;
+import com.google.firebase.FirebaseApp;
+import com.google.firebase.messaging.FirebaseMessaging;
 
 public class MainActivity extends BridgeActivity {
 
     private static final String TAG = "AafiatakApp";
 
-    // Must match the channel IDs in AafiatakFirebaseMessagingService (v3)
-    private static final String CHANNEL_ID = "aafiatak_notifications_v3";
-    private static final String EMERGENCY_CHANNEL_ID = "aafiatak_emergency_v3";
-    private static final String CHAT_CHANNEL_ID = "aafiatak_chat_v3";
-    private static final String SERVICE_CHANNEL_ID = "aafiatak_services_v3";
+    // Must match the channel IDs in AafiatakFirebaseMessagingService (v4)
+    private static final String CHANNEL_ID = "aafiatak_notifications_v4";
+    private static final String EMERGENCY_CHANNEL_ID = "aafiatak_emergency_v4";
+    private static final String CHAT_CHANNEL_ID = "aafiatak_chat_v4";
+    private static final String SERVICE_CHANNEL_ID = "aafiatak_services_v4";
 
-    // Old channel IDs to delete
-    private static final String OLD_CHANNEL_ID_V1 = "aafiatak_notifications";
-    private static final String OLD_EMERGENCY_CHANNEL_ID_V1 = "aafiatak_emergency";
-    private static final String OLD_CHAT_CHANNEL_ID_V1 = "aafiatak_chat";
-    private static final String OLD_SERVICE_CHANNEL_ID_V1 = "aafiatak_services";
-    private static final String OLD_CHANNEL_ID_V2 = "aafiatak_notifications_v2";
-    private static final String OLD_EMERGENCY_CHANNEL_ID_V2 = "aafiatak_emergency_v2";
-    private static final String OLD_CHAT_CHANNEL_ID_V2 = "aafiatak_chat_v2";
-    private static final String OLD_SERVICE_CHANNEL_ID_V2 = "aafiatak_services_v2";
+    // All old channel IDs to delete (v1, v2, v3)
+    private static final String[] OLD_CHANNEL_IDS = {
+        "aafiatak_notifications", "aafiatak_emergency", "aafiatak_chat", "aafiatak_services",
+        "aafiatak_notifications_v2", "aafiatak_emergency_v2", "aafiatak_chat_v2", "aafiatak_services_v2",
+        "aafiatak_notifications_v3", "aafiatak_emergency_v3", "aafiatak_chat_v3", "aafiatak_services_v3"
+    };
 
     private static final int REQUEST_NOTIFICATION_PERMISSION = 1001;
     private static final int REQUEST_FULL_SCREEN_INTENT_PERMISSION = 1002;
@@ -41,9 +41,66 @@ public class MainActivity extends BridgeActivity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
+        // ═══════════════════════════════════════════════════════════
+        // CRITICAL: Initialize Firebase FIRST before anything else
+        // Without this, FCM token generation and message handling
+        // will NOT work when the app starts from a killed state.
+        // ═══════════════════════════════════════════════════════════
+        try {
+            FirebaseApp.initializeApp(this);
+            Log.d(TAG, "FirebaseApp initialized in MainActivity");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to initialize FirebaseApp: " + e.getMessage());
+        }
+
+        // Create notification channels with v4 IDs (bypasses Android caching)
         createNotificationChannels();
+
+        // Request permissions
         requestNotificationPermission();
         requestFullScreenIntentPermission();
+
+        // Ensure FCM token is available
+        ensureFCMToken();
+    }
+
+    /**
+     * Ensure FCM token exists. If not, request one.
+     * This handles the case where the token was not generated during
+     * the initial Capacitor PushNotifications.register() call.
+     */
+    private void ensureFCMToken() {
+        try {
+            SharedPreferences prefs = getSharedPreferences("aafiatak_prefs", MODE_PRIVATE);
+            String existingToken = prefs.getString("fcm_token", null);
+
+            if (existingToken == null || existingToken.isEmpty()) {
+                Log.d(TAG, "No FCM token found — requesting new token");
+                FirebaseMessaging.getInstance().getToken()
+                    .addOnCompleteListener(task -> {
+                        if (task.isSuccessful() && task.getResult() != null) {
+                            String token = task.getResult();
+                            Log.d(TAG, "FCM token obtained: " + token.substring(0, Math.min(token.length(), 20)) + "...");
+                            prefs.edit().putString("fcm_token", token).apply();
+
+                            // Also update the token holder
+                            com.aafiatak.app.services.AafiatakFCMTokenHolder.init(getApplicationContext());
+                            com.aafiatak.app.services.AafiatakFCMTokenHolder.setCurrentToken(token);
+                        } else {
+                            Log.w(TAG, "Failed to get FCM token: " +
+                                (task.getException() != null ? task.getException().getMessage() : "unknown"));
+                        }
+                    });
+            } else {
+                Log.d(TAG, "FCM token already exists: " + existingToken.substring(0, Math.min(existingToken.length(), 20)) + "...");
+
+                // Initialize token holder with existing token
+                com.aafiatak.app.services.AafiatakFCMTokenHolder.init(getApplicationContext());
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Error ensuring FCM token: " + e.getMessage());
+        }
     }
 
     /**
@@ -55,6 +112,7 @@ public class MainActivity extends BridgeActivity {
     @Override
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
+        setIntent(intent);
         handleDeepLink(intent);
     }
 
@@ -129,8 +187,12 @@ public class MainActivity extends BridgeActivity {
 
     /**
      * Create notification channels on app start.
-     * Deletes ALL old channels first to ensure IMPORTANCE_HIGH is actually applied.
-     * Android caches channel settings and ignores code changes to existing channels.
+     * Deletes ALL old channels (v1+v2+v3) first to ensure IMPORTANCE_HIGH
+     * is actually applied. Android caches channel settings and ignores code
+     * changes to existing channels.
+     *
+     * v4: Bumped again because v3 channels may still have cached settings
+     *     on some devices that prevent sound from playing.
      */
     private void createNotificationChannels() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
@@ -138,21 +200,14 @@ public class MainActivity extends BridgeActivity {
             if (manager == null) return;
 
             // Delete ALL old channels to force Android to use new settings
-            try {
-                // Delete v1 channels
-                manager.deleteNotificationChannel(OLD_CHANNEL_ID_V1);
-                manager.deleteNotificationChannel(OLD_EMERGENCY_CHANNEL_ID_V1);
-                manager.deleteNotificationChannel(OLD_CHAT_CHANNEL_ID_V1);
-                manager.deleteNotificationChannel(OLD_SERVICE_CHANNEL_ID_V1);
-                // Delete v2 channels
-                manager.deleteNotificationChannel(OLD_CHANNEL_ID_V2);
-                manager.deleteNotificationChannel(OLD_EMERGENCY_CHANNEL_ID_V2);
-                manager.deleteNotificationChannel(OLD_CHAT_CHANNEL_ID_V2);
-                manager.deleteNotificationChannel(OLD_SERVICE_CHANNEL_ID_V2);
-                Log.d(TAG, "Deleted all old notification channels (v1+v2)");
-            } catch (Exception e) {
-                // Channels may not exist yet
+            for (String oldId : OLD_CHANNEL_IDS) {
+                try {
+                    manager.deleteNotificationChannel(oldId);
+                } catch (Exception e) {
+                    // Channel may not exist yet
+                }
             }
+            Log.d(TAG, "Deleted all old notification channels (v1+v2+v3)");
 
             android.media.AudioAttributes audioAttributes = new android.media.AudioAttributes.Builder()
                     .setContentType(android.media.AudioAttributes.CONTENT_TYPE_SONIFICATION)
@@ -171,7 +226,9 @@ public class MainActivity extends BridgeActivity {
                 soundUri = android.media.RingtoneManager.getDefaultUri(android.media.RingtoneManager.TYPE_NOTIFICATION);
             }
 
-            // Main notifications channel - IMPORTANCE_HIGH = sound + popup + lockscreen
+            // ═══════════════════════════════════════════════════════════
+            // MAIN NOTIFICATIONS CHANNEL — IMPORTANCE_HIGH = sound + popup
+            // ═══════════════════════════════════════════════════════════
             NotificationChannel mainChannel = new NotificationChannel(
                 CHANNEL_ID,
                 "إشعارات عافيتك",
@@ -187,7 +244,9 @@ public class MainActivity extends BridgeActivity {
             mainChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             manager.createNotificationChannel(mainChannel);
 
-            // Emergency channel - IMPORTANCE_HIGH + bypass DND
+            // ═══════════════════════════════════════════════════════════
+            // EMERGENCY CHANNEL — IMPORTANCE_HIGH + bypass DND
+            // ═══════════════════════════════════════════════════════════
             NotificationChannel emergencyChannel = new NotificationChannel(
                 EMERGENCY_CHANNEL_ID,
                 "إشعارات الطوارئ",
@@ -208,7 +267,9 @@ public class MainActivity extends BridgeActivity {
             } catch (NoSuchMethodError ignored) {}
             manager.createNotificationChannel(emergencyChannel);
 
-            // Chat channel - IMPORTANCE_HIGH
+            // ═══════════════════════════════════════════════════════════
+            // CHAT CHANNEL — IMPORTANCE_HIGH
+            // ═══════════════════════════════════════════════════════════
             NotificationChannel chatChannel = new NotificationChannel(
                 CHAT_CHANNEL_ID,
                 "رسائل المحادثة",
@@ -224,7 +285,9 @@ public class MainActivity extends BridgeActivity {
             chatChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             manager.createNotificationChannel(chatChannel);
 
-            // Service channel - IMPORTANCE_HIGH too
+            // ═══════════════════════════════════════════════════════════
+            // SERVICE CHANNEL — IMPORTANCE_HIGH
+            // ═══════════════════════════════════════════════════════════
             NotificationChannel serviceChannel = new NotificationChannel(
                 SERVICE_CHANNEL_ID,
                 "تحديثات الخدمات",
@@ -237,7 +300,7 @@ public class MainActivity extends BridgeActivity {
             serviceChannel.setLockscreenVisibility(Notification.VISIBILITY_PUBLIC);
             manager.createNotificationChannel(serviceChannel);
 
-            Log.d(TAG, "Notification channels created v3 with IMPORTANCE_HIGH");
+            Log.d(TAG, "Notification channels created v4 with IMPORTANCE_HIGH + sound");
         }
     }
 
@@ -245,6 +308,8 @@ public class MainActivity extends BridgeActivity {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
                 requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, REQUEST_NOTIFICATION_PERMISSION);
+            } else {
+                Log.d(TAG, "POST_NOTIFICATIONS permission already granted");
             }
         }
     }
