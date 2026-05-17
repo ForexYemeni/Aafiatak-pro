@@ -1497,7 +1497,7 @@ export function RegisterMultiStep({ onBackToLogin, onRegisterSuccess }: Register
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 18 }}
               transition={{ duration: 0.28 }}
-              className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-3 -mx-1 px-1 pb-2"
+              className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-3 -mx-1 px-1 pb-10"
             >
               {/* Back button */}
               <motion.button
@@ -1722,7 +1722,7 @@ export function RegisterMultiStep({ onBackToLogin, onRegisterSuccess }: Register
           >
             <NurseStepIndicator currentStep={nurseStep} />
 
-            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar -mx-1 px-1 pb-2">
+            <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar -mx-1 px-1 pb-10">
               <AnimatePresence mode="wait" custom={1}>
                 {/* Nurse Step 1: Personal Info */}
                 {nurseStep === 1 && (

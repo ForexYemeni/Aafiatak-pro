@@ -992,7 +992,7 @@ function LoginPageContent() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -18 }}
                 transition={{ duration: 0.28 }}
-                className="flex-1 min-h-0"
+                className="flex-1 min-h-0 flex flex-col"
               >
                 <RegisterMultiStep
                   onBackToLogin={() => { setActiveTab('login'); clearError(); }}

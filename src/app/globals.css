@@ -234,6 +234,10 @@
    Custom Scrollbar (RTL-aware)
    ============================================================================ */
 
+.custom-scrollbar {
+  -webkit-overflow-scrolling: touch;
+}
+
 .custom-scrollbar::-webkit-scrollbar {
   width: 6px;
   height: 6px;
