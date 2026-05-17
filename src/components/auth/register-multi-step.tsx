@@ -23,6 +23,13 @@ import {
   Siren,
   Home,
   MoreHorizontal,
+  Shield,
+  ShieldCheck,
+  Gift,
+  Check,
+  CheckCircle2,
+  Sparkles,
+  Tag,
 } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { useAuthStore } from '@/lib/stores/auth-store';
@@ -57,6 +64,35 @@ function getPasswordStrength(password: string): { score: number; label: string }
   if (score <= 2) return { score: 1, label: 'ضعيفة' };
   if (score <= 3) return { score: 2, label: 'متوسطة' };
   return { score: 3, label: 'قوية' };
+}
+
+// ============================================================================
+// 5-Level Password Strength Calculator (for beneficiary form)
+// ============================================================================
+
+function getPasswordStrength5(password: string): {
+  score: number; label: string;
+  hasMinLength: boolean; hasUppercase: boolean; hasDigit: boolean; hasSpecial: boolean;
+} {
+  if (!password) return { score: 0, label: '', hasMinLength: false, hasUppercase: false, hasDigit: false, hasSpecial: false };
+  const hasMinLength = password.length >= 6;
+  const hasUppercase = /[A-Z]/.test(password);
+  const hasDigit = /[0-9]/.test(password);
+  const hasSpecial = /[^A-Za-z0-9]/.test(password);
+  const hasLongLength = password.length >= 8;
+
+  let score = 0;
+  if (hasMinLength) score += 1;
+  if (hasLongLength) score += 1;
+  if (hasUppercase) score += 1;
+  if (hasDigit) score += 1;
+  if (hasSpecial) score += 1;
+
+  if (score <= 1) return { score: 1, label: 'ضعيفة', hasMinLength, hasUppercase, hasDigit, hasSpecial };
+  if (score === 2) return { score: 2, label: 'ضعيفة', hasMinLength, hasUppercase, hasDigit, hasSpecial };
+  if (score === 3) return { score: 3, label: 'متوسطة', hasMinLength, hasUppercase, hasDigit, hasSpecial };
+  if (score === 4) return { score: 4, label: 'جيدة', hasMinLength, hasUppercase, hasDigit, hasSpecial };
+  return { score: 5, label: 'قوية', hasMinLength, hasUppercase, hasDigit, hasSpecial };
 }
 
 // ============================================================================
@@ -543,6 +579,553 @@ function NurseStepIndicator({ currentStep }: { currentStep: number }) {
 }
 
 // ============================================================================
+// Beneficiary-specific Enhanced Components
+// ============================================================================
+
+// Color config for beneficiary cards
+const BEN_CARD_COLORS: Record<string, {
+  bg: string; border: string; accent: string; iconBg: string; iconBorder: string; iconColor: string; textColor: string;
+  gradient: string; glowBorder: string; hoverGlow: string;
+}> = {
+  teal: {
+    bg: 'rgba(20,184,166,0.04)',
+    border: 'rgba(20,184,166,0.15)',
+    accent: '#14b8a6',
+    iconBg: 'rgba(20,184,166,0.16)',
+    iconBorder: 'rgba(20,184,166,0.28)',
+    iconColor: '#2dd4bf',
+    textColor: 'rgba(20,184,166,0.75)',
+    gradient: 'linear-gradient(135deg, rgba(20,184,166,0.06) 0%, rgba(20,184,166,0.01) 100%)',
+    glowBorder: 'rgba(20,184,166,0.4)',
+    hoverGlow: '0 0 24px -4px rgba(20,184,166,0.15)',
+  },
+  emerald: {
+    bg: 'rgba(16,185,129,0.04)',
+    border: 'rgba(16,185,129,0.15)',
+    accent: '#10b981',
+    iconBg: 'rgba(16,185,129,0.16)',
+    iconBorder: 'rgba(16,185,129,0.28)',
+    iconColor: '#34d399',
+    textColor: 'rgba(16,185,129,0.75)',
+    gradient: 'linear-gradient(135deg, rgba(16,185,129,0.06) 0%, rgba(16,185,129,0.01) 100%)',
+    glowBorder: 'rgba(16,185,129,0.4)',
+    hoverGlow: '0 0 24px -4px rgba(16,185,129,0.15)',
+  },
+  sky: {
+    bg: 'rgba(14,165,233,0.04)',
+    border: 'rgba(14,165,233,0.15)',
+    accent: '#0ea5e9',
+    iconBg: 'rgba(14,165,233,0.16)',
+    iconBorder: 'rgba(14,165,233,0.28)',
+    iconColor: '#38bdf8',
+    textColor: 'rgba(14,165,233,0.75)',
+    gradient: 'linear-gradient(135deg, rgba(14,165,233,0.06) 0%, rgba(14,165,233,0.01) 100%)',
+    glowBorder: 'rgba(14,165,233,0.4)',
+    hoverGlow: '0 0 24px -4px rgba(14,165,233,0.15)',
+  },
+  violet: {
+    bg: 'rgba(139,92,246,0.04)',
+    border: 'rgba(139,92,246,0.15)',
+    accent: '#8b5cf6',
+    iconBg: 'rgba(139,92,246,0.16)',
+    iconBorder: 'rgba(139,92,246,0.28)',
+    iconColor: '#a78bfa',
+    textColor: 'rgba(139,92,246,0.75)',
+    gradient: 'linear-gradient(135deg, rgba(139,92,246,0.06) 0%, rgba(139,92,246,0.01) 100%)',
+    glowBorder: 'rgba(139,92,246,0.4)',
+    hoverGlow: '0 0 24px -4px rgba(139,92,246,0.15)',
+  },
+};
+
+function BeneficiaryGlassCard({
+  children,
+  className,
+  accentColor = 'teal',
+  isCompleted = false,
+  hasError = false,
+  isOptional = false,
+  index = 0,
+}: {
+  children: React.ReactNode;
+  className?: string;
+  accentColor?: string;
+  isCompleted?: boolean;
+  hasError?: boolean;
+  isOptional?: boolean;
+  index?: number;
+}) {
+  const colors = BEN_CARD_COLORS[accentColor] || BEN_CARD_COLORS.teal;
+
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 16, scale: 0.98 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.4, delay: index * 0.08, ease: [0.25, 0.46, 0.45, 0.94] }}
+      className={cn('relative rounded-[20px] overflow-hidden group', className)}
+      style={{
+        background: colors.bg,
+        border: isOptional
+          ? `1.5px dashed ${colors.border}`
+          : isCompleted
+            ? `1.5px solid ${colors.glowBorder}`
+            : hasError
+              ? '1.5px solid rgba(239,68,68,0.35)'
+              : `1px solid ${colors.border}`,
+        boxShadow: isCompleted
+          ? `0 0 20px -4px ${colors.glowBorder.replace('0.4', '0.15')}`
+          : 'none',
+      }}
+      onMouseEnter={(e) => {
+        if (!isCompleted) {
+          e.currentTarget.style.boxShadow = colors.hoverGlow;
+        } else {
+          e.currentTarget.style.boxShadow = `0 0 28px -4px ${colors.glowBorder.replace('0.4', '0.2')}`;
+        }
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.boxShadow = isCompleted
+          ? `0 0 20px -4px ${colors.glowBorder.replace('0.4', '0.15')}`
+          : 'none';
+      }}
+    >
+      {/* Gradient overlay */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{ background: colors.gradient }}
+      />
+
+      {/* Right-side accent bar (RTL: on the right) */}
+      <div
+        className="absolute right-0 top-3 bottom-3 w-[3px] rounded-l-full"
+        style={{
+          background: isCompleted
+            ? `linear-gradient(to bottom, ${colors.accent}, ${colors.accent}88)`
+            : hasError
+              ? 'linear-gradient(to bottom, rgba(239,68,68,0.6), rgba(239,68,68,0.3))'
+              : `${colors.accent}40`,
+          transition: 'background 0.3s ease',
+        }}
+      />
+
+      {/* Completion checkmark badge */}
+      <AnimatePresence>
+        {isCompleted && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+            className="absolute left-2 top-2 z-20"
+          >
+            <div
+              className="w-5 h-5 rounded-full flex items-center justify-center"
+              style={{
+                background: `linear-gradient(135deg, ${colors.accent}, ${colors.accent}cc)`,
+                boxShadow: `0 2px 8px ${colors.accent}66`,
+              }}
+            >
+              <Check className="w-3 h-3 text-white" strokeWidth={3} />
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Card content */}
+      <div className="relative z-10 p-5 space-y-3">
+        {children}
+      </div>
+    </motion.div>
+  );
+}
+
+function BeneficiaryCardHeader({
+  icon: Icon,
+  title,
+  color = 'teal',
+  isCompleted = false,
+  hasError = false,
+  badge,
+}: {
+  icon: React.ElementType;
+  title: string;
+  color?: string;
+  isCompleted?: boolean;
+  hasError?: boolean;
+  badge?: string;
+}) {
+  const colors = BEN_CARD_COLORS[color] || BEN_CARD_COLORS.teal;
+
+  return (
+    <div className="flex items-center gap-2.5 mb-3">
+      <motion.div
+        animate={hasError ? { scale: [1, 1.15, 1] } : { scale: 1 }}
+        transition={hasError ? { duration: 0.6, repeat: Infinity, repeatType: 'loop' } : {}}
+        className="w-8 h-8 rounded-[10px] flex items-center justify-center relative"
+        style={{
+          background: colors.iconBg,
+          border: `1px solid ${isCompleted ? colors.glowBorder : colors.iconBorder}`,
+          boxShadow: isCompleted ? `0 0 12px ${colors.accent}33` : 'none',
+        }}
+      >
+        <Icon className="w-4 h-4" style={{ color: colors.iconColor }} />
+      </motion.div>
+      <span
+        className="text-[12px] font-bold tracking-wide"
+        style={{ color: isCompleted ? colors.iconColor : colors.textColor }}
+      >
+        {title}
+      </span>
+      {badge && (
+        <span
+          className="px-2 py-0.5 rounded-full text-[9px] font-bold"
+          style={{
+            background: 'rgba(14,165,233,0.12)',
+            color: 'rgba(56,189,248,0.8)',
+            border: '1px solid rgba(14,165,233,0.2)',
+          }}
+        >
+          {badge}
+        </span>
+      )}
+    </div>
+  );
+}
+
+// ============================================================================
+// Beneficiary Step Indicator
+// ============================================================================
+
+const BEN_STEPS = [
+  { key: 'personal', label: 'المعلومات الشخصية', shortLabel: 'الشخصية', color: 'teal' },
+  { key: 'location', label: 'الموقع الجغرافي', shortLabel: 'الموقع', color: 'emerald' },
+  { key: 'referral', label: 'كود الإحالة', shortLabel: 'الإحالة', color: 'sky' },
+  { key: 'security', label: 'الأمان', shortLabel: 'الأمان', color: 'violet' },
+];
+
+function BeneficiaryStepIndicator({ completedSteps }: { completedSteps: Record<string, boolean> }) {
+  return (
+    <div className="flex items-center justify-center gap-0 mb-3 px-1" dir="rtl">
+      {BEN_STEPS.map((step, i) => {
+        const isCompleted = completedSteps[step.key] || false;
+        const colors = BEN_CARD_COLORS[step.color] || BEN_CARD_COLORS.teal;
+
+        return (
+          <div key={step.key} className="flex items-center">
+            <div className="flex flex-col items-center gap-0.5">
+              <motion.div
+                animate={{
+                  scale: isCompleted ? 1.05 : 1,
+                  backgroundColor: isCompleted ? colors.accent : 'rgba(255,255,255,0.06)',
+                  borderColor: isCompleted ? colors.accent : 'rgba(255,255,255,0.1)',
+                }}
+                transition={{ duration: 0.35, ease: 'easeOut' }}
+                className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold"
+                style={{
+                  border: '1.5px solid',
+                  color: isCompleted ? 'white' : 'rgba(255,255,255,0.3)',
+                }}
+              >
+                {isCompleted ? <Check className="w-3.5 h-3.5" strokeWidth={3} /> : i + 1}
+              </motion.div>
+              <span
+                className="text-[8px] font-medium transition-colors duration-300"
+                style={{ color: isCompleted ? colors.iconColor : 'rgba(255,255,255,0.25)' }}
+              >
+                {step.shortLabel}
+              </span>
+            </div>
+            {i < BEN_STEPS.length - 1 && (
+              <div
+                className="w-5 h-[2px] mx-0.5 mt-[-12px] rounded-full transition-colors duration-300"
+                style={{ background: isCompleted ? (BEN_CARD_COLORS[BEN_STEPS[i + 1].color]?.accent || '#14b8a6') + '66' : 'rgba(255,255,255,0.06)' }}
+              />
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+// ============================================================================
+// Beneficiary Password Input (5-segment strength + requirements)
+// ============================================================================
+
+function BeneficiaryPasswordInput({
+  value,
+  onChange,
+  error,
+  id,
+  onFocusChange,
+}: {
+  value: string;
+  onChange: (val: string) => void;
+  error: string | null;
+  id: string;
+  onFocusChange?: (focused: boolean) => void;
+}) {
+  const [showPassword, setShowPassword] = useState(false);
+  const [isFocused, setIsFocused] = useState(false);
+  const strength = getPasswordStrength5(value);
+
+  const strengthConfig: Record<number, { color: string; textColor: string; barColor: string }> = {
+    1: { color: '#ef4444', textColor: 'text-red-400', barColor: 'bg-red-500' },
+    2: { color: '#ef4444', textColor: 'text-red-400', barColor: 'bg-red-500' },
+    3: { color: '#f59e0b', textColor: 'text-amber-400', barColor: 'bg-amber-500' },
+    4: { color: '#84cc16', textColor: 'text-lime-400', barColor: 'bg-lime-500' },
+    5: { color: '#10b981', textColor: 'text-emerald-400', barColor: 'bg-emerald-500' },
+  };
+
+  const currentStrength = strengthConfig[strength.score] || strengthConfig[1];
+
+  const requirements = [
+    { label: '٦ أحرف على الأقل', met: strength.hasMinLength },
+    { label: 'حرف كبير', met: strength.hasUppercase },
+    { label: 'رقم', met: strength.hasDigit },
+    { label: 'رمز خاص', met: strength.hasSpecial },
+  ];
+
+  return (
+    <div className="space-y-2">
+      <div className="relative">
+        <Shield
+          className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none transition-colors duration-200"
+          style={{ color: isFocused ? 'rgba(139,92,246,0.5)' : 'rgba(255,255,255,0.28)' }}
+        />
+        <Input
+          id={id}
+          type={showPassword ? 'text' : 'password'}
+          value={value}
+          onChange={(e) => onChange(e.target.value)}
+          placeholder="كلمة المرور"
+          className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200"
+          style={{
+            background: 'rgba(255,255,255,0.06)',
+            border: `1px solid ${error ? 'rgba(239,68,68,0.42)' : isFocused ? 'rgba(139,92,246,0.58)' : 'rgba(255,255,255,0.1)'}`,
+            boxShadow: isFocused
+              ? '0 0 0 3px rgba(139,92,246,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'
+              : 'inset 0 1px 0 rgba(255,255,255,0.05)',
+          }}
+          onFocus={(e) => {
+            setIsFocused(true);
+            onFocusChange?.(true);
+            e.currentTarget.style.background = 'rgba(255,255,255,0.09)';
+            e.currentTarget.style.border = '1px solid rgba(139,92,246,0.58)';
+            e.currentTarget.style.boxShadow = '0 0 0 3px rgba(139,92,246,0.12), inset 0 1px 0 rgba(255,255,255,0.05)';
+          }}
+          onBlur={(e) => {
+            setIsFocused(false);
+            onFocusChange?.(false);
+            e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+            e.currentTarget.style.border = `1px solid ${error ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`;
+            e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)';
+          }}
+        />
+        <motion.button
+          type="button"
+          onClick={() => setShowPassword(!showPassword)}
+          className="absolute left-3 top-1/2 -translate-y-1/2 z-10 p-0.5 rounded-md transition-colors"
+          style={{ color: 'rgba(255,255,255,0.3)' }}
+          whileTap={{ scale: 0.9 }}
+          onMouseEnter={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.6)'; }}
+          onMouseLeave={(e) => { e.currentTarget.style.color = 'rgba(255,255,255,0.3)'; }}
+        >
+          <motion.div
+            animate={{ rotate: showPassword ? 180 : 0 }}
+            transition={{ duration: 0.2 }}
+          >
+            {showPassword ? <EyeOff className="w-[15px] h-[15px]" /> : <Eye className="w-[15px] h-[15px]" />}
+          </motion.div>
+        </motion.button>
+      </div>
+
+      {/* 5-segment Password strength indicator */}
+      <AnimatePresence>
+        {value && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25 }}
+            className="space-y-1.5"
+          >
+            <div className="flex gap-1">
+              {[0, 1, 2, 3, 4].map((i) => (
+                <motion.div
+                  key={i}
+                  className="h-[5px] flex-1 rounded-full overflow-hidden"
+                  style={{ background: 'rgba(255,255,255,0.08)' }}
+                >
+                  <motion.div
+                    initial={{ width: '0%' }}
+                    animate={{ width: i < strength.score ? '100%' : '0%' }}
+                    transition={{ duration: 0.4, delay: i * 0.05, ease: 'easeOut' }}
+                    className="h-full rounded-full"
+                    style={{
+                      background: i < strength.score
+                        ? currentStrength.color
+                        : 'transparent',
+                    }}
+                  />
+                </motion.div>
+              ))}
+            </div>
+            <div className="flex items-center justify-between">
+              <p className={cn('text-[11px] font-medium transition-colors duration-300', currentStrength.textColor)}>
+                قوة كلمة المرور: {strength.label}
+              </p>
+              {strength.score >= 4 && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="flex items-center gap-0.5"
+                >
+                  <ShieldCheck className="w-3 h-3 text-emerald-400" />
+                  <span className="text-[9px] text-emerald-400/70 font-medium">آمنة</span>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Password requirements checklist (shown when focused) */}
+      <AnimatePresence>
+        {isFocused && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="space-y-1 px-1"
+          >
+            {requirements.map((req) => (
+              <motion.div
+                key={req.label}
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                className="flex items-center gap-1.5"
+              >
+                {req.met ? (
+                  <CheckCircle2 className="w-3 h-3 text-emerald-400 shrink-0" />
+                ) : (
+                  <div className="w-3 h-3 rounded-full shrink-0" style={{ background: 'rgba(255,255,255,0.1)', border: '1px solid rgba(255,255,255,0.15)' }} />
+                )}
+                <span className={cn('text-[10px] font-medium transition-colors duration-200', req.met ? 'text-emerald-400/80' : 'text-white/35')}>
+                  {req.label}
+                </span>
+              </motion.div>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {error && (
+          <motion.p
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="text-[11px] text-red-400 flex items-center gap-1"
+          >
+            <AlertTriangle className="w-3 h-3 shrink-0" />
+            {error}
+          </motion.p>
+        )}
+      </AnimatePresence>
+    </div>
+  );
+}
+
+// ============================================================================
+// Beneficiary Submit Button
+// ============================================================================
+
+function BeneficiarySubmitButton({
+  onClick,
+  loading,
+  completionPercent,
+  disabled,
+}: {
+  onClick: () => void;
+  loading: boolean;
+  completionPercent: number;
+  disabled: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      {/* Completion bar */}
+      <div className="flex items-center gap-2">
+        <div className="flex-1 h-[3px] rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
+          <motion.div
+            className="h-full rounded-full"
+            style={{
+              background: completionPercent >= 100
+                ? 'linear-gradient(to left, #14b8a6, #10b981)'
+                : 'linear-gradient(to left, rgba(20,184,166,0.6), rgba(16,185,129,0.4))',
+            }}
+            animate={{ width: `${completionPercent}%` }}
+            transition={{ duration: 0.5, ease: 'easeOut' }}
+          />
+        </div>
+        <span className="text-[10px] font-medium" style={{ color: completionPercent >= 100 ? 'rgba(16,185,129,0.8)' : 'rgba(255,255,255,0.3)' }}>
+          {Math.round(completionPercent)}%
+        </span>
+      </div>
+
+      <motion.button
+        type="button"
+        whileTap={!disabled ? { scale: 0.97 } : undefined}
+        onClick={onClick}
+        disabled={disabled || loading}
+        className="relative w-full h-[50px] rounded-[14px] text-[14px] font-bold transition-all duration-300 flex items-center justify-center gap-2 overflow-hidden"
+        style={{
+          background: disabled
+            ? 'rgba(255,255,255,0.06)'
+            : 'linear-gradient(135deg, #14b8a6, #10b981, #059669)',
+          color: disabled ? 'rgba(255,255,255,0.2)' : 'white',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          boxShadow: disabled ? 'none' : '0 8px 28px -6px rgba(20,184,166,0.4)',
+        }}
+        onMouseEnter={(e) => {
+          if (!disabled) {
+            e.currentTarget.style.boxShadow = '0 12px 36px -6px rgba(20,184,166,0.5)';
+            e.currentTarget.style.transform = 'translateY(-1px)';
+          }
+        }}
+        onMouseLeave={(e) => {
+          e.currentTarget.style.boxShadow = disabled ? 'none' : '0 8px 28px -6px rgba(20,184,166,0.4)';
+          e.currentTarget.style.transform = 'translateY(0)';
+        }}
+      >
+        {/* Shimmer animation on hover */}
+        {!disabled && (
+          <motion.div
+            className="absolute inset-0 pointer-events-none"
+            style={{
+              background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 50%, transparent 100%)',
+              backgroundSize: '200% 100%',
+            }}
+            animate={{ backgroundPosition: ['200% 0', '-200% 0'] }}
+            transition={{ duration: 2.5, repeat: Infinity, ease: 'linear' }}
+          />
+        )}
+        <span className="relative z-10 flex items-center gap-2">
+          {loading ? (
+            <Loader2 className="w-5 h-5 animate-spin" />
+          ) : (
+            <>
+              <Sparkles className="w-4 h-4" />
+              إنشاء الحساب
+            </>
+          )}
+        </span>
+      </motion.button>
+    </div>
+  );
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -884,146 +1467,248 @@ export function RegisterMultiStep({ onBackToLogin, onRegisterSuccess }: Register
           </motion.div>
         )}
 
-        {/* ====== BENEFICIARY FORM (single scrollable view) ====== */}
-        {registerRole === 'beneficiary' && (
-          <motion.div
-            key="beneficiary-form"
-            initial={{ opacity: 0, x: -18 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 18 }}
-            transition={{ duration: 0.28 }}
-            className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-3 -mx-1 px-1 pb-2"
-          >
-            {/* Back button */}
-            <button
-              type="button"
-              onClick={handleBackToRoleSelect}
-              className="flex items-center gap-1.5 text-white/40 hover:text-white/70 transition-colors text-[13px] mb-1"
-            >
-              <ArrowRight className="w-4 h-4" />
-              اختيار نوع الحساب
-            </button>
+        {/* ====== BENEFICIARY FORM (enhanced with cards) ====== */}
+        {registerRole === 'beneficiary' && (() => {
+          // Compute card completion states
+          const personalComplete = !!(benName.trim() && !validatePhone(benPhone));
+          const personalHasError = !!(benNameError || benPhoneError);
+          const locationComplete = !!(benAddress.trim() || benLocationData?.address);
+          const locationHasError = !!benAddressError;
+          const referralComplete = true; // Always "complete" since optional
+          const securityComplete = !!(benPassword && benPassword.length >= 6);
+          const securityHasError = !!benPasswordError;
 
-            {/* Card 1: Personal Info */}
-            <GlassCard>
-              <CardHeader icon={User} title="المعلومات الشخصية" color="teal" />
-              {/* Name */}
-              <div className="space-y-1.5">
+          const completedSteps: Record<string, boolean> = {
+            personal: personalComplete,
+            location: locationComplete,
+            referral: referralComplete,
+            security: securityComplete,
+          };
+
+          // Completion percentage (3 required cards out of 4; referral is optional and always counts)
+          const requiredCardsComplete = [personalComplete, locationComplete, securityComplete].filter(Boolean).length;
+          const completionPercent = Math.round(((requiredCardsComplete + 1) / 4) * 100); // +1 for referral (always done)
+          const canSubmit = personalComplete && locationComplete && securityComplete;
+
+          return (
+            <motion.div
+              key="beneficiary-form"
+              initial={{ opacity: 0, x: -18 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 18 }}
+              transition={{ duration: 0.28 }}
+              className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-3 -mx-1 px-1 pb-2"
+            >
+              {/* Back button */}
+              <motion.button
+                type="button"
+                onClick={handleBackToRoleSelect}
+                className="flex items-center gap-1.5 text-white/40 hover:text-white/70 transition-colors text-[13px] mb-1"
+                whileTap={{ scale: 0.95 }}
+              >
+                <ArrowRight className="w-4 h-4" />
+                اختيار نوع الحساب
+              </motion.button>
+
+              {/* Step progress indicator */}
+              <BeneficiaryStepIndicator completedSteps={completedSteps} />
+
+              {/* ── Card 1: Personal Info (teal accent) ── */}
+              <BeneficiaryGlassCard
+                accentColor="teal"
+                isCompleted={personalComplete}
+                hasError={personalHasError}
+                index={0}
+              >
+                <BeneficiaryCardHeader
+                  icon={User}
+                  title="المعلومات الشخصية"
+                  color="teal"
+                  isCompleted={personalComplete}
+                  hasError={personalHasError}
+                />
+                {/* Name */}
+                <div className="space-y-1.5">
+                  <div className="relative">
+                    <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
+                    <Input
+                      value={benName}
+                      onChange={(e) => { setBenName(e.target.value); if (benNameError) setBenNameError(null); }}
+                      placeholder="الاسم الكامل"
+                      className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200"
+                      style={{
+                        background: 'rgba(255,255,255,0.06)',
+                        border: `1px solid ${benNameError ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`,
+                        boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
+                      }}
+                      onFocus={(e) => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.09)';
+                        e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)';
+                        e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)';
+                      }}
+                      onBlur={(e) => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
+                        e.currentTarget.style.border = `1px solid ${benNameError ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`;
+                        e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)';
+                        if (!benName.trim()) setBenNameError('الاسم مطلوب');
+                      }}
+                    />
+                  </div>
+                  <AnimatePresence>
+                    {benNameError && (
+                      <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="text-[11px] text-red-400 flex items-center gap-1">
+                        <AlertTriangle className="w-3 h-3 shrink-0" /> {benNameError}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                </div>
+                {/* Phone */}
+                <PhoneInput value={benPhone} onChange={(v) => { setBenPhone(v); if (benPhoneError) setBenPhoneError(null); }} error={benPhoneError} id="ben-phone" />
+              </BeneficiaryGlassCard>
+
+              {/* ── Card 2: Location (emerald accent) ── */}
+              <BeneficiaryGlassCard
+                accentColor="emerald"
+                isCompleted={locationComplete}
+                hasError={locationHasError}
+                index={1}
+              >
+                <BeneficiaryCardHeader
+                  icon={MapPin}
+                  title="الموقع الجغرافي"
+                  color="emerald"
+                  isCompleted={locationComplete}
+                  hasError={locationHasError}
+                />
+                <GpsLocationButton
+                  onLocationDetected={handleBenLocation}
+                  value={benAddress}
+                  placeholder="اضغط لتحديد موقعك الجغرافي"
+                />
                 <div className="relative">
-                  <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
                   <Input
-                    value={benName}
-                    onChange={(e) => { setBenName(e.target.value); if (benNameError) setBenNameError(null); }}
-                    placeholder="الاسم الكامل"
-                    className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200"
+                    value={benAddress}
+                    onChange={(e) => { setBenAddress(e.target.value); if (benAddressError) setBenAddressError(null); }}
+                    placeholder="العنوان التفصيلي (اختياري مع تحديد الموقع)"
+                    className="h-[46px] pr-4 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200"
                     style={{
                       background: 'rgba(255,255,255,0.06)',
-                      border: `1px solid ${benNameError ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`,
+                      border: `1px solid ${benAddressError ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`,
                       boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
                     }}
                     onFocus={(e) => {
                       e.currentTarget.style.background = 'rgba(255,255,255,0.09)';
-                      e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)';
-                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)';
+                      e.currentTarget.style.border = '1px solid rgba(16,185,129,0.58)';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(16,185,129,0.12), inset 0 1px 0 rgba(255,255,255,0.05)';
                     }}
                     onBlur={(e) => {
                       e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                      e.currentTarget.style.border = `1px solid ${benNameError ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`;
+                      e.currentTarget.style.border = `1px solid ${benAddressError ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`;
                       e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)';
-                      if (!benName.trim()) setBenNameError('الاسم مطلوب');
+                    }}
+                  />
+                  <AnimatePresence>
+                    {benAddressError && (
+                      <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="text-[11px] text-red-400 flex items-center gap-1 mt-1">
+                        <AlertTriangle className="w-3 h-3 shrink-0" /> {benAddressError}
+                      </motion.p>
+                    )}
+                  </AnimatePresence>
+                </div>
+              </BeneficiaryGlassCard>
+
+              {/* ── Card 3: Referral Code (sky accent, optional) ── */}
+              <BeneficiaryGlassCard
+                accentColor="sky"
+                isCompleted={referralComplete}
+                isOptional={true}
+                index={2}
+              >
+                <BeneficiaryCardHeader
+                  icon={Gift}
+                  title="كود الإحالة"
+                  color="sky"
+                  isCompleted={true}
+                  badge="اختياري"
+                />
+                <div className="relative">
+                  <Tag className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(14,165,233,0.4)' }} />
+                  <Input
+                    value={benReferralCode}
+                    onChange={(e) => setBenReferralCode(e.target.value)}
+                    placeholder="أدخل كود الإحالة إن وُجد"
+                    className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200"
+                    style={{
+                      background: 'rgba(14,165,233,0.04)',
+                      border: '1px dashed rgba(14,165,233,0.2)',
+                      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.03)',
+                    }}
+                    onFocus={(e) => {
+                      e.currentTarget.style.background = 'rgba(14,165,233,0.08)';
+                      e.currentTarget.style.border = '1px solid rgba(14,165,233,0.45)';
+                      e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.1), inset 0 1px 0 rgba(255,255,255,0.05)';
+                    }}
+                    onBlur={(e) => {
+                      e.currentTarget.style.background = 'rgba(14,165,233,0.04)';
+                      e.currentTarget.style.border = '1px dashed rgba(14,165,233,0.2)';
+                      e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.03)';
                     }}
                   />
                 </div>
-                <AnimatePresence>
-                  {benNameError && (
-                    <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="text-[11px] text-red-400 flex items-center gap-1">
-                      <AlertTriangle className="w-3 h-3 shrink-0" /> {benNameError}
-                    </motion.p>
-                  )}
-                </AnimatePresence>
-              </div>
-              {/* Phone */}
-              <PhoneInput value={benPhone} onChange={(v) => { setBenPhone(v); if (benPhoneError) setBenPhoneError(null); }} error={benPhoneError} id="ben-phone" />
-            </GlassCard>
+                <p className="text-[10px] text-sky-300/40 flex items-center gap-1 px-1">
+                  <Gift className="w-3 h-3" />
+                  أدخل كود الإحالة للحصول على مكافأة
+                </p>
+              </BeneficiaryGlassCard>
 
-            {/* Card 2: Location */}
-            <GlassCard>
-              <CardHeader icon={MapPin} title="الموقع الجغرافي" color="teal" />
-              <GpsLocationButton
-                onLocationDetected={handleBenLocation}
-                value={benAddress}
-                placeholder="اضغط لتحديد موقعك الجغرافي"
-              />
-              <div className="relative">
-                <Input
-                  value={benAddress}
-                  onChange={(e) => { setBenAddress(e.target.value); if (benAddressError) setBenAddressError(null); }}
-                  placeholder="العنوان التفصيلي (اختياري مع تحديد الموقع)"
-                  className="h-[46px] pr-4 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200"
-                  style={{
-                    background: 'rgba(255,255,255,0.06)',
-                    border: `1px solid ${benAddressError ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`,
-                    boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
-                  }}
-                  onFocus={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.09)';
-                    e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)';
-                    e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)';
-                  }}
-                  onBlur={(e) => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                    e.currentTarget.style.border = `1px solid ${benAddressError ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`;
-                    e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)';
-                  }}
+              {/* ── Card 4: Security (violet accent) ── */}
+              <BeneficiaryGlassCard
+                accentColor="violet"
+                isCompleted={securityComplete}
+                hasError={securityHasError}
+                index={3}
+              >
+                <BeneficiaryCardHeader
+                  icon={ShieldCheck}
+                  title="الأمان"
+                  color="violet"
+                  isCompleted={securityComplete}
+                  hasError={securityHasError}
                 />
-                <AnimatePresence>
-                  {benAddressError && (
-                    <motion.p initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="text-[11px] text-red-400 flex items-center gap-1 mt-1">
-                      <AlertTriangle className="w-3 h-3 shrink-0" /> {benAddressError}
-                    </motion.p>
-                  )}
-                </AnimatePresence>
-              </div>
-            </GlassCard>
+                <BeneficiaryPasswordInput
+                  value={benPassword}
+                  onChange={(v) => { setBenPassword(v); if (benPasswordError) setBenPasswordError(null); }}
+                  error={benPasswordError}
+                  id="ben-password"
+                />
+                {/* Privacy message */}
+                <div className="flex items-center gap-1.5 pt-1 px-1">
+                  <Lock className="w-3 h-3" style={{ color: 'rgba(139,92,246,0.4)' }} />
+                  <span className="text-[10px] font-medium" style={{ color: 'rgba(139,92,246,0.45)' }}>
+                    بياناتك مشفرة ومحمية
+                  </span>
+                </div>
+              </BeneficiaryGlassCard>
 
-            {/* Card 3: Referral Code */}
-            <GlassCard>
-              <CardHeader icon={User} title="كود الإحالة" color="teal" />
-              <Input
-                value={benReferralCode}
-                onChange={(e) => setBenReferralCode(e.target.value)}
-                placeholder="كود الإحالة (اختياري)"
-                className="h-[46px] pr-4 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200"
-                style={{
-                  background: 'rgba(255,255,255,0.06)',
-                  border: '1px solid rgba(255,255,255,0.1)',
-                  boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)',
-                }}
-                onFocus={(e) => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.09)';
-                  e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)';
-                  e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)';
-                }}
-                onBlur={(e) => {
-                  e.currentTarget.style.background = 'rgba(255,255,255,0.06)';
-                  e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)';
-                  e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)';
-                }}
+              {/* Enhanced Submit Button */}
+              <BeneficiarySubmitButton
+                onClick={handleBeneficiarySubmit}
+                loading={isLoading}
+                completionPercent={completionPercent}
+                disabled={!canSubmit}
               />
-            </GlassCard>
 
-            {/* Card 4: Security */}
-            <GlassCard>
-              <CardHeader icon={Lock} title="الأمان" color="teal" />
-              <PasswordInput value={benPassword} onChange={(v) => { setBenPassword(v); if (benPasswordError) setBenPasswordError(null); }} error={benPasswordError} id="ben-password" />
-            </GlassCard>
-
-            {/* Submit */}
-            <ActionButton onClick={handleBeneficiarySubmit} loading={isLoading} variant="primary">
-              إنشاء الحساب
-            </ActionButton>
-          </motion.div>
-        )}
+              {/* Back to login link */}
+              <button
+                type="button"
+                onClick={onBackToLogin}
+                className="w-full text-center text-[12px] text-white/25 hover:text-white/50 transition-colors py-1"
+              >
+                لديك حساب؟ تسجيل الدخول
+              </button>
+            </motion.div>
+          );
+        })()}
 
         {/* ====== NURSE FORM (multi-step) ====== */}
         {registerRole === 'nurse' && (
