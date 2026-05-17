@@ -13,20 +13,10 @@ import {
   User,
   Shield,
   ShieldCheck,
-  MapPin,
   Sparkles,
   CheckCircle2,
   Loader2,
   AlertTriangle,
-  Search,
-  FlaskConical,
-  Radiation,
-  HeartPulse,
-  Baby,
-  Syringe,
-  Siren,
-  Home,
-  MoreHorizontal,
 } from 'lucide-react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -35,7 +25,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/lib/stores/auth-store';
-import { GpsLocationButton } from '@/components/common/gps-location-button';
+import { RegisterMultiStep } from '@/components/auth/register-multi-step';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
 
@@ -85,177 +75,13 @@ const loginSchema = z.object({
 
 type LoginFormValues = z.infer<typeof loginSchema>;
 
-const nurseRegisterSchema = z.object({
-  name: z.string().min(1, 'الاسم مطلوب').min(3, 'الاسم يجب أن يكون ٣ أحرف على الأقل'),
-  phone: z
-    .string()
-    .min(1, 'رقم الهاتف مطلوب')
-    .regex(/^(7\d{8}|\+9677\d{7,8}|9677\d{7,8})$/, 'صيغة رقم الهاتف غير صحيحة'),
-  password: z.string().min(1, 'كلمة المرور مطلوبة').min(6, 'كلمة المرور يجب أن تكون ٦ أحرف على الأقل'),
-  confirmPassword: z.string().min(1, 'تأكيد كلمة المرور مطلوب'),
-  specialization: z.string().min(1, 'التخصص مطلوب'),
-  licenseNumber: z.string().min(1, 'رقم الترخيص مطلوب'),
-  address: z.string().min(1, 'العنوان التفصيلي مطلوب'),
-  governorate: z.string().optional(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'كلمتا المرور غير متطابقتين',
-  path: ['confirmPassword'],
-});
 
-type NurseRegisterFormValues = z.infer<typeof nurseRegisterSchema>;
-
-const beneficiaryRegisterSchema = z.object({
-  name: z.string().min(1, 'الاسم مطلوب').min(3, 'الاسم يجب أن يكون ٣ أحرف على الأقل'),
-  phone: z
-    .string()
-    .min(1, 'رقم الهاتف مطلوب')
-    .regex(/^(7\d{8}|\+9677\d{7,8}|9677\d{7,8})$/, 'صيغة رقم الهاتف غير صحيحة'),
-  password: z.string().min(1, 'كلمة المرور مطلوبة').min(6, 'كلمة المرور يجب أن تكون ٦ أحرف على الأقل'),
-  confirmPassword: z.string().min(1, 'تأكيد كلمة المرور مطلوب'),
-  address: z.string().min(1, 'العنوان مطلوب'),
-  governorate: z.string().optional(),
-  referralCode: z.string().optional(),
-}).refine((data) => data.password === data.confirmPassword, {
-  message: 'كلمتا المرور غير متطابقتين',
-  path: ['confirmPassword'],
-});
-
-type BeneficiaryRegisterFormValues = z.infer<typeof beneficiaryRegisterSchema>;
 
 // ============================================================================
 // Constants
 // ============================================================================
 
-// ── Category Config ──────────────────────────────────────────────────────────
 
-const CATEGORY_CONFIG: Record<string, {
-  icon: React.ElementType;
-  color: string;
-  bg: string;
-  border: string;
-  activeBg: string;
-  activeText: string;
-  ring: string;
-}> = {
-  'تمريض': {
-    icon: Stethoscope,
-    color: 'text-teal-400',
-    bg: 'bg-teal-500/15',
-    border: 'border-teal-500/30',
-    activeBg: 'bg-teal-500',
-    activeText: 'text-white',
-    ring: 'ring-teal-500/40',
-  },
-  'مختبر': {
-    icon: FlaskConical,
-    color: 'text-purple-400',
-    bg: 'bg-purple-500/15',
-    border: 'border-purple-500/30',
-    activeBg: 'bg-purple-500',
-    activeText: 'text-white',
-    ring: 'ring-purple-500/40',
-  },
-  'أشعة': {
-    icon: Radiation,
-    color: 'text-blue-400',
-    bg: 'bg-blue-500/15',
-    border: 'border-blue-500/30',
-    activeBg: 'bg-blue-500',
-    activeText: 'text-white',
-    ring: 'ring-blue-500/40',
-  },
-  'طبي': {
-    icon: HeartPulse,
-    color: 'text-indigo-400',
-    bg: 'bg-indigo-500/15',
-    border: 'border-indigo-500/30',
-    activeBg: 'bg-indigo-500',
-    activeText: 'text-white',
-    ring: 'ring-indigo-500/40',
-  },
-  'توليد': {
-    icon: Baby,
-    color: 'text-pink-400',
-    bg: 'bg-pink-500/15',
-    border: 'border-pink-500/30',
-    activeBg: 'bg-pink-500',
-    activeText: 'text-white',
-    ring: 'ring-pink-500/40',
-  },
-  'علاج': {
-    icon: Syringe,
-    color: 'text-amber-400',
-    bg: 'bg-amber-500/15',
-    border: 'border-amber-500/30',
-    activeBg: 'bg-amber-500',
-    activeText: 'text-white',
-    ring: 'ring-amber-500/40',
-  },
-  'طوارئ': {
-    icon: Siren,
-    color: 'text-red-400',
-    bg: 'bg-red-500/15',
-    border: 'border-red-500/30',
-    activeBg: 'bg-red-500',
-    activeText: 'text-white',
-    ring: 'ring-red-500/40',
-  },
-  'رعاية': {
-    icon: Home,
-    color: 'text-green-400',
-    bg: 'bg-green-500/15',
-    border: 'border-green-500/30',
-    activeBg: 'bg-green-500',
-    activeText: 'text-white',
-    ring: 'ring-green-500/40',
-  },
-  'أخرى': {
-    icon: MoreHorizontal,
-    color: 'text-gray-400',
-    bg: 'bg-gray-500/15',
-    border: 'border-gray-500/30',
-    activeBg: 'bg-gray-500',
-    activeText: 'text-white',
-    ring: 'ring-gray-500/40',
-  },
-};
-
-// Specializations with categories (from lib/constants)
-const specializations = [
-  { value: 'general_nursing', label: 'ممرض عام', category: 'تمريض' },
-  { value: 'emergency_nursing', label: 'ممرض طوارئ', category: 'تمريض' },
-  { value: 'critical_care', label: 'ممرض عناية مركزة', category: 'تمريض' },
-  { value: 'home_care_nursing', label: 'ممرض منزلي', category: 'تمريض' },
-  { value: 'pediatric', label: 'ممرض أطفال', category: 'تمريض' },
-  { value: 'surgery_nursing', label: 'ممرض عمليات', category: 'تمريض' },
-  { value: 'anesthesia_nursing', label: 'ممرض تخدير', category: 'تمريض' },
-  { value: 'dialysis', label: 'ممرض غسيل كلى', category: 'تمريض' },
-  { value: 'cardiac_nursing', label: 'ممرض قلب', category: 'تمريض' },
-  { value: 'oncology', label: 'ممرض أورام', category: 'تمريض' },
-  { value: 'mental_health', label: 'ممرض نفسي', category: 'تمريض' },
-  { value: 'elderly_care', label: 'ممرض كبار سن', category: 'تمريض' },
-  { value: 'neonatal', label: 'ممرض حديثي الولادة', category: 'تمريض' },
-  { value: 'iv_therapy', label: 'تركيب محاليل', category: 'تمريض' },
-  { value: 'wound_care', label: 'رعاية جروح', category: 'تمريض' },
-  { value: 'post_surgery', label: 'رعاية ما بعد الجراحة', category: 'تمريض' },
-  { value: 'lab_specialist', label: 'أخصائي مختبر', category: 'مختبر' },
-  { value: 'lab_tech', label: 'فني مختبر', category: 'مختبر' },
-  { value: 'blood_draw', label: 'سحب عينات', category: 'مختبر' },
-  { value: 'radiology_specialist', label: 'أخصائي أشعة', category: 'أشعة' },
-  { value: 'radiology_tech', label: 'فني أشعة', category: 'أشعة' },
-  { value: 'physician_assistant', label: 'مساعد طبيب', category: 'طبي' },
-  { value: 'respiratory_specialist', label: 'أخصائي تنفسية', category: 'طبي' },
-  { value: 'midwife', label: 'قابلة', category: 'توليد' },
-  { value: 'physiotherapy', label: 'علاج طبيعي', category: 'علاج' },
-  { value: 'nutrition_therapy', label: 'تغذية علاجية', category: 'علاج' },
-  { value: 'respiratory_therapy', label: 'علاج تنفسي', category: 'علاج' },
-  { value: 'paramedic', label: 'مسعف', category: 'طوارئ' },
-  { value: 'emergency_tech', label: 'فني طوارئ', category: 'طوارئ' },
-  { value: 'home_care', label: 'رعاية منزلية', category: 'رعاية' },
-  { value: 'other', label: 'تخصصات أخرى', category: 'أخرى' },
-];
-
-const SPEC_CATEGORIES = ['تمريض', 'مختبر', 'أشعة', 'طبي', 'توليد', 'علاج', 'طوارئ', 'رعاية', 'أخرى'];
 
 // ============================================================================
 // Role Configuration for Auto-Detected Display
@@ -689,8 +515,7 @@ function LoginPageContent() {
   const redirectPath = searchParams.get('redirect');
 
   const login = useAuthStore((s) => s.login);
-  const registerNurse = useAuthStore((s) => s.registerNurse);
-  const registerBeneficiary = useAuthStore((s) => s.registerBeneficiary);
+
   const isAuthenticated = useAuthStore((s) => s.isAuthenticated);
   const user = useAuthStore((s) => s.user);
   const isLoading = useAuthStore((s) => s.isLoading);
@@ -699,11 +524,10 @@ function LoginPageContent() {
   const _hasHydrated = useAuthStore((s) => s._hasHydrated);
 
   const [activeTab, setActiveTab] = useState<string>('login');
-  const [registerRole, setRegisterRole] = useState<string>('beneficiary');
+  // registerRole is now managed by RegisterMultiStep component
   const [showPassword, setShowPassword] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
-  const [nurseNameShake, setNurseNameShake] = useState(false);
-  const [nurseNameWarning, setNurseNameWarning] = useState(false);
+  // nurseNameShake/Warning moved to RegisterMultiStep
 
   const [isFreshLogin, setIsFreshLogin] = useState(false);
   const hasRedirectedRef = useRef(false);
@@ -719,9 +543,7 @@ function LoginPageContent() {
   const [showEmergencyPassword, setShowEmergencyPassword] = useState(false);
   const heartClickTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // ── Specialization Selection State ────────────────────────────────────
-  const [selectedSpecCategory, setSelectedSpecCategory] = useState<string>('');
-  const [specSearch, setSpecSearch] = useState('');
+  // specSearch/selectedSpecCategory moved to RegisterMultiStep
 
   // On mount: detect if we arrived after a logout
   useEffect(() => {
@@ -882,85 +704,12 @@ function LoginPageContent() {
     }
   };
 
-  // ============================================================================
-  // Nurse Register Form
-  // ============================================================================
-
-  const nurseForm = useForm<NurseRegisterFormValues>({
-    resolver: zodResolver(nurseRegisterSchema),
-    defaultValues: {
-      name: '', phone: '', password: '', confirmPassword: '',
-      specialization: '', licenseNumber: '', address: '', governorate: '',
-    },
-  });
-
-  const onNurseRegister = async (data: NurseRegisterFormValues) => {
-    clearError();
-
-    const nameWords = data.name.trim().split(/\s+/).filter(Boolean);
-    if (nameWords.length < 4) {
-      setNurseNameShake(true);
-      setNurseNameWarning(true);
-      setTimeout(() => {
-        setNurseNameShake(false);
-      }, 600);
-      setTimeout(() => {
-        setNurseNameWarning(false);
-      }, 3000);
-      return;
-    }
-
-    try {
-      await registerNurse({
-        name: data.name,
-        phone: data.phone,
-        password: data.password,
-        specialization: data.specialization,
-        licenseNumber: data.licenseNumber,
-        address: data.address,
-        governorate: data.governorate as never,
-      });
-      setIsFreshLogin(true);
-    } catch {
-      // Error handled in store
-    }
-  };
-
-  // ============================================================================
-  // Beneficiary Register Form
-  // ============================================================================
-
-  const beneficiaryForm = useForm<BeneficiaryRegisterFormValues>({
-    resolver: zodResolver(beneficiaryRegisterSchema),
-    defaultValues: {
-      name: '', phone: '', password: '', confirmPassword: '',
-      address: '', governorate: '', referralCode: '',
-    },
-  });
-
-  const onBeneficiaryRegister = async (data: BeneficiaryRegisterFormValues) => {
-    clearError();
-    try {
-      await registerBeneficiary({
-        name: data.name,
-        phone: data.phone,
-        password: data.password,
-        address: data.address,
-        governorate: data.governorate as never,
-        referralCode: data.referralCode || undefined,
-      });
-      setIsFreshLogin(true);
-    } catch {
-      // Error handled in store
-    }
-  };
+  // Register forms moved to RegisterMultiStep component
 
   // ============================================================================
   // Password watchers
   // ============================================================================
   const loginPasswordValue = loginForm.watch('password');
-  const nursePasswordValue = nurseForm.watch('password');
-  const beneficiaryPasswordValue = beneficiaryForm.watch('password');
 
   // ============================================================================
   // Render
@@ -1243,478 +992,28 @@ function LoginPageContent() {
                 animate={{ opacity: 1, x: 0 }}
                 exit={{ opacity: 0, x: -18 }}
                 transition={{ duration: 0.28 }}
-                className="flex-1 min-h-0 overflow-y-auto custom-scrollbar space-y-4 -mx-1 px-1 pb-2"
+                className="flex-1 min-h-0"
               >
-                {/* === ROLE SELECTOR === */}
-                <div className="grid grid-cols-2 gap-3">
-                  {/* Beneficiary card */}
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => { setRegisterRole('beneficiary'); clearError(); }}
-                    className="relative rounded-[22px] p-5 text-center transition-all duration-300 overflow-hidden min-h-[122px]"
-                    style={{
-                      background: registerRole === 'beneficiary' ? 'rgba(20,184,166,0.11)' : 'rgba(255,255,255,0.035)',
-                      border: `1.5px solid ${registerRole === 'beneficiary' ? 'rgba(20,184,166,0.48)' : 'rgba(255,255,255,0.08)'}`,
-                      boxShadow: registerRole === 'beneficiary' ? '0 10px 36px -10px rgba(20,184,166,0.28), inset 0 1px 0 rgba(20,184,166,0.22)' : 'none',
-                    }}
-                  >
-                    {registerRole === 'beneficiary' && (
-                      <div className="absolute inset-0 rounded-[22px]" style={{ background: 'linear-gradient(135deg, rgba(20,184,166,0.13) 0%, rgba(16,185,129,0.05) 100%)' }} />
-                    )}
-                    <div className="relative z-10">
-                      <div className="w-[52px] h-[52px] rounded-2xl mx-auto mb-3 flex items-center justify-center transition-all duration-300"
-                        style={{
-                          background: registerRole === 'beneficiary' ? 'linear-gradient(135deg, #14b8a6, #10b981)' : 'rgba(255,255,255,0.08)',
-                          boxShadow: registerRole === 'beneficiary' ? '0 10px 28px -6px rgba(20,184,166,0.55)' : 'none',
-                        }}
-                      >
-                        <User className={cn('w-[22px] h-[22px] transition-colors', registerRole === 'beneficiary' ? 'text-white' : 'text-white/25')} />
-                      </div>
-                      <span className={cn('block text-[13px] font-bold mb-0.5 transition-colors', registerRole === 'beneficiary' ? 'text-white' : 'text-white/35')}>مستفيد/ـة</span>
-                      <p className={cn('text-[11px] transition-colors', registerRole === 'beneficiary' ? 'text-teal-300/55' : 'text-white/20')}>رعاية منزلية</p>
-                    </div>
-                  </motion.button>
-
-                  {/* Nurse card */}
-                  <motion.button
-                    type="button"
-                    whileTap={{ scale: 0.95 }}
-                    onClick={() => { setRegisterRole('nurse'); clearError(); }}
-                    className="relative rounded-[22px] p-5 text-center transition-all duration-300 overflow-hidden min-h-[122px]"
-                    style={{
-                      background: registerRole === 'nurse' ? 'rgba(14,165,233,0.10)' : 'rgba(255,255,255,0.035)',
-                      border: `1.5px solid ${registerRole === 'nurse' ? 'rgba(14,165,233,0.46)' : 'rgba(255,255,255,0.08)'}`,
-                      boxShadow: registerRole === 'nurse' ? '0 10px 36px -10px rgba(14,165,233,0.26), inset 0 1px 0 rgba(14,165,233,0.2)' : 'none',
-                    }}
-                  >
-                    {registerRole === 'nurse' && (
-                      <div className="absolute inset-0 rounded-[22px]" style={{ background: 'linear-gradient(135deg, rgba(14,165,233,0.13) 0%, rgba(6,182,212,0.05) 100%)' }} />
-                    )}
-                    <div className="relative z-10">
-                      <div className="w-[52px] h-[52px] rounded-2xl mx-auto mb-3 flex items-center justify-center transition-all duration-300"
-                        style={{
-                          background: registerRole === 'nurse' ? 'linear-gradient(135deg, #0ea5e9, #06b6d4)' : 'rgba(255,255,255,0.08)',
-                          boxShadow: registerRole === 'nurse' ? '0 10px 28px -6px rgba(14,165,233,0.5)' : 'none',
-                        }}
-                      >
-                        <Stethoscope className={cn('w-[22px] h-[22px] transition-colors', registerRole === 'nurse' ? 'text-white' : 'text-white/25')} />
-                      </div>
-                      <span className={cn('block text-[13px] font-bold mb-0.5 transition-colors', registerRole === 'nurse' ? 'text-white' : 'text-white/35')}>ممرض/ـة</span>
-                      <p className={cn('text-[11px] transition-colors', registerRole === 'nurse' ? 'text-sky-300/55' : 'text-white/20')}>ممرض معتمد</p>
-                    </div>
-                  </motion.button>
-                </div>
-
-                {/* ===== BENEFICIARY FORM ===== */}
-                <AnimatePresence mode="wait">
-                  {registerRole === 'beneficiary' && (
-                    <motion.form
-                      key="beneficiary-form"
-                      initial={{ opacity: 0, x: -12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: 12 }}
-                      transition={{ duration: 0.22 }}
-                      onSubmit={beneficiaryForm.handleSubmit(onBeneficiaryRegister)}
-                      className="space-y-3"
-                    >
-                      {/* Personal Info */}
-                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(20,184,166,0.16)', border: '1px solid rgba(20,184,166,0.28)' }}>
-                            <User className="w-3.5 h-3.5 text-teal-400" />
-                          </div>
-                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(20,184,166,0.75)' }}>المعلومات الشخصية</span>
-                        </div>
-                        {/* Name */}
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="ben-name" placeholder="الاسم الكامل" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.name ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.name ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...beneficiaryForm.register('name')} />
-                          </div>
-                          {beneficiaryForm.formState.errors.name && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.name.message}</p>}
-                        </div>
-                        {/* Phone */}
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="ben-phone" type="tel" placeholder="رقم الهاتف" dir="ltr" className="h-[46px] pr-10 pl-[108px] text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.phone ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.phone ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...beneficiaryForm.register('phone')} />
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2 py-1 rounded-[8px] pointer-events-none" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
-                              <YemenFlag /><span className="text-[11px] font-bold" style={{ color: 'rgba(255,255,255,0.4)' }}>+967</span>
-                            </div>
-                          </div>
-                          {beneficiaryForm.formState.errors.phone && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.phone.message}</p>}
-                        </div>
-                      </div>
-
-                      {/* Location */}
-                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(20,184,166,0.16)', border: '1px solid rgba(20,184,166,0.28)' }}>
-                            <MapPin className="w-3.5 h-3.5 text-teal-400" />
-                          </div>
-                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(20,184,166,0.75)' }}>معلومات الموقع</span>
-                        </div>
-                        <GpsLocationButton onLocationDetected={(loc) => {
-                          if (loc.governorate && loc.governorateValue) beneficiaryForm.setValue('governorate', loc.governorateValue);
-                          if (loc.address || loc.district) beneficiaryForm.setValue('address', loc.district || loc.address);
-                        }} />
-                        {/* Address */}
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <MapPin className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="ben-address" placeholder="العنوان التفصيلي" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.address ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.address ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...beneficiaryForm.register('address')} />
-                          </div>
-                          {beneficiaryForm.formState.errors.address && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.address.message}</p>}
-                        </div>
-                        {/* Referral */}
-                        <div className="relative">
-                          <Sparkles className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                          <Input id="ben-referral" placeholder="كود الإحالة (اختياري)" dir="ltr" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.1)', boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                            onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                            onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = '1px solid rgba(255,255,255,0.1)'; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                            {...beneficiaryForm.register('referralCode')} />
-                        </div>
-                      </div>
-
-                      {/* Security */}
-                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(251,191,36,0.13)', border: '1px solid rgba(251,191,36,0.24)' }}>
-                            <Lock className="w-3.5 h-3.5 text-amber-400" />
-                          </div>
-                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(251,191,36,0.75)' }}>الأمان</span>
-                        </div>
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="ben-password" type={showPassword ? 'text' : 'password'} placeholder="كلمة المرور (٦ أحرف على الأقل)" dir="ltr" className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.password ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.password ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...beneficiaryForm.register('password')} />
-                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                          </div>
-                          {beneficiaryForm.formState.errors.password && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.password.message}</p>}
-                          <PasswordStrengthBar password={beneficiaryPasswordValue} />
-                        </div>
-                        {/* Confirm Password */}
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="ben-confirm-password" type={showPassword ? 'text' : 'password'} placeholder="تأكيد كلمة المرور" dir="ltr" className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${beneficiaryForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${beneficiaryForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...beneficiaryForm.register('confirmPassword')} />
-                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                          </div>
-                          {beneficiaryForm.formState.errors.confirmPassword && <p className="text-[11px] text-red-400 mr-1">{beneficiaryForm.formState.errors.confirmPassword.message}</p>}
-                        </div>
-                      </div>
-
-                      {/* Submit */}
-                      <motion.div whileHover={{ scale: 1.016 }} whileTap={{ scale: 0.984 }} className="pt-1">
-                        <button type="submit" disabled={isLoading} className="login-shimmer-btn relative w-full h-[54px] rounded-2xl font-bold text-[15px] text-white overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
-                          style={{ background: 'linear-gradient(135deg, #0d9488 0%, #0ea57a 40%, #06b6d4 100%)', boxShadow: '0 10px 36px -8px rgba(20,184,166,0.55), 0 2px 10px -2px rgba(20,184,166,0.3)' }}>
-                          {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
-                            <span className="flex items-center gap-2 justify-center"><CheckCircle2 className="w-4 h-4" />إنشاء حساب مستفيد</span>
-                          )}
-                        </button>
-                      </motion.div>
-                    </motion.form>
-                  )}
-                </AnimatePresence>
-
-                {/* ===== NURSE FORM ===== */}
-                <AnimatePresence mode="wait">
-                  {registerRole === 'nurse' && (
-                    <motion.form
-                      key="nurse-form"
-                      initial={{ opacity: 0, x: 12 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      exit={{ opacity: 0, x: -12 }}
-                      transition={{ duration: 0.22 }}
-                      onSubmit={nurseForm.handleSubmit(onNurseRegister)}
-                      className="space-y-3"
-                    >
-                      {/* Professional Info */}
-                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(14,165,233,0.16)', border: '1px solid rgba(14,165,233,0.28)' }}>
-                            <Stethoscope className="w-3.5 h-3.5 text-sky-400" />
-                          </div>
-                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(14,165,233,0.75)' }}>المعلومات المهنية</span>
-                        </div>
-
-                        {/* Name */}
-                        <div className="space-y-1.5">
-                          <div className={cn('relative', nurseNameShake && 'animate-shake')}>
-                            <User className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="nurse-name" placeholder="الاسم الرباعي (أربع كلمات)" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${(nurseForm.formState.errors.name || nurseNameWarning) ? 'rgba(251,191,36,0.45)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(14,165,233,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${(nurseForm.formState.errors.name || nurseNameWarning) ? 'rgba(251,191,36,0.45)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...nurseForm.register('name')} />
-                          </div>
-                          {nurseNameWarning && <motion.p initial={{ opacity: 0, y: -3 }} animate={{ opacity: 1, y: 0 }} className="text-[11px] text-amber-400 mr-1">يجب إدخال الاسم الرباعي (٤ كلمات على الأقل)</motion.p>}
-                          {nurseForm.formState.errors.name && !nurseNameWarning && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.name.message}</p>}
-                        </div>
-
-                        {/* Phone */}
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <Phone className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="nurse-phone" type="tel" placeholder="رقم الهاتف" dir="ltr" className="h-[46px] pr-10 pl-[108px] text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.phone ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(14,165,233,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.phone ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...nurseForm.register('phone')} />
-                            <div className="absolute left-3 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-2 py-1 rounded-[8px] pointer-events-none" style={{ background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(255,255,255,0.09)' }}>
-                              <YemenFlag /><span className="text-[11px] font-bold" style={{ color: 'rgba(255,255,255,0.4)' }}>+967</span>
-                            </div>
-                          </div>
-                          {nurseForm.formState.errors.phone && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.phone.message}</p>}
-                        </div>
-
-                        {/* Specialization Categorized Selection */}
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(20,184,166,0.75)' }}>التخصص</span>
-                            {nurseForm.watch('specialization') && (
-                              <span className="flex items-center gap-1 text-[11px] text-emerald-400">
-                                <CheckCircle2 className="w-3 h-3" />
-                                {specializations.find(s => s.value === nurseForm.watch('specialization'))?.label}
-                              </span>
-                            )}
-                          </div>
-
-                          {/* Search */}
-                          <div className="relative">
-                            <Search className="absolute right-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input
-                              value={specSearch}
-                              onChange={(e) => setSpecSearch(e.target.value)}
-                              placeholder="ابحث عن تخصص..."
-                              className="h-9 pr-9 text-sm text-white placeholder-white/22 rounded-[10px] border-0 focus:outline-none focus:ring-0"
-                              dir="rtl"
-                              style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-                            />
-                          </div>
-
-                          {/* Category Chips */}
-                          <div className="flex gap-1 flex-wrap">
-                            {SPEC_CATEGORIES.filter(cat => {
-                              const catSpecs = specializations.filter(s => s.category === cat);
-                              const matchSearch = !specSearch || catSpecs.some(s => s.label.includes(specSearch) || s.value.includes(specSearch) || s.category.includes(specSearch));
-                              return catSpecs.length > 0 && matchSearch;
-                            }).map((cat) => {
-                              const config = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['أخرى'];
-                              const Icon = config.icon;
-                              const isActive = selectedSpecCategory === cat;
-                              const catSpecs = specializations.filter(s => s.category === cat);
-                              return (
-                                <button
-                                  key={cat}
-                                  type="button"
-                                  onClick={() => setSelectedSpecCategory(isActive ? '' : cat)}
-                                  className={cn(
-                                    'flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium transition-all duration-200 border',
-                                    isActive
-                                      ? `${config.activeBg} ${config.activeText} border-transparent`
-                                      : `${config.bg} ${config.color} ${config.border} hover:opacity-80`,
-                                  )}
-                                >
-                                  <Icon className="w-2.5 h-2.5" />
-                                  {cat}
-                                  <span className="opacity-60">({catSpecs.length})</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-
-                          {/* Specializations Grid */}
-                          <div className="max-h-36 overflow-y-auto rounded-[12px] p-2 space-y-1.5 custom-scrollbar" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                            {(() => {
-                              const grouped = SPEC_CATEGORIES.reduce<Record<string, typeof specializations>>((acc, cat) => {
-                                const items = specializations.filter(s => s.category === cat);
-                                if (items.length > 0) acc[cat] = items;
-                                return acc;
-                              }, {});
-                              const filteredGrouped = Object.entries(grouped).reduce<Record<string, typeof specializations>>((acc, [cat, items]) => {
-                                const filtered = items.filter(s =>
-                                  !specSearch || s.label.includes(specSearch) || s.value.includes(specSearch) || s.category.includes(specSearch)
-                                );
-                                if (filtered.length > 0) acc[cat] = filtered;
-                                return acc;
-                              }, {});
-                              const displayGrouped = selectedSpecCategory
-                                ? { [selectedSpecCategory]: filteredGrouped[selectedSpecCategory] || [] }
-                                : filteredGrouped;
-                              return Object.entries(displayGrouped).map(([cat, items]) => (
-                                <div key={cat}>
-                                  {!selectedSpecCategory && (
-                                    <div className="flex items-center gap-1 px-1 py-0.5 mb-0.5">
-                                      {(() => {
-                                        const config = CATEGORY_CONFIG[cat] || CATEGORY_CONFIG['أخرى'];
-                                        const Icon = config.icon;
-                                        return (
-                                          <>
-                                            <Icon className={cn('w-2.5 h-2.5', config.color)} />
-                                            <span className={cn('text-[8px] font-bold uppercase tracking-wider', config.color)}>{cat}</span>
-                                            <div className="flex-1 h-px" style={{ background: 'rgba(255,255,255,0.08)' }} />
-                                          </>
-                                        );
-                                      })()}
-                                    </div>
-                                  )}
-                                  <div className="grid grid-cols-2 gap-1">
-                                    {items.map((spec) => {
-                                      const isSelected = nurseForm.watch('specialization') === spec.value;
-                                      const config = CATEGORY_CONFIG[spec.category] || CATEGORY_CONFIG['أخرى'];
-                                      return (
-                                        <button
-                                          key={spec.value}
-                                          type="button"
-                                          onClick={() => nurseForm.setValue('specialization', spec.value, { shouldValidate: true })}
-                                          className={cn(
-                                            'flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-medium transition-all duration-200 border text-right',
-                                            isSelected
-                                              ? `${config.activeBg} text-white border-transparent shadow-md ring-1 ${config.ring}`
-                                              : `${config.bg} ${config.color} ${config.border} hover:opacity-80 active:scale-[0.98]`,
-                                          )}
-                                        >
-                                          {isSelected && <CheckCircle2 className="w-3 h-3 shrink-0" />}
-                                          <span className="truncate">{spec.label}</span>
-                                        </button>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              ));
-                            })()}
-                            {!specSearch && specializations.length === 0 && (
-                              <div className="text-center py-3 text-[11px]" style={{ color: 'rgba(255,255,255,0.3)' }}>لا توجد تخصصات</div>
-                            )}
-                          </div>
-
-                          {nurseForm.formState.errors.specialization && (
-                            <p className="text-xs text-red-400 mr-1">{nurseForm.formState.errors.specialization.message}</p>
-                          )}
-                        </div>
-
-                        {/* License number */}
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <Shield className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="nurse-license" placeholder="رقم الترخيص المهني" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.licenseNumber ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(14,165,233,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.licenseNumber ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...nurseForm.register('licenseNumber')} />
-                          </div>
-                          {nurseForm.formState.errors.licenseNumber && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.licenseNumber.message}</p>}
-                        </div>
-                      </div>
-
-                      {/* Location */}
-                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(20,184,166,0.16)', border: '1px solid rgba(20,184,166,0.28)' }}>
-                            <MapPin className="w-3.5 h-3.5 text-teal-400" />
-                          </div>
-                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(20,184,166,0.75)' }}>الموقع</span>
-                        </div>
-                        <GpsLocationButton onLocationDetected={(loc) => {
-                          if (loc.governorate && loc.governorateValue) nurseForm.setValue('governorate', loc.governorateValue);
-                          if (loc.address || loc.district) nurseForm.setValue('address', loc.district || loc.address);
-                        }} />
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <MapPin className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="nurse-address" placeholder="العنوان التفصيلي" className="h-[46px] pr-10 pl-4 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.address ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.address ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...nurseForm.register('address')} />
-                          </div>
-                          {nurseForm.formState.errors.address && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.address.message}</p>}
-                        </div>
-                      </div>
-
-                      {/* Security */}
-                      <div className="rounded-[20px] p-4 space-y-3" style={{ background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <div className="flex items-center gap-2 mb-2">
-                          <div className="w-6 h-6 rounded-[8px] flex items-center justify-center" style={{ background: 'rgba(251,191,36,0.13)', border: '1px solid rgba(251,191,36,0.24)' }}>
-                            <Lock className="w-3.5 h-3.5 text-amber-400" />
-                          </div>
-                          <span className="text-[10.5px] font-bold tracking-wider uppercase" style={{ color: 'rgba(251,191,36,0.75)' }}>الأمان</span>
-                        </div>
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="nurse-password" type={showPassword ? 'text' : 'password'} placeholder="كلمة المرور (٦ أحرف على الأقل)" dir="ltr" className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.password ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(20,184,166,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(20,184,166,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.password ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...nurseForm.register('password')} />
-                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                          </div>
-                          {nurseForm.formState.errors.password && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.password.message}</p>}
-                          <PasswordStrengthBar password={nursePasswordValue} />
-                        </div>
-                        {/* Confirm Password */}
-                        <div className="space-y-1.5">
-                          <div className="relative">
-                            <Lock className="absolute right-3.5 top-1/2 -translate-y-1/2 w-[15px] h-[15px] z-10 pointer-events-none" style={{ color: 'rgba(255,255,255,0.28)' }} />
-                            <Input id="nurse-confirm-password" type={showPassword ? 'text' : 'password'} placeholder="تأكيد كلمة المرور" dir="ltr" className="h-[46px] pr-10 pl-10 text-right rounded-[12px] text-sm text-white placeholder-white/22 border-0 focus:outline-none focus:ring-0 transition-all duration-200" style={{ background: 'rgba(255,255,255,0.06)', border: `1px solid ${nurseForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`, boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.05)' }}
-                              onFocus={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.09)'; e.currentTarget.style.border = '1px solid rgba(14,165,233,0.58)'; e.currentTarget.style.boxShadow = '0 0 0 3px rgba(14,165,233,0.12), inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              onBlur={(e) => { e.currentTarget.style.background = 'rgba(255,255,255,0.06)'; e.currentTarget.style.border = `1px solid ${nurseForm.formState.errors.confirmPassword ? 'rgba(239,68,68,0.42)' : 'rgba(255,255,255,0.1)'}`; e.currentTarget.style.boxShadow = 'inset 0 1px 0 rgba(255,255,255,0.05)'; }}
-                              {...nurseForm.register('confirmPassword')} />
-                            <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute left-3 top-1/2 -translate-y-1/2 transition-colors z-10 min-w-[40px] min-h-[40px] flex items-center justify-center" style={{ color: 'rgba(255,255,255,0.28)' }}>
-                              {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                            </button>
-                          </div>
-                          {nurseForm.formState.errors.confirmPassword && <p className="text-[11px] text-red-400 mr-1">{nurseForm.formState.errors.confirmPassword.message}</p>}
-                        </div>
-                      </div>
-
-                      {/* Submit */}
-                      <motion.div whileHover={{ scale: 1.016 }} whileTap={{ scale: 0.984 }} className="pt-1">
-                        <button type="submit" disabled={isLoading} className="login-shimmer-btn relative w-full h-[54px] rounded-2xl font-bold text-[15px] text-white overflow-hidden disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-300"
-                          style={{ background: 'linear-gradient(135deg, #0369a1 0%, #0ea5e9 45%, #06b6d4 100%)', boxShadow: '0 10px 36px -8px rgba(14,165,233,0.55), 0 2px 10px -2px rgba(14,165,233,0.3)' }}>
-                          {isLoading ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
-                            <span className="flex items-center gap-2 justify-center"><CheckCircle2 className="w-4 h-4" />إنشاء حساب ممرض/ـة</span>
-                          )}
-                        </button>
-                      </motion.div>
-                    </motion.form>
-                  )}
-                </AnimatePresence>
+                <RegisterMultiStep
+                  onBackToLogin={() => { setActiveTab('login'); clearError(); }}
+                  onRegisterSuccess={() => setIsFreshLogin(true)}
+                />
               </motion.div>
             )}
           </AnimatePresence>
 
-          {/* Trust badge */}
-          {activeTab === 'login' && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.65 }}
-            className="mt-7 flex items-center justify-center gap-2 shrink-0"
-            style={{ color: 'rgba(255,255,255,0.18)' }}
-          >
-            <Shield className="w-3 h-3" />
-            <span className="text-[11px]">بياناتك مشفرة ومحمية بالكامل</span>
-          </motion.div>
+          {/* Security notice */}
+          {activeTab === 'register' && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.65 }}
+              className="mt-7 flex items-center justify-center gap-2 shrink-0"
+              style={{ color: 'rgba(255,255,255,0.18)' }}
+            >
+              <Shield className="w-3 h-3" />
+              <span className="text-[11px]">بياناتك مشفرة ومحمية بالكامل</span>
+            </motion.div>
           )}
 
         </div>
