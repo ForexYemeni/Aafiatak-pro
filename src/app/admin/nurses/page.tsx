@@ -33,6 +33,7 @@ import {
   PowerOff,
   Send,
   Banknote,
+  Lock,
 } from 'lucide-react';
 import { PageHeader } from '@/components/layout/page-header';
 import { SPECIALIZATION_LABELS, YEMEN_GOVERNORATES, SPECIALIZATION_CATEGORIES, DEFAULT_SPECIALIZATIONS } from '@/lib/constants';
@@ -214,6 +215,12 @@ export default function AdminNursesPage() {
   const [withdrawalSearch, setWithdrawalSearch] = useState('');
   const [withdrawalPage, setWithdrawalPage] = useState(1);
   const [withdrawalTotalPages, setWithdrawalTotalPages] = useState(1);
+
+  // Change password dialog
+  const [changePasswordTarget, setChangePasswordTarget] = useState<{id: string; name: string; role: string} | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [newPasswordError, setNewPasswordError] = useState<string | null>(null);
 
   // Withdrawal action dialog
   const [withdrawalAction, setWithdrawalAction] = useState<WithdrawalItem | null>(null);
@@ -432,6 +439,34 @@ export default function AdminNursesPage() {
       setIsDeleting(false);
       setDeleteTarget(null);
       setDeleteConfirmName('');
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!changePasswordTarget) return;
+    if (!newPassword || newPassword.length < 6) {
+      setNewPasswordError('كلمة المرور يجب أن تكون ٦ أحرف على الأقل');
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      const res = await authFetch(`/api/admin/users/${changePasswordTarget.id}/change-password`, {
+        method: 'PATCH',
+        body: JSON.stringify({ newPassword }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`تم تغيير كلمة مرور ${changePasswordTarget.name} بنجاح`);
+        setChangePasswordTarget(null);
+        setNewPassword('');
+        setNewPasswordError(null);
+      } else {
+        toast.error(json.message ?? 'فشل تغيير كلمة المرور');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء تغيير كلمة المرور');
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -1065,6 +1100,15 @@ export default function AdminNursesPage() {
                           <Ban className="w-3.5 h-3.5" />
                           {nurse.isBlocked ? 'فك الحظر' : 'حظر'}
                         </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-1 text-xs text-violet-600 hover:text-violet-700 hover:bg-violet-50 dark:hover:bg-violet-950/20"
+                          onClick={() => setChangePasswordTarget({ id: nurse.id, name: nurse.name, role: 'nurse' })}
+                        >
+                          <Lock className="w-3.5 h-3.5" />
+                          تغيير كلمة المرور
+                        </Button>
                         {!isSubadmin && (
                           <Button
                             variant="ghost"
@@ -1669,6 +1713,75 @@ export default function AdminNursesPage() {
                 : withdrawalActionType === 'approve'
                   ? 'تأكيد التحويل'
                   : 'رفض الطلب'}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* ═══ Change Password Dialog ═══ */}
+      <Dialog open={!!changePasswordTarget} onOpenChange={(open) => { if (!open) { setChangePasswordTarget(null); setNewPassword(''); setNewPasswordError(null); } }}>
+        <DialogContent dir="rtl" className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-violet-500" />
+              تغيير كلمة المرور
+            </DialogTitle>
+            <DialogDescription>
+              تغيير كلمة مرور: {changePasswordTarget?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="new-password" className="text-sm font-semibold">كلمة المرور الجديدة</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => { setNewPassword(e.target.value); if (newPasswordError) setNewPasswordError(null); }}
+                placeholder="أدخل كلمة المرور الجديدة"
+                className={cn('h-12', newPasswordError && 'border-red-400 focus:border-red-500')}
+                dir="ltr"
+              />
+              {newPasswordError && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  {newPasswordError}
+                </p>
+              )}
+              {newPassword && newPassword.length >= 6 && (
+                <div className="flex gap-1">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'h-1 flex-1 rounded-full transition-all',
+                        i < (newPassword.length >= 8 && /[A-Z]/.test(newPassword) && /[0-9]/.test(newPassword) ? 3 : newPassword.length >= 6 ? 1 : 0)
+                          ? 'bg-emerald-500'
+                          : 'bg-slate-200 dark:bg-slate-700'
+                      )}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setChangePasswordTarget(null); setNewPassword(''); setNewPasswordError(null); }}
+              disabled={isChangingPassword}
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={isChangingPassword || !newPassword || newPassword.length < 6}
+              className="bg-gradient-to-l from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
+            >
+              {isChangingPassword ? (
+                <><Loader2 className="w-4 h-4 animate-spin ml-1" /> جارٍ الحفظ...</>
+              ) : (
+                <><Lock className="w-4 h-4 ml-1" /> حفظ كلمة المرور</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

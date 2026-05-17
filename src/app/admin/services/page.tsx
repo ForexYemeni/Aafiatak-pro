@@ -6,13 +6,14 @@ import {
   Plus, Edit, Trash2, AlertTriangle, RefreshCw,
   Stethoscope, Heart, Activity, Brain, Baby, Pill,
   Syringe, Ambulance, LayoutGrid, List, CheckCircle2,
-  XCircle, Search, ToggleLeft, ToggleRight, Eye,
+  ToggleLeft, ToggleRight, Eye,
+  Loader2, Tag, Hash, Info,
 } from 'lucide-react';
-import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
 import { SearchInput } from '@/components/common/search-input';
 import { BadgeStatus } from '@/components/common/badge-status';
-import { Currency, formatYemeniRial } from '@/components/common/currency';
+import { Currency } from '@/components/common/currency';
+import { EmptyState } from '@/components/common/empty-state';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
@@ -33,6 +34,7 @@ import {
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { toast } from 'sonner';
 import { toArabicNum } from '@/components/common/date-formatter';
+import { cn } from '@/lib/utils';
 
 interface ServiceItem {
   id: string;
@@ -115,6 +117,14 @@ const container = {
 const item = {
   hidden: { opacity: 0, y: 20 },
   show: { opacity: 1, y: 0 },
+};
+const statCardVariants = {
+  hidden: { opacity: 0, scale: 0.9 },
+  show: { opacity: 1, scale: 1, transition: { type: 'spring', stiffness: 300, damping: 25 } },
+};
+const cardHover = {
+  scale: 1.015,
+  transition: { type: 'spring', stiffness: 400, damping: 25 },
 };
 
 const defaultForm = {
@@ -323,63 +333,96 @@ export default function AdminServicesPage() {
 
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
+      {/* ═══ Professional Gradient Header Banner ═══ */}
       <motion.div variants={item}>
-        <PageHeader
-          title="إدارة الخدمات"
-          description="إضافة وتعديل وإدارة خدمات المنصة"
-          {...(!isSubadmin ? { action: { label: 'إضافة خدمة', onClick: openAdd, icon: <Plus className="w-4 h-4" /> } } : {})}
-        />
+        <div className="relative overflow-hidden rounded-2xl border border-admin/20 bg-gradient-to-l from-admin/8 via-admin/4 to-transparent p-5">
+          <div className="absolute -top-6 -left-6 w-24 h-24 rounded-full bg-admin/8 blur-xl" />
+          <div className="absolute -bottom-4 left-1/3 w-16 h-16 rounded-full bg-admin/5 blur-lg" />
+          <div className="absolute top-2 right-12 w-10 h-10 rounded-full bg-admin/3 blur-md" />
+          <div className="relative flex items-center justify-between flex-wrap gap-3">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-admin/25 to-admin/10 flex items-center justify-center border border-admin/25 shadow-sm shadow-admin/20">
+                <Stethoscope className="w-6 h-6 text-admin" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2 mb-0.5">
+                  <h1 className="text-xl font-black text-foreground">إدارة الخدمات</h1>
+                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-admin/15 text-admin border border-admin/25">
+                    عافيتك Pro
+                  </span>
+                </div>
+                <p className="text-muted-foreground text-xs">إضافة وتعديل وإدارة خدمات المنصة والأسعار</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5 bg-admin/10 border border-admin/20 rounded-xl px-3 py-1.5">
+                <Stethoscope className="w-3.5 h-3.5 text-admin" />
+                <span className="text-xs font-bold text-admin">{toArabicNum(totalServices)} خدمة</span>
+              </div>
+              <div className="flex items-center gap-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-xl px-3 py-1.5">
+                <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">{toArabicNum(activeServices)} نشطة</span>
+              </div>
+              {!isSubadmin && (
+                <Button
+                  onClick={openAdd}
+                  className="gap-1.5 bg-gradient-to-l from-admin to-admin/90 hover:from-admin/90 hover:to-admin/80 shadow-sm shadow-admin/25"
+                  size="sm"
+                >
+                  <Plus className="w-4 h-4" />
+                  إضافة خدمة
+                </Button>
+              )}
+              <Button variant="outline" size="icon" className="border-admin/30 hover:bg-admin/8 hover:border-admin/50" onClick={() => void fetchServices()}>
+                <RefreshCw className="w-4 h-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
       </motion.div>
 
-      {/* Statistics Cards */}
-      <motion.div variants={item} className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <GlassCard variant="admin" className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-admin/10 flex items-center justify-center">
-              <Stethoscope className="w-5 h-5 text-admin" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">إجمالي الخدمات</p>
-              <p className="text-xl font-bold">{toArabicNum(totalServices)}</p>
-            </div>
+      {/* ═══ Gradient Stat Cards ═══ */}
+      <motion.div
+        variants={container}
+        initial="hidden"
+        animate="show"
+        className="grid grid-cols-2 md:grid-cols-4 gap-3"
+      >
+        <motion.div variants={statCardVariants}>
+          <div className={cn('relative overflow-hidden rounded-2xl bg-gradient-to-br p-4 text-white shadow-lg', `from-sky-500 to-sky-700 shadow-sky-500/20`)}>
+            <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+            <Stethoscope className="w-8 h-8 mb-2 opacity-80" />
+            <p className="text-2xl font-bold">{toArabicNum(totalServices)}</p>
+            <p className="text-xs text-sky-100">إجمالي الخدمات</p>
           </div>
-        </GlassCard>
-        <GlassCard variant="admin" className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-green-100 dark:bg-green-900/30 flex items-center justify-center">
-              <CheckCircle2 className="w-5 h-5 text-green-600 dark:text-green-400" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">خدمات نشطة</p>
-              <p className="text-xl font-bold text-green-600">{toArabicNum(activeServices)}</p>
-            </div>
+        </motion.div>
+        <motion.div variants={statCardVariants}>
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-emerald-500 to-emerald-700 p-4 text-white shadow-lg shadow-emerald-500/20">
+            <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+            <CheckCircle2 className="w-8 h-8 mb-2 opacity-80" />
+            <p className="text-2xl font-bold">{toArabicNum(activeServices)}</p>
+            <p className="text-xs text-emerald-100">خدمات نشطة</p>
           </div>
-        </GlassCard>
-        <GlassCard variant="admin" className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
-              <Ambulance className="w-5 h-5 text-red-600 dark:text-red-400" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">خدمات طوارئ</p>
-              <p className="text-xl font-bold text-red-600">{toArabicNum(emergencyServices)}</p>
-            </div>
+        </motion.div>
+        <motion.div variants={statCardVariants}>
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-red-500 to-red-700 p-4 text-white shadow-lg shadow-red-500/20">
+            <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+            <Ambulance className="w-8 h-8 mb-2 opacity-80" />
+            <p className="text-2xl font-bold">{toArabicNum(emergencyServices)}</p>
+            <p className="text-xs text-red-100">خدمات طوارئ</p>
           </div>
-        </GlassCard>
-        <GlassCard variant="admin" className="p-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
-              <Eye className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-            </div>
-            <div>
-              <p className="text-xs text-muted-foreground">عدد الفئات</p>
-              <p className="text-xl font-bold">{toArabicNum(Object.keys(categoryCounts).length)}</p>
-            </div>
+        </motion.div>
+        <motion.div variants={statCardVariants}>
+          <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-amber-500 to-amber-700 p-4 text-white shadow-lg shadow-amber-500/20">
+            <div className="absolute top-0 left-0 w-24 h-24 bg-white/10 rounded-full -translate-x-8 -translate-y-8" />
+            <Eye className="w-8 h-8 mb-2 opacity-80" />
+            <p className="text-2xl font-bold">{toArabicNum(Object.keys(categoryCounts).length)}</p>
+            <p className="text-xs text-amber-100">عدد الفئات</p>
           </div>
-        </GlassCard>
+        </motion.div>
       </motion.div>
 
-      {/* Category Filter & Search */}
+      {/* ═══ Category Filter & Search ═══ */}
       <motion.div variants={item}>
         <GlassCard variant="admin" className="p-4">
           <div className="flex flex-col gap-4">
@@ -440,89 +483,128 @@ export default function AdminServicesPage() {
         </GlassCard>
       </motion.div>
 
-      {/* Services Grid / Table View */}
+      {/* ═══ Services Grid / Table View ═══ */}
       <motion.div variants={item}>
-        {services.length === 0 ? (
-          <GlassCard variant="admin" className="p-12 text-center">
-            <Stethoscope className="w-12 h-12 text-muted-foreground mx-auto mb-3" />
-            <p className="text-muted-foreground">لا توجد خدمات</p>
-            {!isSubadmin && (
-              <Button className="mt-4 bg-admin hover:bg-admin/90" onClick={openAdd}>
-                <Plus className="w-4 h-4 ml-2" /> إضافة خدمة جديدة
-              </Button>
-            )}
+        {isLoading ? (
+          <GlassCard variant="admin" className="p-16">
+            <div className="flex flex-col items-center gap-3">
+              <Loader2 className="w-10 h-10 animate-spin text-admin" />
+              <p className="text-sm text-muted-foreground">جاري تحميل الخدمات...</p>
+            </div>
+          </GlassCard>
+        ) : services.length === 0 ? (
+          <GlassCard variant="admin" className="p-8">
+            <EmptyState
+              icon={<Stethoscope className="w-10 h-10 text-muted-foreground" />}
+              title="لا توجد خدمات"
+              description="لم يتم العثور على خدمات مطابقة لمعايير البحث"
+              variant="admin"
+              action={search || categoryFilter !== 'all' ? { label: 'إعادة تعيين', onClick: () => { setSearch(''); setCategoryFilter('all'); } } : undefined}
+              secondaryAction={!isSubadmin ? { label: 'إضافة خدمة جديدة', onClick: openAdd } : undefined}
+            />
           </GlassCard>
         ) : viewMode === 'grid' ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {services.map((service) => {
               const Icon = categoryIcons[service.category] || getIconComponent(service.icon);
               const gradient = categoryGradients[service.category] || 'from-gray-400 to-gray-500';
+              const catColor = categoryColors[service.category] || 'bg-muted text-muted-foreground';
               return (
                 <motion.div
                   key={service.id}
                   initial={{ opacity: 0, y: 10 }}
                   animate={{ opacity: 1, y: 0 }}
-                  className={`rounded-2xl border bg-card shadow-sm transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 group ${!service.isActive ? 'opacity-60' : ''}`}
+                  whileHover={cardHover}
+                  className={cn(
+                    'group relative rounded-2xl border bg-card shadow-sm transition-all duration-300 hover:shadow-xl overflow-hidden',
+                    !service.isActive && 'opacity-60'
+                  )}
                 >
+                  {/* Gradient accent top bar */}
+                  <div className={cn(
+                    'h-1.5 w-full',
+                    service.isEmergency
+                      ? 'bg-gradient-to-l from-red-500 to-red-400'
+                      : `bg-gradient-to-l ${gradient}`
+                  )} />
+
                   <div className="p-4 space-y-3">
                     {/* Header with gradient icon and status */}
                     <div className="flex items-start justify-between">
-                      <div className={`w-11 h-11 rounded-xl bg-gradient-to-br ${gradient} flex items-center justify-center shadow-sm`}>
+                      <div className={cn('w-12 h-12 rounded-xl bg-gradient-to-br flex items-center justify-center shadow-sm', gradient)}>
                         <Icon className="w-5 h-5 text-white" />
                       </div>
                       <div className="flex items-center gap-1.5">
                         {service.isEmergency && (
-                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0">طوارئ</Badge>
+                          <Badge variant="destructive" className="text-[10px] px-1.5 py-0 gap-0.5">
+                            <Ambulance className="w-2.5 h-2.5" />
+                            طوارئ
+                          </Badge>
                         )}
-                        <div className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium ${
+                        <div className={cn(
+                          'flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium',
                           service.isActive
                             ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
                             : 'bg-gray-100 text-gray-500 dark:bg-gray-800 dark:text-gray-400'
-                        }`}>
-                          <div className={`w-1.5 h-1.5 rounded-full ${service.isActive ? 'bg-green-500' : 'bg-gray-400'}`} />
+                        )}>
+                          <div className={cn('w-1.5 h-1.5 rounded-full', service.isActive ? 'bg-green-500' : 'bg-gray-400')} />
                           {service.isActive ? 'نشطة' : 'متوقفة'}
                         </div>
                       </div>
                     </div>
 
-                    {/* Service Name */}
+                    {/* Service Name & Description */}
                     <div>
-                      <h3 className="font-semibold text-sm leading-tight line-clamp-2">{service.nameAr}</h3>
+                      <h3 className="font-bold text-sm leading-tight line-clamp-2">{service.nameAr}</h3>
                       {service.descriptionAr && (
-                        <p className="text-xs text-muted-foreground mt-1 line-clamp-1">{service.descriptionAr}</p>
+                        <p className="text-[11px] text-muted-foreground mt-1 line-clamp-2 leading-relaxed">{service.descriptionAr}</p>
                       )}
                     </div>
 
-                    {/* Category Badge */}
-                    <Badge variant="outline" className="text-[10px]">
-                      {categoryLabels[service.category] || service.category}
-                    </Badge>
-
-                    {/* Price & Sort Order */}
-                    <div className="flex items-center justify-between pt-2 border-t border-border/30">
-                      <Currency amount={service.basePrice} className="text-sm font-bold" />
+                    {/* Category & Duration Row */}
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge variant="outline" className={cn('text-[10px] gap-1', catColor.split(' ').slice(0, 1).join(' '), catColor.split(' ').slice(2).join(' '))}>
+                        <Tag className="w-2.5 h-2.5" />
+                        {categoryLabels[service.category] || service.category}
+                      </Badge>
                       {service.sortOrder > 0 && (
-                        <span className="text-[10px] text-muted-foreground bg-muted px-1.5 py-0.5 rounded-full">
+                        <span className="text-[10px] text-muted-foreground bg-muted/80 px-1.5 py-0.5 rounded-full flex items-center gap-0.5">
+                          <Hash className="w-2.5 h-2.5" />
                           {toArabicNum(service.sortOrder)}
                         </span>
                       )}
                     </div>
 
+                    {/* Price Section */}
+                    <div className="rounded-xl bg-muted/40 backdrop-blur-sm p-3 border border-border/30">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="text-[10px] text-muted-foreground mb-0.5">السعر الأساسي</p>
+                          <div className="flex items-baseline gap-1">
+                            <Currency amount={service.basePrice} className="text-base font-bold" />
+                          </div>
+                        </div>
+                        <div className={cn('w-10 h-10 rounded-lg flex items-center justify-center', catColor.split(' ').slice(0, 1).join(' '))}>
+                          <Icon className={cn('w-5 h-5', catColor.split(' ').slice(2).join(' '))} />
+                        </div>
+                      </div>
+                    </div>
+
                     {/* Actions */}
                     {!isSubadmin && (
                       <div className="flex items-center gap-1 pt-2 border-t border-border/30">
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => openEdit(service)}>
-                          <Edit className="w-3.5 h-3.5 ml-1" /> تعديل
+                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs gap-1 hover:bg-admin/10 hover:text-admin" onClick={() => openEdit(service)}>
+                          <Edit className="w-3.5 h-3.5" /> تعديل
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs" onClick={() => setToggleTarget(service)}>
+                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs gap-1" onClick={() => setToggleTarget(service)}>
                           {service.isActive ? (
-                            <><ToggleRight className="w-3.5 h-3.5 ml-1 text-orange-500" /> إيقاف</>
+                            <><ToggleRight className="w-3.5 h-3.5 text-orange-500" /> إيقاف</>
                           ) : (
-                            <><ToggleLeft className="w-3.5 h-3.5 ml-1 text-green-500" /> تفعيل</>
+                            <><ToggleLeft className="w-3.5 h-3.5 text-green-500" /> تفعيل</>
                           )}
                         </Button>
-                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-red-600 hover:text-red-700" onClick={() => setDeleteTarget(service)}>
-                          <Trash2 className="w-3.5 h-3.5 ml-1" /> حذف
+                        <Button variant="ghost" size="sm" className="h-8 px-2 text-xs text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950/20 gap-1" onClick={() => setDeleteTarget(service)}>
+                          <Trash2 className="w-3.5 h-3.5" /> حذف
                         </Button>
                       </div>
                     )}
@@ -537,7 +619,7 @@ export default function AdminServicesPage() {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead>
-                  <tr className="border-b border-border">
+                  <tr className="border-b border-border bg-muted/30">
                     <th className="text-right text-xs font-medium text-muted-foreground p-3">الخدمة</th>
                     <th className="text-right text-xs font-medium text-muted-foreground p-3">الفئة</th>
                     <th className="text-right text-xs font-medium text-muted-foreground p-3">السعر</th>
@@ -552,22 +634,38 @@ export default function AdminServicesPage() {
                     return (
                       <tr key={service.id} className={`border-b border-border/50 hover:bg-muted/30 transition-colors ${!service.isActive ? 'opacity-60' : ''}`}>
                         <td className="p-3">
-                          <div className="flex items-center gap-2">
-                            <div className={`w-8 h-8 rounded-lg ${catColor.split(' ').slice(0, 1).join(' ')} flex items-center justify-center shrink-0`}>
-                              <Icon className={`w-4 h-4 ${catColor.split(' ').slice(2).join(' ')}`} />
+                          <div className="flex items-center gap-3">
+                            <div className={cn('w-9 h-9 rounded-lg flex items-center justify-center shrink-0', catColor.split(' ').slice(0, 1).join(' '))}>
+                              <Icon className={cn('w-4 h-4', catColor.split(' ').slice(2).join(' '))} />
                             </div>
                             <div className="min-w-0">
-                              <p className="font-medium text-sm truncate">{service.nameAr}</p>
-                              {service.isEmergency && (
-                                <span className="text-[10px] text-red-500 font-medium">خدمة طوارئ</span>
-                              )}
+                              <p className="font-semibold text-sm truncate">{service.nameAr}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5">
+                                {service.isEmergency && (
+                                  <span className="text-[10px] text-red-500 font-medium flex items-center gap-0.5">
+                                    <Ambulance className="w-2.5 h-2.5" />
+                                    طوارئ
+                                  </span>
+                                )}
+                                {service.sortOrder > 0 && (
+                                  <span className="text-[10px] text-muted-foreground">#{service.sortOrder}</span>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </td>
                         <td className="p-3">
-                          <Badge variant="outline" className="text-[10px]">{categoryLabels[service.category] || service.category}</Badge>
+                          <Badge variant="outline" className="text-[10px] gap-1">
+                            <Tag className="w-2.5 h-2.5" />
+                            {categoryLabels[service.category] || service.category}
+                          </Badge>
                         </td>
-                        <td className="p-3"><Currency amount={service.basePrice} className="text-sm" /></td>
+                        <td className="p-3">
+                          <div className="flex flex-col">
+                            <Currency amount={service.basePrice} className="text-sm font-bold" />
+                            <span className="text-[10px] text-muted-foreground">ر.ي</span>
+                          </div>
+                        </td>
                         <td className="p-3">
                           <BadgeStatus
                             status={service.isActive ? 'active' : 'inactive'}
@@ -577,13 +675,13 @@ export default function AdminServicesPage() {
                         {!isSubadmin && (
                           <td className="p-3">
                             <div className="flex items-center gap-1">
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => openEdit(service)}>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 hover:bg-admin/10 hover:text-admin" onClick={() => openEdit(service)}>
                                 <Edit className="w-3.5 h-3.5" />
                               </Button>
                               <Button variant="ghost" size="sm" className="h-7 w-7 p-0" onClick={() => setToggleTarget(service)}>
                                 {service.isActive ? <ToggleRight className="w-3.5 h-3.5 text-orange-500" /> : <ToggleLeft className="w-3.5 h-3.5 text-green-500" />}
                               </Button>
-                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600" onClick={() => setDeleteTarget(service)}>
+                              <Button variant="ghost" size="sm" className="h-7 w-7 p-0 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/20" onClick={() => setDeleteTarget(service)}>
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
                             </div>
@@ -599,38 +697,56 @@ export default function AdminServicesPage() {
         )}
       </motion.div>
 
-      {/* Add/Edit Dialog */}
+      {/* ═══ Add/Edit Dialog ═══ */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogContent dir="rtl" className="max-w-lg max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingService ? 'تعديل الخدمة' : 'إضافة خدمة جديدة'}</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              {editingService ? (
+                <>
+                  <div className="w-8 h-8 rounded-lg bg-admin/10 flex items-center justify-center">
+                    <Edit className="w-4 h-4 text-admin" />
+                  </div>
+                  تعديل الخدمة
+                </>
+              ) : (
+                <>
+                  <div className="w-8 h-8 rounded-lg bg-admin/10 flex items-center justify-center">
+                    <Plus className="w-4 h-4 text-admin" />
+                  </div>
+                  إضافة خدمة جديدة
+                </>
+              )}
+            </DialogTitle>
             <DialogDescription>
               {editingService ? 'قم بتعديل بيانات الخدمة' : 'أدخل بيانات الخدمة الجديدة'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
             <div className="space-y-2">
-              <Label>اسم الخدمة *</Label>
+              <Label className="text-sm font-semibold">اسم الخدمة *</Label>
               <Input
                 value={form.nameAr}
                 onChange={(e) => setForm({ ...form, nameAr: e.target.value })}
                 placeholder="مثال: تمريض منزلي"
+                className="h-11"
               />
             </div>
             <div className="space-y-2">
-              <Label>الوصف</Label>
+              <Label className="text-sm font-semibold">الوصف</Label>
               <Textarea
                 value={form.descriptionAr}
                 onChange={(e) => setForm({ ...form, descriptionAr: e.target.value })}
                 placeholder="وصف الخدمة..."
                 rows={3}
+                className="resize-none"
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>الفئة *</Label>
+                <Label className="text-sm font-semibold">الفئة *</Label>
                 <Select value={form.category} onValueChange={(v) => setForm({ ...form, category: v })}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -641,21 +757,25 @@ export default function AdminServicesPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label>السعر الأساسي (ر.ي) *</Label>
+                <Label className="text-sm font-semibold flex items-center gap-1">
+                  السعر الأساسي (ر.ي) *
+                  <Info className="w-3 h-3 text-muted-foreground" />
+                </Label>
                 <Input
                   type="number"
                   value={form.basePrice}
                   onChange={(e) => setForm({ ...form, basePrice: e.target.value })}
                   placeholder="0"
                   min={0}
+                  className="h-11"
                 />
               </div>
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>الأيقونة</Label>
+                <Label className="text-sm font-semibold">الأيقونة</Label>
                 <Select value={form.icon} onValueChange={(v) => setForm({ ...form, icon: v })}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-11">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -671,7 +791,7 @@ export default function AdminServicesPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="flex items-center gap-1.5">
+                <Label className="text-sm font-semibold flex items-center gap-1.5">
                   ترتيب الفرز
                   {!editingService && (
                     <span className="text-[10px] text-green-600 dark:text-green-400 font-normal">(تلقائي)</span>
@@ -682,54 +802,89 @@ export default function AdminServicesPage() {
                   value={form.sortOrder}
                   onChange={(e) => setForm({ ...form, sortOrder: parseInt(e.target.value) || 0 })}
                   min={0}
+                  className="h-11"
                 />
               </div>
             </div>
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-2">
+
+            {/* Switches with better styling */}
+            <div className="flex items-center gap-6 p-3 rounded-xl bg-muted/40 border border-border/30">
+              <div className="flex items-center gap-2.5">
                 <Switch
                   checked={form.isActive}
                   onCheckedChange={(v) => setForm({ ...form, isActive: v })}
                 />
-                <Label>نشطة</Label>
+                <div>
+                  <Label className="text-sm font-medium">نشطة</Label>
+                  <p className="text-[10px] text-muted-foreground">تفعيل/إيقاف الخدمة</p>
+                </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2.5">
                 <Switch
                   checked={form.isEmergency}
                   onCheckedChange={(v) => setForm({ ...form, isEmergency: v })}
                 />
-                <Label>خدمة طوارئ</Label>
+                <div>
+                  <Label className="text-sm font-medium">خدمة طوارئ</Label>
+                  <p className="text-[10px] text-muted-foreground">متاحة للطوارئ</p>
+                </div>
               </div>
             </div>
 
-            {/* Preview Card */}
+            {/* Enhanced Preview Card */}
             {form.nameAr && (
               <div className="space-y-2">
-                <Label className="text-xs text-muted-foreground">معاينة البطاقة</Label>
-                <div className="rounded-xl border bg-card p-3">
-                  <div className="flex items-center gap-3">
-                    <div className={`w-10 h-10 rounded-xl ${categoryColors[form.category]?.split(' ').slice(0, 1).join(' ') || 'bg-muted'} flex items-center justify-center`}>
-                      {(() => {
-                        const PreviewIcon = getIconComponent(form.icon);
-                        return <PreviewIcon className={`w-5 h-5 ${categoryColors[form.category]?.split(' ').slice(2).join(' ') || 'text-muted-foreground'}`} />;
-                      })()}
+                <Label className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Eye className="w-3 h-3" />
+                  معاينة البطاقة
+                </Label>
+                <div className="rounded-xl border bg-card overflow-hidden shadow-sm">
+                  {/* Preview gradient bar */}
+                  <div className={cn('h-1.5 w-full bg-gradient-to-l', categoryGradients[form.category] || 'from-gray-400 to-gray-500')} />
+                  <div className="p-3">
+                    <div className="flex items-center gap-3">
+                      <div className={cn('w-10 h-10 rounded-xl bg-gradient-to-br flex items-center justify-center', categoryGradients[form.category] || 'from-gray-400 to-gray-500')}>
+                        {(() => {
+                          const PreviewIcon = getIconComponent(form.icon);
+                          return <PreviewIcon className="w-5 h-5 text-white" />;
+                        })()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-sm">{form.nameAr}</p>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <Badge variant="outline" className="text-[9px] px-1.5 py-0">
+                            {categoryLabels[form.category]}
+                          </Badge>
+                          {form.isEmergency && (
+                            <Badge variant="destructive" className="text-[9px] px-1.5 py-0">طوارئ</Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="text-left">
+                        <Currency amount={Number(form.basePrice) || 0} className="text-sm font-bold" />
+                        <p className="text-[9px] text-muted-foreground">ر.ي</p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="font-semibold text-sm">{form.nameAr}</p>
-                      <p className="text-xs text-muted-foreground">{categoryLabels[form.category]}</p>
-                    </div>
-                    <Currency amount={Number(form.basePrice) || 0} className="text-sm font-bold" />
+                    {form.descriptionAr && (
+                      <p className="text-[10px] text-muted-foreground mt-2 line-clamp-1">{form.descriptionAr}</p>
+                    )}
                   </div>
                 </div>
               </div>
             )}
           </div>
-          <DialogFooter>
+          <DialogFooter className="gap-2">
             <Button variant="outline" onClick={() => setDialogOpen(false)} disabled={isSaving}>
               إلغاء
             </Button>
-            <Button onClick={handleSave} disabled={isSaving} className="bg-admin hover:bg-admin/90">
-              {isSaving ? 'جارٍ الحفظ...' : editingService ? 'تحديث' : 'إضافة'}
+            <Button onClick={handleSave} disabled={isSaving} className="bg-gradient-to-l from-admin to-admin/90 hover:from-admin/90 hover:to-admin/80 shadow-sm shadow-admin/25 gap-1.5">
+              {isSaving ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> جارٍ الحفظ...</>
+              ) : editingService ? (
+                <><CheckCircle2 className="w-4 h-4" /> تحديث</>
+              ) : (
+                <><Plus className="w-4 h-4" /> إضافة</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -755,7 +910,9 @@ export default function AdminServicesPage() {
         <DialogContent dir="rtl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2 text-red-600">
-              <Trash2 className="w-5 h-5" />
+              <div className="w-8 h-8 rounded-lg bg-red-100 dark:bg-red-900/30 flex items-center justify-center">
+                <Trash2 className="w-4 h-4" />
+              </div>
               حذف الخدمة نهائياً
             </DialogTitle>
             <DialogDescription>
@@ -778,8 +935,13 @@ export default function AdminServicesPage() {
               onClick={handleDelete}
               disabled={isDeleting}
               variant="destructive"
+              className="gap-1.5"
             >
-              {isDeleting ? 'جارٍ الحذف...' : 'حذف نهائياً'}
+              {isDeleting ? (
+                <><Loader2 className="w-4 h-4 animate-spin" /> جارٍ الحذف...</>
+              ) : (
+                <><Trash2 className="w-4 h-4" /> حذف نهائياً</>
+              )}
             </Button>
           </DialogFooter>
         </DialogContent>

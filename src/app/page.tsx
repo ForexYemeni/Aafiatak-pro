@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { RegisterMultiStep } from '@/components/auth/register-multi-step';
+import { ForgotPasswordFlow } from '@/components/auth/forgot-password-flow';
 import { cn } from '@/lib/utils';
 import type { UserRole } from '@/types';
 
@@ -524,6 +525,7 @@ function LoginPageContent() {
   const _hasHydrated = useAuthStore((s) => s._hasHydrated);
 
   const [activeTab, setActiveTab] = useState<string>('login');
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
   // registerRole is now managed by RegisterMultiStep component
   const [showPassword, setShowPassword] = useState(false);
   const [showLoadingScreen, setShowLoadingScreen] = useState(false);
@@ -829,7 +831,7 @@ function LoginPageContent() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.22 }}
             className={cn('relative flex p-[5px] rounded-2xl shrink-0', activeTab === 'register' ? 'mb-4' : 'mb-7')}
-            style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)' }}
+            style={{ background: 'rgba(255,255,255,0.045)', border: '1px solid rgba(255,255,255,0.08)', display: showForgotPassword ? 'none' : undefined }}
           >
             <motion.div
               className="absolute rounded-[13px]"
@@ -869,7 +871,7 @@ function LoginPageContent() {
 
           {/* ====== LOGIN FORM ====== */}
           <AnimatePresence mode="wait">
-            {activeTab === 'login' && (
+            {!showForgotPassword && activeTab === 'login' && (
               <motion.form
                 key="login-form"
                 initial={{ opacity: 0, x: -18 }}
@@ -955,6 +957,7 @@ function LoginPageContent() {
                   <button type="button" className="text-[12px] font-semibold transition-colors duration-200" style={{ color: 'rgba(20,184,166,0.6)' }}
                     onMouseEnter={(e) => e.currentTarget.style.color = 'rgba(20,184,166,1)'}
                     onMouseLeave={(e) => e.currentTarget.style.color = 'rgba(20,184,166,0.6)'}
+                    onClick={() => { setShowForgotPassword(true); clearError(); }}
                   >
                     نسيت كلمة المرور؟
                   </button>
@@ -983,9 +986,27 @@ function LoginPageContent() {
             )}
           </AnimatePresence>
 
+          {/* ====== FORGOT PASSWORD ====== */}
+          <AnimatePresence mode="wait">
+            {showForgotPassword && (
+              <motion.div
+                key="forgot-password"
+                initial={{ opacity: 0, x: 18 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -18 }}
+                transition={{ duration: 0.28 }}
+                className="flex-1 min-h-0"
+              >
+                <ForgotPasswordFlow
+                  onBack={() => { setShowForgotPassword(false); clearError(); }}
+                />
+              </motion.div>
+            )}
+          </AnimatePresence>
+
           {/* ====== REGISTER FORMS ====== */}
           <AnimatePresence mode="wait">
-            {activeTab === 'register' && (
+            {!showForgotPassword && activeTab === 'register' && (
               <motion.div
                 key="register-container"
                 initial={{ opacity: 0, x: 18 }}

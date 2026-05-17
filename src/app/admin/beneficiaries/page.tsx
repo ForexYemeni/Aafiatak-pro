@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { Users, Eye, RefreshCw, MapPin, Phone, MessageCircle, Ban, Trash2, Shield, Heart, Navigation, Activity, TrendingUp, UserCheck, UserPlus, Copy, CheckCircle2, Loader2 } from 'lucide-react';
+import { Users, Eye, RefreshCw, MapPin, Phone, MessageCircle, Ban, Trash2, Shield, Heart, Navigation, Activity, TrendingUp, UserCheck, UserPlus, Copy, CheckCircle2, Loader2, Lock, AlertTriangle } from 'lucide-react';
 import { DataTable } from '@/components/common/data-table';
 import { PageHeader } from '@/components/layout/page-header';
 import { GlassCard } from '@/components/common/glass-card';
@@ -13,6 +13,8 @@ import { Currency } from '@/components/common/currency';
 import { useAuthFetch } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -21,6 +23,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
+  DialogDescription,
 } from '@/components/ui/dialog';
 import {
   Drawer,
@@ -31,6 +35,7 @@ import {
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { cn } from '@/lib/utils';
 import type { ColumnDef } from '@tanstack/react-table';
 
 interface BeneficiaryItem {
@@ -100,6 +105,12 @@ export default function AdminBeneficiariesPage() {
   const [blockTarget, setBlockTarget] = useState<BeneficiaryItem | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<BeneficiaryItem | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Change password dialog
+  const [changePasswordTarget, setChangePasswordTarget] = useState<{id: string; name: string; role: string} | null>(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
+  const [newPasswordError, setNewPasswordError] = useState<string | null>(null);
 
   // Referral detail state
   const [referralTarget, setReferralTarget] = useState<BeneficiaryItem | null>(null);
@@ -194,6 +205,34 @@ export default function AdminBeneficiariesPage() {
       setReferredUsers([]);
     } finally {
       setIsLoadingReferrals(false);
+    }
+  };
+
+  const handleChangePassword = async () => {
+    if (!changePasswordTarget) return;
+    if (!newPassword || newPassword.length < 6) {
+      setNewPasswordError('كلمة المرور يجب أن تكون ٦ أحرف على الأقل');
+      return;
+    }
+    setIsChangingPassword(true);
+    try {
+      const res = await authFetch(`/api/admin/users/${changePasswordTarget.id}/change-password`, {
+        method: 'PATCH',
+        body: JSON.stringify({ newPassword }),
+      });
+      const json = await res.json();
+      if (json.success) {
+        toast.success(`تم تغيير كلمة مرور ${changePasswordTarget.name} بنجاح`);
+        setChangePasswordTarget(null);
+        setNewPassword('');
+        setNewPasswordError(null);
+      } else {
+        toast.error(json.message ?? 'فشل تغيير كلمة المرور');
+      }
+    } catch {
+      toast.error('حدث خطأ أثناء تغيير كلمة المرور');
+    } finally {
+      setIsChangingPassword(false);
     }
   };
 
@@ -318,6 +357,13 @@ export default function AdminBeneficiariesPage() {
       label: (row: Record<string, unknown>) => ((row as unknown as BeneficiaryItem).isBlocked ? 'إلغاء الحظر' : 'حظر'),
       onClick: (row: Record<string, unknown>) => setBlockTarget(row as unknown as BeneficiaryItem),
       variant: 'destructive' as const,
+    },
+    {
+      label: 'تغيير كلمة المرور',
+      onClick: (row: Record<string, unknown>) => {
+        const ben = row as unknown as BeneficiaryItem;
+        setChangePasswordTarget({ id: ben.id, name: ben.name, role: 'beneficiary' });
+      },
     },
     ...(!isSubadmin ? [{
       label: 'حذف نهائي',
@@ -711,6 +757,75 @@ export default function AdminBeneficiariesPage() {
               </div>
             )}
           </div>
+        </DialogContent>
+      </Dialog>
+      {/* Change Password Dialog */}
+      <Dialog open={!!changePasswordTarget} onOpenChange={(open) => { if (!open) { setChangePasswordTarget(null); setNewPassword(''); setNewPasswordError(null); } }}>
+        <DialogContent dir="rtl" className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Lock className="w-5 h-5 text-violet-500" />
+              تغيير كلمة المرور
+            </DialogTitle>
+            <DialogDescription>
+              تغيير كلمة مرور: {changePasswordTarget?.name}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-2">
+              <Label htmlFor="new-password" className="text-sm font-semibold">كلمة المرور الجديدة</Label>
+              <Input
+                id="new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => { setNewPassword(e.target.value); if (newPasswordError) setNewPasswordError(null); }}
+                placeholder="أدخل كلمة المرور الجديدة"
+                className={cn('h-12', newPasswordError && 'border-red-400 focus:border-red-500')}
+                dir="ltr"
+              />
+              {newPasswordError && (
+                <p className="text-xs text-destructive flex items-center gap-1">
+                  <AlertTriangle className="w-3 h-3" />
+                  {newPasswordError}
+                </p>
+              )}
+              {newPassword && newPassword.length >= 6 && (
+                <div className="flex gap-1">
+                  {[0, 1, 2].map((i) => (
+                    <div
+                      key={i}
+                      className={cn(
+                        'h-1 flex-1 rounded-full transition-all',
+                        i < (newPassword.length >= 8 && /[A-Z]/.test(newPassword) && /[0-9]/.test(newPassword) ? 3 : newPassword.length >= 6 ? 1 : 0)
+                          ? 'bg-emerald-500'
+                          : 'bg-slate-200 dark:bg-slate-700'
+                      )}
+                    />
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+          <DialogFooter className="gap-2">
+            <Button
+              variant="outline"
+              onClick={() => { setChangePasswordTarget(null); setNewPassword(''); setNewPasswordError(null); }}
+              disabled={isChangingPassword}
+            >
+              إلغاء
+            </Button>
+            <Button
+              onClick={handleChangePassword}
+              disabled={isChangingPassword || !newPassword || newPassword.length < 6}
+              className="bg-gradient-to-l from-violet-500 to-purple-600 hover:from-violet-600 hover:to-purple-700"
+            >
+              {isChangingPassword ? (
+                <><Loader2 className="w-4 h-4 animate-spin ml-1" /> جارٍ الحفظ...</>
+              ) : (
+                <><Lock className="w-4 h-4 ml-1" /> حفظ كلمة المرور</>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </motion.div>
