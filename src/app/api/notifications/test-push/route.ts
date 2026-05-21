@@ -13,8 +13,8 @@ export async function POST(request: NextRequest) {
   try {
     await connectDB();
 
-    // Require admin authentication
-    const { user, error } = requireRole(request, ['admin']);
+    // Require admin or subadmin authentication
+    const { user, error } = requireRole(request, ['admin', 'subadmin']);
     if (error) return error;
 
     const body = await request.json();

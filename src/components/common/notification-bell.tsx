@@ -250,7 +250,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
                         const role = user?.role;
                         if (role === 'nurse') {
                           router.push('/nurse/ratings');
-                        } else if (role === 'admin') {
+                        } else if (role === 'admin' || role === 'subadmin') {
                           router.push('/admin/ratings');
                         }
                         setIsOpen(false);
@@ -258,7 +258,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
                         const role = user?.role;
                         if (role === 'nurse') {
                           router.push('/nurse');
-                        } else if (role === 'admin') {
+                        } else if (role === 'admin' || role === 'subadmin') {
                           router.push('/admin/emergencies');
                         } else if (role === 'beneficiary') {
                           router.push('/beneficiary/emergency');
@@ -268,7 +268,7 @@ export function NotificationBell({ className }: NotificationBellProps) {
                         const role = user?.role;
                         if (role === 'nurse') {
                           router.push('/nurse');
-                        } else if (role === 'admin') {
+                        } else if (role === 'admin' || role === 'subadmin') {
                           router.push('/admin/orders');
                         }
                         setIsOpen(false);

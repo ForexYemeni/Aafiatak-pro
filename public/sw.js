@@ -137,9 +137,9 @@ const VIBRATIONS = {
 };
 
 const ROUTE_MAP = {
-  service_request: '/nurse',
+  service_request: '/admin/orders',
   service_assigned: '/nurse',
-  assignment: '/nurse',
+  assignment: '/admin/orders',
   deployment: '/admin/deployments',
   deployment_created: '/admin/deployments',
   deployment_applied: '/nurse/deployments',
@@ -153,14 +153,14 @@ const ROUTE_MAP = {
   service_completed: '/beneficiary/orders',
   service_cancelled: '/beneficiary/orders',
   status_change: '/beneficiary/orders',
-  emergency: '/nurse',
-  emergency_assigned: '/nurse',
+  emergency: '/admin/emergencies',
+  emergency_assigned: '/admin/emergencies',
   payment: '/nurse/earnings',
   withdrawal: '/nurse/earnings',
   withdrawal_approved: '/nurse/earnings',
   withdrawal_rejected: '/nurse/earnings',
   chat: '/chat',
-  rating: '/nurse/ratings',
+  rating: '/admin/ratings',
   verification: '/nurse/profile',
   system: '/',
   loyalty: '/beneficiary/loyalty',
@@ -172,6 +172,23 @@ function getNotificationUrl(data) {
   if (data?.url) return data.url;
   if (data?.type) {
     const basePath = ROUTE_MAP[data.type] || '/';
+    // Admin and subadmin share the same dashboard routes (/admin/...)
+    if ((data.userRole === 'admin' || data.userRole === 'subadmin') && !basePath.startsWith('/admin')) {
+      // Some types default to nurse routes, redirect admins to their dashboard
+      if (data.type === 'service_request' || data.type === 'assignment') {
+        return '/admin/orders';
+      }
+      if (data.type === 'emergency' || data.type === 'emergency_assigned') {
+        return '/admin/emergencies';
+      }
+      if (data.type === 'rating') {
+        return '/admin/ratings';
+      }
+      if (data.type === 'payment' || data.type === 'withdrawal' || data.type === 'withdrawal_approved' || data.type === 'withdrawal_rejected') {
+        return '/admin/payments';
+      }
+      return basePath.startsWith('/nurse') ? '/admin' + basePath.substring(6) : basePath;
+    }
     if (data.userRole === 'nurse' && !basePath.startsWith('/nurse')) {
       return '/nurse' + basePath;
     }

@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { EmergencyRequest, Notification, Nurse, AdminSettings } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { emitNotificationToUsers, emitToAdmins } from '@/lib/notifications/socket-client';
 import { serializeDoc } from '@/lib/mongoose/serialize';
 
 export async function GET(request: NextRequest) {
@@ -106,19 +107,22 @@ export async function POST(request: NextRequest) {
     // Run all notifications in parallel for maximum speed
     const notificationPromises: Promise<any>[] = [];
 
+    // Get beneficiary name for all notifications (declared at function scope)
+    const { User, Beneficiary: BeneficiaryModel } = await import('@/models/mongoose');
+    const beneficiaryDoc = await BeneficiaryModel.findById(user.userId).select('name phone').lean();
+    const beneficiaryName = beneficiaryDoc?.name || 'مستفيد';
+
     // 1. Notify admins IMMEDIATELY with voice alert (highest priority)
     try {
-      const { User, Beneficiary: BeneficiaryModel } = await import('@/models/mongoose');
-      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id').lean();
-      const beneficiaryDoc = await BeneficiaryModel.findById(user.userId).select('name phone').lean();
-      const beneficiaryName = beneficiaryDoc?.name || 'مستفيد';
+      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
 
       for (const admin of admins) {
+        const adminRole = (admin as any).role || 'admin';
         // Create DB notification + push in parallel
         notificationPromises.push(
           Notification.create({
             userId: admin._id,
-            userRole: 'admin',
+            userRole: adminRole,
             titleAr: '🚨 حالة طوارئ جديدة - تنبيه عاجل!',
             bodyAr: `طلب طوارئ عاجل من ${beneficiaryName}: ${description.substring(0, 80)}. نوع الطوارئ: ${type || 'طبية'}`,
             type: 'emergency',
@@ -134,11 +138,39 @@ export async function POST(request: NextRequest) {
             priority: 'urgent',
             sound: true,
             url: '/admin/emergencies',
-            userRole: 'admin',
+            userRole: adminRole,
             data: { emergencyRequestId: emergency._id.toString(), voiceAlert: true, voiceText: `حالة طوارئ جديدة من ${beneficiaryName}` },
           })
         );
       }
+
+      // 1b. Emit real-time Socket.IO events (instant delivery, non-blocking)
+      const adminIds = admins.map((a: any) => a._id.toString());
+
+      // Emit emergency_created to admins room (includes subadmins)
+      emitToAdmins('emergency_created', {
+        emergencyRequestId: emergency._id.toString(),
+        type: type || 'medical',
+        description,
+        beneficiaryId: user.userId,
+        beneficiaryName,
+        location: lat && lng ? { lat, lng, updatedAt: new Date().toISOString() } : null,
+        address: address || '',
+        priority: 'urgent',
+        createdAt: new Date().toISOString(),
+      }).catch(() => {});
+
+      // Emit notification event to each admin/subadmin individually
+      emitNotificationToUsers(adminIds, {
+        titleAr: '🚨 حالة طوارئ جديدة - تنبيه عاجل!',
+        bodyAr: `طلب طوارئ عاجل من ${beneficiaryName}`,
+        type: 'emergency',
+        priority: 'urgent',
+        data: { emergencyRequestId: emergency._id.toString(), voiceAlert: true, voiceText: `حالة طوارئ جديدة من ${beneficiaryName}` },
+        actionUrl: '/admin/emergencies',
+        voiceEnabled: true,
+        voiceText: `حالة طوارئ جديدة من ${beneficiaryName}`,
+      }).catch(() => {});
     } catch {
       // Non-critical
     }
