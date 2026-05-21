@@ -107,11 +107,12 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
 
         // 2️⃣ Notify ADMIN: Nurse accepted the order
         const { User } = await import('@/models/mongoose');
-        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
         for (const admin of admins) {
+          const adminRole = (admin as any).role || "admin";
           await Notification.create({
             userId: admin._id,
-            userRole: 'admin',
+            userRole: adminRole,
             titleAr: 'قبول الممرض للطلب',
             bodyAr: `قبل ${nurseName} الطلب #${id.slice(-6)} وسيبدأ التنفيذ قريباً`,
             type: 'status_change',
@@ -128,7 +129,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
             type: 'service_accepted',
             priority: 'medium',
             url: '/admin/orders',
-            userRole: 'admin',
+            userRole: adminRole,
             data: { requestId: id, status: 'accepted', voiceAlert: true, voiceText: `قبل ${nurseName} الطلب وسيبدأ التنفيذ قريباً` },
           }).catch(() => {});
         }
@@ -173,11 +174,12 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
 
         // 2️⃣ Notify ADMIN: Nurse rejected the assignment
         const { User } = await import('@/models/mongoose');
-        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
         for (const admin of admins) {
+          const adminRole = (admin as any).role || "admin";
           await Notification.create({
             userId: admin._id,
-            userRole: 'admin',
+            userRole: adminRole,
             titleAr: 'رفض ممرض طلباً',
             bodyAr: `رفض الممرض ${nurseName} الطلب #${id.slice(-6)} - يرجى تعيين ممرض بديل`,
             type: 'status_change',
@@ -194,7 +196,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
             type: 'service_cancelled',
             priority: 'high',
             url: '/admin/orders',
-            userRole: 'admin',
+            userRole: adminRole,
             data: { requestId: id, status: 'rejected', voiceAlert: true, voiceText: `رفض الممرض ${nurseName} الطلب. يرجى تعيين ممرض بديل` },
           }).catch(() => {});
         }

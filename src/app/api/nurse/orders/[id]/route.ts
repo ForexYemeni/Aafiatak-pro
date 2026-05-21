@@ -80,11 +80,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
         // 2️⃣ Notify ADMIN: Nurse started the service
         const { User } = await import('@/models/mongoose');
-        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
         for (const admin of admins) {
+          const adminRole = (admin as any).role || 'admin';
           await Notification.create({
             userId: admin._id,
-            userRole: 'admin',
+            userRole: adminRole,
             titleAr: 'بدأ تنفيذ الطلب',
             bodyAr: `بدأ ${nurseName} تنفيذ الطلب #${id.slice(-6)}`,
             type: 'status_change',
@@ -100,7 +101,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             type: 'service_started',
             priority: 'medium',
             url: '/admin/orders',
-            userRole: 'admin',
+            userRole: adminRole,
             data: { requestId: id, status: 'in_progress', voiceAlert: true, voiceText: `بدأ ${nurseName} تنفيذ طلب الخدمة` },
           }).catch(() => {});
         }
@@ -187,11 +188,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
         // 3️⃣ Notify ADMIN: Order completed
         const { User } = await import('@/models/mongoose');
-        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
         for (const admin of admins) {
+          const adminRole = (admin as any).role || 'admin';
           await Notification.create({
             userId: admin._id,
-            userRole: 'admin',
+            userRole: adminRole,
             titleAr: 'تم إكمال الطلب',
             bodyAr: `أكمل ${nurseName} الطلب #${id.slice(-6)} بنجاح`,
             type: 'status_change',
@@ -207,7 +209,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             type: 'service_completed',
             priority: 'medium',
             url: '/admin/orders',
-            userRole: 'admin',
+            userRole: adminRole,
             data: { requestId: id, status: 'completed', voiceAlert: true, voiceText: `أكمل ${nurseName} طلب الخدمة بنجاح` },
           }).catch(() => {});
         }

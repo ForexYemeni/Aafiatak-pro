@@ -177,11 +177,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       // 3️⃣ Notify ADMIN: Order cancelled by beneficiary
       const { User } = await import('@/models/mongoose');
-      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
       for (const admin of admins) {
+        const adminRole = (admin as any).role || 'admin';
         await Notification.create({
           userId: admin._id,
-          userRole: 'admin',
+          userRole: adminRole,
           titleAr: 'إلغاء طلب بواسطة المستفيد',
           bodyAr: `تم إلغاء الطلب #${id.slice(-6)} بواسطة المستفيد`,
           type: 'status_change',
@@ -197,7 +198,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           type: 'service_cancelled',
           priority: 'medium',
           url: '/admin/orders',
-          userRole: 'admin',
+          userRole: adminRole,
           data: { requestId: id, status: 'cancelled' },
         }).catch(() => {});
       }

@@ -124,14 +124,15 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
       // 3️⃣ Notify ADMIN (confirmation): Assignment successful
       const { User } = await import('@/models/mongoose');
-      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
       for (const admin of admins) {
-        // Don't notify the admin who performed the action
+        // Don't notify the admin/subadmin who performed the action
         if (admin._id.toString() === user!.userId) continue;
+        const adminRole = (admin as any).role || 'admin';
 
         await Notification.create({
           userId: admin._id,
-          userRole: 'admin',
+          userRole: adminRole,
           titleAr: 'تم تعيين ممرض',
           bodyAr: `تم تعيين ${nurseName} للطلب #${id.slice(-6)}`,
           type: 'system',
@@ -147,7 +148,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
           type: 'system',
           priority: 'low',
           url: '/admin/orders',
-          userRole: 'admin',
+          userRole: adminRole,
           data: { requestId: id },
         }).catch(() => {});
       }

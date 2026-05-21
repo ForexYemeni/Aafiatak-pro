@@ -76,12 +76,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // 2. Notify admins in parallel
       try {
         const { User } = await import('@/models/mongoose');
-        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
         for (const admin of admins) {
+          const adminRole = (admin as any).role || "admin";
           notifPromises.push(
             Notification.create({
               userId: admin._id,
-              userRole: 'admin',
+              userRole: adminRole,
               titleAr: 'قبول الممرض لحالة الطوارئ',
               bodyAr: `قبل ${nurseName} حالة الطوارئ #${id.slice(-6)} وسيصل للموقع قريباً`,
               type: 'status_change',
@@ -96,7 +97,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               type: 'status_change',
               priority: 'high',
               url: '/admin/emergencies',
-              userRole: 'admin',
+              userRole: adminRole,
               data: { emergencyRequestId: id, status: 'accepted', voiceAlert: true, voiceText: `قبل ${nurseName} حالة الطوارئ وسيصل للموقع قريباً` },
             })
           );
@@ -162,12 +163,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // 2. Notify admins in parallel
       try {
         const { User } = await import('@/models/mongoose');
-        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
         for (const admin of admins) {
+          const adminRole = (admin as any).role || "admin";
           notifPromises.push(
             Notification.create({
               userId: admin._id,
-              userRole: 'admin',
+              userRole: adminRole,
               titleAr: 'بدأ التعامل مع حالة الطوارئ',
               bodyAr: `وصل ${nurseName} للموقع وبدأ التعامل مع حالة الطوارئ #${id.slice(-6)}`,
               type: 'status_change',
@@ -182,7 +184,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
               type: 'service_started',
               priority: 'high',
               url: '/admin/emergencies',
-              userRole: 'admin',
+              userRole: adminRole,
               data: { emergencyRequestId: id, status: 'in_progress', voiceAlert: true, voiceText: `وصل ${nurseName} للموقع وبدأ التعامل مع حالة الطوارئ` },
             })
           );
@@ -300,11 +302,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
         // Notify admins
         const { User } = await import('@/models/mongoose');
-        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
         for (const admin of admins) {
+          const adminRole = (admin as any).role || "admin";
           await Notification.create({
             userId: admin._id,
-            userRole: 'admin',
+            userRole: adminRole,
             titleAr: 'تم حل حالة الطوارئ',
             bodyAr: `أكمل ${nurseName} حالة الطوارئ #${id.slice(-6)}. النتيجة: ${outcomeLabels[outcome] || outcome}${resolvedNotes ? `. ملاحظات: ${resolvedNotes}` : ''}`,
             type: 'status_change',
@@ -320,7 +323,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             type: 'service_completed',
             priority: 'medium',
             url: '/admin/emergencies',
-            userRole: 'admin',
+            userRole: adminRole,
             data: { emergencyRequestId: id, status: 'resolved', outcome, voiceAlert: true, voiceText: `أكمل ${nurseName} حالة الطوارئ بنجاح` },
           }).catch(() => {});
         }
@@ -371,11 +374,12 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
         // Notify admins - high priority to reassign
         const { User } = await import('@/models/mongoose');
-        const admins = await User.find({ role: 'admin' }).select('_id').lean();
+        const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
         for (const admin of admins) {
+          const adminRole = (admin as any).role || "admin";
           await Notification.create({
             userId: admin._id,
-            userRole: 'admin',
+            userRole: adminRole,
             titleAr: 'رفض ممرض حالة طوارئ',
             bodyAr: `رفض الممرض ${nurseName} حالة الطوارئ #${id.slice(-6)} - يرجى تعيين ممرض بديل`,
             type: 'status_change',
@@ -392,7 +396,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
             type: 'service_cancelled',
             priority: 'high',
             url: '/admin/emergencies',
-            userRole: 'admin',
+            userRole: adminRole,
             data: { emergencyRequestId: id, status: 'rejected', voiceAlert: true, voiceText: `رفض الممرض ${nurseName} حالة الطوارئ. يرجى تعيين ممرض بديل` },
           }).catch(() => {});
         }

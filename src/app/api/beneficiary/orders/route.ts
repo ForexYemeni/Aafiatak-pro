@@ -315,11 +315,12 @@ export async function POST(request: NextRequest) {
         : `طلب جديد بانتظار تأكيد الدفع: ${serviceNames} من ${beneficiaryName} - ${totalAmount} ر.ي`;
 
       const { User } = await import('@/models/mongoose');
-      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
       for (const admin of admins) {
+        const adminRole = (admin as any).role || 'admin';
         await Notification.create({
           userId: admin._id,
-          userRole: 'admin',
+          userRole: adminRole,
           titleAr: isCashPayment ? 'طلب خدمة جديد' : 'طلب جديد بانتظار تأكيد الدفع',
           bodyAr: adminMsg,
           type: isEmergency ? 'emergency' : 'assignment',
@@ -336,7 +337,7 @@ export async function POST(request: NextRequest) {
           type: isEmergency ? 'emergency' : 'service_request',
           priority: isEmergency ? 'urgent' : 'high',
           url: '/admin/orders',
-          userRole: 'admin',
+          userRole: adminRole,
           data: { orderId, serviceIds: ids, voiceAlert: true, voiceText: isEmergency ? `طلب طوارئ من ${beneficiaryName}` : `طلب خدمة جديد من ${beneficiaryName} - ${totalAmount} ريال` },
         }).catch(() => {});
       }

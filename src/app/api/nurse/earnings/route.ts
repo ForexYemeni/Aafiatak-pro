@@ -199,11 +199,12 @@ export async function POST(request: NextRequest) {
     // ── Notify admins about new withdrawal request ──
     try {
       const { User } = await import('@/models/mongoose');
-      const admins = await User.find({ role: 'admin' }).select('_id').lean();
+      const admins = await User.find({ role: { $in: ['admin', 'subadmin'] } }).select('_id role').lean();
       for (const admin of admins) {
+        const adminRole = (admin as any).role || 'admin';
         await Notification.create({
           userId: admin._id,
-          userRole: 'admin',
+          userRole: adminRole,
           titleAr: 'طلب سحب جديد',
           bodyAr: `طلب سحب ${amount} ر.ي من ${nurse.name}`,
           type: 'withdrawal',
@@ -219,7 +220,7 @@ export async function POST(request: NextRequest) {
           type: 'withdrawal',
           priority: 'high',
           url: '/admin/withdrawals',
-          userRole: 'admin',
+          userRole: adminRole,
           data: { withdrawalId: withdrawalRequest._id.toString(), nurseId: user.userId, amount: String(amount) },
         }).catch(() => {});
       }
