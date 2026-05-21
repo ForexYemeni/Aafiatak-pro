@@ -159,6 +159,18 @@ export async function POST(
     // Fire ALL notifications in parallel
     await Promise.allSettled(notificationPromises);
 
+    // ── Emit real-time socket event ──
+    try {
+      const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+      await emitRealtimeEvent.paymentChanged({
+        deploymentId: id,
+        applicationId: application._id.toString(),
+        applicantId: user.userId,
+        status: 'payment_submitted',
+        paymentAction: 'submitted',
+      }, { changedBy: user.userId, changedByRole: user.role });
+    } catch {}
+
     return Response.json({
       success: true,
       data: {

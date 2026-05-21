@@ -31,6 +31,16 @@ async function handleAvailability(request: NextRequest) {
 
     if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
 
+    // ── Emit real-time socket event ──
+    try {
+      const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+      await emitRealtimeEvent.userChanged({
+        userId: user.userId,
+        role: 'nurse',
+        action: 'availability_changed',
+      }, { changedBy: user.userId, changedByRole: user.role });
+    } catch {}
+
     return Response.json({
       success: true,
       data: { isAvailable: nurse.isAvailable, isOnline: nurse.isOnline },

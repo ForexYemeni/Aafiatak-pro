@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   ClipboardList, Eye, UserPlus, RefreshCw, Phone, MessageCircle, MapPin,
@@ -30,6 +30,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 
 interface OrderItem {
   id: string;
@@ -193,8 +194,6 @@ export default function AdminOrdersPage() {
   // Image viewer
   const [imageViewerSrc, setImageViewerSrc] = useState<string | null>(null);
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   const fetchOrders = useCallback(async () => {
     try {
       const params = new URLSearchParams({
@@ -228,10 +227,11 @@ export default function AdminOrdersPage() {
     void fetchOrders();
   }, [fetchOrders]);
 
-  useEffect(() => {
-    intervalRef.current = setInterval(() => void fetchOrders(), 15000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [fetchOrders]);
+  const { refresh: realtimeRefreshOrders } = useRealtimeRefresh({
+    entities: ['order'],
+    onRefresh: () => void fetchOrders(),
+    fallbackInterval: 30000,
+  });
 
   const fetchAvailableNurses = async (orderLat?: number, orderLng?: number) => {
     setIsLoadingNurses(true);

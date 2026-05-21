@@ -39,6 +39,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { ListSkeleton } from '@/components/common/loading-skeleton';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { useToast } from '@/hooks/use-toast';
 import type { ApiResponse, ServiceRequest, PaginationMeta, ServiceRequestStatus } from '@/types';
 
@@ -288,6 +289,16 @@ export default function OrdersPage() {
     fetchCounts();
     fetchEmergencies();
   }, [fetchOrders, fetchCounts, fetchEmergencies]);
+
+  useRealtimeRefresh({
+    entities: ['order'],
+    onRefresh: () => {
+      void fetchOrders();
+      void fetchCounts();
+      void fetchEmergencies();
+    },
+    fallbackInterval: 30000,
+  });
 
   // Compute emergency counts by tab
   const emergencyCounts = {

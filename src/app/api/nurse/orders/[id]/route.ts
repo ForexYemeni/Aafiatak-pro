@@ -109,6 +109,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         // Non-critical
       }
 
+      // ── Emit real-time socket event ──
+      try {
+        const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+        await emitRealtimeEvent.orderStatusChanged({
+          requestId: id,
+          beneficiaryId: order.beneficiaryId?.toString(),
+          nurseId: user.userId,
+          status: 'in_progress',
+        }, { changedBy: user.userId, changedByRole: user.role });
+      } catch {}
+
       return Response.json({
         success: true,
         data: serializeDoc(order.toObject()),
@@ -216,6 +227,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       } catch {
         // Non-critical
       }
+
+      // ── Emit real-time socket event ──
+      try {
+        const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+        await emitRealtimeEvent.orderStatusChanged({
+          requestId: id,
+          beneficiaryId: order.beneficiaryId?.toString(),
+          nurseId: user.userId,
+          status: 'completed',
+        }, { changedBy: user.userId, changedByRole: user.role });
+      } catch {}
 
       return Response.json({
         success: true,

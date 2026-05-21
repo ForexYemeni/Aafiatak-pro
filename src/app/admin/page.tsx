@@ -38,6 +38,7 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { Currency } from '@/components/common/currency';
 import { DateFormatter, toArabicNum } from '@/components/common/date-formatter';
 import { useAuthFetch, _GET_CACHE_readSync, invalidateAuthFetchCache } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
@@ -258,6 +259,12 @@ export default function AdminDashboardPage() {
     invalidateAuthFetchCache('/api/admin/');
     void fetchDashboard(false);
   }, []);
+
+  useRealtimeRefresh({
+    entities: ['order', 'emergency', 'deployment'],
+    onRefresh: () => void fetchDashboard(true),
+    fallbackInterval: 30000,
+  });
 
   // Quick search handler
   const handleQuickSearch = async (e?: React.FormEvent) => {

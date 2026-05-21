@@ -48,6 +48,7 @@ import { GlassCard } from '@/components/common/glass-card';
 import { GpsLocationButton } from '@/components/common/gps-location-button';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { toast } from 'sonner';
 import { toArabicNum } from '@/components/common/date-formatter';
 import { formatYemeniRial } from '@/components/common/currency';
@@ -400,37 +401,44 @@ export default function EmergencyPage() {
   }, []);
 
   // ─── Check for active or recently-resolved emergency on load ───
-  useEffect(() => {
-    const checkActiveEmergency = async () => {
-      try {
-        const res = await authFetch('/api/beneficiary/emergency');
-        if (res.ok) {
-          const data = await res.json();
-          if (data.success && data.data) {
-            const emergencies = Array.isArray(data.data)
-              ? data.data
-              : data.data.emergencies || [];
-            const active = emergencies.find((e: any) =>
-              ['pending', 'dispatched', 'in_progress'].includes(e.status)
+  const fetchActiveEmergency = useCallback(async () => {
+    try {
+      const res = await authFetch('/api/beneficiary/emergency');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.data) {
+          const emergencies = Array.isArray(data.data)
+            ? data.data
+            : data.data.emergencies || [];
+          const active = emergencies.find((e: any) =>
+            ['pending', 'dispatched', 'in_progress'].includes(e.status)
+          );
+          if (active) {
+            setActiveEmergency(active);
+          } else {
+            const resolved = emergencies.find(
+              (e: any) => e.status === 'resolved' && e.nurseId
             );
-            if (active) {
-              setActiveEmergency(active);
-            } else {
-              const resolved = emergencies.find(
-                (e: any) => e.status === 'resolved' && e.nurseId
-              );
-              if (resolved) {
-                setActiveEmergency(resolved);
-              }
+            if (resolved) {
+              setActiveEmergency(resolved);
             }
           }
         }
-      } catch {
-        // Ignore
       }
-    };
-    checkActiveEmergency();
+    } catch {
+      // Ignore
+    }
   }, [authFetch]);
+
+  useEffect(() => {
+    fetchActiveEmergency();
+  }, [fetchActiveEmergency]);
+
+  useRealtimeRefresh({
+    entities: ['emergency'],
+    onRefresh: () => void fetchActiveEmergency(),
+    fallbackInterval: 30000,
+  });
 
   // ─── Fetch emergency fee ───
   useEffect(() => {

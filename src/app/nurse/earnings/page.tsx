@@ -31,6 +31,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { ChartSkeleton, CardSkeleton } from '@/components/common/loading-skeleton';
 import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { formatDateOnly, toArabicNum } from '@/components/common/date-formatter';
 import { toast } from 'sonner';
 
@@ -114,6 +115,12 @@ export default function NurseEarningsPage() {
   useEffect(() => {
     fetchEarnings();
   }, [fetchEarnings]);
+
+  useRealtimeRefresh({
+    entities: ['payment', 'withdrawal'],
+    onRefresh: () => void fetchEarnings(),
+    fallbackInterval: 30000,
+  });
 
   const openPayoutDialog = () => {
     if (!earnings || earnings.availableBalance <= 0) return;

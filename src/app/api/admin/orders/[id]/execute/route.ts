@@ -104,6 +104,17 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       }
     }
 
+    // ── Emit real-time socket event ──
+    try {
+      const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+      await emitRealtimeEvent.orderStatusChanged({
+        requestId: id,
+        beneficiaryId: order.beneficiaryId?.toString(),
+        nurseId: order.nurseId?.toString(),
+        status: 'completed',
+      }, { changedBy: user!.userId, changedByRole: user!.role });
+    } catch {}
+
     await logActivity({
       userId: user!.userId,
       userRole: user!.role,

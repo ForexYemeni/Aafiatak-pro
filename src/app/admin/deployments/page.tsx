@@ -17,6 +17,7 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { EmptyState } from '@/components/common/empty-state';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -230,6 +231,12 @@ export default function AdminDeploymentsPage() {
       setIsLoading(false);
     }
   }, [authFetch, statusFilter, typeFilter]);
+
+  useRealtimeRefresh({
+    entities: ['deployment', 'application', 'payment'],
+    onRefresh: () => void fetchDeployments(),
+    fallbackInterval: 30000,
+  });
 
   useEffect(() => {
     setIsLoading(true);

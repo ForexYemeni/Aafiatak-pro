@@ -11,6 +11,7 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { DateFormatter } from '@/components/common/date-formatter';
 import { Currency } from '@/components/common/currency';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -148,6 +149,12 @@ export default function AdminBeneficiariesPage() {
   useEffect(() => {
     void fetchBeneficiaries();
   }, [fetchBeneficiaries]);
+
+  useRealtimeRefresh({
+    entities: ['user'],
+    onRefresh: () => void fetchBeneficiaries(),
+    fallbackInterval: 30000,
+  });
 
   const handleToggle = async () => {
     if (!toggleTarget) return;

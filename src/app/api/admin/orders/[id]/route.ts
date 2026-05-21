@@ -147,6 +147,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         // Non-critical
       }
 
+      // ── Emit real-time socket event ──
+      try {
+        const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+        await emitRealtimeEvent.orderStatusChanged({
+          requestId: id,
+          beneficiaryId: order.beneficiaryId?.toString(),
+          nurseId: order.nurseId?.toString(),
+          status: 'completed',
+        }, { changedBy: user!.userId, changedByRole: user!.role });
+      } catch {}
+
       await logActivity({
         userId: user!.userId,
         userRole: user!.role,
@@ -225,6 +236,17 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       } catch {
         // Non-critical
       }
+
+      // ── Emit real-time socket event ──
+      try {
+        const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+        await emitRealtimeEvent.orderCancelled({
+          requestId: id,
+          beneficiaryId: order.beneficiaryId?.toString(),
+          nurseId: order.nurseId?.toString(),
+          status: 'cancelled',
+        }, cancelReason || 'إلغاء بواسطة الإدارة', { changedBy: user!.userId, changedByRole: user!.role });
+      } catch {}
 
       await logActivity({
         userId: user!.userId,
@@ -321,6 +343,27 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         // Non-critical
       }
     }
+
+    // ── Emit real-time socket event ──
+    try {
+      const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+      if (body.paymentStatus) {
+        await emitRealtimeEvent.orderPaymentUpdated({
+          requestId: id,
+          beneficiaryId: (order as any).beneficiaryId?.toString(),
+          nurseId: (order as any).nurseId?.toString(),
+          status: body.status || (order as any).status,
+          paymentStatus: body.paymentStatus,
+        }, { changedBy: user!.userId, changedByRole: user!.role });
+      } else if (body.status) {
+        await emitRealtimeEvent.orderStatusChanged({
+          requestId: id,
+          beneficiaryId: (order as any).beneficiaryId?.toString(),
+          nurseId: (order as any).nurseId?.toString(),
+          status: body.status,
+        }, { changedBy: user!.userId, changedByRole: user!.role });
+      }
+    } catch {}
 
     await logActivity({
       userId: user!.userId,

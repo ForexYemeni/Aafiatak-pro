@@ -216,6 +216,27 @@ export async function PATCH(
     // Fire ALL notifications in parallel
     await Promise.allSettled(notificationPromises);
 
+    // ── Emit real-time socket event ──
+    try {
+      const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+      await emitRealtimeEvent.paymentChanged({
+        deploymentId: id,
+        applicationId: applicationId,
+        applicantId: application.applicantId.toString(),
+        status: verified ? 'accepted' : 'payment_pending',
+        paymentAction: verified ? 'verified' : 'rejected',
+      }, { changedBy: user!.userId, changedByRole: user!.role });
+
+      // Also emit deployment change if verified (deployment status changes)
+      if (verified) {
+        await emitRealtimeEvent.deploymentChanged({
+          deploymentId: id,
+          status: 'assigned',
+          creatorId: deployment.createdBy?.toString(),
+        }, { changedBy: user!.userId, changedByRole: user!.role });
+      }
+    } catch {}
+
     return Response.json({
       success: true,
       data: {

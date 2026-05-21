@@ -43,6 +43,7 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { EmptyState } from '@/components/common/empty-state';
 import { DateFormatter } from '@/components/common/date-formatter';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -334,6 +335,12 @@ export default function AdminNursesPage() {
   useEffect(() => {
     void fetchNurses();
   }, [fetchNurses]);
+
+  useRealtimeRefresh({
+    entities: ['user'],
+    onRefresh: () => void fetchNurses(),
+    fallbackInterval: 30000,
+  });
 
   useEffect(() => {
     if (activeTab === 'withdrawals') {

@@ -362,6 +362,16 @@ export async function POST(request: NextRequest) {
     // Fire ALL notifications in parallel
     await Promise.allSettled(notificationPromises);
 
+    // ── Emit real-time socket event ──
+    try {
+      const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+      await emitRealtimeEvent.deploymentChanged({
+        deploymentId: deployment._id.toString(),
+        status: 'open',
+        creatorId: user!.userId,
+      }, { changedBy: user!.userId, changedByRole: user!.role });
+    } catch {}
+
     return Response.json({
       success: true,
       data: {

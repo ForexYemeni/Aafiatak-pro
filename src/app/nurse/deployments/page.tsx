@@ -17,6 +17,7 @@ import { BadgeStatus } from '@/components/common/badge-status';
 import { EmptyState } from '@/components/common/empty-state';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useDeployments, useApplyForDeployment, useSubmitPayment, useChangeDeploymentStatus, useCreateDeployment, useSelectApplicant } from '@/hooks/use-deployments';
 import { Button } from '@/components/ui/button';
@@ -238,7 +239,7 @@ export default function NurseDeploymentsPage() {
   const currentUserId = authUser?.id || '';
 
   // Use React Query hook for cached, real-time synced data
-  const { data: deployments = [], isLoading } = useDeployments();
+  const { data: deployments = [], isLoading, refetch: refetchDeployments } = useDeployments();
   const [activeTab, setActiveTab] = useState('available');
 
   // Apply modal state
@@ -298,6 +299,12 @@ export default function NurseDeploymentsPage() {
   const changeStatusMutation = useChangeDeploymentStatus();
   const createDeploymentMutation = useCreateDeployment();
   const selectApplicantMutation = useSelectApplicant();
+
+  useRealtimeRefresh({
+    entities: ['deployment', 'application', 'payment'],
+    onRefresh: () => void refetchDeployments(),
+    fallbackInterval: 30000,
+  });
 
   /* ── Fetch admin settings for commission ── */
   useEffect(() => {

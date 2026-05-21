@@ -188,6 +188,17 @@ export async function POST(
       ?.filter((a: any) => a.applicantId.toString() === user.userId)
       .sort((a: any, b: any) => new Date(b.appliedAt).getTime() - new Date(a.appliedAt).getTime())[0];
 
+    // ── Emit real-time socket event ──
+    try {
+      const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+      await emitRealtimeEvent.applicationChanged({
+        deploymentId: id,
+        applicationId: newApplication?._id?.toString() || '',
+        applicantId: user.userId,
+        status: 'pending',
+      }, { changedBy: user.userId, changedByRole: user.role });
+    } catch {}
+
     return Response.json({
       success: true,
       data: {

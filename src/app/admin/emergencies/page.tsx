@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   AlertTriangle, Eye, UserPlus, RefreshCw, Clock, Phone, MessageCircle,
@@ -29,6 +29,7 @@ import {
   DialogDescription,
 } from '@/components/ui/dialog';
 import { toast } from 'sonner';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { toArabicNum } from '@/components/common/date-formatter';
 import { socketService } from '@/lib/socket';
 
@@ -171,8 +172,6 @@ export default function AdminEmergenciesPage() {
   const [resolveTarget, setResolveTarget] = useState<EmergencyItem | null>(null);
   const [isResolving, setIsResolving] = useState(false);
 
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-
   /* ── Fetch emergencies ── */
   const fetchEmergencies = useCallback(async () => {
     try {
@@ -198,11 +197,11 @@ export default function AdminEmergenciesPage() {
     void fetchEmergencies();
   }, [fetchEmergencies]);
 
-  // Auto-refresh every 15s
-  useEffect(() => {
-    intervalRef.current = setInterval(() => void fetchEmergencies(), 15000);
-    return () => { if (intervalRef.current) clearInterval(intervalRef.current); };
-  }, [fetchEmergencies]);
+  const { refresh: realtimeRefreshEmergencies } = useRealtimeRefresh({
+    entities: ['emergency'],
+    onRefresh: () => void fetchEmergencies(),
+    fallbackInterval: 30000,
+  });
 
   /* ── Fetch nearby nurses ── */
   const fetchNearbyNurses = useCallback(async (em: EmergencyItem, searchTerm?: string) => {

@@ -276,6 +276,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     });
 
+    // ── Emit real-time socket event ──
+    try {
+      const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+      await emitRealtimeEvent.emergencyStatusChanged({
+        emergencyRequestId: id,
+        beneficiaryId: (emergency as any).beneficiaryId?.toString(),
+        nurseId: (emergency as any).nurseId?.toString(),
+        status: body.status,
+        type: (emergency as any).type,
+      }, { changedBy: user!.userId, changedByRole: user!.role });
+    } catch {}
+
     return Response.json({ success: true, data: serializeDoc(emergency), message: 'تم تحديث طلب الطوارئ بنجاح' });
   } catch (error) {
     console.error('[ADMIN EMERGENCY UPDATE ERROR]', error);

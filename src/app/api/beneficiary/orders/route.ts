@@ -345,6 +345,17 @@ export async function POST(request: NextRequest) {
       // Notification creation should not block order creation
     }
 
+    // ── Emit real-time socket event ──
+    try {
+      const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+      await emitRealtimeEvent.orderCreated({
+        requestId: order._id.toString(),
+        beneficiaryId: user.userId,
+        status: orderStatus,
+        paymentStatus: isCashPayment ? 'pending' : 'awaiting_confirmation',
+      }, { changedBy: user.userId, changedByRole: user.role });
+    } catch {}
+
     // Return the unified order
     return Response.json({
       success: true,

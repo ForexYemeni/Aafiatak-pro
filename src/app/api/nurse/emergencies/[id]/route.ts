@@ -109,6 +109,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // Fire ALL notifications simultaneously
       await Promise.allSettled(notifPromises);
 
+      // ── Emit real-time socket event ──
+      try {
+        const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+        await emitRealtimeEvent.emergencyStatusChanged({
+          emergencyRequestId: id,
+          beneficiaryId: emergency.beneficiaryId?.toString(),
+          nurseId: user.userId,
+          status: 'accepted',
+          type: emergency.type,
+        }, { changedBy: user.userId, changedByRole: user.role });
+      } catch {}
+
       return Response.json({
         success: true,
         data: serializeDoc(emergency.toObject()),
@@ -195,6 +207,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       // Fire ALL notifications simultaneously
       await Promise.allSettled(notifPromises);
+
+      // ── Emit real-time socket event ──
+      try {
+        const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+        await emitRealtimeEvent.emergencyStatusChanged({
+          emergencyRequestId: id,
+          beneficiaryId: emergency.beneficiaryId?.toString(),
+          nurseId: user.userId,
+          status: 'in_progress',
+          type: emergency.type,
+        }, { changedBy: user.userId, changedByRole: user.role });
+      } catch {}
 
       return Response.json({
         success: true,
@@ -331,6 +355,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         // Non-critical
       }
 
+      // ── Emit real-time socket event ──
+      try {
+        const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+        await emitRealtimeEvent.emergencyStatusChanged({
+          emergencyRequestId: id,
+          beneficiaryId: emergency.beneficiaryId?.toString(),
+          nurseId: user.userId,
+          status: 'resolved',
+          type: emergency.type,
+        }, { changedBy: user.userId, changedByRole: user.role });
+      } catch {}
+
       return Response.json({
         success: true,
         data: serializeDoc(emergency.toObject()),
@@ -403,6 +439,18 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       } catch {
         // Non-critical
       }
+
+      // ── Emit real-time socket event ──
+      try {
+        const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+        await emitRealtimeEvent.emergencyStatusChanged({
+          emergencyRequestId: id,
+          beneficiaryId: emergency.beneficiaryId?.toString(),
+          nurseId: user.userId,
+          status: 'rejected',
+          type: emergency.type,
+        }, { changedBy: user.userId, changedByRole: user.role });
+      } catch {}
 
       return Response.json({
         success: true,

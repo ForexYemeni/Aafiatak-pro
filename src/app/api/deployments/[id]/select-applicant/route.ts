@@ -283,6 +283,17 @@ export async function PATCH(
     // Fire ALL notifications in parallel
     await Promise.allSettled(notificationPromises);
 
+    // ── Emit real-time socket event ──
+    try {
+      const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
+      await emitRealtimeEvent.applicationChanged({
+        deploymentId: id,
+        applicationId: applicationId,
+        applicantId: application.applicantId.toString(),
+        status: 'selected_by_creator',
+      }, { changedBy: user!.userId, changedByRole: user!.role });
+    } catch {}
+
     // ── Response ──
     const responseAppStatus = application.status;
     const responseDepStatus = deployment.status;

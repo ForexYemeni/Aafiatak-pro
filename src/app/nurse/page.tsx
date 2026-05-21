@@ -47,6 +47,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { useAuthFetch, _GET_CACHE_readSync } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useOrderUpdates } from '@/hooks/use-socket';
 import { formatDateOnly, formatTimeOnly, toArabicNum } from '@/components/common/date-formatter';
@@ -304,6 +305,15 @@ export default function NurseTasksPage() {
       fetchCounts();
     }
   }, [orderUpdates.latestOrderUpdate, fetchAssignments, fetchCounts]);
+
+  useRealtimeRefresh({
+    entities: ['order', 'emergency'],
+    onRefresh: () => {
+      void fetchAssignments();
+      void fetchCounts();
+    },
+    fallbackInterval: 30000,
+  });
 
   const handleRefresh = async () => {
     setIsRefreshing(true);
