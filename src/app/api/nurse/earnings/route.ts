@@ -231,7 +231,7 @@ export async function POST(request: NextRequest) {
 
     // ═══ EMIT REAL-TIME EVENT ═══
     try {
-      await emitRealtimeEvent.withdrawalChanged(
+      emitRealtimeEvent.withdrawalChanged(
         withdrawalRequest._id.toString(),
         user.userId,
         'pending',

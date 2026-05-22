@@ -200,7 +200,7 @@ export default function AdminEmergenciesPage() {
   const { refresh: realtimeRefreshEmergencies } = useRealtimeRefresh({
     entities: ['emergency'],
     onRefresh: () => void fetchEmergencies(),
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   /* ── Fetch nearby nurses ── */

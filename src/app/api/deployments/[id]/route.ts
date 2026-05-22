@@ -341,7 +341,7 @@ export async function PATCH(
     // ── Emit real-time socket event ──
     try {
       const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-      await emitRealtimeEvent.deploymentChanged({
+      emitRealtimeEvent.deploymentChanged({
         deploymentId: id,
         status: body.status || deployment.status,
         creatorId: deployment.createdBy?.toString(),

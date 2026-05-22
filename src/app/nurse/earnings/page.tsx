@@ -119,7 +119,7 @@ export default function NurseEarningsPage() {
   useRealtimeRefresh({
     entities: ['payment', 'withdrawal'],
     onRefresh: () => void fetchEarnings(),
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   const openPayoutDialog = () => {

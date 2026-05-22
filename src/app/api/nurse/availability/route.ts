@@ -34,7 +34,7 @@ async function handleAvailability(request: NextRequest) {
     // ── Emit real-time socket event ──
     try {
       const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-      await emitRealtimeEvent.userChanged({
+      emitRealtimeEvent.userChanged({
         userId: user.userId,
         role: 'nurse',
         action: 'availability_changed',

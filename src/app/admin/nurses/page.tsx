@@ -339,7 +339,7 @@ export default function AdminNursesPage() {
   useRealtimeRefresh({
     entities: ['user'],
     onRefresh: () => void fetchNurses(),
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   useEffect(() => {

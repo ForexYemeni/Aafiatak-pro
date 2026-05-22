@@ -219,7 +219,7 @@ export async function PATCH(
     // ── Emit real-time socket event ──
     try {
       const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-      await emitRealtimeEvent.paymentChanged({
+      emitRealtimeEvent.paymentChanged({
         deploymentId: id,
         applicationId: applicationId,
         applicantId: application.applicantId.toString(),
@@ -229,7 +229,7 @@ export async function PATCH(
 
       // Also emit deployment change if verified (deployment status changes)
       if (verified) {
-        await emitRealtimeEvent.deploymentChanged({
+        emitRealtimeEvent.deploymentChanged({
           deploymentId: id,
           status: 'assigned',
           creatorId: deployment.createdBy?.toString(),

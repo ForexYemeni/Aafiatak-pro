@@ -112,7 +112,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // ── Emit real-time socket event ──
       try {
         const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-        await emitRealtimeEvent.emergencyStatusChanged({
+        emitRealtimeEvent.emergencyStatusChanged({
           emergencyRequestId: id,
           beneficiaryId: emergency.beneficiaryId?.toString(),
           nurseId: user.userId,
@@ -211,7 +211,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // ── Emit real-time socket event ──
       try {
         const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-        await emitRealtimeEvent.emergencyStatusChanged({
+        emitRealtimeEvent.emergencyStatusChanged({
           emergencyRequestId: id,
           beneficiaryId: emergency.beneficiaryId?.toString(),
           nurseId: user.userId,
@@ -358,7 +358,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // ── Emit real-time socket event ──
       try {
         const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-        await emitRealtimeEvent.emergencyStatusChanged({
+        emitRealtimeEvent.emergencyStatusChanged({
           emergencyRequestId: id,
           beneficiaryId: emergency.beneficiaryId?.toString(),
           nurseId: user.userId,
@@ -443,7 +443,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // ── Emit real-time socket event ──
       try {
         const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-        await emitRealtimeEvent.emergencyStatusChanged({
+        emitRealtimeEvent.emergencyStatusChanged({
           emergencyRequestId: id,
           beneficiaryId: emergency.beneficiaryId?.toString(),
           nurseId: user.userId,

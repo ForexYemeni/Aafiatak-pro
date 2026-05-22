@@ -140,7 +140,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
 
       // ═══ EMIT REAL-TIME EVENT ═══
       try {
-        await emitRealtimeEvent.orderStatusChanged(
+        emitRealtimeEvent.orderStatusChanged(
           { requestId: id, beneficiaryId: order.beneficiaryId?.toString(), nurseId: user.userId, status: 'accepted' },
           { changedBy: user.userId, changedByRole: 'nurse' }
         );
@@ -217,7 +217,7 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
 
       // ═══ EMIT REAL-TIME EVENT ═══
       try {
-        await emitRealtimeEvent.orderStatusChanged(
+        emitRealtimeEvent.orderStatusChanged(
           { requestId: id, beneficiaryId: order.beneficiaryId?.toString(), nurseId: user.userId, status: 'rejected' },
           { changedBy: user.userId, changedByRole: 'nurse' }
         );

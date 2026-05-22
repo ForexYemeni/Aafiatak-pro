@@ -85,7 +85,7 @@ export async function PATCH(request: NextRequest) {
 
     // ═══ EMIT REAL-TIME EVENT (profile update path) ═══
     try {
-      await emitRealtimeEvent.userChanged(
+      emitRealtimeEvent.userChanged(
         { userId: user.userId, role: 'nurse', action: 'updated' },
         { changedBy: user.userId, changedByRole: 'nurse' }
       );

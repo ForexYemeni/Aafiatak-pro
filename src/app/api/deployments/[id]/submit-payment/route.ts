@@ -162,7 +162,7 @@ export async function POST(
     // ── Emit real-time socket event ──
     try {
       const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-      await emitRealtimeEvent.paymentChanged({
+      emitRealtimeEvent.paymentChanged({
         deploymentId: id,
         applicationId: application._id.toString(),
         applicantId: user.userId,

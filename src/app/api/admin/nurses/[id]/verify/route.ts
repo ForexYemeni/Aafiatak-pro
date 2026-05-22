@@ -84,7 +84,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
 
     // ═══ EMIT REAL-TIME EVENT ═══
     try {
-      await emitRealtimeEvent.userChanged(
+      emitRealtimeEvent.userChanged(
         { userId: id, role: 'nurse', action: status === 'verified' ? 'verified' : 'updated' },
         { changedBy: user!.userId, changedByRole: user!.role }
       );

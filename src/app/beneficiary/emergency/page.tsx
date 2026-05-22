@@ -437,7 +437,7 @@ export default function EmergencyPage() {
   useRealtimeRefresh({
     entities: ['emergency'],
     onRefresh: () => void fetchActiveEmergency(),
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   // ─── Fetch emergency fee ───

@@ -209,7 +209,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // ── Emit real-time socket event ──
     try {
       const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-      await emitRealtimeEvent.orderCancelled({
+      emitRealtimeEvent.orderCancelled({
         requestId: id,
         beneficiaryId: user.userId,
         nurseId: order.nurseId?.toString(),

@@ -365,7 +365,7 @@ export async function POST(request: NextRequest) {
     // ── Emit real-time socket event ──
     try {
       const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-      await emitRealtimeEvent.deploymentChanged({
+      emitRealtimeEvent.deploymentChanged({
         deploymentId: deployment._id.toString(),
         status: 'open',
         creatorId: user!.userId,

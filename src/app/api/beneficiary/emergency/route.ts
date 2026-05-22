@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
 
     // ═══ EMIT REAL-TIME EVENT (supplement existing raw socket calls) ═══
     try {
-      await emitRealtimeEvent.emergencyCreated(
+      emitRealtimeEvent.emergencyCreated(
         {
           emergencyRequestId: emergency._id.toString(),
           beneficiaryId: user.userId,

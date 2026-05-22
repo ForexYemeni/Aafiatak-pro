@@ -75,7 +75,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         ...(transaction.beneficiaryId ? [transaction.beneficiaryId.toString()] : []),
         ...(transaction.nurseId ? [transaction.nurseId.toString()] : []),
       ];
-      await emitRealtimeEvent.transactionChanged(
+      emitRealtimeEvent.transactionChanged(
         id,
         userIds,
         body.status || 'updated',

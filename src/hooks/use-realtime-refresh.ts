@@ -10,7 +10,7 @@
 //   const { refresh } = useRealtimeRefresh({
 //     entities: ['order', 'emergency'],  // Which entities to listen for
 //     onRefresh: fetchOrders,            // Callback to refresh data
-//     fallbackInterval: 30000,           // Fallback polling when socket disconnected (default: 30s)
+//     fallbackInterval: 5000,           // Fallback polling when socket disconnected (default: 5s)
 //   });
 // ============================================================================
 
@@ -24,7 +24,7 @@ interface UseRealtimeRefreshOptions {
   entities: Array<'order' | 'emergency' | 'deployment' | 'application' | 'payment' | 'user' | 'notification' | 'withdrawal' | 'transaction' | 'complaint' | 'chat' | 'location' | 'rating'>;
   /** Callback function to refresh data */
   onRefresh: () => void | Promise<void>;
-  /** Fallback polling interval in ms when socket is disconnected (default: 30000) */
+  /** Fallback polling interval in ms when socket is disconnected (default: 5000) */
   fallbackInterval?: number;
   /** Whether to also listen for specific entity events (order_created, etc.) in addition to data_change */
   listenSpecificEvents?: boolean;
@@ -45,12 +45,13 @@ interface UseRealtimeRefreshReturn {
  * 4. Deduplicates rapid refresh calls (debounces within 500ms)
  *
  * This replaces the old pattern of `setInterval(fetchData, 15000)`.
+ * Falls back to 5s polling when socket is disconnected for near-instant UX.
  */
 export function useRealtimeRefresh(options: UseRealtimeRefreshOptions): UseRealtimeRefreshReturn {
   const {
     entities,
     onRefresh,
-    fallbackInterval = 30000,
+    fallbackInterval = 5000,
     listenSpecificEvents = true,
   } = options;
 

@@ -126,7 +126,7 @@ export async function POST(request: NextRequest) {
 
       // ═══ EMIT REAL-TIME EVENT (multipart path) ═══
       try {
-        await emitRealtimeEvent.userChanged(
+        emitRealtimeEvent.userChanged(
           { userId: user.userId, role: 'nurse', action: 'updated' },
           { changedBy: user.userId, changedByRole: 'nurse' }
         );
@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
 
     // ═══ EMIT REAL-TIME EVENT (JSON path) ═══
     try {
-      await emitRealtimeEvent.userChanged(
+      emitRealtimeEvent.userChanged(
         { userId: user.userId, role: 'nurse', action: 'updated' },
         { changedBy: user.userId, changedByRole: 'nurse' }
       );

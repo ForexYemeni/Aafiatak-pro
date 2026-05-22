@@ -107,7 +107,7 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     // ── Emit real-time socket event ──
     try {
       const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-      await emitRealtimeEvent.orderStatusChanged({
+      emitRealtimeEvent.orderStatusChanged({
         requestId: id,
         beneficiaryId: order.beneficiaryId?.toString(),
         nurseId: order.nurseId?.toString(),

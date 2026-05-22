@@ -3,9 +3,9 @@
 
 import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
-import { Nurse } from '@/models/mongoose';
+import { Nurse, ServiceRequest } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
-import { emitToAdmins } from '@/lib/notifications/socket-client';
+import { emitToAdmins, emitToUser } from '@/lib/notifications/socket-client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -35,20 +35,40 @@ export async function POST(request: NextRequest) {
 
     if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
 
-    // ═══ EMIT REAL-TIME EVENT ═══
-    // Use emitToAdmins directly for performance (location updates are frequent)
+    // ═══ EMIT REAL-TIME EVENT (fire-and-forget) ═══
+    const locationPayload = {
+      entity: 'location',
+      entityId: user.userId,
+      action: 'updated',
+      changedBy: user.userId,
+      changedByRole: 'nurse',
+      timestamp: new Date().toISOString(),
+      data: { nurseId: user.userId, lat, lng, updatedAt: nurse.locationUpdatedAt?.toISOString() },
+    };
+
+    // 1. Emit to admins room (admin + subadmin)
+    emitToAdmins('data_change', locationPayload).catch(() => {});
+
+    // 2. Emit to the beneficiary who has an active order with this nurse
+    // This is CRITICAL for the tracking page to get instant location updates
     try {
-      emitToAdmins('data_change', {
-        entity: 'location',
-        entityId: user.userId,
-        action: 'updated',
-        changedBy: user.userId,
-        changedByRole: 'nurse',
-        timestamp: new Date().toISOString(),
-        data: { nurseId: user.userId, lat, lng, updatedAt: nurse.locationUpdatedAt?.toISOString() },
-      }).catch(() => {});
+      const activeOrder = await ServiceRequest.findOne({
+        nurseId: user.userId,
+        status: { $in: ['assigned', 'accepted', 'in_progress'] },
+      }).select('beneficiaryId').lean();
+
+      if (activeOrder?.beneficiaryId) {
+        const beneficiaryId = activeOrder.beneficiaryId.toString();
+        emitToUser(beneficiaryId, 'data_change', locationPayload).catch(() => {});
+        emitToUser(beneficiaryId, 'location_update', {
+          nurseId: user.userId,
+          lat,
+          lng,
+          updatedAt: nurse.locationUpdatedAt?.toISOString(),
+        }).catch(() => {});
+      }
     } catch {
-      // Non-critical — socket server may be down
+      // Non-critical — beneficiary notification
     }
 
     return Response.json({

@@ -173,7 +173,7 @@ export async function POST(request: NextRequest) {
 
     // ═══ EMIT REAL-TIME EVENT ═══
     try {
-      await emitRealtimeEvent.orderStatusChanged(
+      emitRealtimeEvent.orderStatusChanged(
         { requestId, beneficiaryId: user.userId, nurseId, status: 'rated' },
         { changedBy: user.userId, changedByRole: 'beneficiary' }
       );

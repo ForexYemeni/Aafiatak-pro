@@ -230,7 +230,7 @@ export default function AdminOrdersPage() {
   const { refresh: realtimeRefreshOrders } = useRealtimeRefresh({
     entities: ['order'],
     onRefresh: () => void fetchOrders(),
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   const fetchAvailableNurses = async (orderLat?: number, orderLng?: number) => {

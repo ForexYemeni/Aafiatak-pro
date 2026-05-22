@@ -133,7 +133,7 @@ export async function PATCH(
 
     // ═══ EMIT REAL-TIME EVENT ═══
     try {
-      await emitRealtimeEvent.withdrawalChanged(
+      emitRealtimeEvent.withdrawalChanged(
         id,
         withdrawal.nurseId.toString(),
         status,

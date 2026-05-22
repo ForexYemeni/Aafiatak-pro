@@ -42,7 +42,7 @@ async function sendToSocketServer(
         'X-Internal-API-Key': INTERNAL_API_KEY,
       },
       body: JSON.stringify(data),
-      signal: AbortSignal.timeout(3000), // 3 second timeout
+      signal: AbortSignal.timeout(500), // 500ms timeout - fail fast when socket server is down
     });
 
     if (!response.ok) {

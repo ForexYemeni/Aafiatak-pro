@@ -220,11 +220,11 @@ export async function PATCH(
     // ═══ EMIT REAL-TIME EVENT ═══
     try {
       const role = user.role || 'admin';
-      await emitRealtimeEvent.applicationChanged(
+      emitRealtimeEvent.applicationChanged(
         { deploymentId: id, applicationId, applicantId: application.applicantId.toString(), status: 'accepted' },
         { changedBy: user.userId, changedByRole: role }
       );
-      await emitRealtimeEvent.deploymentChanged(
+      emitRealtimeEvent.deploymentChanged(
         { deploymentId: id, status: 'assigned', creatorId: deployment.createdBy?.toString() },
         { changedBy: user.userId, changedByRole: role }
       );

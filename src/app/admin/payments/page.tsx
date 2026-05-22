@@ -233,7 +233,7 @@ export default function AdminPaymentsPage() {
       void fetchTransactions();
       void fetchSummary();
     },
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   useEffect(() => {

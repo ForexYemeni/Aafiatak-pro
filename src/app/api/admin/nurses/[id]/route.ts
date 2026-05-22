@@ -103,7 +103,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
       // ═══ EMIT REAL-TIME EVENT ═══
       try {
-        await emitRealtimeEvent.userChanged(
+        emitRealtimeEvent.userChanged(
           { userId: id, role: 'nurse', action: isBlocked ? 'blocked' : 'unblocked' },
           { changedBy: user!.userId, changedByRole: user!.role }
         );
@@ -135,7 +135,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
 
     // ═══ EMIT REAL-TIME EVENT ═══
     try {
-      await emitRealtimeEvent.userChanged(
+      emitRealtimeEvent.userChanged(
         { userId: id, role: 'nurse', action: 'updated' },
         { changedBy: user!.userId, changedByRole: user!.role }
       );
@@ -180,7 +180,7 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
 
     // ═══ EMIT REAL-TIME EVENT ═══
     try {
-      await emitRealtimeEvent.userChanged(
+      emitRealtimeEvent.userChanged(
         { userId: id, role: 'nurse', action: 'deleted' },
         { changedBy: user!.userId, changedByRole: user!.role }
       );

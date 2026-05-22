@@ -103,14 +103,17 @@ export default function TrackingPage() {
 
   useEffect(() => {
     fetchTracking();
+    // Fast auto-refresh every 5 seconds for live tracking
+    const interval = setInterval(fetchTracking, 5000);
+    return () => clearInterval(interval);
   }, [fetchTracking]);
 
   // Real-time refresh via socket events (location/order changes)
-  // Falls back to polling only when socket is disconnected
+  // Socket provides instant updates when available; 5s polling ensures reliability
   useRealtimeRefresh({
     entities: ['location', 'order'],
     onRefresh: fetchTracking,
-    fallbackInterval: 15000,
+    fallbackInterval: 5000,
   });
 
   if (isLoading) {

@@ -297,7 +297,7 @@ export default function OrdersPage() {
       void fetchCounts();
       void fetchEmergencies();
     },
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   // Compute emergency counts by tab

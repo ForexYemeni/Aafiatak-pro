@@ -303,7 +303,7 @@ export default function NurseDeploymentsPage() {
   useRealtimeRefresh({
     entities: ['deployment', 'application', 'payment'],
     onRefresh: () => void refetchDeployments(),
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   /* ── Fetch admin settings for commission ── */

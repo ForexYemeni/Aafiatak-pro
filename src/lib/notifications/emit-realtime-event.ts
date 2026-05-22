@@ -7,8 +7,8 @@
 //
 // USAGE in API routes:
 //   import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
-//   await emitRealtimeEvent.orderCreated(orderData, { changedBy: userId, changedByRole: 'admin' });
-//   await emitRealtimeEvent.paymentUpdated(deploymentId, applicationId, applicantId, status, action, { changedBy, changedByRole });
+//   emitRealtimeEvent.orderCreated(orderData, { changedBy: userId, changedByRole: 'admin' });
+//   emitRealtimeEvent.paymentUpdated(deploymentId, applicationId, applicantId, status, action, { changedBy, changedByRole });
 // ============================================================================
 
 import {
@@ -84,7 +84,7 @@ interface UserEventData {
  * Emit a generic `data_change` event to the admins room + specific user rooms.
  * This is the universal mechanism that triggers cache invalidation on all clients.
  */
-async function emitDataChange(
+function emitDataChange(
   entity: 'order' | 'emergency' | 'deployment' | 'application' | 'payment' | 'user' | 'notification' | 'withdrawal' | 'transaction' | 'complaint' | 'chat' | 'location' | 'rating',
   entityId: string,
   action: 'created' | 'updated' | 'deleted' | 'status_changed',
@@ -92,7 +92,7 @@ async function emitDataChange(
   meta: ChangeMeta,
   /** Additional user IDs to notify directly (e.g., beneficiary, nurse) */
   notifyUserIds: string[] = []
-): Promise<void> {
+): void {
   const timestamp = new Date().toISOString();
 
   const dataChangePayload = {
@@ -156,8 +156,8 @@ export const emitRealtimeEvent = {
       }).catch(() => {});
     }
 
-    // Generic data_change
-    await emitDataChange('order', order.requestId, 'created', order as Record<string, unknown>, meta, notifyUserIds);
+    // Generic data_change (fire-and-forget)
+    emitDataChange('order', order.requestId, 'created', order as Record<string, unknown>, meta, notifyUserIds);
   },
 
   /** Emit when an order's status changes */
@@ -181,8 +181,8 @@ export const emitRealtimeEvent = {
       }).catch(() => {});
     }
 
-    // Generic data_change
-    await emitDataChange('order', order.requestId, 'status_changed', order as Record<string, unknown>, meta, notifyUserIds);
+    // Generic data_change (fire-and-forget)
+    emitDataChange('order', order.requestId, 'status_changed', order as Record<string, unknown>, meta, notifyUserIds);
   },
 
   /** Emit when an order is assigned to a nurse */
@@ -215,7 +215,7 @@ export const emitRealtimeEvent = {
       }).catch(() => {});
     }
 
-    await emitDataChange('order', order.requestId, 'updated', order as Record<string, unknown>, meta || { changedBy: '', changedByRole: '' }, notifyUserIds);
+    emitDataChange('order', order.requestId, 'updated', order as Record<string, unknown>, meta || { changedBy: '', changedByRole: '' }, notifyUserIds);
   },
 
   /** Emit when an order is cancelled */
@@ -238,7 +238,7 @@ export const emitRealtimeEvent = {
       }).catch(() => {});
     }
 
-    await emitDataChange('order', order.requestId, 'status_changed', { ...order, cancelReason } as Record<string, unknown>, meta || { changedBy: '', changedByRole: '' }, notifyUserIds);
+    emitDataChange('order', order.requestId, 'status_changed', { ...order, cancelReason } as Record<string, unknown>, meta || { changedBy: '', changedByRole: '' }, notifyUserIds);
   },
 
   /** Emit when payment status changes on an order */
@@ -260,7 +260,7 @@ export const emitRealtimeEvent = {
       }).catch(() => {});
     }
 
-    await emitDataChange('order', order.requestId, 'updated', order as Record<string, unknown>, meta, notifyUserIds);
+    emitDataChange('order', order.requestId, 'updated', order as Record<string, unknown>, meta, notifyUserIds);
   },
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -283,7 +283,7 @@ export const emitRealtimeEvent = {
       location: emergency.beneficiaryId, // Simplified - frontend will fetch full data
     }).catch(() => {});
 
-    await emitDataChange('emergency', emergency.emergencyRequestId, 'created', emergency as Record<string, unknown>, meta, notifyUserIds);
+    emitDataChange('emergency', emergency.emergencyRequestId, 'created', emergency as Record<string, unknown>, meta, notifyUserIds);
   },
 
   /** Emit when emergency status changes (dispatched, in_progress, resolved, cancelled) */
@@ -315,7 +315,7 @@ export const emitRealtimeEvent = {
       }).catch(() => {});
     }
 
-    await emitDataChange('emergency', emergency.emergencyRequestId, 'status_changed', emergency as Record<string, unknown>, meta, notifyUserIds);
+    emitDataChange('emergency', emergency.emergencyRequestId, 'status_changed', emergency as Record<string, unknown>, meta, notifyUserIds);
   },
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -343,7 +343,7 @@ export const emitRealtimeEvent = {
       }).catch(() => {});
     }
 
-    await emitDataChange('deployment', deployment.deploymentId, 'updated', deployment as Record<string, unknown>, meta, notifyUserIds);
+    emitDataChange('deployment', deployment.deploymentId, 'updated', deployment as Record<string, unknown>, meta, notifyUserIds);
   },
 
   /** Emit when an application status changes */
@@ -369,7 +369,7 @@ export const emitRealtimeEvent = {
       }).catch(() => {});
     }
 
-    await emitDataChange('application', application.applicationId, 'updated', application as Record<string, unknown>, meta, notifyUserIds);
+    emitDataChange('application', application.applicationId, 'updated', application as Record<string, unknown>, meta, notifyUserIds);
   },
 
   // ──────────────────────────────────────────────────────────────────────────
@@ -402,7 +402,7 @@ export const emitRealtimeEvent = {
       }).catch(() => {});
     }
 
-    await emitDataChange('payment', payment.applicationId, 'updated', payment as Record<string, unknown>, meta, notifyUserIds);
+    emitDataChange('payment', payment.applicationId, 'updated', payment as Record<string, unknown>, meta, notifyUserIds);
   },
 
   // ──────────────────────────────────────────────────────────────────────────

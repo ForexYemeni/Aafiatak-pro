@@ -263,7 +263,7 @@ export default function AdminDashboardPage() {
   useRealtimeRefresh({
     entities: ['order', 'emergency', 'deployment'],
     onRefresh: () => void fetchDashboard(true),
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   // Quick search handler

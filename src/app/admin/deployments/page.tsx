@@ -235,7 +235,7 @@ export default function AdminDeploymentsPage() {
   useRealtimeRefresh({
     entities: ['deployment', 'application', 'payment'],
     onRefresh: () => void fetchDeployments(),
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   useEffect(() => {

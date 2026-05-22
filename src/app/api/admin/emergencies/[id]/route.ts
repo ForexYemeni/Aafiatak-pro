@@ -279,7 +279,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // ── Emit real-time socket event ──
     try {
       const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-      await emitRealtimeEvent.emergencyStatusChanged({
+      emitRealtimeEvent.emergencyStatusChanged({
         emergencyRequestId: id,
         beneficiaryId: (emergency as any).beneficiaryId?.toString(),
         nurseId: (emergency as any).nurseId?.toString(),

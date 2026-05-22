@@ -312,7 +312,7 @@ export default function NurseTasksPage() {
       void fetchAssignments();
       void fetchCounts();
     },
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   const handleRefresh = async () => {

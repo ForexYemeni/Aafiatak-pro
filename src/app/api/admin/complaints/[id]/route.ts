@@ -65,7 +65,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     // ═══ EMIT REAL-TIME EVENT ═══
     try {
       const beneficiaryId = (complaint as any).fromUserId?.toString() || '';
-      await emitRealtimeEvent.complaintChanged(
+      emitRealtimeEvent.complaintChanged(
         id,
         beneficiaryId,
         body.status || 'updated',

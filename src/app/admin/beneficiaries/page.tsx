@@ -153,7 +153,7 @@ export default function AdminBeneficiariesPage() {
   useRealtimeRefresh({
     entities: ['user'],
     onRefresh: () => void fetchBeneficiaries(),
-    fallbackInterval: 30000,
+    fallbackInterval: 5000,
   });
 
   const handleToggle = async () => {

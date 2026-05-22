@@ -150,7 +150,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // ── Emit real-time socket event ──
       try {
         const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-        await emitRealtimeEvent.orderStatusChanged({
+        emitRealtimeEvent.orderStatusChanged({
           requestId: id,
           beneficiaryId: order.beneficiaryId?.toString(),
           nurseId: order.nurseId?.toString(),
@@ -240,7 +240,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       // ── Emit real-time socket event ──
       try {
         const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
-        await emitRealtimeEvent.orderCancelled({
+        emitRealtimeEvent.orderCancelled({
           requestId: id,
           beneficiaryId: order.beneficiaryId?.toString(),
           nurseId: order.nurseId?.toString(),
@@ -348,7 +348,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     try {
       const { emitRealtimeEvent } = await import('@/lib/notifications/emit-realtime-event');
       if (body.paymentStatus) {
-        await emitRealtimeEvent.orderPaymentUpdated({
+        emitRealtimeEvent.orderPaymentUpdated({
           requestId: id,
           beneficiaryId: (order as any).beneficiaryId?.toString(),
           nurseId: (order as any).nurseId?.toString(),
@@ -356,7 +356,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
           paymentStatus: body.paymentStatus,
         }, { changedBy: user!.userId, changedByRole: user!.role });
       } else if (body.status) {
-        await emitRealtimeEvent.orderStatusChanged({
+        emitRealtimeEvent.orderStatusChanged({
           requestId: id,
           beneficiaryId: (order as any).beneficiaryId?.toString(),
           nurseId: (order as any).nurseId?.toString(),

@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
 
     // ═══ EMIT REAL-TIME EVENT ═══
     try {
-      await emitRealtimeEvent.complaintChanged(
+      emitRealtimeEvent.complaintChanged(
         complaint._id.toString(),
         user.userId,
         'open',
