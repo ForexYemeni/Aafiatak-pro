@@ -206,7 +206,7 @@ export function useGeolocation(): UseGeolocationReturn {
       // ────────────────────────────────────────────────
       const position = await getPosition({
         enableHighAccuracy: false,
-        timeout: 8000,
+        timeout: 20000, // 20s - generous timeout for slow GPS devices
         maximumAge: 300000,
       });
 
@@ -237,7 +237,7 @@ export function useGeolocation(): UseGeolocationReturn {
       // ────────────────────────────────────────────────
       getPosition({
         enableHighAccuracy: true,
-        timeout: 15000,
+        timeout: 30000, // 30s for high-accuracy GPS
         maximumAge: 0,
       })
         .then((precisePos) => {

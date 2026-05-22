@@ -732,7 +732,7 @@ export default function AdminOrdersPage() {
   return (
     <motion.div variants={container} initial="hidden" animate="show" className="space-y-6">
       <motion.div variants={itemAnim}>
-        <PageHeader title="إدارة الطلبات" description="عرض وإدارة طلبات الخدمة - تحديث تلقائي كل ١٥ ثانية" />
+        <PageHeader title="إدارة الطلبات" description="عرض وإدارة طلبات الخدمة - تحديث فوري لحظي" />
       </motion.div>
 
       {/* Stats Cards */}

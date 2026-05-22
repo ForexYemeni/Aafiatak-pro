@@ -4,27 +4,27 @@
 // عافيتك (Aafiatak) - Universal Real-time Refresh Hook
 // ============================================================================
 // Provides instant data refresh for any page when Socket.IO events arrive.
-// Replaces the old 15-second polling with event-driven + fallback polling.
+// ALWAYS polls at the specified interval as a baseline, with Socket.IO events
+// providing instant (sub-second) refresh when the socket server is running.
 //
 // USAGE:
 //   const { refresh } = useRealtimeRefresh({
 //     entities: ['order', 'emergency'],  // Which entities to listen for
 //     onRefresh: fetchOrders,            // Callback to refresh data
-//     fallbackInterval: 5000,           // Fallback polling when socket disconnected (default: 5s)
+//     fallbackInterval: 5000,           // Always polls every 5s (default: 5s)
 //   });
 // ============================================================================
 
 import { useEffect, useCallback, useRef } from 'react';
 import { socketService as socketServiceV2 } from '@/lib/socket-v2';
 import type { DataChangeEvent } from '@/lib/socket-v2';
-import { useAuthStore } from '@/lib/stores/auth-store';
 
 interface UseRealtimeRefreshOptions {
   /** Which entity types to listen for changes */
   entities: Array<'order' | 'emergency' | 'deployment' | 'application' | 'payment' | 'user' | 'notification' | 'withdrawal' | 'transaction' | 'complaint' | 'chat' | 'location' | 'rating'>;
   /** Callback function to refresh data */
   onRefresh: () => void | Promise<void>;
-  /** Fallback polling interval in ms when socket is disconnected (default: 5000) */
+  /** Polling interval in ms - ALWAYS polls at this rate (default: 5000) */
   fallbackInterval?: number;
   /** Whether to also listen for specific entity events (order_created, etc.) in addition to data_change */
   listenSpecificEvents?: boolean;
@@ -39,13 +39,12 @@ interface UseRealtimeRefreshReturn {
  * Hook that provides instant data refresh when Socket.IO events arrive.
  *
  * This hook:
- * 1. Listens for `data_change` events matching the specified entities
- * 2. Calls `onRefresh` immediately when a matching event arrives
- * 3. Falls back to polling when socket is disconnected
- * 4. Deduplicates rapid refresh calls (debounces within 500ms)
+ * 1. ALWAYS polls at the specified interval (5s default) as a reliable baseline
+ * 2. Listens for `data_change` events for instant (sub-second) updates when socket works
+ * 3. Deduplicates rapid refresh calls (debounces within 50ms)
  *
- * This replaces the old pattern of `setInterval(fetchData, 15000)`.
- * Falls back to 5s polling when socket is disconnected for near-instant UX.
+ * The polling NEVER stops — it ensures data is always fresh even when
+ * the socket server is down (e.g., on Vercel serverless deployment).
  */
 export function useRealtimeRefresh(options: UseRealtimeRefreshOptions): UseRealtimeRefreshReturn {
   const {
@@ -59,9 +58,8 @@ export function useRealtimeRefresh(options: UseRealtimeRefreshOptions): UseRealt
   onRefreshRef.current = onRefresh;
 
   const lastRefreshRef = useRef(0);
-  const debounceMs = 50; // Near-instant: 50ms debounce (was 500ms — too slow for real-time UX)
-  const isConnectedRef = useRef(false);
-  const fallbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const debounceMs = 50; // Near-instant: 50ms debounce
+  const pollingTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /** Debounced refresh - prevents rapid successive calls */
   const debouncedRefresh = useCallback(() => {
@@ -90,7 +88,7 @@ export function useRealtimeRefresh(options: UseRealtimeRefreshOptions): UseRealt
     void onRefreshRef.current();
   }, []);
 
-  // ── Listen for generic data_change events ──
+  // ── Listen for generic data_change events (instant when socket works) ──
   useEffect(() => {
     const entitySet = new Set(entities);
 
@@ -147,63 +145,30 @@ export function useRealtimeRefresh(options: UseRealtimeRefreshOptions): UseRealt
     };
   }, [entities, listenSpecificEvents, debouncedRefresh]);
 
-  // ── Track socket connection state ──
+  // ── ALWAYS poll at the specified interval ──
+  // This is the reliable baseline - Socket.IO events provide instant bonus when available,
+  // but polling ensures data is ALWAYS fresh regardless of socket status.
   useEffect(() => {
-    const unsub = socketServiceV2.onConnectionStateChange((state) => {
-      const wasConnected = isConnectedRef.current;
-      isConnectedRef.current = state === 'connected';
+    // Start polling immediately
+    pollingTimerRef.current = setInterval(() => {
+      void onRefreshRef.current();
+    }, fallbackInterval);
 
-      // If we just reconnected, do an immediate refresh
-      if (!wasConnected && state === 'connected') {
+    // Refresh on socket reconnection (bonus instant refresh)
+    const unsub = socketServiceV2.onConnectionStateChange((state) => {
+      if (state === 'connected') {
         debouncedRefresh();
       }
     });
 
-    return unsub;
-  }, [debouncedRefresh]);
-
-  // ── Fallback polling when socket is disconnected ──
-  useEffect(() => {
-    const startFallbackPolling = () => {
-      if (fallbackTimerRef.current) return; // Already polling
-
-      fallbackTimerRef.current = setInterval(() => {
-        if (!isConnectedRef.current) {
-          // Socket not connected — use fallback polling
-          void onRefreshRef.current();
-        }
-      }, fallbackInterval);
-    };
-
-    const stopFallbackPolling = () => {
-      if (fallbackTimerRef.current) {
-        clearInterval(fallbackTimerRef.current);
-        fallbackTimerRef.current = null;
-      }
-    };
-
-    // Start fallback polling
-    startFallbackPolling();
-
-    // Also listen for connection state to adjust polling
-    const unsub = socketServiceV2.onConnectionStateChange((state) => {
-      if (state === 'connected') {
-        // Socket connected — stop polling entirely, rely on real-time events only
-        stopFallbackPolling();
-      } else {
-        // Socket disconnected — use fallback polling
-        stopFallbackPolling();
-        fallbackTimerRef.current = setInterval(() => {
-          void onRefreshRef.current();
-        }, fallbackInterval);
-      }
-    });
-
     return () => {
-      stopFallbackPolling();
+      if (pollingTimerRef.current) {
+        clearInterval(pollingTimerRef.current);
+        pollingTimerRef.current = null;
+      }
       unsub();
     };
-  }, [fallbackInterval]);
+  }, [fallbackInterval, debouncedRefresh]);
 
   return { refresh };
 }

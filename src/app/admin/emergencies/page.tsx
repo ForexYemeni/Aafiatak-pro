@@ -359,7 +359,7 @@ export default function AdminEmergenciesPage() {
       <motion.div variants={itemAnim}>
         <PageHeader
           title="إدارة الطوارئ"
-          description="متابعة وإدارة طلبات الطوارئ - تحديث تلقائي كل ١٥ ثانية"
+          description="متابعة وإدارة طلبات الطوارئ - تحديث فوري لحظي"
         />
       </motion.div>
 
