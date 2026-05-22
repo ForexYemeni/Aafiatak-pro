@@ -355,7 +355,7 @@ export interface PaymentUpdatedEvent {
 
 /** Generic data change event for any entity */
 export interface DataChangeEvent {
-  entity: 'deployment' | 'application' | 'payment' | 'order' | 'emergency' | 'user' | 'notification';
+  entity: 'deployment' | 'application' | 'payment' | 'order' | 'emergency' | 'user' | 'notification' | 'chat' | 'location' | 'rating' | 'withdrawal' | 'transaction' | 'complaint';
   entityId: string;
   action: 'created' | 'updated' | 'deleted' | 'status_changed';
   changedBy: string;

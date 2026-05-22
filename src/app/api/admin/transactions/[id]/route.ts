@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Transaction, Beneficiary, Nurse } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -67,6 +68,22 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       details: `تحديث حالة المعاملة إلى: ${body.status || 'محدث'}`,
       request,
     });
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      const userIds = [
+        ...(transaction.beneficiaryId ? [transaction.beneficiaryId.toString()] : []),
+        ...(transaction.nurseId ? [transaction.nurseId.toString()] : []),
+      ];
+      await emitRealtimeEvent.transactionChanged(
+        id,
+        userIds,
+        body.status || 'updated',
+        { changedBy: user!.userId, changedByRole: user!.role }
+      );
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({ success: true, data: serializeDoc(transaction), message: 'تم تحديث المعاملة بنجاح' });
   } catch (error) {

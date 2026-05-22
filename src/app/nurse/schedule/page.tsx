@@ -28,6 +28,7 @@ import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { toArabicNum, formatDateOnly, formatTimeOnly } from '@/components/common/date-formatter';
 
 // ---- Types ----
@@ -158,6 +159,8 @@ export default function NurseSchedulePage() {
       setIsLoading(false);
     }
   }, [authFetch, weekDates]);
+
+  useRealtimeRefresh({ entities: ['deployment', 'emergency', 'application'], onRefresh: fetchSchedule });
 
   useEffect(() => {
     setIsLoading(true);

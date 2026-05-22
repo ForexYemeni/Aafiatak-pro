@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Complaint } from '@/models/mongoose';
 import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 import { serializeDoc } from '@/lib/mongoose/serialize';
 
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -60,6 +61,19 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       details: `تحديث الشكوى: ${body.status ? `الحالة=${body.status}` : ''} ${body.resolution ? `الحل=${body.resolution}` : ''}`,
       request,
     });
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      const beneficiaryId = (complaint as any).fromUserId?.toString() || '';
+      await emitRealtimeEvent.complaintChanged(
+        id,
+        beneficiaryId,
+        body.status || 'updated',
+        { changedBy: user!.userId, changedByRole: user!.role }
+      );
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({
       success: true,

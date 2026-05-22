@@ -7,6 +7,7 @@ import { User } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { hashPassword, verifyPassword } from '@/lib/auth';
 import { logActivity } from '@/lib/api/helpers';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
@@ -115,6 +116,8 @@ export async function PATCH(request: NextRequest) {
       details: 'تحديث بيانات الملف الشخصي',
       request,
     });
+
+    emitToAdmins('data_change', { entity: 'user', entityId: user.userId, action: 'updated', timestamp: new Date().toISOString() }).catch(() => {});
 
     return Response.json({
       success: true,

@@ -10,6 +10,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useAuthFetch, invalidateAuthFetchCache } from '@/hooks/use-auth';
 import { useSocket } from '@/hooks/use-socket';
@@ -142,32 +143,6 @@ export default function ChatDetailPage() {
       method: 'POST',
       body: JSON.stringify({ type: 'chat', chatId }),
     }).catch(() => {});
-  }, [chatId, authFetch]);
-
-  // Polling — smart merge preserving optimistic + recently confirmed messages
-  useEffect(() => {
-    if (!chatId) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await authFetch(`/api/chat/${chatId}/messages?limit=50`);
-        const data = await res.json();
-        if (data.success && data.data) {
-          const msgs: ChatMessage[] = data.data.messages || data.data;
-          if (Array.isArray(msgs)) {
-            setMessages((prev) => {
-              const serverIds = new Set(msgs.map((m) => m.id));
-              const stillPending = prev.filter((m) => (m.isPending || m.isFailed) && !serverIds.has(m.id));
-              // Also keep confirmed messages not yet in server response (cache timing)
-              const confirmedNotInServer = prev.filter((m) => !m.isPending && !m.isFailed && !serverIds.has(m.id));
-              return [...msgs, ...confirmedNotInServer, ...stillPending];
-            });
-          }
-        }
-      } catch {
-        // silently handle
-      }
-    }, 3000);
-    return () => clearInterval(interval);
   }, [chatId, authFetch]);
 
   // Socket listeners for real-time messages
@@ -315,7 +290,7 @@ export default function ChatDetailPage() {
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
+      <PullToRefresh onRefresh={fetchMessages} className="flex-1 p-4 space-y-3">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="w-8 h-8 text-beneficiary animate-spin" />
@@ -386,7 +361,7 @@ export default function ChatDetailPage() {
           </motion.div>
         )}
         <div ref={messagesEndRef} />
-      </div>
+      </PullToRefresh>
 
       {/* Send Error Banner */}
       <AnimatePresence>

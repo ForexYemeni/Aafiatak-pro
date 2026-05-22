@@ -13,6 +13,7 @@ import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { ListSkeleton } from '@/components/common/loading-skeleton';
 import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { getRelativeTime, toArabicNum } from '@/components/common/date-formatter';
 import Link from 'next/link';
@@ -53,11 +54,10 @@ export default function NurseChatPage() {
     }
   }, [authFetch]);
 
+  useRealtimeRefresh({ entities: ['chat'], onRefresh: fetchChats });
+
   useEffect(() => {
     fetchChats();
-    // Auto-refresh every 10 seconds for new messages
-    const interval = setInterval(fetchChats, 10000);
-    return () => clearInterval(interval);
   }, [fetchChats]);
 
   const filteredChats = chats.filter((chat) => {

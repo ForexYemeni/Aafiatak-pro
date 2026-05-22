@@ -12,6 +12,7 @@ import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { CardSkeleton } from '@/components/common/loading-skeleton';
 import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { toArabicNum, formatDateOnly, getRelativeTime } from '@/components/common/date-formatter';
 
@@ -112,6 +113,8 @@ export default function NurseRatingsPage() {
       setIsLoading(false);
     }
   }, [authFetch]);
+
+  useRealtimeRefresh({ entities: ['order', 'emergency'], onRefresh: fetchRatings });
 
   useEffect(() => {
     fetchRatings();

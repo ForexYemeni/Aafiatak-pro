@@ -7,6 +7,7 @@ import { Nurse, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function POST(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -80,6 +81,16 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
       details: status === 'verified' ? `توثيق الممرض: ${nurse.name}` : `رفض توثيق الممرض: ${nurse.name}`,
       request,
     });
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      await emitRealtimeEvent.userChanged(
+        { userId: id, role: 'nurse', action: status === 'verified' ? 'verified' : 'updated' },
+        { changedBy: user!.userId, changedByRole: user!.role }
+      );
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({
       success: true,

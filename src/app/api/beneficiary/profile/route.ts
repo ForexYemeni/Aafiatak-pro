@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Beneficiary } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { serializeDoc } from '@/lib/mongoose/serialize';
+import { emitToAdmins, emitToUser } from '@/lib/notifications/socket-client';
 
 export async function GET(request: NextRequest) {
   try {
@@ -52,6 +53,9 @@ export async function PATCH(request: NextRequest) {
 
     const beneficiary = await Beneficiary.findByIdAndUpdate(user.userId, body, { new: true }).select('-password').lean();
     if (!beneficiary) return createErrorResponse('المستفيد غير موجود', 404, 'NOT_FOUND');
+
+    emitToAdmins('data_change', { entity: 'user', entityId: user.userId, action: 'updated', timestamp: new Date().toISOString() }).catch(() => {});
+    emitToUser(user.userId, 'data_change', { entity: 'user', entityId: user.userId, action: 'updated', timestamp: new Date().toISOString() }).catch(() => {});
 
     return Response.json({
       success: true,

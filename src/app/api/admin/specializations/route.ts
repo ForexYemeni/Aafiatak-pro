@@ -5,6 +5,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Specialization } from '@/models/mongoose/Specialization';
 import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { DEFAULT_SPECIALIZATIONS } from '@/lib/constants';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 export async function GET(request: NextRequest) {
   try {
@@ -67,6 +68,8 @@ export async function POST(request: NextRequest) {
     const spec = await Specialization.create({
       id, label, category, isActive: true, isDefault: false, order,
     });
+
+    emitToAdmins('data_change', { entity: 'specialization', entityId: id, action: 'created', timestamp: new Date().toISOString() }).catch(() => {});
 
     return Response.json({ success: true, data: spec }, { status: 201 });
   } catch (error) {

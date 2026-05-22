@@ -7,6 +7,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Nurse, Transaction, WithdrawalRequest, AdminSettings, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
@@ -226,6 +227,18 @@ export async function POST(request: NextRequest) {
       }
     } catch {
       // Non-critical
+    }
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      await emitRealtimeEvent.withdrawalChanged(
+        withdrawalRequest._id.toString(),
+        user.userId,
+        'pending',
+        { changedBy: user.userId, changedByRole: 'nurse' }
+      );
+    } catch {
+      // Non-critical — socket server may be down
     }
 
     return Response.json({

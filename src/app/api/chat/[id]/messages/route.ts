@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Chat, ChatMessage } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { emitToChat, emitToUser } from '@/lib/notifications/socket-client';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -114,6 +115,38 @@ export async function POST(request: NextRequest, { params }: { params: Promise<{
     }
 
     await chat.save();
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      const messageId = message._id.toString();
+      const chatIdStr = id;
+      const messagePayload = {
+        messageId,
+        chatId: chatIdStr,
+        senderId: user.userId,
+        senderRole: user.role,
+        content: content || '',
+        type: type || (imageUrl ? 'image' : 'text'),
+        imageUrl: imageUrl || null,
+        createdAt: new Date().toISOString(),
+      };
+      // Emit to the chat room so all participants receive the message instantly
+      emitToChat(chatIdStr, 'chat_message', messagePayload).catch(() => {});
+      // Also emit to each participant's personal room for offline notifications
+      for (const participant of chat.participants) {
+        if (participant.userId.toString() !== user.userId) {
+          emitToUser(participant.userId.toString(), 'chat_message_received', {
+            chatId: chatIdStr,
+            fromUserId: user.userId,
+            fromUserRole: user.role,
+            preview: (content || '[صورة]').substring(0, 50),
+            createdAt: new Date().toISOString(),
+          }).catch(() => {});
+        }
+      }
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({
       success: true,

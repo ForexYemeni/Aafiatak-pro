@@ -20,8 +20,10 @@ import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { GlassCard } from '@/components/common/glass-card';
 import { BadgeStatus } from '@/components/common/badge-status';
+import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { useAuthStore } from '@/lib/stores/auth-store';
 import { useToast } from '@/hooks/use-toast';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 
 interface NurseInfo {
   name: string;
@@ -101,10 +103,15 @@ export default function TrackingPage() {
 
   useEffect(() => {
     fetchTracking();
-    // Auto-refresh every 5 seconds
-    const interval = setInterval(fetchTracking, 5000);
-    return () => clearInterval(interval);
   }, [fetchTracking]);
+
+  // Real-time refresh via socket events (location/order changes)
+  // Falls back to polling only when socket is disconnected
+  useRealtimeRefresh({
+    entities: ['location', 'order'],
+    onRefresh: fetchTracking,
+    fallbackInterval: 15000,
+  });
 
   if (isLoading) {
     return (
@@ -130,7 +137,7 @@ export default function TrackingPage() {
   }
 
   return (
-    <div className="space-y-4 -m-4 md:-m-6">
+    <PullToRefresh onRefresh={fetchTracking} className="space-y-4 -m-4 md:-m-6 min-h-screen">
       {/* Full-screen Map Area */}
       <div className="relative w-full h-[50vh] bg-muted flex items-center justify-center">
         {/* Map placeholder */}
@@ -318,11 +325,11 @@ export default function TrackingPage() {
           <div className="bg-beneficiary/5 rounded-xl p-3 flex items-start gap-2">
             <CheckCircle2 className="w-4 h-4 text-beneficiary mt-0.5 shrink-0" />
             <p className="text-xs text-muted-foreground">
-              يتم تحديث الموقع تلقائياً كل 5 ثوانٍ. يمكنك الاتصال بالممرض مباشرة أو مراسلته عبر المحادثة.
+              يتم تحديث الموقع تلقائياً في الوقت الفعلي. يمكنك الاتصال بالممرض مباشرة أو مراسلته عبر المحادثة.
             </p>
           </div>
         </div>
       )}
-    </div>
+    </PullToRefresh>
   );
 }

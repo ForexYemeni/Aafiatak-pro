@@ -22,6 +22,7 @@ import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { ListSkeleton } from '@/components/common/loading-skeleton';
 import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 import { useNotifications } from '@/hooks/use-socket';
 import { formatDateOnly, getRelativeTime, toArabicNum } from '@/components/common/date-formatter';
 
@@ -152,6 +153,8 @@ export default function NurseNotificationsPage() {
       setIsLoading(false);
     }
   }, [authFetch]);
+
+  useRealtimeRefresh({ entities: ['notification'], onRefresh: fetchNotifications });
 
   useEffect(() => {
     fetchNotifications();

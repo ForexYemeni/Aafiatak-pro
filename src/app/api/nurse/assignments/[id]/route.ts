@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { ServiceRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 async function handleAssignmentAction(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -137,6 +138,16 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
         // Non-critical
       }
 
+      // ═══ EMIT REAL-TIME EVENT ═══
+      try {
+        await emitRealtimeEvent.orderStatusChanged(
+          { requestId: id, beneficiaryId: order.beneficiaryId?.toString(), nurseId: user.userId, status: 'accepted' },
+          { changedBy: user.userId, changedByRole: 'nurse' }
+        );
+      } catch {
+        // Non-critical — socket server may be down
+      }
+
       return Response.json({
         success: true,
         data: serializeDoc(order.toObject()),
@@ -202,6 +213,16 @@ async function handleAssignmentAction(request: NextRequest, { params }: { params
         }
       } catch {
         // Non-critical
+      }
+
+      // ═══ EMIT REAL-TIME EVENT ═══
+      try {
+        await emitRealtimeEvent.orderStatusChanged(
+          { requestId: id, beneficiaryId: order.beneficiaryId?.toString(), nurseId: user.userId, status: 'rejected' },
+          { changedBy: user.userId, changedByRole: 'nurse' }
+        );
+      } catch {
+        // Non-critical — socket server may be down
       }
 
       return Response.json({

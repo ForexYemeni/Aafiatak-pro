@@ -12,9 +12,11 @@ import {
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { GlassCard } from '@/components/common/glass-card';
 import { EmptyState } from '@/components/common/empty-state';
+import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { ListSkeleton } from '@/components/common/loading-skeleton';
 import { SearchInput } from '@/components/common/search-input';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
 
 interface ChatConversation {
   id: string;
@@ -48,22 +50,11 @@ export default function ChatPage() {
     }
   }, [authFetch]);
 
+  useRealtimeRefresh({ entities: ['chat'], onRefresh: fetchChats });
+
   useEffect(() => {
     fetchChats();
-    // Auto-refresh every 10 seconds for new messages
-    const interval = setInterval(async () => {
-      try {
-        const res = await authFetch('/api/chat');
-        const data = await res.json();
-        if (data.success && data.data) {
-          setChats(Array.isArray(data.data) ? data.data : []);
-        }
-      } catch {
-        // silently handle
-      }
-    }, 10000);
-    return () => clearInterval(interval);
-  }, [fetchChats, authFetch]);
+  }, [fetchChats]);
 
   const filteredChats = chats.filter((chat) =>
     chat.participantName.includes(searchQuery) || chat.lastMessage.includes(searchQuery)
@@ -107,6 +98,7 @@ export default function ChatPage() {
           description="ستظهر هنا محادثاتك مع الممرضين/ـات والدعم الفني بعد تعيين ممرض لطلبك"
         />
       ) : (
+      <PullToRefresh onRefresh={async () => { setIsLoading(true); await fetchChats(); }}>
         <div className="space-y-2 max-h-[calc(100vh-260px)] overflow-y-auto custom-scrollbar">
           {filteredChats.map((chat, index) => (
             <motion.div
@@ -150,6 +142,7 @@ export default function ChatPage() {
             </motion.div>
           ))}
         </div>
+      </PullToRefresh>
       )}
     </div>
   );

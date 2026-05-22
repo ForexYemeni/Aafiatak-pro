@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Chat, ChatMessage, Nurse, Beneficiary, User } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { emitToChat, emitToUser, emitToAdmins } from '@/lib/notifications/socket-client';
 
 export async function GET(request: NextRequest) {
   try {
@@ -172,6 +173,29 @@ export async function POST(request: NextRequest) {
         unreadCount: {},
         isActive: true,
       });
+
+      // ═══ EMIT REAL-TIME EVENT ═══
+      try {
+        const chatIdStr = chat._id.toString();
+        // Notify participant about new chat via their personal room
+        emitToUser(participantId, 'chat_created', {
+          chatId: chatIdStr,
+          createdBy: user.userId,
+          createdAt: new Date().toISOString(),
+        }).catch(() => {});
+        // Also emit to admins
+        emitToAdmins('data_change', {
+          entity: 'chat',
+          entityId: chatIdStr,
+          action: 'created',
+          changedBy: user.userId,
+          changedByRole: user.role,
+          timestamp: new Date().toISOString(),
+          data: { chatId: chatIdStr, participantIds: [user.userId, participantId] },
+        }).catch(() => {});
+      } catch {
+        // Non-critical — socket server may be down
+      }
     }
 
     // Get participant info for response

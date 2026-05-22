@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import PaymentMethod from '@/models/PaymentMethod';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 const walletNames: Record<string, { ar: string; en: string }> = {
@@ -111,6 +112,8 @@ export async function POST(request: NextRequest) {
       details: `إنشاء طريقة دفع: ${pm.nameAr}`,
       request,
     });
+
+    emitToAdmins('data_change', { entity: 'payment_method', entityId: pm._id.toString(), action: 'created', timestamp: new Date().toISOString() }).catch(() => {});
 
     return Response.json({
       success: true,

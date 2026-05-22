@@ -21,7 +21,7 @@ import { useAuthStore } from '@/lib/stores/auth-store';
 
 interface UseRealtimeRefreshOptions {
   /** Which entity types to listen for changes */
-  entities: Array<'order' | 'emergency' | 'deployment' | 'application' | 'payment' | 'user' | 'notification' | 'withdrawal' | 'transaction' | 'complaint'>;
+  entities: Array<'order' | 'emergency' | 'deployment' | 'application' | 'payment' | 'user' | 'notification' | 'withdrawal' | 'transaction' | 'complaint' | 'chat' | 'location' | 'rating'>;
   /** Callback function to refresh data */
   onRefresh: () => void | Promise<void>;
   /** Fallback polling interval in ms when socket is disconnected (default: 30000) */
@@ -58,7 +58,7 @@ export function useRealtimeRefresh(options: UseRealtimeRefreshOptions): UseRealt
   onRefreshRef.current = onRefresh;
 
   const lastRefreshRef = useRef(0);
-  const debounceMs = 500; // Minimum time between refresh calls
+  const debounceMs = 50; // Near-instant: 50ms debounce (was 500ms — too slow for real-time UX)
   const isConnectedRef = useRef(false);
   const fallbackTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
@@ -187,14 +187,10 @@ export function useRealtimeRefresh(options: UseRealtimeRefreshOptions): UseRealt
     // Also listen for connection state to adjust polling
     const unsub = socketServiceV2.onConnectionStateChange((state) => {
       if (state === 'connected') {
-        // Socket connected — no need for frequent fallback polling
-        // But keep a slow fallback just in case (60s)
+        // Socket connected — stop polling entirely, rely on real-time events only
         stopFallbackPolling();
-        fallbackTimerRef.current = setInterval(() => {
-          void onRefreshRef.current();
-        }, 60000);
       } else {
-        // Socket disconnected — use more frequent fallback
+        // Socket disconnected — use fallback polling
         stopFallbackPolling();
         fallbackTimerRef.current = setInterval(() => {
           void onRefreshRef.current();

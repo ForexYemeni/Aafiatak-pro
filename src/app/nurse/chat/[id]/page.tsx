@@ -11,7 +11,9 @@ import { Input } from '@/components/ui/input';
 import { EmptyState } from '@/components/common/empty-state';
 import { useAuthFetch, invalidateAuthFetchCache } from '@/hooks/use-auth';
 import { useAuthStore } from '@/lib/stores/auth-store';
+import { useSocket } from '@/hooks/use-socket';
 import { formatTimeOnly } from '@/components/common/date-formatter';
+import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { setActiveChatId } from '@/components/providers/socket-provider';
 import Link from 'next/link';
 
@@ -53,8 +55,12 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
   const [sendError, setSendError] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const authFetch = useAuthFetch();
   const user = useAuthStore((s) => s.user);
+  const { isConnected, service } = useSocket();
+
+  const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
     params.then((p) => setChatId(p.id));
@@ -117,31 +123,38 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
     }).catch(() => {});
   }, [chatId, authFetch]);
 
-  // Polling — smart merge preserving optimistic + recently confirmed messages
+  // Socket listeners for real-time messages
   useEffect(() => {
-    if (!chatId) return;
-    const interval = setInterval(async () => {
-      try {
-        const res = await authFetch(`/api/chat/${chatId}/messages?limit=100`);
-        const data = await res.json();
-        if (data.success && data.data) {
-          const msgs: ChatMessage[] = data.data.messages || data.data;
-          if (Array.isArray(msgs)) {
-            setMessages((prev) => {
-              const serverIds = new Set(msgs.map((m) => m.id));
-              const stillPending = prev.filter((m) => (m.isPending || m.isFailed) && !serverIds.has(m.id));
-              // Also keep confirmed messages not yet in server response (cache timing)
-              const confirmedNotInServer = prev.filter((m) => !m.isPending && !m.isFailed && !serverIds.has(m.id));
-              return [...msgs, ...confirmedNotInServer, ...stillPending];
-            });
-          }
-        }
-      } catch {
-        // silently handle
+    if (!service || !chatId) return;
+    service.joinChat(chatId);
+
+    const unsubMessage = service.onMessage((event: any) => {
+      if (event.chatId === chatId) {
+        setMessages((prev) => {
+          const exists = prev.some((m) => m.id === event.message?.id);
+          if (exists) return prev;
+          return [...prev, event.message];
+        });
       }
-    }, 3000);
-    return () => clearInterval(interval);
-  }, [chatId, authFetch]);
+    });
+
+    const unsubTyping = service.onTyping((event: any) => {
+      if (event.chatId === chatId && event.userId !== user?.id) {
+        setIsTyping(event.isTyping);
+        if (event.isTyping) {
+          if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+          typingTimeoutRef.current = setTimeout(() => setIsTyping(false), 3000);
+        }
+      }
+    });
+
+    return () => {
+      service.leaveChat(chatId);
+      unsubMessage();
+      unsubTyping();
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+    };
+  }, [service, chatId, user?.id]);
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -216,6 +229,13 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
     setIsSending(false);
   };
 
+  const handleTyping = () => {
+    if (service && chatId) {
+      service.startTyping(chatId);
+      setTimeout(() => service.stopTyping(chatId), 2000);
+    }
+  };
+
   const isMyMessage = (msg: ChatMessage): boolean =>
     msg.senderId === user?.id || msg.senderId === (user as any)?._id;
 
@@ -245,11 +265,16 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
           <div className="flex-1 min-w-0">
             <p className="font-semibold text-sm truncate">{chatInfo?.participantName || 'مستفيد'}</p>
             <p className="text-[10px] text-muted-foreground">
-              {chatInfo?.participantRole === 'nurse' ? 'ممرض/ـة' :
-               chatInfo?.participantRole === 'beneficiary' ? 'مستفيد/ـة' :
-               chatInfo?.participantRole === 'admin' ? 'دعم فني' :
-               chatInfo?.participantRole === 'subadmin' ? 'مدير فرعي' : 'محادثة نشطة'}
+              {isTyping ? 'يكتب...' : isConnected ? 'متصل' : 'غير متصل'}
             </p>
+            {!isTyping && (
+              <p className="text-[10px] text-muted-foreground/60">
+                {chatInfo?.participantRole === 'nurse' ? 'ممرض/ـة' :
+                 chatInfo?.participantRole === 'beneficiary' ? 'مستفيد/ـة' :
+                 chatInfo?.participantRole === 'admin' ? 'دعم فني' :
+                 chatInfo?.participantRole === 'subadmin' ? 'مدير فرعي' : ''}
+              </p>
+            )}
           </div>
           {chatInfo?.participantPhone && (
             <Button variant="ghost" size="icon" className="shrink-0" onClick={() => window.open(`tel:${chatInfo.participantPhone}`)}>
@@ -260,7 +285,7 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-3">
+      <PullToRefresh onRefresh={fetchMessages} className="flex-1 p-4 space-y-3">
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <Loader2 className="w-8 h-8 text-nurse animate-spin" />
@@ -326,7 +351,19 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
             <div ref={messagesEndRef} />
           </>
         )}
-      </div>
+
+        {isTyping && (
+          <motion.div initial={{ opacity: 0, y: 5 }} animate={{ opacity: 1, y: 0 }} className="flex justify-end">
+            <div className="glass rounded-2xl rounded-bl-md px-4 py-3">
+              <div className="flex gap-1">
+                {[0, 150, 300].map((delay) => (
+                  <div key={delay} className="w-2 h-2 rounded-full bg-muted-foreground animate-bounce" style={{ animationDelay: `${delay}ms` }} />
+                ))}
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </PullToRefresh>
 
       {/* Send Error Banner */}
       <AnimatePresence>
@@ -370,7 +407,7 @@ export default function NurseChatDetailPage({ params }: { params: Promise<{ id: 
             <Input
               placeholder="اكتب رسالة..."
               value={newMessage}
-              onChange={(e) => { setNewMessage(e.target.value); setSendError(null); }}
+              onChange={(e) => { setNewMessage(e.target.value); handleTyping(); setSendError(null); }}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSendMessage(); }
               }}

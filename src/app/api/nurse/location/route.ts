@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Nurse } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 export async function POST(request: NextRequest) {
   try {
@@ -33,6 +34,22 @@ export async function POST(request: NextRequest) {
     ).select('lat lng locationUpdatedAt').lean();
 
     if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    // Use emitToAdmins directly for performance (location updates are frequent)
+    try {
+      emitToAdmins('data_change', {
+        entity: 'location',
+        entityId: user.userId,
+        action: 'updated',
+        changedBy: user.userId,
+        changedByRole: 'nurse',
+        timestamp: new Date().toISOString(),
+        data: { nurseId: user.userId, lat, lng, updatedAt: nurse.locationUpdatedAt?.toISOString() },
+      }).catch(() => {});
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({
       success: true,

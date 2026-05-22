@@ -15,6 +15,7 @@ import { FirebaseConfig } from '@/models/mongoose';
 import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { reinitializeFirebaseAdmin } from '@/lib/notifications/firebase-admin-sdk';
 import { logActivity } from '@/lib/api/helpers';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 // ── GET: Retrieve current Firebase config (private key masked) ──────
 
@@ -176,6 +177,8 @@ export async function POST(request: NextRequest) {
       ? '••••••••' + configObj.privateKey.slice(-10)
       : '••••••••';
 
+    emitToAdmins('data_change', { entity: 'firebase_config', entityId: 'config', action: 'updated', timestamp: new Date().toISOString() }).catch(() => {});
+
     return Response.json({
       success: true,
       data: {
@@ -226,6 +229,8 @@ export async function DELETE(request: NextRequest) {
       details: 'تعطيل إعدادات Firebase Admin SDK',
       request,
     });
+
+    emitToAdmins('data_change', { entity: 'firebase_config', entityId: 'config', action: 'deleted', timestamp: new Date().toISOString() }).catch(() => {});
 
     return Response.json({
       success: true,

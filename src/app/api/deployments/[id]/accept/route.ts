@@ -11,6 +11,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Deployment, Notification, User } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 
 export async function PATCH(
   request: NextRequest,
@@ -215,6 +216,21 @@ export async function PATCH(
 
     // Fire ALL notifications in parallel
     await Promise.allSettled(notificationPromises);
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      const role = user.role || 'admin';
+      await emitRealtimeEvent.applicationChanged(
+        { deploymentId: id, applicationId, applicantId: application.applicantId.toString(), status: 'accepted' },
+        { changedBy: user.userId, changedByRole: role }
+      );
+      await emitRealtimeEvent.deploymentChanged(
+        { deploymentId: id, status: 'assigned', creatorId: deployment.createdBy?.toString() },
+        { changedBy: user.userId, changedByRole: role }
+      );
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({
       success: true,

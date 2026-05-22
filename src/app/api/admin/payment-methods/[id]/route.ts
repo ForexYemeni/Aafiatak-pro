@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import PaymentMethod from '@/models/PaymentMethod';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -58,6 +59,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     });
 
+    emitToAdmins('data_change', { entity: 'payment_method', entityId: id, action: 'updated', timestamp: new Date().toISOString() }).catch(() => {});
+
     return Response.json({ success: true, data: serializeDoc(pm), message: 'تم تحديث طريقة الدفع بنجاح' });
   } catch (error) {
     console.error('[ADMIN PAYMENT METHOD UPDATE ERROR]', error);
@@ -84,6 +87,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       details: `حذف طريقة دفع: ${pm.nameAr}`,
       request,
     });
+
+    emitToAdmins('data_change', { entity: 'payment_method', entityId: id, action: 'deleted', timestamp: new Date().toISOString() }).catch(() => {});
 
     return Response.json({ success: true, message: 'تم حذف طريقة الدفع بنجاح' });
   } catch (error) {

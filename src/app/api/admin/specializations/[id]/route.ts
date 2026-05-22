@@ -4,6 +4,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Specialization } from '@/models/mongoose/Specialization';
 import { requireRole, createErrorResponse } from '@/lib/auth/middleware';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 export async function PATCH(
   request: NextRequest,
@@ -31,6 +32,8 @@ export async function PATCH(
 
     if (!spec) return createErrorResponse('التخصص غير موجود', 404, 'NOT_FOUND');
 
+    emitToAdmins('data_change', { entity: 'specialization', entityId: id, action: 'updated', timestamp: new Date().toISOString() }).catch(() => {});
+
     return Response.json({ success: true, data: spec });
   } catch (error) {
     console.error('[ADMIN SPEC PATCH ERROR]', error);
@@ -57,6 +60,8 @@ export async function DELETE(
     }
 
     await Specialization.deleteOne({ id });
+
+    emitToAdmins('data_change', { entity: 'specialization', entityId: id, action: 'deleted', timestamp: new Date().toISOString() }).catch(() => {});
 
     return Response.json({ success: true, message: 'تم حذف التخصص' });
   } catch (error) {

@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Nurse } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 import { serializeDoc } from '@/lib/mongoose/serialize';
 import bcrypt from 'bcryptjs';
 
@@ -81,6 +82,16 @@ export async function PATCH(request: NextRequest) {
       .lean();
 
     if (!nurse) return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+
+    // ═══ EMIT REAL-TIME EVENT (profile update path) ═══
+    try {
+      await emitRealtimeEvent.userChanged(
+        { userId: user.userId, role: 'nurse', action: 'updated' },
+        { changedBy: user.userId, changedByRole: 'nurse' }
+      );
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({
       success: true,

@@ -3,6 +3,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Nurse } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function PATCH(request: NextRequest) {
@@ -53,6 +54,16 @@ export async function PATCH(request: NextRequest) {
 
     if (!nurse) {
       return createErrorResponse('الممرض غير موجود', 404, 'NOT_FOUND');
+    }
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      await emitRealtimeEvent.userChanged(
+        { userId: user.userId, role: 'nurse', action: 'updated' },
+        { changedBy: user.userId, changedByRole: 'nurse' }
+      );
+    } catch {
+      // Non-critical — socket server may be down
     }
 
     return Response.json({

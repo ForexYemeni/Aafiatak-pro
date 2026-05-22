@@ -13,6 +13,8 @@ import { PullToRefresh } from '@/components/common/pull-to-refresh';
 import { ListSkeleton } from '@/components/common/loading-skeleton';
 import { PageHeader } from '@/components/layout/page-header';
 import { useAuthFetch } from '@/hooks/use-auth';
+import { useRealtimeRefresh } from '@/hooks/use-realtime-refresh';
+import { socketService } from '@/lib/socket-v2';
 import { getRelativeTime, toArabicNum } from '@/components/common/date-formatter';
 import { Button } from '@/components/ui/button';
 import Link from 'next/link';
@@ -70,10 +72,18 @@ export default function AdminChatPage() {
     }
   }, [authFetch]);
 
+  useRealtimeRefresh({ entities: ['chat'], onRefresh: fetchChats });
+
+  // Listen for instant new message notifications via socket
+  useEffect(() => {
+    const unsub = socketService.onMessage(() => {
+      fetchChats();
+    });
+    return unsub;
+  }, [fetchChats]);
+
   useEffect(() => {
     fetchChats();
-    const interval = setInterval(fetchChats, 10000);
-    return () => clearInterval(interval);
   }, [fetchChats]);
 
   // Search users when query changes

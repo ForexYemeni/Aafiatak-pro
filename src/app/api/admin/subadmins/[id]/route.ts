@@ -7,6 +7,7 @@ import { User } from '@/models/mongoose';
 import { hashPassword, verifyPassword, createErrorResponse } from '@/lib/auth';
 import { requireRole } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -58,6 +59,8 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       request,
     });
 
+    emitToAdmins('data_change', { entity: 'user', entityId: id, action: 'updated', timestamp: new Date().toISOString() }).catch(() => {});
+
     return Response.json({ success: true, data: serializeDoc(subadmin), message: 'تم تحديث بيانات المشرف بنجاح' });
   } catch (error) {
     console.error('[ADMIN SUBADMIN UPDATE ERROR]', error);
@@ -101,6 +104,8 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       details: 'حذف المشرف',
       request,
     });
+
+    emitToAdmins('data_change', { entity: 'user', entityId: id, action: 'deleted', timestamp: new Date().toISOString() }).catch(() => {});
 
     return Response.json({ success: true, message: 'تم حذف المشرف بنجاح' });
   } catch (error) {

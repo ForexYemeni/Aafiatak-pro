@@ -7,6 +7,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Rating, ServiceRequest, EmergencyRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
@@ -168,6 +169,16 @@ export async function POST(request: NextRequest) {
       }).catch(() => {});
     } catch {
       // Non-critical
+    }
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      await emitRealtimeEvent.orderStatusChanged(
+        { requestId, beneficiaryId: user.userId, nurseId, status: 'rated' },
+        { changedBy: user.userId, changedByRole: 'beneficiary' }
+      );
+    } catch {
+      // Non-critical — socket server may be down
     }
 
     return Response.json({

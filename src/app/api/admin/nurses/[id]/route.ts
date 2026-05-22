@@ -7,6 +7,7 @@ import { Nurse, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -100,6 +101,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
         request,
       });
 
+      // ═══ EMIT REAL-TIME EVENT ═══
+      try {
+        await emitRealtimeEvent.userChanged(
+          { userId: id, role: 'nurse', action: isBlocked ? 'blocked' : 'unblocked' },
+          { changedBy: user!.userId, changedByRole: user!.role }
+        );
+      } catch {
+        // Non-critical — socket server may be down
+      }
+
       return Response.json({
         success: true,
         data: serializeDoc(nurse),
@@ -121,6 +132,16 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
       details: `تحديث بيانات الممرض: ${nurse.name}`,
       request,
     });
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      await emitRealtimeEvent.userChanged(
+        { userId: id, role: 'nurse', action: 'updated' },
+        { changedBy: user!.userId, changedByRole: user!.role }
+      );
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({ success: true, data: serializeDoc(nurse), message: 'تم تحديث بيانات الممرض بنجاح' });
   } catch (error) {
@@ -156,6 +177,16 @@ export async function DELETE(request: NextRequest, { params }: { params: Promise
       details: `حذف الممرض نهائياً: ${nurse.name}`,
       request,
     });
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      await emitRealtimeEvent.userChanged(
+        { userId: id, role: 'nurse', action: 'deleted' },
+        { changedBy: user!.userId, changedByRole: user!.role }
+      );
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({
       success: true,

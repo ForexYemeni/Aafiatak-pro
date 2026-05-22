@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Coupon } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
@@ -87,6 +88,8 @@ export async function POST(request: NextRequest) {
       details: `إنشاء كوبون: ${coupon.code}`,
       request,
     });
+
+    emitToAdmins('data_change', { entity: 'coupon', entityId: coupon._id.toString(), action: 'created', timestamp: new Date().toISOString() }).catch(() => {});
 
     return Response.json({
       success: true,

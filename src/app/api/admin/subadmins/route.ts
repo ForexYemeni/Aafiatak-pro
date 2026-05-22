@@ -7,6 +7,7 @@ import { User } from '@/models/mongoose';
 import { hashPassword, createErrorResponse } from '@/lib/auth';
 import { requireRole } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
@@ -93,6 +94,8 @@ export async function POST(request: NextRequest) {
       details: `إنشاء مشرف جديد: ${name}`,
       request,
     });
+
+    emitToAdmins('data_change', { entity: 'user', entityId: subadmin._id.toString(), action: 'created', timestamp: new Date().toISOString() }).catch(() => {});
 
     return Response.json({
       success: true,

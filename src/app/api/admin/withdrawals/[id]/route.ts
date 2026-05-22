@@ -7,6 +7,7 @@ import { connectDB } from '@/lib/mongodb';
 import { WithdrawalRequest, Nurse, Notification } from '@/models/mongoose';
 import { requireSubadminPermission, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 
 export async function PATCH(
   request: NextRequest,
@@ -128,6 +129,18 @@ export async function PATCH(
       }
     } catch {
       // Non-critical
+    }
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      await emitRealtimeEvent.withdrawalChanged(
+        id,
+        withdrawal.nurseId.toString(),
+        status,
+        { changedBy: user!.userId, changedByRole: user!.role }
+      );
+    } catch {
+      // Non-critical — socket server may be down
     }
 
     return Response.json({

@@ -6,6 +6,7 @@ import { NextRequest } from 'next/server';
 import { connectDB } from '@/lib/mongodb';
 import { Complaint, Beneficiary, Nurse } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 
 // POST - Create a new complaint
@@ -53,6 +54,18 @@ export async function POST(request: NextRequest) {
       againstUserId: againstUserId || undefined,
       againstUserName: againstUserName || undefined,
     });
+
+    // ═══ EMIT REAL-TIME EVENT ═══
+    try {
+      await emitRealtimeEvent.complaintChanged(
+        complaint._id.toString(),
+        user.userId,
+        'open',
+        { changedBy: user.userId, changedByRole: 'beneficiary' }
+      );
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({
       success: true,

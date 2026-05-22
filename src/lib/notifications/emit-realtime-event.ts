@@ -85,7 +85,7 @@ interface UserEventData {
  * This is the universal mechanism that triggers cache invalidation on all clients.
  */
 async function emitDataChange(
-  entity: 'order' | 'emergency' | 'deployment' | 'application' | 'payment' | 'user' | 'notification' | 'withdrawal' | 'transaction' | 'complaint',
+  entity: 'order' | 'emergency' | 'deployment' | 'application' | 'payment' | 'user' | 'notification' | 'withdrawal' | 'transaction' | 'complaint' | 'chat' | 'location' | 'rating',
   entityId: string,
   action: 'created' | 'updated' | 'deleted' | 'status_changed',
   data: Record<string, unknown>,

@@ -7,6 +7,7 @@ import { EmergencyRequest, Notification, Nurse, AdminSettings } from '@/models/m
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
 import { emitNotificationToUsers, emitToAdmins } from '@/lib/notifications/socket-client';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 import { serializeDoc } from '@/lib/mongoose/serialize';
 
 export async function GET(request: NextRequest) {
@@ -237,6 +238,21 @@ export async function POST(request: NextRequest) {
 
     // Fire ALL notifications in parallel for maximum speed
     await Promise.allSettled(notificationPromises);
+
+    // ═══ EMIT REAL-TIME EVENT (supplement existing raw socket calls) ═══
+    try {
+      await emitRealtimeEvent.emergencyCreated(
+        {
+          emergencyRequestId: emergency._id.toString(),
+          beneficiaryId: user.userId,
+          type: type || 'medical',
+          status: 'pending',
+        },
+        { changedBy: user.userId, changedByRole: 'beneficiary' }
+      );
+    } catch {
+      // Non-critical — socket server may be down
+    }
 
     return Response.json({
       success: true,

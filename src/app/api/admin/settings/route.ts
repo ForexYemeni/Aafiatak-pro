@@ -6,6 +6,7 @@ import { connectDB } from '@/lib/mongodb';
 import { AdminSettings } from '@/models/mongoose';
 import { requireSubadminPermission, requireRole, createErrorResponse } from '@/lib/auth/middleware';
 import { logActivity } from '@/lib/api/helpers';
+import { emitToAdmins } from '@/lib/notifications/socket-client';
 
 import { serializeDoc, serializeDocs } from '@/lib/mongoose/serialize';
 export async function GET(request: NextRequest) {
@@ -56,6 +57,9 @@ export async function PATCH(request: NextRequest) {
     });
 
     const settingsObj = settings.toObject();
+
+    emitToAdmins('data_change', { entity: 'settings', entityId: 'platform', action: 'updated', timestamp: new Date().toISOString() }).catch(() => {});
+
     return Response.json({
       success: true,
       data: serializeDoc(settingsObj),

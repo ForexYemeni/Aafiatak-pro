@@ -7,6 +7,7 @@ import { connectDB } from '@/lib/mongodb';
 import { Nurse, Notification, User } from '@/models/mongoose';
 import { requireAuth, createErrorResponse } from '@/lib/auth/middleware';
 import { sendPushToUser } from '@/lib/notifications/push-service';
+import { emitRealtimeEvent } from '@/lib/notifications/emit-realtime-event';
 
 export async function POST(request: NextRequest) {
   try {
@@ -123,6 +124,16 @@ export async function POST(request: NextRequest) {
         // Non-critical
       }
 
+      // ═══ EMIT REAL-TIME EVENT (multipart path) ═══
+      try {
+        await emitRealtimeEvent.userChanged(
+          { userId: user.userId, role: 'nurse', action: 'updated' },
+          { changedBy: user.userId, changedByRole: 'nurse' }
+        );
+      } catch {
+        // Non-critical — socket server may be down
+      }
+
       return Response.json({
         success: true,
         data: {
@@ -217,6 +228,16 @@ export async function POST(request: NextRequest) {
       await Promise.allSettled(notificationPromises);
     } catch (notifError) {
       console.error('[NURSE DOCUMENTS] Notification error:', notifError);
+    }
+
+    // ═══ EMIT REAL-TIME EVENT (JSON path) ═══
+    try {
+      await emitRealtimeEvent.userChanged(
+        { userId: user.userId, role: 'nurse', action: 'updated' },
+        { changedBy: user.userId, changedByRole: 'nurse' }
+      );
+    } catch {
+      // Non-critical — socket server may be down
     }
 
     return Response.json({
