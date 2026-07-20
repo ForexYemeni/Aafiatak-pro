@@ -85,3 +85,7 @@ export type { IFirebaseConfig } from './FirebaseConfig';
 // Complaint model (الشكاوى والبلاغات)
 export { Complaint } from './Complaint';
 export type { IComplaint, ComplaintStatus, ComplaintPriority } from './Complaint';
+
+// Special Service Request model (طلب الخدمة الخاصة)
+export { SpecialServiceRequest } from './SpecialServiceRequest';
+export type { ISpecialServiceRequest, ISpecialServiceMessage, IOfferRecord, SpecialServiceStatus, SpecialServiceMessageType } from './SpecialServiceRequest';
