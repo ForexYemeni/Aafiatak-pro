@@ -58,8 +58,8 @@ export async function POST(request: NextRequest) {
     }
 
     // ── التحقق من أن الخدمات مفعّلة ──
-    const settings = await AdminSettings.findOne().lean().select('servicesEnabled');
-    if (settings && settings.servicesEnabled === false) {
+    const settings = await AdminSettings.findOne().lean().select('specialServicesEnabled');
+    if (settings && settings.specialServicesEnabled === false) {
       return createErrorResponse('الخدمات غير متاحة حالياً', 403, 'SERVICES_DISABLED');
     }
 

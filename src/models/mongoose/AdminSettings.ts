@@ -38,6 +38,8 @@ export interface IAdminSettings extends Document {
   supportEmail: string;
   withdrawalFee: number;
   enabledWalletTypes: string[];
+  // ── تفعيل/تعطيل خدمة "طلب الخدمة الخاصة" ──
+  specialServicesEnabled: boolean;
 }
 
 const AdminSettingsSchema = new Schema<IAdminSettings>({
@@ -78,6 +80,8 @@ const AdminSettingsSchema = new Schema<IAdminSettings>({
   supportEmail: { type: String, default: '' },
   withdrawalFee: { type: Number, default: 200 },
   enabledWalletTypes: [{ type: String }],
+  // ── تفعيل/تعطيل خدمة "طلب الخدمة الخاصة" (افتراضي: مفعّل) ──
+  specialServicesEnabled: { type: Boolean, default: true },
 }, { timestamps: true });
 
 export const AdminSettings = mongoose.models.AdminSettings || mongoose.model<IAdminSettings>('AdminSettings', AdminSettingsSchema);

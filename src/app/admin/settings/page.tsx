@@ -57,6 +57,8 @@ interface SettingsData {
   privacyPolicyAr: string;
   withdrawalFee: number;
   enabledWalletTypes: string[];
+  // ── خدمة "طلب الخدمة الخاصة" ──
+  specialServicesEnabled: boolean;
 }
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -100,6 +102,7 @@ const defaultSettings: SettingsData = {
   privacyPolicyAr: '',
   withdrawalFee: 200,
   enabledWalletTypes: ['جيب', 'جوالي', 'فلوسك', 'حوالة بنكية'],
+  specialServicesEnabled: true,
 };
 
 export default function AdminSettingsPage() {
@@ -609,6 +612,7 @@ export default function AdminSettingsPage() {
     { id: 'support', label: 'أرقام التواصل', icon: Phone },
     { id: 'legal', label: 'المستندات القانونية', icon: FileText },
     { id: 'maintenance', label: 'وضع الصيانة', icon: Wrench },
+    { id: 'special-services', label: 'الخدمات الخاصة', icon: MessageSquare },
     { id: 'firebase', label: 'Firebase والإشعارات', icon: Flame },
     { id: 'database', label: 'قاعدة البيانات', icon: Database },
     { id: 'backup-admin', label: 'النسخ الاحتياطية', icon: Shield },
@@ -1569,6 +1573,77 @@ export default function AdminSettingsPage() {
                     />
                   </div>
                 )}
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* Special Services Toggle - تفعيل/تعطيل طلب الخدمة الخاصة */}
+      {activeSection === 'special-services' && (
+        <motion.div variants={itemAnim} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <GlassCard variant="admin" className={settings.specialServicesEnabled ? 'border-emerald-200 dark:border-emerald-900/50' : 'border-red-200 dark:border-red-900/50'}>
+            <GlassCardHeader>
+              <GlassCardTitle className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${settings.specialServicesEnabled ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                  <MessageSquare className={`w-4 h-4 ${settings.specialServicesEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} />
+                </div>
+                خدمة طلب الخدمة الخاصة
+              </GlassCardTitle>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="space-y-5">
+                {/* Toggle */}
+                <div className="flex items-center justify-between p-4 glass rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${settings.specialServicesEnabled ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                      <MessageSquare className={`w-5 h-5 ${settings.specialServicesEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">تفعيل خدمة الطلبات الخاصة</p>
+                      <p className="text-xs text-muted-foreground">السماح للمستفيدين بإنشاء طلبات خدمة خاصة مع التفاوض على السعر</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.specialServicesEnabled}
+                    onCheckedChange={(v) => updateField('specialServicesEnabled', v)}
+                  />
+                </div>
+
+                {/* Status Banner */}
+                {settings.specialServicesEnabled ? (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50">
+                    <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">الخدمة مفعّلة</p>
+                      <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70 leading-relaxed">
+                        يستطيع المستفيدون إنشاء طلبات خدمة خاصة، التواصل مع الإدارة عبر المحادثة، واستقبال عروض الأسعار.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
+                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-red-700 dark:text-red-400">الخدمة معطّلة</p>
+                      <p className="text-xs text-red-600/80 dark:text-red-400/70 leading-relaxed">
+                        لا يستطيع المستفيدون إنشاء طلبات خدمة خاصة جديدة. الطلبات الحالية ستظل موجودة وقابلة للمتابعة.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Banner */}
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50">
+                  <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-400">معلومات عن الخدمة</p>
+                    <p className="text-xs text-blue-600/80 dark:text-blue-400/70 leading-relaxed">
+                      عند تفعيل هذه الخدمة، يمكن للمستفيدين إنشاء طلبات خدمة مخصصة لا تجدها في القائمة العادية.
+                      يتم التفاوض على السعر والمدة عبر المحادثة مع الإدارة قبل التنفيذ. التغيير يُحفظ مباشرة ويُطبّق على جميع المستخدمين فوراً.
+                    </p>
+                  </div>
+                </div>
               </div>
             </GlassCardContent>
           </GlassCard>

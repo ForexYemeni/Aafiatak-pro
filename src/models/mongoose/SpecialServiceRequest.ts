@@ -257,17 +257,19 @@ SpecialServiceRequestSchema.index({ nurseId: 1, status: 1, createdAt: -1 });
 SpecialServiceRequestSchema.index({ status: 1, createdAt: -1 });
 SpecialServiceRequestSchema.index({ lastMessageAt: -1 });
 
-// ── Pre-save hook: auto-generate orderNumber ────────────────────────────
-SpecialServiceRequestSchema.pre('validate', async function (this: ISpecialServiceRequest, next) {
+// ── Pre-validate hook: auto-generate orderNumber ────────────────────────
+SpecialServiceRequestSchema.pre('validate', async function (this: ISpecialServiceRequest) {
   if (!this.orderNumber) {
     try {
-      const lastRequest = await (this.constructor as any).findOne({}, { orderNumber: 1 }).sort({ orderNumber: -1 }).lean();
+      const lastRequest = await (this.constructor as any)
+        .findOne({}, { orderNumber: 1 })
+        .sort({ orderNumber: -1 })
+        .lean();
       this.orderNumber = (lastRequest?.orderNumber ?? 1000) + 1;
     } catch {
       this.orderNumber = Math.floor(1000 + Math.random() * 9000);
     }
   }
-  next();
 });
 
 // ── Model ────────────────────────────────────────────────────────────────
