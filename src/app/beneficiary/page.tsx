@@ -864,6 +864,30 @@ export default function BeneficiaryHomePage() {
           </span>
         </motion.button>
       </motion.div>
+
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* SPECIAL SERVICE REQUEST FAB - Custom service requests        */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      <motion.div
+        variants={fabVariants}
+        initial="hidden"
+        animate="visible"
+        className="fixed bottom-24 md:bottom-8 right-6 z-30"
+      >
+        <motion.button
+          whileHover={{ scale: 1.1 }}
+          whileTap={{ scale: 0.9 }}
+          onClick={() => router.push('/beneficiary/special-requests')}
+          className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-beneficiary to-purple-700 text-white shadow-2xl shadow-beneficiary/40 flex items-center justify-center backdrop-blur-sm"
+          title="طلب خدمة خاصة"
+        >
+          <Sparkles className="w-7 h-7" />
+          <div className="absolute inset-0 rounded-2xl ring-2 ring-white/20" />
+          <span className="absolute -bottom-7 text-[10px] font-black text-beneficiary dark:text-purple-400 whitespace-nowrap hidden md:block">
+            خدمة خاصة
+          </span>
+        </motion.button>
+      </motion.div>
     </div>
   );
 }

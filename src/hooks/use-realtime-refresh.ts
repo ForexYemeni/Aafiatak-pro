@@ -21,7 +21,7 @@ import type { DataChangeEvent } from '@/lib/socket-v2';
 
 interface UseRealtimeRefreshOptions {
   /** Which entity types to listen for changes */
-  entities: Array<'order' | 'emergency' | 'deployment' | 'application' | 'payment' | 'user' | 'notification' | 'withdrawal' | 'transaction' | 'complaint' | 'chat' | 'location' | 'rating'>;
+  entities: Array<'order' | 'emergency' | 'deployment' | 'application' | 'payment' | 'user' | 'notification' | 'withdrawal' | 'transaction' | 'complaint' | 'chat' | 'location' | 'rating' | 'special_request' | 'settings'>;
   /** Callback function to refresh data */
   onRefresh: () => void | Promise<void>;
   /** Polling interval in ms - ALWAYS polls at this rate (default: 5000) */
