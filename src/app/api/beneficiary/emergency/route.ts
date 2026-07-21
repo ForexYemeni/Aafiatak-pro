@@ -60,11 +60,10 @@ export async function POST(request: NextRequest) {
     }
 
     // ── التحقق من أن الخدمات العامة مفعّلة ──
-    // ملاحظة: في حالات الطوارئ الحرجة قد نرغب بالسماح حتى لو كانت معطّلة،
-    // لكن للحفاظ على التحكم الكامل، نتحقق منها ونُظهر رسالة واضحة
+    // لا نكشف للمستخدم أن الخدمات معطّلة - نُرجع رسالة عامة
     const generalSettings = await AdminSettings.findOne().lean().select('generalServicesEnabled');
     if (generalSettings && generalSettings.generalServicesEnabled === false) {
-      return createErrorResponse('الخدمات العامة غير متاحة حالياً. في حالة الطوارئ الحقيقية يرجى الاتصال بالأرقام المباشرة', 403, 'SERVICES_DISABLED');
+      return createErrorResponse('تعذر معالجة طلب الطوارئ حالياً، يرجى المحاولة لاحقاً', 503, 'UNAVAILABLE');
     }
 
     const body = await request.json();

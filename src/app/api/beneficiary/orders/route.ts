@@ -144,9 +144,10 @@ export async function POST(request: NextRequest) {
     }
 
     // ── التحقق من أن الخدمات العامة مفعّلة ──
+    // لا نكشف للمستخدم أن الخدمات معطّلة - نُرجع رسالة عامة
     const generalSettings = await AdminSettings.findOne().lean().select('generalServicesEnabled');
     if (generalSettings && generalSettings.generalServicesEnabled === false) {
-      return createErrorResponse('الخدمات العامة غير متاحة حالياً. يرجى المحاولة لاحقاً', 403, 'SERVICES_DISABLED');
+      return createErrorResponse('تعذر إنشاء الطلب حالياً، يرجى المحاولة لاحقاً', 503, 'UNAVAILABLE');
     }
 
     const body = await request.json();

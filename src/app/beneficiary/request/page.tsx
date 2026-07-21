@@ -283,6 +283,20 @@ function MultiServiceRequestPageInner() {
     fetchLoyalty();
   }, [fetchServices, fetchPaymentMethods, fetchSettings, fetchLoyalty]);
 
+  // ── فحص حالة الخدمات العامة - redirect صامت عند التعطيل ──
+  // الخدمات العامة معطّلة = يُخفى هذا المسار تماماً ولا يصل إليه المستفيد
+  useEffect(() => {
+    fetch('/api/settings/services-status')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && json.data && json.data.generalServicesEnabled === false) {
+          // إخفاء صامت - إعادة توجيه للصفحة الرئيسية دون أي إشعار
+          router.replace('/beneficiary');
+        }
+      })
+      .catch(() => {});
+  }, [router]);
+
   const validateCoupon = async () => {
     if (!token || !couponCode || selectedServices.length === 0) return;
     try {

@@ -380,6 +380,23 @@ export default function EmergencyPage() {
     isAnonymous?: boolean;
   } | null>(null);
 
+  // ── فحص حالة الخدمات العامة - redirect صامت عند التعطيل ──
+  // الخدمات العامة معطّلة = يُخفى هذا المسار تماماً ولا يصل إليه المستفيد
+  const [servicesHidden, setServicesHidden] = useState(false);
+  useEffect(() => {
+    fetch('/api/settings/services-status')
+      .then((r) => r.json())
+      .then((json) => {
+        if (json.success && json.data && json.data.generalServicesEnabled === false) {
+          // إخفاء صامت - إعادة توجيه للصفحة الرئيسية للمستفيد دون أي إشعار
+          router.replace('/beneficiary');
+        } else {
+          setServicesHidden(true);
+        }
+      })
+      .catch(() => setServicesHidden(true));
+  }, [router]);
+
   // Derived payment info
   const selectedPaymentMethod = paymentMethods.find((pm) => pm.id === selectedPaymentMethodId);
   const isCashPayment = selectedPaymentMethod?.type === 'cash';
@@ -1214,6 +1231,15 @@ export default function EmergencyPage() {
   // ═══════════════════════════════════════════════════════════════════════
 
   const feeValue = emergencyFee || 5000;
+
+  // ── أثناء فحص حالة الخدمات أو عند التعطيل: لا شيء يُعرض ──
+  if (!servicesHidden) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <Loader2 className="w-8 h-8 text-beneficiary animate-spin" />
+      </div>
+    );
+  }
 
   return (
     <motion.div

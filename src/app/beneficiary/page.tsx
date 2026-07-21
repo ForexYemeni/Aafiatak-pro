@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
-import { toast } from 'sonner';
 import {
   Stethoscope,
   Ambulance,
@@ -26,7 +25,6 @@ import {
   Flame,
   Plus,
   Minus,
-  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -328,31 +326,120 @@ export default function BeneficiaryHomePage() {
   return (
     <div className="space-y-5 pb-28">
       {/* ═══════════════════════════════════════════════════════════════ */}
-      {/* GENERAL SERVICES DISABLED BANNER                              */}
+      {/* GENERAL SERVICES HIDDEN - عند تعطيل الخدمات العامة تُخفى تماماً   */}
+      {/* يُعرض فقط قسم الطلبات النشطة + الخدمات الخاصة (لها تفعيل مستقل)    */}
       {/* ═══════════════════════════════════════════════════════════════ */}
-      {!generalServicesEnabled && (
+      {!generalServicesEnabled ? (
         <motion.div
-          initial={{ opacity: 0, y: -10 }}
+          initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-red-600 to-red-500 p-4 text-white shadow-lg shadow-red-500/30 border border-red-400/50"
+          className="space-y-5"
         >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
-              <AlertCircle className="w-6 h-6" />
+          {/* HERO مبسّط - بدون إشارة لأي تعطيل */}
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="relative overflow-hidden rounded-3xl bg-gradient-to-bl from-beneficiary via-purple-600 to-teal-500 p-6 pb-8 text-white shadow-2xl shadow-beneficiary/30"
+          >
+            <div className="absolute inset-0 overflow-hidden pointer-events-none">
+              <div className="absolute -top-24 -right-24 w-72 h-72 rounded-full bg-white/10 blur-3xl" />
+              <div className="absolute -bottom-20 -left-20 w-56 h-56 rounded-full bg-teal-400/20 blur-2xl" />
+              <div className="aurora-bg opacity-60" />
             </div>
-            <div className="flex-1">
-              <p className="font-bold text-sm">الخدمات العامة معطّلة حالياً</p>
-              <p className="text-xs text-white/90 leading-relaxed mt-0.5">
-                لا يمكن إنشاء طلبات خدمات عادية أو طلبات طوارئ أو تكليفات جديدة حتى يتم تفعيل الخدمات من قبل الإدارة. طلبات الخدمات الخاصة تعمل بشكل مستقل.
-              </p>
+            <div className="relative z-10">
+              <div className="flex items-start justify-between mb-5">
+                <div>
+                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/15 border border-white/20 backdrop-blur-sm text-[11px] font-bold mb-3">
+                    <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
+                    منصة عافيتك
+                  </div>
+                  <h1 className="text-2xl sm:text-3xl font-black leading-tight">
+                    مرحباً {user?.name?.split(' ')[0] || ''}
+                  </h1>
+                  <p className="text-sm opacity-85 mt-1.5 font-medium">
+                    خدمات الرعاية الصحية المنزلية
+                  </p>
+                </div>
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  transition={{ type: 'spring', stiffness: 200 }}
+                >
+                  {activeOrdersCount > 0 ? (
+                    <Button
+                      size="sm"
+                      className="bg-white/20 hover:bg-white/30 text-white border border-white/30 backdrop-blur-sm shrink-0 gap-2 font-bold shadow-lg shadow-black/10"
+                      onClick={() => router.push('/beneficiary/orders')}
+                    >
+                      <Clock className="w-3.5 h-3.5" />
+                      طلبات نشطة
+                      <span className="bg-red-500 text-white text-[10px] font-black w-5 h-5 rounded-full flex items-center justify-center shadow-sm">
+                        {toArabicNum(activeOrdersCount)}
+                      </span>
+                    </Button>
+                  ) : (
+                    <div className="w-14 h-14 rounded-2xl bg-white/15 border border-white/25 flex items-center justify-center backdrop-blur-sm">
+                      <Heart className="w-7 h-7 text-white" />
+                    </div>
+                  )}
+                </motion.div>
+              </div>
             </div>
-          </div>
+          </motion.div>
+
+          {/* بطاقة طلب خدمة خاصة - المتاح الوحيد حالياً */}
+          <GlassCard
+            variant="beneficiary"
+            className="p-6 cursor-pointer hover:shadow-lg transition-all"
+            onClick={() => router.push('/beneficiary/special-requests')}
+          >
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-beneficiary to-purple-700 flex items-center justify-center shadow-lg shadow-beneficiary/30 shrink-0">
+                <Sparkles className="w-7 h-7 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-black text-base mb-1">طلب خدمة خاصة</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">
+                  تواصل مباشرة مع فريق الإدارة لطلب خدمة مخصصة تناسب احتياجاتك عبر المحادثة
+                </p>
+                <div className="flex items-center gap-1.5 mt-3 text-beneficiary">
+                  <span className="text-sm font-bold">إنشاء طلب</span>
+                  <ArrowLeft className="w-4 h-4" />
+                </div>
+              </div>
+            </div>
+          </GlassCard>
+
+          {/* بطاقة الطلبات السابقة */}
+          <GlassCard variant="beneficiary" className="p-6">
+            <div className="flex items-start gap-4">
+              <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-teal-500/30 shrink-0">
+                <Clock className="w-7 h-7 text-white" />
+              </div>
+              <div className="flex-1">
+                <h3 className="font-black text-base mb-1">طلباتي السابقة</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed mb-3">
+                  تابع حالة طلباتك السابقة والمحادثات مع الممرضين
+                </p>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="gap-2"
+                  onClick={() => router.push('/beneficiary/orders')}
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  عرض الطلبات
+                </Button>
+              </div>
+            </div>
+          </GlassCard>
         </motion.div>
-      )}
+      ) : null}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* HERO SECTION - Gradient mesh with aurora effect              */}
       {/* ═══════════════════════════════════════════════════════════════ */}
+      {generalServicesEnabled && (
       <motion.div
         variants={heroVariants}
         initial="hidden"
@@ -450,10 +537,12 @@ export default function BeneficiaryHomePage() {
           </motion.div>
         </div>
       </motion.div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* SEARCH BAR                                                    */}
       {/* ═══════════════════════════════════════════════════════════════ */}
+      {generalServicesEnabled && (
       <motion.div
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
@@ -461,10 +550,12 @@ export default function BeneficiaryHomePage() {
       >
         <SearchInput placeholder="ابحث عن خدمة..." onChange={setSearchQuery} className="w-full" />
       </motion.div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* COUPON BANNER - Shimmer with glass effect                    */}
       {/* ═══════════════════════════════════════════════════════════════ */}
+      {generalServicesEnabled && (
       <AnimatePresence>
         {activeCoupons.length > 0 && (
           <motion.div
@@ -528,10 +619,12 @@ export default function BeneficiaryHomePage() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* SERVICE CATEGORIES - Gradient pill chips                     */}
       {/* ═══════════════════════════════════════════════════════════════ */}
+      {generalServicesEnabled && (
       <motion.div
         variants={categoryStagger}
         initial="hidden"
@@ -570,11 +663,12 @@ export default function BeneficiaryHomePage() {
           })}
         </div>
       </motion.div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* POPULAR SERVICES - Horizontal scroll cards                   */}
       {/* ═══════════════════════════════════════════════════════════════ */}
-      {activeCategory === 'all' && !searchQuery && popularServices.length > 0 && (
+      {generalServicesEnabled && activeCategory === 'all' && !searchQuery && popularServices.length > 0 && (
         <motion.div
           initial={{ opacity: 0, y: 14 }}
           animate={{ opacity: 1, y: 0 }}
@@ -671,6 +765,8 @@ export default function BeneficiaryHomePage() {
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* ALL SERVICES GRID                                             */}
       {/* ═══════════════════════════════════════════════════════════════ */}
+      {generalServicesEnabled && (
+      <>
       {isLoading ? (
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
           {Array.from({ length: 8 }).map((_, i) => (
@@ -784,10 +880,13 @@ export default function BeneficiaryHomePage() {
           </AnimatePresence>
         </motion.div>
       )}
+      </>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* FLOATING BOTTOM BAR - Glassmorphism action bar               */}
       {/* ═══════════════════════════════════════════════════════════════ */}
+      {generalServicesEnabled && (
       <AnimatePresence>
         {selectedServices.size > 0 && (
           <motion.div
@@ -862,13 +961,8 @@ export default function BeneficiaryHomePage() {
                       إلغاء
                     </Button>
                     <Button
-                      className="bg-gradient-to-l from-beneficiary to-purple-600 hover:opacity-90 text-white gap-2 shadow-lg shadow-beneficiary/30 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
-                      disabled={!generalServicesEnabled}
+                      className="bg-gradient-to-l from-beneficiary to-purple-600 hover:opacity-90 text-white gap-2 shadow-lg shadow-beneficiary/30 font-bold"
                       onClick={() => {
-                        if (!generalServicesEnabled) {
-                          toast.error('الخدمات العامة معطّلة حالياً. لا يمكن إنشاء طلبات جديدة');
-                          return;
-                        }
                         if (selectedServices.size === 1) {
                           router.push(
                             `/beneficiary/request/${Array.from(selectedServices)[0]}`
@@ -890,10 +984,12 @@ export default function BeneficiaryHomePage() {
           </motion.div>
         )}
       </AnimatePresence>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* EMERGENCY FAB - Glass effect with pulse glow                 */}
       {/* ═══════════════════════════════════════════════════════════════ */}
+      {generalServicesEnabled && (
       <motion.div
         variants={fabVariants}
         initial="hidden"
@@ -904,13 +1000,9 @@ export default function BeneficiaryHomePage() {
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
           onClick={() => {
-            if (!generalServicesEnabled) {
-              toast.error('الخدمات العامة معطّلة حالياً. في حالة الطوارئ الحقيقية يرجى الاتصال بالأرقام المباشرة');
-              return;
-            }
             router.push('/beneficiary/emergency');
           }}
-          className={`relative w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 text-white shadow-2xl shadow-red-600/40 flex items-center justify-center emergency-float-btn backdrop-blur-sm ${!generalServicesEnabled ? 'opacity-60 grayscale' : ''}`}
+          className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 text-white shadow-2xl shadow-red-600/40 flex items-center justify-center emergency-float-btn backdrop-blur-sm"
         >
           <Ambulance className="w-7 h-7" />
           {/* Inner glow ring */}
@@ -921,6 +1013,7 @@ export default function BeneficiaryHomePage() {
           </span>
         </motion.button>
       </motion.div>
+      )}
 
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* SPECIAL SERVICE REQUEST FAB - Custom service requests        */}
