@@ -92,12 +92,55 @@ interface ChatMessage {
 interface PaymentMethod {
   id: string;
   nameAr: string;
+  nameEn?: string;
   type: string;
   walletType?: string | null;
+  exchangeType?: string | null;
+  customProviderName?: string;
   accountName?: string;
   accountNumber?: string;
   instructions?: string;
 }
+
+// ── خريطة أسماء المحافظ الإلكترونية ──
+const walletTypeLabels: Record<string, string> = {
+  jeep: 'جيب',
+  jawali: 'جوالي',
+  cash_wallet: 'محفظة كاش',
+  one_cash: 'وان كاش',
+  flousk: 'فلوسك',
+  saba_cash: 'سبا كاش',
+  other: 'محفظة أخرى',
+};
+
+// ── خريطة أسماء شركات الصرافة ──
+const exchangeTypeLabels: Record<string, string> = {
+  al_najm: 'النجم للصرافة',
+  yemen_express: 'يمن إكسبرس',
+  al_imtiaz: 'الإمتياز',
+  al_hazmi: 'ال hazmi',
+  other: 'صرافة أخرى',
+};
+
+// ── الحصول على اسم طريقة الدفع المعروض ──
+const getPaymentMethodDisplayName = (method: PaymentMethod): string => {
+  // إذا كان هناك اسم مخصص في nameAr، استخدمه
+  if (method.nameAr && method.nameAr.trim()) return method.nameAr.trim();
+  // حسب النوع
+  if (method.type === 'cash') return 'نقدي عند الوصول';
+  if (method.type === 'wallet_deposit' && method.walletType) {
+    return walletTypeLabels[method.walletType] || 'محفظة إلكترونية';
+  }
+  if (method.type === 'bank_transfer') {
+    if (method.exchangeType && exchangeTypeLabels[method.exchangeType]) {
+      return exchangeTypeLabels[method.exchangeType];
+    }
+    return 'تحويل بنكي / صرافة';
+  }
+  // اسم مخصص إذا موجود
+  if (method.customProviderName) return method.customProviderName;
+  return 'طريقة دفع';
+};
 
 const statusConfig: Record<string, { label: string; color: string; bg: string; border: string }> = {
   new: { label: 'جديد', color: 'text-blue-700', bg: 'bg-blue-50 dark:bg-blue-900/30', border: 'border-blue-200 dark:border-blue-800' },
@@ -131,7 +174,8 @@ export default function BeneficiarySpecialRequestDetailPage() {
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [paymentMethods, setPaymentMethods] = useState<PaymentMethod[]>([]);
   const [selectedPaymentMethodId, setSelectedPaymentMethodId] = useState('');
-  const [paymentProofUrl, setPaymentProofUrl] = useState('');
+  const [paymentProofFile, setPaymentProofFile] = useState<File | null>(null);
+  const [paymentProofPreview, setPaymentProofPreview] = useState<string | null>(null);
   const [isSubmittingPayment, setIsSubmittingPayment] = useState(false);
 
   // Rating dialog
@@ -255,14 +299,43 @@ export default function BeneficiarySpecialRequestDetailPage() {
     }
   };
 
+  // ── معالج اختيار صورة إثبات الدفع ──
+  const handlePaymentProofFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // التحقق من النوع
+    if (!file.type.startsWith('image/')) {
+      toast.error('يرجى اختيار ملف صورة فقط');
+      return;
+    }
+
+    // التحقق من الحجم (max 3MB - للتوافق مع حدود API)
+    if (file.size > 3 * 1024 * 1024) {
+      toast.error('حجم الصورة يجب أن لا يتجاوز 3 ميجابايت');
+      return;
+    }
+
+    setPaymentProofFile(file);
+    const reader = new FileReader();
+    reader.onloadend = () => setPaymentProofPreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  // ── إزالة الصورة المختارة ──
+  const handleClearPaymentProof = () => {
+    setPaymentProofFile(null);
+    setPaymentProofPreview(null);
+  };
+
   // ── رفع إثبات الدفع ──
   const handleSubmitPayment = async () => {
     if (!selectedPaymentMethodId) {
       toast.error('يرجى اختيار طريقة الدفع');
       return;
     }
-    if (!paymentProofUrl.trim()) {
-      toast.error('يرجى إدخال رابط إثبات الدفع (صورة الإيصال)');
+    if (!paymentProofPreview) {
+      toast.error('يرجى رفع صورة إثبات الدفع (إيصال التحويل)');
       return;
     }
 
@@ -272,25 +345,25 @@ export default function BeneficiarySpecialRequestDetailPage() {
       const res = await authFetch(`/api/special-requests/${requestId}/payment`, {
         method: 'POST',
         body: JSON.stringify({
-          paymentMethod: selectedMethod?.nameAr || selectedMethod?.type || 'bank_transfer',
+          paymentMethod: getPaymentMethodDisplayName(selectedMethod!) || selectedMethod?.type || 'bank_transfer',
           paymentMethodId: selectedPaymentMethodId,
           hasPaymentProof: true,
-          paymentProofData: paymentProofUrl.trim(),
+          paymentProofData: paymentProofPreview, // base64 image data
         }),
       });
       const json = await res.json();
       if (json.success) {
-        toast.success(json.message);
+        toast.success(json.message || 'تم رفع إثبات الدفع بنجاح');
         setShowPaymentDialog(false);
         setSelectedPaymentMethodId('');
-        setPaymentProofUrl('');
+        handleClearPaymentProof();
         await fetchMessages();
         await fetchDetail();
       } else {
         toast.error(json.message ?? 'فشل رفع الإثبات');
       }
     } catch {
-      toast.error('حدث خطأ');
+      toast.error('حدث خطأ أثناء رفع الإثبات');
     } finally {
       setIsSubmittingPayment(false);
     }
@@ -860,54 +933,96 @@ export default function BeneficiarySpecialRequestDetailPage() {
           <DialogHeader>
             <DialogTitle>رفع إثبات الدفع</DialogTitle>
             <DialogDescription>
-              اختر طريقة الدفع وأدخل رابط صورة الإيصال
+              اختر طريقة الدفع وارفع صورة إيصال التحويل
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-3">
+          <div className="space-y-4">
             <div>
-              <Label>طريقة الدفع</Label>
+              <Label className="font-semibold">طريقة الدفع *</Label>
               <div className="space-y-2 mt-2">
                 {paymentMethods.length === 0 ? (
                   <p className="text-sm text-muted-foreground text-center py-4">جاري التحميل...</p>
                 ) : (
-                  paymentMethods.map((method) => (
-                    <button
-                      key={method.id}
-                      onClick={() => setSelectedPaymentMethodId(method.id)}
-                      className={`w-full text-right p-3 rounded-xl border-2 transition-all ${
-                        selectedPaymentMethodId === method.id
-                          ? 'border-beneficiary bg-beneficiary/5'
-                          : 'border-border hover:border-beneficiary/30'
-                      }`}
-                    >
-                      <p className="font-bold text-sm">{method.nameAr}</p>
-                      {method.accountNumber && (
-                        <p className="text-xs text-muted-foreground mt-1" dir="ltr">
-                          {method.accountNumber}
-                        </p>
-                      )}
-                      {method.instructions && (
-                        <p className="text-xs text-muted-foreground mt-1">{method.instructions}</p>
-                      )}
-                    </button>
-                  ))
+                  paymentMethods.map((method) => {
+                    const displayName = getPaymentMethodDisplayName(method);
+                    return (
+                      <button
+                        key={method.id}
+                        onClick={() => setSelectedPaymentMethodId(method.id)}
+                        className={`w-full text-right p-3 rounded-xl border-2 transition-all ${
+                          selectedPaymentMethodId === method.id
+                            ? 'border-beneficiary bg-beneficiary/5'
+                            : 'border-border hover:border-beneficiary/30'
+                        }`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="font-bold text-sm">{displayName}</p>
+                          {method.type === 'cash' && (
+                            <Badge variant="outline" className="text-[10px]">نقدي</Badge>
+                          )}
+                          {method.type === 'wallet_deposit' && (
+                            <Badge variant="outline" className="text-[10px]">محفظة</Badge>
+                          )}
+                          {method.type === 'bank_transfer' && (
+                            <Badge variant="outline" className="text-[10px]">تحويل</Badge>
+                          )}
+                        </div>
+                        {method.accountName && (
+                          <p className="text-xs text-muted-foreground mt-1">
+                            الاسم: <span className="font-medium">{method.accountName}</span>
+                          </p>
+                        )}
+                        {method.accountNumber && (
+                          <p className="text-xs text-muted-foreground mt-1" dir="ltr">
+                            الرقم: <span className="font-mono font-medium">{method.accountNumber}</span>
+                          </p>
+                        )}
+                        {method.instructions && (
+                          <p className="text-xs text-muted-foreground mt-1 italic">{method.instructions}</p>
+                        )}
+                      </button>
+                    );
+                  })
                 )}
               </div>
             </div>
+
             <div>
-              <Label htmlFor="paymentProofUrl">رابط صورة الإيصال *</Label>
-              <Input
-                id="paymentProofUrl"
-                value={paymentProofUrl}
-                onChange={(e) => setPaymentProofUrl(e.target.value)}
-                placeholder="https://...jpg"
-                dir="ltr"
-              />
-              <p className="text-xs text-muted-foreground mt-1">
-                ارفع صورة الإيصال على أي خدمة رفع صور ثم الصق الرابط هنا
+              <Label className="font-semibold">صورة إيصال الدفع *</Label>
+              <p className="text-xs text-muted-foreground mb-2">
+                ارفع صورة واضحة لإيصال التحويل أو الإيداع
               </p>
-              {paymentProofUrl && (
-                <img src={paymentProofUrl} alt="preview" className="mt-2 max-h-40 rounded-lg border" />
+              {paymentProofPreview ? (
+                <div className="relative rounded-xl overflow-hidden border-2 border-beneficiary/30">
+                  <img src={paymentProofPreview} alt="إثبات الدفع" className="w-full max-h-64 object-cover" />
+                  <button
+                    onClick={handleClearPaymentProof}
+                    className="absolute top-2 left-2 p-1.5 rounded-full bg-black/60 text-white hover:bg-black/80 transition-colors"
+                    type="button"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                  <div className="absolute bottom-2 right-2 px-2 py-1 rounded-full bg-emerald-500/90 text-white text-[10px] font-bold flex items-center gap-1">
+                    <CheckCircle2 className="w-3 h-3" />
+                    تم التحديد
+                  </div>
+                </div>
+              ) : (
+                <label className="flex flex-col items-center justify-center gap-3 p-8 rounded-xl border-2 border-dashed border-border hover:border-beneficiary/50 cursor-pointer transition-colors bg-muted/30">
+                  <div className="w-12 h-12 rounded-full bg-beneficiary/10 flex items-center justify-center">
+                    <Upload className="w-6 h-6 text-beneficiary" />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-medium">اضغط لرفع صورة الإيصال</p>
+                    <p className="text-xs text-muted-foreground mt-1">PNG, JPG, JPEG - حتى 3 ميجابايت</p>
+                  </div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handlePaymentProofFileChange}
+                  />
+                </label>
               )}
             </div>
           </div>
@@ -915,7 +1030,7 @@ export default function BeneficiarySpecialRequestDetailPage() {
             <Button variant="outline" onClick={() => setShowPaymentDialog(false)}>إلغاء</Button>
             <Button
               onClick={handleSubmitPayment}
-              disabled={isSubmittingPayment}
+              disabled={isSubmittingPayment || !selectedPaymentMethodId || !paymentProofPreview}
               className="gap-2 bg-beneficiary hover:bg-beneficiary/90"
             >
               {isSubmittingPayment ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
