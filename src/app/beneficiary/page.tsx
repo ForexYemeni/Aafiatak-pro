@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'sonner';
 import {
   Stethoscope,
   Ambulance,
@@ -25,6 +26,7 @@ import {
   Flame,
   Plus,
   Minus,
+  AlertCircle,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -195,6 +197,8 @@ export default function BeneficiaryHomePage() {
     Array<{ code: string; discountPercent: number; maxDiscountAmount?: number }>
   >([]);
   const [selectedServices, setSelectedServices] = useState<Set<string>>(new Set());
+  // ── حالة الخدمات العامة (لإظهار banner تنبيهي عند التعطيل) ──
+  const [generalServicesEnabled, setGeneralServicesEnabled] = useState(true);
 
   // ──────────────────────── DATA FETCHING ────────────────────────
 
@@ -242,6 +246,25 @@ export default function BeneficiaryHomePage() {
   useEffect(() => {
     fetchServices();
   }, [fetchServices]);
+
+  // ── فحص حالة الخدمات العامة بشكل دوري ──
+  useEffect(() => {
+    const checkServicesStatus = async () => {
+      try {
+        const res = await fetch('/api/settings/services-status');
+        const json = await res.json();
+        if (json.success && json.data) {
+          setGeneralServicesEnabled(json.data.generalServicesEnabled !== false);
+        }
+      } catch {
+        // silent
+      }
+    };
+    checkServicesStatus();
+    // فحص كل 30 ثانية للتحديث الفوري
+    const interval = setInterval(checkServicesStatus, 30000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     fetchActiveOrdersCount();
@@ -304,6 +327,29 @@ export default function BeneficiaryHomePage() {
 
   return (
     <div className="space-y-5 pb-28">
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {/* GENERAL SERVICES DISABLED BANNER                              */}
+      {/* ═══════════════════════════════════════════════════════════════ */}
+      {!generalServicesEnabled && (
+        <motion.div
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="relative overflow-hidden rounded-2xl bg-gradient-to-l from-red-600 to-red-500 p-4 text-white shadow-lg shadow-red-500/30 border border-red-400/50"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 backdrop-blur-sm flex items-center justify-center shrink-0">
+              <AlertCircle className="w-6 h-6" />
+            </div>
+            <div className="flex-1">
+              <p className="font-bold text-sm">الخدمات العامة معطّلة حالياً</p>
+              <p className="text-xs text-white/90 leading-relaxed mt-0.5">
+                لا يمكن إنشاء طلبات خدمات عادية أو طلبات طوارئ أو تكليفات جديدة حتى يتم تفعيل الخدمات من قبل الإدارة. طلبات الخدمات الخاصة تعمل بشكل مستقل.
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      )}
+
       {/* ═══════════════════════════════════════════════════════════════ */}
       {/* HERO SECTION - Gradient mesh with aurora effect              */}
       {/* ═══════════════════════════════════════════════════════════════ */}
@@ -816,8 +862,13 @@ export default function BeneficiaryHomePage() {
                       إلغاء
                     </Button>
                     <Button
-                      className="bg-gradient-to-l from-beneficiary to-purple-600 hover:opacity-90 text-white gap-2 shadow-lg shadow-beneficiary/30 font-bold"
+                      className="bg-gradient-to-l from-beneficiary to-purple-600 hover:opacity-90 text-white gap-2 shadow-lg shadow-beneficiary/30 font-bold disabled:opacity-50 disabled:cursor-not-allowed"
+                      disabled={!generalServicesEnabled}
                       onClick={() => {
+                        if (!generalServicesEnabled) {
+                          toast.error('الخدمات العامة معطّلة حالياً. لا يمكن إنشاء طلبات جديدة');
+                          return;
+                        }
                         if (selectedServices.size === 1) {
                           router.push(
                             `/beneficiary/request/${Array.from(selectedServices)[0]}`
@@ -852,8 +903,14 @@ export default function BeneficiaryHomePage() {
         <motion.button
           whileHover={{ scale: 1.1 }}
           whileTap={{ scale: 0.9 }}
-          onClick={() => router.push('/beneficiary/emergency')}
-          className="relative w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 text-white shadow-2xl shadow-red-600/40 flex items-center justify-center emergency-float-btn backdrop-blur-sm"
+          onClick={() => {
+            if (!generalServicesEnabled) {
+              toast.error('الخدمات العامة معطّلة حالياً. في حالة الطوارئ الحقيقية يرجى الاتصال بالأرقام المباشرة');
+              return;
+            }
+            router.push('/beneficiary/emergency');
+          }}
+          className={`relative w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500 to-red-700 text-white shadow-2xl shadow-red-600/40 flex items-center justify-center emergency-float-btn backdrop-blur-sm ${!generalServicesEnabled ? 'opacity-60 grayscale' : ''}`}
         >
           <Ambulance className="w-7 h-7" />
           {/* Inner glow ring */}

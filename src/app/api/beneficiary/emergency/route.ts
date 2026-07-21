@@ -59,6 +59,14 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
     }
 
+    // ── التحقق من أن الخدمات العامة مفعّلة ──
+    // ملاحظة: في حالات الطوارئ الحرجة قد نرغب بالسماح حتى لو كانت معطّلة،
+    // لكن للحفاظ على التحكم الكامل، نتحقق منها ونُظهر رسالة واضحة
+    const generalSettings = await AdminSettings.findOne().lean().select('generalServicesEnabled');
+    if (generalSettings && generalSettings.generalServicesEnabled === false) {
+      return createErrorResponse('الخدمات العامة غير متاحة حالياً. في حالة الطوارئ الحقيقية يرجى الاتصال بالأرقام المباشرة', 403, 'SERVICES_DISABLED');
+    }
+
     const body = await request.json();
     const { type, description, lat, lng, address, paymentMethod, paymentMethodId, hasPaymentProof, paymentProofData } = body;
 

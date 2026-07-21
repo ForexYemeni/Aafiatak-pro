@@ -138,6 +138,12 @@ export async function POST(request: NextRequest) {
     const { user, error } = requireRole(request, ['admin', 'subadmin', 'nurse']);
     if (error) return error;
 
+    // ── التحقق من أن الخدمات العامة مفعّلة ──
+    const generalSettings = await AdminSettings.findOne().lean().select('generalServicesEnabled');
+    if (generalSettings && generalSettings.generalServicesEnabled === false) {
+      return createErrorResponse('الخدمات العامة معطّلة حالياً. لا يمكن إنشاء تكليفات جديدة', 403, 'SERVICES_DISABLED');
+    }
+
     const body = await request.json();
     const {
       title,

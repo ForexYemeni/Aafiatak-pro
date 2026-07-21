@@ -7,7 +7,8 @@ import {
   Phone, MessageSquare, FileText, Wrench, MapPin, Users,
   Heart, Gift, Zap, Clock, AlertTriangle, Globe, Briefcase, Building2,
   Database, CheckCircle, Eye, EyeOff, RefreshCw, AlertOctagon, CreditCard,
-  Trash2, TriangleAlert, Upload, Download, Archive, Info, Flame, Mail
+  Trash2, TriangleAlert, Upload, Download, Archive, Info, Flame, Mail,
+  Stethoscope
 } from 'lucide-react';
 import { GlassCard, GlassCardHeader, GlassCardTitle, GlassCardContent } from '@/components/common/glass-card';
 import { useAuthFetch, invalidateAuthFetchCache } from '@/hooks/use-auth';
@@ -59,6 +60,8 @@ interface SettingsData {
   enabledWalletTypes: string[];
   // ── خدمة "طلب الخدمة الخاصة" ──
   specialServicesEnabled: boolean;
+  // ─ـ الخدمات العامة (الطلبات العادية + الطوارئ + التكليفات) ──
+  generalServicesEnabled: boolean;
 }
 
 const container = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
@@ -103,6 +106,7 @@ const defaultSettings: SettingsData = {
   withdrawalFee: 200,
   enabledWalletTypes: ['جيب', 'جوالي', 'فلوسك', 'حوالة بنكية'],
   specialServicesEnabled: true,
+  generalServicesEnabled: true,
 };
 
 export default function AdminSettingsPage() {
@@ -612,6 +616,7 @@ export default function AdminSettingsPage() {
     { id: 'support', label: 'أرقام التواصل', icon: Phone },
     { id: 'legal', label: 'المستندات القانونية', icon: FileText },
     { id: 'maintenance', label: 'وضع الصيانة', icon: Wrench },
+    { id: 'general-services', label: 'الخدمات العامة', icon: Stethoscope },
     { id: 'special-services', label: 'الخدمات الخاصة', icon: MessageSquare },
     { id: 'firebase', label: 'Firebase والإشعارات', icon: Flame },
     { id: 'database', label: 'قاعدة البيانات', icon: Database },
@@ -1573,6 +1578,82 @@ export default function AdminSettingsPage() {
                     />
                   </div>
                 )}
+              </div>
+            </GlassCardContent>
+          </GlassCard>
+        </motion.div>
+      )}
+
+      {/* General Services Toggle - تفعيل/تعطيل جميع الخدمات العامة */}
+      {activeSection === 'general-services' && (
+        <motion.div variants={itemAnim} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
+          <GlassCard variant="admin" className={settings.generalServicesEnabled ? 'border-emerald-200 dark:border-emerald-900/50' : 'border-red-200 dark:border-red-900/50'}>
+            <GlassCardHeader>
+              <GlassCardTitle className="flex items-center gap-2">
+                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${settings.generalServicesEnabled ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                  <Stethoscope className={`w-4 h-4 ${settings.generalServicesEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} />
+                </div>
+                الخدمات العامة
+              </GlassCardTitle>
+            </GlassCardHeader>
+            <GlassCardContent>
+              <div className="space-y-5">
+                {/* Toggle */}
+                <div className="flex items-center justify-between p-4 glass rounded-xl">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${settings.generalServicesEnabled ? 'bg-emerald-100 dark:bg-emerald-900/30' : 'bg-red-100 dark:bg-red-900/30'}`}>
+                      <Stethoscope className={`w-5 h-5 ${settings.generalServicesEnabled ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`} />
+                    </div>
+                    <div>
+                      <p className="font-medium text-sm">تفعيل جميع الخدمات العامة</p>
+                      <p className="text-xs text-muted-foreground">السماح للمستفيدين بإنشاء طلبات الخدمات العادية وطلبات الطوارئ والتكليفات</p>
+                    </div>
+                  </div>
+                  <Switch
+                    checked={settings.generalServicesEnabled}
+                    onCheckedChange={(v) => updateField('generalServicesEnabled', v)}
+                  />
+                </div>
+
+                {/* Status Banner */}
+                {settings.generalServicesEnabled ? (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/50">
+                    <CheckCircle className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-emerald-700 dark:text-emerald-400">الخدمات العامة مفعّلة</p>
+                      <p className="text-xs text-emerald-600/80 dark:text-emerald-400/70 leading-relaxed">
+                        يستطيع المستفيدون إنشاء طلبات الخدمات العادية (تمريض، فحص، علاج طبيعي...)، طلبات الطوارئ، والتكليفات. الطلبات الحالية ستظل تعمل بشكل طبيعي.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800/50">
+                    <AlertTriangle className="w-5 h-5 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
+                    <div>
+                      <p className="text-sm font-medium text-red-700 dark:text-red-400">الخدمات العامة معطّلة</p>
+                      <p className="text-xs text-red-600/80 dark:text-red-400/70 leading-relaxed">
+                        لا يستطيع المستفيدون إنشاء طلبات خدمات عادية أو طلبات طوارئ أو تكليفات جديدة. الطلبات الحالية ستظل موجودة وقابلة للمتابعة من قبل الإدارة والممرضين.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {/* Info Banner */}
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/50">
+                  <Info className="w-5 h-5 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                  <div className="space-y-1">
+                    <p className="text-sm font-medium text-blue-700 dark:text-blue-400">ماذا يشمل هذا الإعداد؟</p>
+                    <ul className="text-xs text-blue-600/80 dark:text-blue-400/70 leading-relaxed space-y-1 list-disc list-inside">
+                      <li><strong>الطلبات العادية:</strong> طلبات الخدمات المدرجة في القائمة (تمريض منزلي، فحص طبي، علاج طبيعي...)</li>
+                      <li><strong>الطوارئ:</strong> طلبات التمريض الإسعافي العاجلة</li>
+                      <li><strong>التكليفات:</strong> تكليف ممرضين بمهام محددة من قبل المستفيدين</li>
+                    </ul>
+                    <p className="text-xs text-blue-600/80 dark:text-blue-400/70 leading-relaxed mt-2">
+                      ملاحظة: خدمة "الطلب الخاص" لها تفعيل/تعطيل مستقل في تبويب "الخدمات الخاصة".
+                      التغيير يُحفظ مباشرة ويُطبّق على جميع المستخدمين فوراً.
+                    </p>
+                  </div>
+                </div>
               </div>
             </GlassCardContent>
           </GlassCard>

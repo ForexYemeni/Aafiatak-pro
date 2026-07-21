@@ -40,6 +40,8 @@ export interface IAdminSettings extends Document {
   enabledWalletTypes: string[];
   // ── تفعيل/تعطيل خدمة "طلب الخدمة الخاصة" ──
   specialServicesEnabled: boolean;
+  // ── تفعيل/تعطيل جميع الخدمات العامة (الطلبات العادية + الطوارئ + التكليفات) ──
+  generalServicesEnabled: boolean;
 }
 
 const AdminSettingsSchema = new Schema<IAdminSettings>({
@@ -82,6 +84,9 @@ const AdminSettingsSchema = new Schema<IAdminSettings>({
   enabledWalletTypes: [{ type: String }],
   // ── تفعيل/تعطيل خدمة "طلب الخدمة الخاصة" (افتراضي: مفعّل) ──
   specialServicesEnabled: { type: Boolean, default: true },
+  // ── تفعيل/تعطيل جميع الخدمات العامة (افتراضي: مفعّل) ──
+  // يشمل: الطلبات العادية، الطوارئ، التكليفات
+  generalServicesEnabled: { type: Boolean, default: true },
 }, { timestamps: true });
 
 export const AdminSettings = mongoose.models.AdminSettings || mongoose.model<IAdminSettings>('AdminSettings', AdminSettingsSchema);

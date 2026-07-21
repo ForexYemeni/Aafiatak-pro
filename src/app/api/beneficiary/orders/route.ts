@@ -143,6 +143,12 @@ export async function POST(request: NextRequest) {
       return createErrorResponse('هذا الإجراء متاح للمستفيدين فقط', 403, 'FORBIDDEN');
     }
 
+    // ── التحقق من أن الخدمات العامة مفعّلة ──
+    const generalSettings = await AdminSettings.findOne().lean().select('generalServicesEnabled');
+    if (generalSettings && generalSettings.generalServicesEnabled === false) {
+      return createErrorResponse('الخدمات العامة غير متاحة حالياً. يرجى المحاولة لاحقاً', 403, 'SERVICES_DISABLED');
+    }
+
     const body = await request.json();
     const { serviceId, serviceIds, scheduledAt, notes, address, lat, lng, isEmergency, paymentMethod, paymentMethodId, couponCode, loyaltyPointsToRedeem, hasPaymentProof, paymentProofData } = body;
 
